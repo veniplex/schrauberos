@@ -1,19 +1,25 @@
 import type { ReactNode } from "react";
 import type { MessageKey } from "@/i18n/translate";
-import type { Permission } from "./permissions";
+import type { Area, Permission } from "./permissions";
 
 export type IconName =
   | "dashboard"
   | "calendar"
   | "tires"
   | "customers"
+  | "vehicles"
   | "users"
   | "roles"
   | "settings"
   | "network"
   | "server"
   | "ip"
-  | "cabling";
+  | "cabling"
+  | "invoices"
+  | "employees"
+  | "absences"
+  | "fleet"
+  | "docs";
 
 export type NavItem = {
   id: string;
@@ -22,7 +28,8 @@ export type NavItem = {
   icon: IconName;
   /** Ohne Angabe: für alle eingeloggten Benutzer sichtbar */
   permission?: Permission;
-  section: "main" | "it" | "admin";
+  /** Bereich der Navigation: Werkstatt, Büro, IT, Verwaltung */
+  section: Area;
   order: number;
 };
 
@@ -30,6 +37,8 @@ export type WidgetDef = {
   id: string;
   /** Widget wird nur Benutzern mit dieser Berechtigung angezeigt */
   permission: Permission;
+  /** Bereich, unter dem das Widget auf der Übersicht erscheint */
+  area: Exclude<Area, "admin">;
   /** Breite im Dashboard-Raster (1 = halb, 2 = voll) */
   span?: 1 | 2;
   order: number;

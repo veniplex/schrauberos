@@ -1,6 +1,14 @@
+import { docsDe } from "./modules/docs.de";
+import { invoicesDe } from "./modules/invoices.de";
+import { fleetDe } from "./modules/fleet.de";
+import { employeesDe } from "./modules/employees.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
+  docs: docsDe,
+  invoices: invoicesDe,
+  fleet: fleetDe,
+  employees: employeesDe,
   common: {
     save: "Speichern",
     saved: "Gespeichert.",
@@ -36,11 +44,25 @@ export const de = {
     roles: "Rollen & Rechte",
     settings: "Einstellungen",
     account: "Mein Konto",
+    workshop: "Werkstatt",
+    office: "Büro",
+    vehicles: "Fahrzeuge",
+    invoices: "Rechnungen",
+    employees: "Mitarbeiter",
+    absences: "Abwesenheiten",
+    fleet: "Fuhrpark",
+    docs: "Dokumentation",
     it: "IT & Netzwerk",
     network: "Netzwerk",
     devices: "Geräte",
     ipam: "IP-Verwaltung",
     cabling: "Verkabelung",
+  },
+  areas: {
+    workshop: "Werkstatt",
+    office: "Büro",
+    it: "IT & Netzwerk",
+    admin: "Verwaltung",
   },
   auth: {
     signIn: "Anmelden",
@@ -71,12 +93,29 @@ export const de = {
     noWidgets: "Für dein Konto sind noch keine Übersichts-Bausteine freigeschaltet.",
   },
   vehicles: {
+    title: "Fahrzeuge",
+    description: "Alle Fahrzeuge – unabhängig vom Kunden. Der Halter kann wechseln, Reifen und Termine bleiben am Fahrzeug.",
     searchPlaceholder: "Kennzeichen, Kunde oder Modell suchen …",
+    searchList: "Kennzeichen, FIN, Modell oder Halter …",
     new: "Fahrzeug anlegen",
     edit: "Fahrzeug bearbeiten",
     delete: "Fahrzeug löschen",
     confirmDelete: "Fahrzeug wirklich löschen? Zugehörige Reifensätze werden ebenfalls gelöscht.",
     empty: "Noch kein Fahrzeug erfasst.",
+    listEmpty: "Keine Fahrzeuge gefunden.",
+    listEmptyHint: "Lege das erste Fahrzeug an. Es braucht keinen Kunden.",
+    count_one: "{count} Fahrzeug",
+    count_other: "{count} Fahrzeuge",
+    noOwner: "ohne Halter",
+    noTireSets: "Keine Reifensätze zu diesem Fahrzeug.",
+    ownerHistory: "Halter-Historie",
+    noHistory: "Noch kein Halter erfasst.",
+    today: "heute",
+    details: "Fahrzeugdaten",
+    transfer: "Halterwechsel",
+    transferHint: "Beendet die Zuordnung zum bisherigen Halter und legt den neuen an. Reifen und Termine bleiben am Fahrzeug.",
+    filters: { anyOwner: "Alle Halter", noOwner: "Nur ohne Halter" },
+    cols: { vehicle: "Fahrzeug" },
     fields: {
       plate: "Kennzeichen",
       year: "Baujahr",
@@ -84,8 +123,17 @@ export const de = {
       model: "Modell",
       vin: "Fahrgestellnummer (FIN)",
       vinHint: "17 Zeichen, optional.",
+      owner: "Halter",
+      ownerHint: "Optional – ein Fahrzeug kann auch ohne Kunde geführt werden.",
+      newOwner: "Neuer Halter",
+      newOwnerHint: "Leer lassen, wenn das Fahrzeug künftig keinen Halter hat.",
+      transferDate: "Wechsel zum",
+      noteHint: "z. B. Verkauf, Kaufvertrag …",
     },
-    errors: { plateExists: "Dieses Kennzeichen existiert bereits (Kunde: {customer})." },
+    errors: {
+      plateExists: "Dieses Kennzeichen existiert bereits (Halter: {customer}).",
+      sameOwner: "Das ist bereits der aktuelle Halter.",
+    },
   },
   appointments: {
     title: "Terminplanung",
@@ -213,7 +261,7 @@ export const de = {
     new: "Kunde anlegen",
     edit: "Kunde bearbeiten",
     delete: "Kunde löschen",
-    confirmDelete: "Kunde samt Fahrzeugen und Reifensätzen wirklich löschen?",
+    confirmDelete: "Kunde wirklich löschen? Seine Fahrzeuge bleiben ohne Halter erhalten.",
     searchPlaceholder: "Name, Kundennummer, Ort, Telefon oder Kennzeichen …",
     empty: "Keine Kunden gefunden.",
     emptyHint: "Lege den ersten Kunden an. Später können die Daten aus Werbas übernommen werden.",
@@ -247,6 +295,7 @@ export const de = {
     delete: "Benutzer löschen",
     confirmDelete: "Benutzer „{name}“ wirklich löschen?",
     cols: { user: "Benutzer", roles: "Rollen", source: "Anmeldung", lastLogin: "Letzte Anmeldung" },
+    linkedEmployee: "Mitarbeiter: {name}",
     sourceLocal: "Lokal",
     active: "Aktiv",
     inactive: "Deaktiviert",
@@ -295,6 +344,12 @@ export const de = {
     roles: "Rollen",
     settings: "Einstellungen",
     network: "IT & Netzwerk",
+    docsWorkshop: "Dokumentation Werkstatt",
+    invoices: "Rechnungsarchiv",
+    employees: "Mitarbeiter",
+    fleet: "Fuhrpark",
+    docsOffice: "Dokumentation Büro",
+    docsIt: "Dokumentation IT",
   },
   permissions: {
     appointments: {
@@ -318,6 +373,34 @@ export const de = {
       view: "Netzwerk-Dokumentation ansehen",
       edit: "Netzwerk-Dokumentation bearbeiten",
       delete: "Netzwerk-Einträge löschen",
+    },
+    docsWorkshop: {
+      view: "Werkstatt-Dokumentation lesen",
+      edit: "Werkstatt-Dokumentation bearbeiten",
+    },
+    invoices: {
+      view: "Rechnungen ansehen",
+      edit: "Rechnungen erfassen und bearbeiten",
+      delete: "Rechnungen löschen",
+    },
+    employees: {
+      view: "Mitarbeiter ansehen",
+      edit: "Mitarbeiter und Abwesenheiten bearbeiten",
+      delete: "Mitarbeiter löschen",
+      sensitive: "Sensible Mitarbeiterdaten (Notfallkontakt, Krankheit)",
+    },
+    fleet: {
+      view: "Fuhrpark ansehen",
+      edit: "Fuhrpark bearbeiten",
+      delete: "Fuhrpark-Einträge löschen",
+    },
+    docsOffice: {
+      view: "Büro-Dokumentation lesen",
+      edit: "Büro-Dokumentation bearbeiten",
+    },
+    docsIt: {
+      view: "IT-Dokumentation lesen",
+      edit: "IT-Dokumentation bearbeiten",
     },
     users: {
       view: "Benutzerliste ansehen",

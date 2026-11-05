@@ -157,16 +157,26 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
 
           <Card title={t("tires.sections.owner")}>
             <p className="font-medium">
-              {session.can("customers.view") ? (
-                <Link href={`/customers/${set.vehicle.customerId}`} className="text-accent-text hover:underline">
+              {!set.vehicle.customer ? (
+                <span className="text-ink-muted">{t("vehicles.noOwner")}</span>
+              ) : session.can("customers.view") ? (
+                <Link href={`/customers/${set.vehicle.customer.id}`} className="text-accent-text hover:underline">
                   {customerDisplayName(set.vehicle.customer)}
                 </Link>
               ) : (
                 customerDisplayName(set.vehicle.customer)
               )}
             </p>
-            <p className="mt-1 text-sm text-ink-muted">{[set.vehicle.make, set.vehicle.model].filter(Boolean).join(" ")}</p>
-            {set.vehicle.customer.phone ? <p className="mt-1 text-sm">{set.vehicle.customer.phone}</p> : null}
+            <p className="mt-1 text-sm">
+              {session.can("customers.view") ? (
+                <Link href={`/vehicles/${set.vehicle.id}`} className="text-accent-text hover:underline">
+                  {[set.vehicle.make, set.vehicle.model].filter(Boolean).join(" ") || set.vehicle.plate}
+                </Link>
+              ) : (
+                <span className="text-ink-muted">{[set.vehicle.make, set.vehicle.model].filter(Boolean).join(" ")}</span>
+              )}
+            </p>
+            {set.vehicle.customer?.phone ? <p className="mt-1 text-sm">{set.vehicle.customer.phone}</p> : null}
           </Card>
 
           {canEdit || session.can("tires.delete") ? (

@@ -19,3 +19,22 @@ export function parseDateParam(value: string | undefined): Date {
   }
   return startOfDay(new Date());
 }
+
+/** Heutiges Datum als yyyy-MM-dd (Hilfsfunktion außerhalb von Komponenten, wegen react-hooks/purity). */
+export const todayInput = () => toDateInput(new Date());
+
+/** Aktuelles Jahr (außerhalb von Komponenten, wegen react-hooks/purity). */
+export const currentYear = () => new Date().getFullYear();
+
+/** URL-Parameter "yyyy-MM" -> Monatsbeginn; fällt bei Fehlern auf den aktuellen Monat zurück. */
+export function parseMonthParam(value: string | undefined): Date {
+  if (value && /^\d{4}-\d{2}$/.test(value)) {
+    const d = parse(`${value}-01`, "yyyy-MM-dd", new Date());
+    if (isValid(d)) return d;
+  }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/** Aktuelle Zeit (außerhalb von Komponenten, wegen react-hooks/purity). */
+export const nowDate = () => new Date();

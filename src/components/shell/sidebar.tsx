@@ -5,15 +5,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  BookOpen,
   Cable,
   CalendarDays,
+  CalendarOff,
+  Car,
+  Contact,
   Disc3,
   Globe,
   LayoutDashboard,
   Menu,
   Network,
+  Receipt,
   Server,
   Settings,
+  Truck,
   ShieldCheck,
   UserCog,
   Users,
@@ -22,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { IconName } from "@/modules/types";
+import type { Area } from "@/modules/permissions";
 import { useI18n } from "@/i18n/client";
 
 const ICONS: Record<IconName, LucideIcon> = {
@@ -36,9 +43,15 @@ const ICONS: Record<IconName, LucideIcon> = {
   server: Server,
   ip: Globe,
   cabling: Cable,
+  vehicles: Car,
+  invoices: Receipt,
+  employees: Contact,
+  absences: CalendarOff,
+  fleet: Truck,
+  docs: BookOpen,
 };
 
-export type SidebarItem = { href: string; label: string; icon: IconName; section: "main" | "it" | "admin" };
+export type SidebarItem = { href: string; label: string; icon: IconName; section: "top" | Area };
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -68,7 +81,9 @@ export function Sidebar({
   }
 
   const groups: Array<{ id: string; label: string | null; items: SidebarItem[] }> = [
-    { id: "main", label: null, items: items.filter((i) => i.section === "main") },
+    { id: "top", label: null, items: items.filter((i) => i.section === "top") },
+    { id: "workshop", label: t("nav.workshop"), items: items.filter((i) => i.section === "workshop") },
+    { id: "office", label: t("nav.office"), items: items.filter((i) => i.section === "office") },
     { id: "it", label: t("nav.it"), items: items.filter((i) => i.section === "it") },
     { id: "admin", label: t("nav.administration"), items: items.filter((i) => i.section === "admin") },
   ].filter((g) => g.items.length > 0);

@@ -220,3 +220,38 @@ dialog.modal::backdrop {
     display: none !important;
   }
 }
+
+/* ───────── Markdown-Inhalte (Dokumentation) ───────── */
+.md {
+  @apply max-w-3xl text-[15px] leading-relaxed text-ink;
+  overflow-wrap: anywhere;
+}
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md h1 { @apply mb-3 mt-8 text-2xl font-semibold; }
+.md h2 { @apply mb-2 mt-8 border-b border-line pb-1 text-xl font-semibold; scroll-margin-top: 5rem; }
+.md h3 { @apply mb-2 mt-6 text-lg font-semibold; scroll-margin-top: 5rem; }
+.md h4 { @apply mb-1 mt-4 font-semibold; }
+.md p { @apply my-3; }
+.md a { @apply text-accent-text underline underline-offset-2; }
+.md a:hover { text-decoration-thickness: 2px; }
+.md ul, .md ol { @apply my-3 pl-6; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md li { @apply my-1; }
+.md li > ul, .md li > ol { @apply my-1; }
+.md ul.contains-task-list { list-style: none; padding-left: 0.25rem; }
+.md .task-list-item input { @apply mr-2 align-middle; accent-color: var(--accent); }
+.md blockquote { @apply my-4 border-l-4 border-line-strong bg-surface-2 px-4 py-2 text-ink-muted; }
+.md blockquote > :first-child { margin-top: 0; }
+.md blockquote > :last-child { margin-bottom: 0; }
+.md code { @apply rounded-sm bg-surface-2 px-1.5 py-0.5 font-mono text-[0.9em]; }
+.md pre { @apply my-4 overflow-x-auto rounded-md border border-line bg-surface-2 p-4; }
+.md pre code { @apply bg-transparent p-0 text-[13px]; }
+.md hr { @apply my-6 border-line; }
+.md img { @apply my-4 h-auto max-w-full rounded-md border border-line; }
+.md .md-table { @apply my-4 overflow-x-auto rounded-md border border-line; }
+.md table { @apply w-full border-collapse text-sm; }
+.md th { @apply border-b border-line bg-surface-2 px-3 py-2 text-left font-medium; }
+.md td { @apply border-b border-line px-3 py-2 align-top; }
+.md tr:last-child td { @apply border-b-0; }

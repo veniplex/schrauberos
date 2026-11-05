@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { Field, FormMessage, Input, Select, type ActionState } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
-import { PERMISSION_GROUPS, type PermissionGroup } from "@/modules/permissions";
+import { PERMISSION_AREAS, PERMISSION_GROUPS, type Area } from "@/modules/permissions";
 import { ACCENT_PRESETS } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/domain/constants";
 import type { OpeningHours } from "@/lib/domain/opening-hours";
@@ -175,40 +175,49 @@ export function RoleForm({
       {initial.isAdmin ? (
         <p className="rounded-md bg-info-bg px-3.5 py-2.5 text-sm text-info-ink">{t("roles.adminNotice")}</p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {(Object.keys(PERMISSION_GROUPS) as PermissionGroup[]).map((group) => {
-            const keys = PERMISSION_GROUPS[group];
-            const allOn = keys.every((k) => selected.has(k));
-            return (
-              <Card
-                key={group}
-                title={t(`permissionGroups.${group}`)}
-                actions={
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleGroup(keys, !allOn)}>
-                    {allOn ? t("roles.selectNone") : t("roles.selectAll")}
-                  </button>
-                }
-              >
-                <ul className="flex flex-col gap-2">
-                  {keys.map((key) => (
-                    <li key={key}>
-                      <label className="flex cursor-pointer items-center gap-3 text-sm">
-                        <input
-                          type="checkbox"
-                          name="permission"
-                          value={key}
-                          checked={selected.has(key)}
-                          onChange={(e) => toggle(key, e.target.checked)}
-                          className="size-4 accent-[var(--accent)]"
-                        />
-                        {t(`permissions.${key}` as never)}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            );
-          })}
+        <div className="flex flex-col gap-6">
+          {(Object.keys(PERMISSION_AREAS) as Area[]).map((area) => (
+            <section key={area} aria-labelledby={`perm-area-${area}`}>
+              <h2 id={`perm-area-${area}`} className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                {t(`areas.${area}`)}
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                {PERMISSION_AREAS[area].map((group) => {
+                  const keys = PERMISSION_GROUPS[group];
+                  const allOn = keys.every((k) => selected.has(k));
+                  return (
+                    <Card
+                      key={group}
+                      title={t(`permissionGroups.${group}`)}
+                      actions={
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleGroup(keys, !allOn)}>
+                          {allOn ? t("roles.selectNone") : t("roles.selectAll")}
+                        </button>
+                      }
+                    >
+                      <ul className="flex flex-col gap-2">
+                        {keys.map((key) => (
+                          <li key={key}>
+                            <label className="flex cursor-pointer items-center gap-3 text-sm">
+                              <input
+                                type="checkbox"
+                                name="permission"
+                                value={key}
+                                checked={selected.has(key)}
+                                onChange={(e) => toggle(key, e.target.checked)}
+                                className="size-4 accent-[var(--accent)]"
+                              />
+                              {t(`permissions.${key}` as never)}
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 

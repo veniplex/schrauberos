@@ -10,11 +10,11 @@ export const appointmentsModule: ModuleManifest = {
       labelKey: "nav.appointments",
       icon: "calendar",
       permission: "appointments.view",
-      section: "main",
+      section: "workshop",
       order: 10,
     },
   ],
   widgets: [
-    { id: "today-appointments", permission: "appointments.view", span: 2, order: 10, Component: TodayAppointmentsWidget },
+    { id: "today-appointments", permission: "appointments.view", area: "workshop", span: 2, order: 10, Component: TodayAppointmentsWidget },
   ],
 };

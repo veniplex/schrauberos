@@ -10,12 +10,12 @@ export const tiresModule: ModuleManifest = {
       labelKey: "nav.tires",
       icon: "tires",
       permission: "tires.view",
-      section: "main",
+      section: "workshop",
       order: 20,
     },
   ],
   widgets: [
-    { id: "tire-attention", permission: "tires.view", span: 1, order: 20, Component: TireAttentionWidget },
-    { id: "tire-swap", permission: "tires.view", span: 1, order: 21, Component: TireSwapWidget },
+    { id: "tire-attention", permission: "tires.view", area: "workshop", span: 1, order: 20, Component: TireAttentionWidget },
+    { id: "tire-swap", permission: "tires.view", area: "workshop", span: 1, order: 21, Component: TireSwapWidget },
   ],
 };

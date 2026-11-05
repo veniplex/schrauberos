@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { Field, FormMessage, Input, Textarea, type ActionState } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { useI18n } from "@/i18n/client";
-import { saveCustomer, saveVehicle } from "./actions";
+import { saveCustomer } from "./actions";
 
 export type CustomerFormValues = {
   id?: string;
@@ -59,56 +59,6 @@ export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormVal
           <Input id="city" name="city" defaultValue={initial.city} autoComplete="off" />
         </Field>
       </div>
-      <Field label={t("common.notes")} htmlFor="notes">
-        <Textarea id="notes" name="notes" defaultValue={initial.notes} maxLength={2000} />
-      </Field>
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
-          {t("common.cancel")}
-        </Link>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
-  );
-}
-
-export type VehicleFormValues = {
-  id?: string;
-  customerId: string;
-  plate: string;
-  make: string;
-  model: string;
-  vin: string;
-  year: string;
-  notes: string;
-};
-
-export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValues; cancelHref: string }) {
-  const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveVehicle, {});
-  const err = state.fieldErrors ?? {};
-  return (
-    <form action={action} className="card card-pad flex flex-col gap-4">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
-      <input type="hidden" name="customerId" value={initial.customerId} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("vehicles.fields.plate")} htmlFor="plate" error={err.plate} required>
-          <Input id="plate" name="plate" defaultValue={initial.plate} invalid={!!err.plate} className="font-mono uppercase" placeholder="B-AB 1234" autoComplete="off" required />
-        </Field>
-        <Field label={t("vehicles.fields.year")} htmlFor="year" error={err.year}>
-          <Input id="year" name="year" type="number" inputMode="numeric" defaultValue={initial.year} invalid={!!err.year} placeholder="2021" />
-        </Field>
-        <Field label={t("vehicles.fields.make")} htmlFor="make">
-          <Input id="make" name="make" defaultValue={initial.make} placeholder="VW" autoComplete="off" />
-        </Field>
-        <Field label={t("vehicles.fields.model")} htmlFor="model">
-          <Input id="model" name="model" defaultValue={initial.model} placeholder="Golf VIII" autoComplete="off" />
-        </Field>
-      </div>
-      <Field label={t("vehicles.fields.vin")} htmlFor="vin" error={err.vin} hint={t("vehicles.fields.vinHint")}>
-        <Input id="vin" name="vin" defaultValue={initial.vin} invalid={!!err.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" />
-      </Field>
       <Field label={t("common.notes")} htmlFor="notes">
         <Textarea id="notes" name="notes" defaultValue={initial.notes} maxLength={2000} />
       </Field>

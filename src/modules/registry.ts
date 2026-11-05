@@ -2,12 +2,16 @@ import type { AppSession } from "@/server/auth/session";
 import { appointmentsModule } from "./appointments/manifest";
 import { coreModule } from "./core/manifest";
 import { customersModule } from "./customers/manifest";
+import { docsModule } from "./docs/manifest";
+import { employeesModule } from "./employees/manifest";
+import { fleetModule } from "./fleet/manifest";
+import { invoicesModule } from "./invoices/manifest";
 import { networkModule } from "./network/manifest";
 import { tiresModule } from "./tires/manifest";
 import type { ModuleManifest, NavItem, WidgetDef } from "./types";
 
 /** Alle aktiven Module. Neues Feature: Manifest anlegen und hier eintragen. */
-export const modules: ModuleManifest[] = [appointmentsModule, tiresModule, customersModule, networkModule, coreModule];
+export const modules: ModuleManifest[] = [appointmentsModule, tiresModule, customersModule, invoicesModule, employeesModule, fleetModule, networkModule, docsModule, coreModule];
 
 export function navFor(session: AppSession): NavItem[] {
   return modules

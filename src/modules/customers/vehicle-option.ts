@@ -6,7 +6,8 @@ type VehicleWithCustomer = {
   plate: string;
   make: string | null;
   model: string | null;
-  customer: { firstName: string | null; lastName: string; company: string | null };
+  /** Fahrzeuge können ohne Halter existieren */
+  customer: { firstName: string | null; lastName: string; company: string | null } | null;
 };
 
 export function toVehicleOption(v: VehicleWithCustomer): VehicleOption {
@@ -14,6 +15,6 @@ export function toVehicleOption(v: VehicleWithCustomer): VehicleOption {
     id: v.id,
     plate: v.plate,
     description: [v.make, v.model].filter(Boolean).join(" "),
-    customer: customerDisplayName(v.customer),
+    customer: v.customer ? customerDisplayName(v.customer) : "",
   };
 }

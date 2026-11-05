@@ -1,0 +1,54 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui/layout";
+import { getI18n } from "@/i18n/server";
+import { toDateInput } from "@/lib/dates";
+import { customerDisplayName } from "@/lib/domain/vehicles";
+import { centsToInput } from "@/lib/money";
+import { requirePermission } from "@/server/auth/session";
+import { db } from "@/server/db";
+import { InvoiceForm } from "@/modules/invoices/invoice-form";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("invoices.edit") };
+}
+
+export default async function EditInvoicePage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission("invoices.edit");
+  const [{ t }, { id }] = await Promise.all([getI18n(), params]);
+  const [inv, cats] = await Promise.all([
+    db.invoice.findUnique({ where: { id }, include: { customer: true, file: { select: { name: true, size: true } } } }),
+    db.invoice.findMany({ where: { category: { not: null } }, select: { category: true }, distinct: ["category"], take: 100 }),
+  ]);
+  if (!inv) notFound();
+  const direction = inv.direction === "outgoing" ? "outgoing" : "incoming";
+
+  return (
+    <>
+      <PageHeader title={t("invoices.edit")} description={<span className="font-mono">{inv.number}</span>} />
+      <InvoiceForm
+        cancelHref={`/invoices/${inv.id}`}
+        categories={cats.map((c) => c.category!).sort()}
+        initial={{
+          id: inv.id,
+          direction,
+          number: inv.number,
+          partyName: inv.partyName,
+          customer: inv.customer ? { id: inv.customer.id, label: customerDisplayName(inv.customer), sublabel: inv.customer.city ?? undefined } : null,
+          issueDate: toDateInput(inv.issueDate),
+          dueDate: inv.dueDate ? toDateInput(inv.dueDate) : "",
+          net: centsToInput(inv.netCents),
+          vat: centsToInput(inv.vatCents),
+          gross: centsToInput(inv.grossCents),
+          status: inv.status,
+          paidAt: inv.paidAt ? toDateInput(inv.paidAt) : "",
+          category: inv.category ?? "",
+          reference: inv.reference ?? "",
+          notes: inv.notes ?? "",
+          file: inv.file,
+        }}
+      />
+    </>
+  );
+}

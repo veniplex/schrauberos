@@ -66,7 +66,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             padded={false}
             actions={
               canEdit ? (
-                <Link href={`/customers/${customer.id}/vehicles/new`} className="btn btn-secondary btn-sm">
+                <Link href={`/vehicles/new?customer=${customer.id}`} className="btn btn-secondary btn-sm">
                   <Plus className="size-3.5" aria-hidden /> {t("vehicles.new")}
                 </Link>
               ) : null
@@ -80,7 +80,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   <li key={v.id} className="px-5 py-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <Plate>{v.plate}</Plate>
+                        <Link href={`/vehicles/${v.id}`}><Plate>{v.plate}</Plate></Link>
                         <p className="mt-1 text-sm">{[v.make, v.model, v.year].filter(Boolean).join(" ") || "–"}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -95,7 +95,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                           </Link>
                         ) : null}
                         {canEdit ? (
-                          <Link href={`/customers/${customer.id}/vehicles/${v.id}`} className="btn btn-ghost btn-sm">
+                          <Link href={`/vehicles/${v.id}/edit`} className="btn btn-ghost btn-sm">
                             {t("common.edit")}
                           </Link>
                         ) : null}

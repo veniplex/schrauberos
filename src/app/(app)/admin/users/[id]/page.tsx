@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/layout";
 import { ConfirmSubmitButton } from "@/components/ui/buttons";
@@ -17,7 +18,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
   const session = await requirePermission("users.manage");
   const [{ t }, { id }] = await Promise.all([getI18n(), params]);
   const [user, roles] = await Promise.all([
-    db.user.findUnique({ where: { id }, include: { roles: true } }),
+    db.user.findUnique({ where: { id }, include: { roles: true, employee: true } }),
     db.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }] }),
   ]);
   if (!user) notFound();
@@ -25,7 +26,23 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
 
   return (
     <>
-      <PageHeader title={user.name} description={user.username} />
+      <PageHeader
+        title={user.name}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <span>{user.username}</span>
+            {user.employee ? (
+              session.can("employees.view") ? (
+                <Link href={`/employees/${user.employee.id}`} className="text-accent-text hover:underline">
+                  {t("users.linkedEmployee", { name: `${user.employee.firstName} ${user.employee.lastName}` })}
+                </Link>
+              ) : (
+                <span>{t("users.linkedEmployee", { name: `${user.employee.firstName} ${user.employee.lastName}` })}</span>
+              )
+            ) : null}
+          </span>
+        }
+      />
       <div className="flex flex-col gap-4">
         <UserForm
           initial={{

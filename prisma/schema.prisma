@@ -38,6 +38,8 @@ model User {
   sessions     Session[]
   assigned     Appointment[] @relation("AppointmentAssignee")
   createdAppts Appointment[] @relation("AppointmentCreator")
+  // verknüpfter Mitarbeiter (optional, 1:1)
+  employee     Employee?
 
   @@unique([authSource, externalId])
 }
@@ -138,7 +140,9 @@ model Customer {
   updatedAt      DateTime  @updatedAt
 
   vehicles     Vehicle[]
+  ownerships   VehicleOwnership[]
   appointments Appointment[]
+  invoices     Invoice[]
 
   @@unique([externalSource, externalId])
   @@index([lastName])
@@ -146,7 +150,8 @@ model Customer {
 
 model Vehicle {
   id             String    @id @default(cuid())
-  customerId     String
+  // aktueller Halter; null = ohne Kunde (Bestand, Gebrauchtwagen, ehemaliger Kunde gelöscht)
+  customerId     String?
   // normalisiert: Großbuchstaben, ohne Leerzeichen/Bindestriche (z. B. "BAB1234")
   plateNorm      String
   // wie eingegeben: "B-AB 1234"
@@ -162,12 +167,30 @@ model Vehicle {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  customer     Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer     Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  ownerships   VehicleOwnership[]
   tireSets     TireSet[]
   appointments Appointment[]
 
   @@unique([externalSource, externalId])
   @@index([plateNorm])
+  @@index([customerId])
+}
+
+// Halter-Historie eines Fahrzeugs (Halterwechsel). Der aktuelle Halter steht zusätzlich in Vehicle.customerId.
+model VehicleOwnership {
+  id         String    @id @default(cuid())
+  vehicleId  String
+  customerId String
+  fromDate   DateTime  @default(now())
+  // null = aktueller Halter
+  toDate     DateTime?
+  note       String?
+
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
   @@index([customerId])
 }
 
@@ -388,4 +411,263 @@ model NetConnection {
 
   @@index([fromDeviceId])
   @@index([toDeviceId])
+}
+
+// ───────────── Mitarbeiter ─────────────
+
+model Employee {
+  id                  String    @id @default(cuid())
+  personnelNumber     String?   @unique
+  firstName           String
+  lastName            String
+  jobTitle            String?
+  // workshop | office | it | management | other
+  department          String    @default("other")
+  email               String?
+  phone               String?
+  mobile              String?
+  hireDate            DateTime?
+  leaveDate           DateTime?
+  active              Boolean   @default(true)
+  vacationDaysPerYear Int?
+  notes               String?
+  // besonders schützenswerte Daten (Recht employees.sensitive)
+  emergencyName       String?
+  emergencyPhone      String?
+  emergencyRelation   String?
+  // Zuordnung zu einem Benutzerkonto (optional, 1:1)
+  userId              String?   @unique
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  absences       Absence[]
+  qualifications Qualification[]
+  fleetVehicles  FleetVehicle[]
+  licenseChecks  FleetLicenseCheck[]
+
+  @@index([lastName])
+}
+
+model Absence {
+  id         String   @id @default(cuid())
+  employeeId String
+  // vacation | sick | training | other
+  type       String
+  // ganze Tage, Enddatum inklusive
+  startDate  DateTime
+  endDate    DateTime
+  note       String?
+  createdAt  DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, startDate])
+  @@index([startDate])
+}
+
+model Qualification {
+  id         String    @id @default(cuid())
+  employeeId String
+  name       String
+  issuedAt   DateTime?
+  expiresAt  DateTime?
+  note       String?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([expiresAt])
+}
+
+// ───────────── Fuhrpark (Firmenfahrzeuge) ─────────────
+
+model FleetVehicle {
+  id               String    @id @default(cuid())
+  plate            String
+  make             String?
+  model            String?
+  vin              String?
+  year             Int?
+  // petrol | diesel | electric | hybrid | other
+  fuelType         String?
+  color            String?
+  // active | in_service | reserve | sold
+  status           String    @default("active")
+  driverId         String?
+  location         String?
+  huDue            DateTime?
+  serviceDue       DateTime?
+  serviceDueKm     Int?
+  insuranceCompany String?
+  insurancePolicy  String?
+  insuranceUntil   DateTime?
+  leasingProvider  String?
+  leasingUntil     DateTime?
+  leasingRateCents Int?
+  fuelCardNo       String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  driver  Employee?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  mileage FleetMileage[]
+  costs   FleetCost[]
+
+  @@index([driverId])
+}
+
+model FleetMileage {
+  id             String   @id @default(cuid())
+  fleetVehicleId String
+  date           DateTime
+  km             Int
+  note           String?
+
+  fleetVehicle FleetVehicle @relation(fields: [fleetVehicleId], references: [id], onDelete: Cascade)
+
+  @@index([fleetVehicleId, date])
+}
+
+model FleetCost {
+  id             String   @id @default(cuid())
+  fleetVehicleId String
+  date           DateTime
+  // fuel | service | repair | tires | tax | insurance | other
+  category       String
+  amountCents    Int
+  km             Int?
+  note           String?
+
+  fleetVehicle FleetVehicle @relation(fields: [fleetVehicleId], references: [id], onDelete: Cascade)
+
+  @@index([fleetVehicleId, date])
+}
+
+// Führerscheinkontrolle je Fahrer (Halterpflicht)
+model FleetLicenseCheck {
+  id            String   @id @default(cuid())
+  employeeId    String
+  checkedAt     DateTime
+  nextDue       DateTime
+  method        String?
+  note          String?
+  checkedByName String?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, checkedAt])
+}
+
+// ───────────── Rechnungsarchiv ─────────────
+
+model Invoice {
+  id         String    @id @default(cuid())
+  // incoming = Eingangsrechnung, outgoing = Ausgangsrechnung
+  direction  String
+  number     String
+  // Lieferant (incoming) bzw. Rechnungsempfänger (outgoing)
+  partyName  String
+  // optional: Kunde aus der Kundenverwaltung (nur outgoing)
+  customerId String?
+  issueDate  DateTime
+  dueDate    DateTime?
+  netCents   Int?
+  vatCents   Int?
+  grossCents Int
+  // open | paid | cancelled  (überfällig wird aus Fälligkeit berechnet)
+  status     String    @default("open")
+  paidAt     DateTime?
+  category   String?
+  // Ablageort / Auftrags- oder Bestellnummer
+  reference  String?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  file     InvoiceFile?
+
+  @@index([direction, status])
+  @@index([issueDate])
+  @@index([dueDate])
+}
+
+// Datei (PDF/Bild) zur Rechnung – bewusst eigenes Modell, damit Listen die Binärdaten nie mitladen
+model InvoiceFile {
+  id         String   @id @default(cuid())
+  invoiceId  String   @unique
+  name       String
+  mime       String
+  size       Int
+  data       Bytes
+  uploadedAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ───────────── Dokumentation (Markdown) ─────────────
+
+model DocCategory {
+  id        String @id @default(cuid())
+  // workshop | it | office
+  area      String
+  name      String
+  sortOrder Int    @default(0)
+
+  pages DocPage[]
+
+  @@index([area])
+}
+
+model DocPage {
+  id            String   @id @default(cuid())
+  area          String
+  categoryId    String?
+  title         String
+  slug          String
+  content       String
+  pinned        Boolean  @default(false)
+  createdByName String?
+  updatedByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category DocCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  versions DocVersion[]
+
+  @@unique([area, slug])
+  @@index([area])
+}
+
+model DocVersion {
+  id          String   @id @default(cuid())
+  pageId      String
+  title       String
+  content     String
+  savedAt     DateTime @default(now())
+  savedByName String?
+
+  page DocPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, savedAt])
+}
+
+// Bilder in Dokumentationsseiten (in der Datenbank gespeichert)
+model DocImage {
+  id        String   @id @default(cuid())
+  area      String
+  name      String
+  mime      String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([area])
+}
+
+// Merker für einmalige Daten-Migrationen beim Seeden (z. B. neue Standard-Rechte für bestehende Rollen)
+model SeedMarker {
+  key       String   @id
+  appliedAt DateTime @default(now())
 }

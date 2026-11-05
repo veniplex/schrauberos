@@ -1,6 +1,14 @@
 import type { Messages } from "./de";
+import { docsEn } from "./modules/docs.en";
+import { invoicesEn } from "./modules/invoices.en";
+import { fleetEn } from "./modules/fleet.en";
+import { employeesEn } from "./modules/employees.en";
 
 export const en: Messages = {
+  docs: docsEn,
+  invoices: invoicesEn,
+  fleet: fleetEn,
+  employees: employeesEn,
   common: {
     save: "Save",
     saved: "Saved.",
@@ -36,11 +44,25 @@ export const en: Messages = {
     roles: "Roles & permissions",
     settings: "Settings",
     account: "My account",
+    workshop: "Workshop",
+    office: "Office",
+    vehicles: "Vehicles",
+    invoices: "Invoices",
+    employees: "Employees",
+    absences: "Absences",
+    fleet: "Fleet",
+    docs: "Documentation",
     it: "IT & network",
     network: "Network",
     devices: "Devices",
     ipam: "IP management",
     cabling: "Cabling",
+  },
+  areas: {
+    workshop: "Workshop",
+    office: "Office",
+    it: "IT & network",
+    admin: "Administration",
   },
   auth: {
     signIn: "Sign in",
@@ -71,12 +93,29 @@ export const en: Messages = {
     noWidgets: "No overview widgets are enabled for your account yet.",
   },
   vehicles: {
+    title: "Vehicles",
+    description: "All vehicles – independent of the customer. The owner can change; tyres and appointments stay with the vehicle.",
     searchPlaceholder: "Search plate, customer or model …",
+    searchList: "Plate, VIN, model or owner …",
     new: "Add vehicle",
     edit: "Edit vehicle",
     delete: "Delete vehicle",
     confirmDelete: "Really delete this vehicle? Its tyre sets will be deleted as well.",
     empty: "No vehicle recorded yet.",
+    listEmpty: "No vehicles found.",
+    listEmptyHint: "Add the first vehicle. It does not need a customer.",
+    count_one: "{count} vehicle",
+    count_other: "{count} vehicles",
+    noOwner: "no owner",
+    noTireSets: "No tyre sets for this vehicle.",
+    ownerHistory: "Ownership history",
+    noHistory: "No owner recorded yet.",
+    today: "today",
+    details: "Vehicle details",
+    transfer: "Change owner",
+    transferHint: "Ends the assignment to the current owner and creates the new one. Tyres and appointments stay with the vehicle.",
+    filters: { anyOwner: "All owners", noOwner: "Without owner only" },
+    cols: { vehicle: "Vehicle" },
     fields: {
       plate: "Licence plate",
       year: "Year",
@@ -84,8 +123,17 @@ export const en: Messages = {
       model: "Model",
       vin: "VIN",
       vinHint: "17 characters, optional.",
+      owner: "Owner",
+      ownerHint: "Optional – a vehicle can also exist without a customer.",
+      newOwner: "New owner",
+      newOwnerHint: "Leave empty if the vehicle will have no owner.",
+      transferDate: "Change on",
+      noteHint: "e.g. sale, purchase contract …",
     },
-    errors: { plateExists: "This plate already exists (customer: {customer})." },
+    errors: {
+      plateExists: "This plate already exists (owner: {customer}).",
+      sameOwner: "This is already the current owner.",
+    },
   },
   appointments: {
     title: "Scheduling",
@@ -213,7 +261,7 @@ export const en: Messages = {
     new: "Add customer",
     edit: "Edit customer",
     delete: "Delete customer",
-    confirmDelete: "Really delete the customer including vehicles and tyre sets?",
+    confirmDelete: "Really delete the customer? Their vehicles are kept without an owner.",
     searchPlaceholder: "Name, customer no., city, phone or plate …",
     empty: "No customers found.",
     emptyHint: "Add the first customer. Data can later be imported from Werbas.",
@@ -247,6 +295,7 @@ export const en: Messages = {
     delete: "Delete user",
     confirmDelete: "Really delete user “{name}”?",
     cols: { user: "User", roles: "Roles", source: "Sign-in", lastLogin: "Last sign-in" },
+    linkedEmployee: "Employee: {name}",
     sourceLocal: "Local",
     active: "Active",
     inactive: "Disabled",
@@ -295,6 +344,12 @@ export const en: Messages = {
     roles: "Roles",
     settings: "Settings",
     network: "IT & network",
+    docsWorkshop: "Workshop documentation",
+    invoices: "Invoice archive",
+    employees: "Employees",
+    fleet: "Fleet",
+    docsOffice: "Office documentation",
+    docsIt: "IT documentation",
   },
   permissions: {
     appointments: {
@@ -318,6 +373,34 @@ export const en: Messages = {
       view: "View network documentation",
       edit: "Edit network documentation",
       delete: "Delete network entries",
+    },
+    docsWorkshop: {
+      view: "Read workshop documentation",
+      edit: "Edit workshop documentation",
+    },
+    invoices: {
+      view: "View invoices",
+      edit: "Record and edit invoices",
+      delete: "Delete invoices",
+    },
+    employees: {
+      view: "View employees",
+      edit: "Edit employees and absences",
+      delete: "Delete employees",
+      sensitive: "Sensitive employee data (emergency contact, sickness)",
+    },
+    fleet: {
+      view: "View fleet",
+      edit: "Edit fleet",
+      delete: "Delete fleet entries",
+    },
+    docsOffice: {
+      view: "Read office documentation",
+      edit: "Edit office documentation",
+    },
+    docsIt: {
+      view: "Read IT documentation",
+      edit: "Edit IT documentation",
     },
     users: {
       view: "View user list",

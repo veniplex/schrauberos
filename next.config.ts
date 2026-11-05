@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   partialPrefetching: false,
   output: "standalone",
+  experimental: {
+    // Rechnungs-Uploads (bis 10 MB) und Doku-Bilder laufen über Server Actions / Route Handler
+    serverActions: { bodySizeLimit: "12mb" },
+  },
   serverExternalPackages: [
     "@prisma/client",
     "@prisma/adapter-better-sqlite3",

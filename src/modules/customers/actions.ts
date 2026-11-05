@@ -8,7 +8,6 @@ import { requirePermission } from "@/server/auth/session";
 import { getI18n } from "@/i18n/server";
 import type { ActionState } from "@/components/ui/form";
 import { fieldErrors, formObject } from "@/lib/forms";
-import { formatPlate, normalizePlate } from "@/lib/domain/vehicles";
 
 const customerSchema = z.object({
   id: z.string().optional(),
@@ -60,64 +59,6 @@ export async function deleteCustomer(formData: FormData) {
   if (id) await db.customer.deleteMany({ where: { id } });
   revalidatePath("/customers");
   revalidatePath("/tires");
+  revalidatePath("/vehicles");
   redirect("/customers");
-}
-
-const vehicleSchema = z.object({
-  id: z.string().optional(),
-  customerId: z.string(),
-  plate: z.string().min(2).max(14),
-  make: z.string().max(60).optional(),
-  model: z.string().max(60).optional(),
-  vin: z
-    .string()
-    .transform((v) => v.toUpperCase().replace(/\s/g, ""))
-    .pipe(z.string().regex(/^[A-HJ-NPR-Z0-9]{17}$/))
-    .optional(),
-  year: z.coerce.number().int().min(1950).max(2100).optional(),
-  notes: z.string().max(2000).optional(),
-});
-
-export async function saveVehicle(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("customers.edit");
-  const { t } = await getI18n();
-  const parsed = vehicleSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, customerId, plate, ...d } = parsed.data;
-
-  const plateNorm = normalizePlate(plate);
-  if (plateNorm.length < 2) return { fieldErrors: { plate: t("validation.invalid") } };
-
-  const duplicate = await db.vehicle.findFirst({
-    where: { plateNorm, ...(id ? { id: { not: id } } : {}) },
-    include: { customer: true },
-  });
-  if (duplicate) return { fieldErrors: { plate: t("vehicles.errors.plateExists", { customer: duplicate.customer.lastName }) } };
-
-  const data = {
-    customerId,
-    plate: formatPlate(plate),
-    plateNorm,
-    make: d.make ?? null,
-    model: d.model ?? null,
-    vin: d.vin ?? null,
-    year: d.year ?? null,
-    notes: d.notes ?? null,
-  };
-  if (id) await db.vehicle.update({ where: { id }, data });
-  else await db.vehicle.create({ data });
-
-  revalidatePath(`/customers/${customerId}`);
-  revalidatePath("/tires");
-  redirect(`/customers/${customerId}`);
-}
-
-export async function deleteVehicle(formData: FormData) {
-  await requirePermission("customers.delete");
-  const id = String(formData.get("id") ?? "");
-  const customerId = String(formData.get("customerId") ?? "");
-  if (id) await db.vehicle.deleteMany({ where: { id } });
-  revalidatePath(`/customers/${customerId}`);
-  revalidatePath("/tires");
-  redirect(`/customers/${customerId}`);
 }

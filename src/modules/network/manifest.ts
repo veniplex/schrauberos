@@ -10,5 +10,5 @@ export const networkModule: ModuleManifest = {
     { id: "network-ip", href: "/network/ip", labelKey: "nav.ipam", icon: "ip", permission: "network.view", section: "it", order: 62 },
     { id: "network-cabling", href: "/network/cabling", labelKey: "nav.cabling", icon: "cabling", permission: "network.view", section: "it", order: 63 },
   ],
-  widgets: [{ id: "network-status", permission: "network.view", span: 1, order: 30, Component: NetworkStatusWidget }],
+  widgets: [{ id: "network-status", permission: "network.view", area: "it", span: 1, order: 30, Component: NetworkStatusWidget }],
 };

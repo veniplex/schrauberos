@@ -4,6 +4,7 @@ import { addDays, setHours, setMinutes, startOfDay, startOfWeek } from "date-fns
 import { createPrismaClient } from "../src/server/db-client";
 import { DEFAULT_ROLES } from "../src/modules/permissions";
 import { normalizePlate } from "../src/lib/domain/vehicles";
+import { slugify } from "../src/lib/slug";
 
 const db = createPrismaClient();
 
@@ -22,6 +23,32 @@ async function seedRoles() {
       },
     });
     console.log(`Rolle angelegt: ${role.name}`);
+  }
+}
+
+/**
+ * Einmalige Rechte-Erweiterungen für bereits bestehende Standardrollen: seedRoles() legt nur fehlende Rollen an
+ * und überschreibt nie Anpassungen. Neue Funktionen sollen aber auch bestehenden Rollen zugutekommen –
+ * einmalig (SeedMarker), damit später bewusst entzogene Rechte nicht wieder auftauchen.
+ */
+const DEFAULT_GRANTS: Array<{ marker: string; role: string; permissions: string[] }> = [
+  { marker: "grants-docs-2026-11:advisor", role: "advisor", permissions: ["docsWorkshop.view"] },
+  { marker: "grants-docs-2026-11:mechanic", role: "mechanic", permissions: ["docsWorkshop.view"] },
+  { marker: "grants-docs-2026-11:warehouse", role: "warehouse", permissions: ["docsWorkshop.view"] },
+  { marker: "grants-docs-2026-11:it_admin", role: "it_admin", permissions: ["docsIt.view", "docsIt.edit"] },
+];
+
+async function applyDefaultGrants() {
+  for (const g of DEFAULT_GRANTS) {
+    if (await db.seedMarker.findUnique({ where: { key: g.marker } })) continue;
+    const role = await db.role.findUnique({ where: { key: g.role } });
+    if (role && !role.isAdmin) {
+      for (const permission of g.permissions) {
+        await db.rolePermission.upsert({ where: { roleId_permission: { roleId: role.id, permission } }, update: {}, create: { roleId: role.id, permission } });
+      }
+      console.log(`Rechte ergänzt: ${role.name} (+${g.permissions.join(", ")})`);
+    }
+    await db.seedMarker.create({ data: { key: g.marker } });
   }
 }
 
@@ -88,17 +115,27 @@ async function seedDemo() {
   ];
 
   const vehicleIds: Record<string, string> = {};
+  const customerIds: Record<string, string> = {};
   let nr = 10001;
   for (const c of customers) {
     const { vehicles, ...data } = c;
     const created = await db.customer.create({ data: { ...data, customerNumber: String(nr++) } });
+    customerIds[c.lastName] = created.id;
     for (const v of vehicles) {
       const veh = await db.vehicle.create({
-        data: { ...v, plateNorm: normalizePlate(v.plate), customerId: created.id },
+        data: { ...v, plateNorm: normalizePlate(v.plate), customerId: created.id, ownerships: { create: [{ customerId: created.id }] } },
       });
       vehicleIds[v.plate] = veh.id;
     }
   }
+
+  // Halterwechsel-Beispiel: Mini gehörte früher Familie Krause
+  await db.vehicleOwnership.updateMany({ where: { vehicleId: vehicleIds["B-MS 815"] }, data: { fromDate: new Date("2024-02-15") } });
+  await db.vehicleOwnership.create({
+    data: { vehicleId: vehicleIds["B-MS 815"], customerId: customerIds["Krause"], fromDate: new Date("2021-03-01"), toDate: new Date("2024-02-15"), note: "Verkauf" },
+  });
+  // Fahrzeug ohne Halter (Bestand)
+  await db.vehicle.create({ data: { plate: "B-GW 200", plateNorm: normalizePlate("B-GW 200"), make: "VW", model: "Polo", year: 2018, notes: "Gebrauchtwagen im Bestand" } });
 
   // Reifensätze – bewusst mit unterschiedlichem Zustand, damit Warnungen sichtbar werden
   const sets: Array<{
@@ -257,13 +294,189 @@ async function seedNetworkDemo() {
   await link(swW, "3", cam, "eth0", "K-013");
 }
 
+/** Für Fahrzeuge aus der Zeit vor der Halter-Historie: aktuellen Halter als Eintrag nachtragen (idempotent). */
+async function backfillOwnerships() {
+  const vehicles = await db.vehicle.findMany({
+    where: { customerId: { not: null }, ownerships: { none: {} } },
+    select: { id: true, customerId: true, createdAt: true },
+  });
+  for (const v of vehicles) {
+    await db.vehicleOwnership.create({ data: { vehicleId: v.id, customerId: v.customerId!, fromDate: v.createdAt } });
+  }
+  if (vehicles.length) console.log(`Halter-Historie nachgetragen: ${vehicles.length}`);
+}
+
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const at = (offsetDays: number) => addDays(startOfDay(new Date()), offsetDays);
+const noonOf = (d: Date) => new Date(`${iso(d)}T12:00:00`);
+
+async function seedOfficeDemo() {
+  if ((await db.employee.count()) > 0) return;
+  console.log("Büro-Demo-Daten (Mitarbeiter, Fuhrpark, Rechnungen) werden angelegt …");
+
+  // ───── Mitarbeiter ─────
+  const mk = (firstName: string, lastName: string, department: string, jobTitle: string, extra: Record<string, unknown> = {}) =>
+    db.employee.create({
+      data: {
+        firstName, lastName, department, jobTitle, vacationDaysPerYear: 30, active: true,
+        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`, hireDate: new Date("2019-04-01"),
+        ...extra,
+      },
+    });
+  const chef = await mk("Thomas", "Brandt", "management", "Geschäftsführer", { personnelNumber: "1001", emergencyName: "Karin Brandt", emergencyPhone: "0170 5550101", emergencyRelation: "Ehefrau" });
+  const julia = await mk("Julia", "Wagner", "office", "Assistenz der Geschäftsführung", { personnelNumber: "1002" });
+  const petra = await mk("Petra", "Lehmann", "office", "Buchhaltung", { personnelNumber: "1003" });
+  await mk("Ida", "Kaiser", "it", "Systemadministratorin", { personnelNumber: "1004", emergencyName: "Jonas Kaiser", emergencyPhone: "0171 5550102", emergencyRelation: "Bruder" });
+  const tom = await mk("Tom", "Meyer", "workshop", "Kfz-Mechatroniker", { personnelNumber: "2001" });
+  const sven = await mk("Sven", "Richter", "workshop", "Kfz-Mechatroniker", { personnelNumber: "2002" });
+  const lena = await mk("Lena", "Hoffmann", "workshop", "Kfz-Meisterin / Werkstattleitung", { personnelNumber: "2003", emergencyName: "Paul Hoffmann", emergencyPhone: "0172 5550103", emergencyRelation: "Ehemann" });
+  const murat = await mk("Murat", "Demir", "workshop", "Lager & Reifenservice", { personnelNumber: "2004" });
+  await mk("Frank", "Neumann", "workshop", "Kfz-Mechatroniker (ausgeschieden)", { personnelNumber: "2000", active: false, leaveDate: new Date("2025-12-31") });
+
+  // Qualifikationen (einige bald/bereits abgelaufen)
+  const qual = (employeeId: string, name: string, expiresInDays: number | null) =>
+    db.qualification.create({ data: { employeeId, name, issuedAt: new Date("2022-03-01"), expiresAt: expiresInDays == null ? null : at(expiresInDays) } });
+  await qual(lena.id, "Hochvolt-Fachkundiger (HV 2S)", 25);
+  await qual(lena.id, "Klimaservice (Kältemittel)", 400);
+  await qual(tom.id, "Hochvolt-Schulung HV 1S", -12);
+  await qual(sven.id, "Brandschutzhelfer", 700);
+  await qual(murat.id, "Staplerschein", 45);
+  await qual(julia.id, "Ersthelfer", 120);
+
+  // Abwesenheiten
+  const absence = (employeeId: string, type: string, from: number, to: number, note?: string) =>
+    db.absence.create({ data: { employeeId, type, startDate: noonOf(at(from)), endDate: noonOf(at(to)), note: note ?? null } });
+  await absence(julia.id, "vacation", -1, 3, "Sommerurlaub");
+  await absence(sven.id, "sick", 0, 1);
+  await absence(petra.id, "training", 6, 7, "DATEV-Seminar");
+  await absence(tom.id, "vacation", 14, 25);
+  await absence(chef.id, "vacation", 30, 38);
+
+  // ───── Fuhrpark ─────
+  const caddy = await db.fleetVehicle.create({
+    data: { plate: "B-FW 101", make: "VW", model: "Caddy Cargo", year: 2022, fuelType: "diesel", driverId: tom.id, location: "Werkstatthof", huDue: at(25), serviceDueKm: 60000,
+      insuranceCompany: "Sicher Versicherung AG", insurancePolicy: "KFZ-2201-884", insuranceUntil: at(280), leasingProvider: "AutoLease Bank", leasingUntil: at(300), leasingRateCents: 28900, fuelCardNo: "7001 2200 4411" },
+  });
+  const transit = await db.fleetVehicle.create({
+    data: { plate: "B-FW 102", make: "Ford", model: "Transit Custom", year: 2021, fuelType: "diesel", driverId: lena.id, location: "Werkstatthof", huDue: at(210), serviceDue: at(18),
+      insuranceCompany: "Sicher Versicherung AG", insurancePolicy: "KFZ-2102-117", insuranceUntil: at(280), leasingProvider: "AutoLease Bank", leasingUntil: at(40), leasingRateCents: 34900 },
+  });
+  const octavia = await db.fleetVehicle.create({
+    data: { plate: "B-FW 103", make: "Škoda", model: "Octavia Combi", year: 2020, fuelType: "petrol", driverId: julia.id, location: "Büro", huDue: at(120), serviceDueKm: 45000,
+      insuranceCompany: "Sicher Versicherung AG", insurancePolicy: "KFZ-2003-559", insuranceUntil: at(190) },
+  });
+  const km = (fleetVehicleId: string, daysAgo: number, value: number) =>
+    db.fleetMileage.create({ data: { fleetVehicleId, date: noonOf(at(-daysAgo)), km: value } });
+  await km(caddy.id, 180, 21000); await km(caddy.id, 90, 26500); await km(caddy.id, 5, 31800);
+  await km(transit.id, 150, 62000); await km(transit.id, 60, 70400); await km(transit.id, 3, 74900);
+  await km(octavia.id, 200, 40100); await km(octavia.id, 100, 42500); await km(octavia.id, 7, 44200);
+  const cost = (fleetVehicleId: string, daysAgo: number, category: string, amountCents: number, note?: string) =>
+    db.fleetCost.create({ data: { fleetVehicleId, date: noonOf(at(-daysAgo)), category, amountCents, note: note ?? null } });
+  await cost(caddy.id, 12, "fuel", 7450); await cost(caddy.id, 40, "fuel", 6890); await cost(caddy.id, 95, "service", 31200, "Inspektion + Ölwechsel");
+  await cost(transit.id, 8, "fuel", 9120); await cost(transit.id, 70, "repair", 48750, "Bremsscheiben vorn");
+  await cost(octavia.id, 15, "fuel", 6240); await cost(octavia.id, 120, "tires", 52000, "Winterreifen");
+
+  // Führerscheinkontrollen: Tom bald fällig, Lena abgelaufen, Julia nie kontrolliert
+  const check = (employeeId: string, monthsAgo: number) => {
+    const checkedAt = noonOf(addDays(at(0), -monthsAgo * 30));
+    return db.fleetLicenseCheck.create({ data: { employeeId, checkedAt, nextDue: noonOf(addDays(checkedAt, 182)), method: "Sichtkontrolle", checkedByName: "Administrator" } });
+  };
+  await check(tom.id, 5);
+  await check(lena.id, 8);
+
+  // ───── Rechnungen ─────
+  const customers = await db.customer.findMany({ take: 3, orderBy: { customerNumber: "asc" } });
+  const inv = (direction: "incoming" | "outgoing", number: string, partyName: string, issueAgo: number, dueIn: number | null, grossCents: number, status = "open", extra: Record<string, unknown> = {}) =>
+    db.invoice.create({
+      data: {
+        direction, number, partyName, issueDate: noonOf(at(-issueAgo)), dueDate: dueIn == null ? null : noonOf(at(dueIn)),
+        grossCents, netCents: Math.round(grossCents / 1.19), vatCents: grossCents - Math.round(grossCents / 1.19),
+        status, paidAt: status === "paid" ? noonOf(at(-Math.max(issueAgo - 10, 1))) : null, ...extra,
+      },
+    });
+  await inv("incoming", "RE-2026-4411", "Reifengroßhandel Nord GmbH", 40, -10, 482350, "open", { category: "Material", reference: "Ordner Eingang 2026/11" });
+  await inv("incoming", "AM-77310", "Autoteile Müller", 22, 8, 123780, "open", { category: "Material" });
+  await inv("incoming", "SW-11-2026", "Stadtwerke", 15, 15, 41280, "open", { category: "Nebenkosten" });
+  await inv("incoming", "TK-9981234", "Telekom Deutschland", 30, -2, 18990, "open", { category: "Telefon/Internet" });
+  await inv("incoming", "BB-2026-088", "Büro-Bedarf Schmitt", 60, -30, 9450, "paid", { category: "Büro" });
+  await inv("incoming", "SV-2026-Q4", "Sicher Versicherung AG", 70, -40, 214000, "paid", { category: "Versicherung", reference: "Policen-Ordner" });
+  await inv("outgoing", "2026-0187", customers[0] ? `${customers[0].firstName ?? ""} ${customers[0].lastName}`.trim() : "Kunde", 35, -5, 31250, "open", { customerId: customers[0]?.id, category: "Inspektion" });
+  await inv("outgoing", "2026-0188", customers[1]?.company ?? customers[1]?.lastName ?? "Kunde", 20, 10, 128900, "open", { customerId: customers[1]?.id, category: "Reparatur" });
+  await inv("outgoing", "2026-0189", customers[2] ? `${customers[2].firstName ?? ""} ${customers[2].lastName}`.trim() : "Kunde", 12, 2, 8900, "open", { customerId: customers[2]?.id, category: "Reifenwechsel" });
+  await inv("outgoing", "2026-0176", customers[0] ? `${customers[0].firstName ?? ""} ${customers[0].lastName}`.trim() : "Kunde", 80, -50, 45600, "paid", { customerId: customers[0]?.id, category: "Reifenlagerung" });
+}
+
+async function seedDocsDemo() {
+  if ((await db.docPage.count()) > 0) return;
+  console.log("Doku-Demo-Seiten werden angelegt …");
+
+  const cat = async (area: string, name: string, sortOrder: number) => (await db.docCategory.create({ data: { area, name, sortOrder } })).id;
+  const page = async (area: string, title: string, categoryId: string | null, content: string, pinned = false) => {
+    const created = await db.docPage.create({
+      data: { area, slug: slugify(title), title, categoryId, content, pinned, createdByName: "Administrator", updatedByName: "Administrator" },
+    });
+    await db.docVersion.create({ data: { pageId: created.id, title, content, savedByName: "Administrator" } });
+  };
+
+  // Werkstatt
+  const wArbeit = await cat("workshop", "Arbeitsanweisungen", 1);
+  const wSicher = await cat("workshop", "Sicherheit", 2);
+  await page("workshop", "Reifenwechsel – Ablauf", wArbeit, [
+    "## Vorbereitung", "", "- Auftrag prüfen: Kennzeichen, Reifensatz, Felgenart", "- Reifenlager: Satz anhand des Lagerorts bereitstellen", "- Fahrzeug auf der Hebebühne aufnehmen (Aufnahmepunkte beachten)", "",
+    "## Durchführung", "", "1. Räder abnehmen, Bremsen und Radlager auf Sicht prüfen", "2. Profiltiefe und DOT-Alter der neuen Räder messen und in der **Reifenliste** eintragen", "3. Räder montieren, Radschrauben **über Kreuz** vorziehen", "4. Mit Drehmomentschlüssel anziehen", "", "| Felgenart | Anzugsdrehmoment |", "| --- | --- |", "| Stahlfelge | laut Herstellerangabe |", "| Alufelge | laut Herstellerangabe |", "",
+    "> Das Anzugsdrehmoment steht in der Fahrzeugdokumentation – hier ist bewusst kein Wert hinterlegt.", "",
+    "## Nachbereitung", "", "- [ ] Alte Räder mit Lagerort etikettieren", "- [ ] Reifensatz in der Reifenliste auf *eingelagert* setzen", "- [ ] Nach 50 km Radschrauben nachziehen (kundeninformation)",
+  ].join("\n"));
+  await page("workshop", "Hebebühne: Sicherheitscheck", wSicher, [
+    "Vor jeder Schicht kurz prüfen:", "", "- [ ] Aufnahmeteller und Tragarme unbeschädigt", "- [ ] Sicherungen rasten hörbar ein", "- [ ] Bereich um die Bühne frei", "- [ ] Mängel sofort der Werkstattleitung melden und Bühne sperren", "",
+  ].join("\n"));
+  await page("workshop", "Notfall: Verletzung in der Werkstatt", wSicher, [
+    "## Sofortmaßnahmen", "", "1. **Ruhe bewahren**, Unfallstelle sichern", "2. Notruf **112**", "3. Erste Hilfe leisten (Verbandskasten: Eingang Werkstatt)", "4. Ersthelfer rufen", "5. Vorfall im Verbandbuch dokumentieren", "",
+    "## Wichtige Orte", "", "- Verbandskasten und Augenspülung: am Eingang", "- Feuerlöscher: neben dem Hallentor", "",
+  ].join("\n"), true);
+
+  // IT
+  const iAnl = await cat("it", "Anleitungen", 1);
+  const iBetrieb = await cat("it", "Betrieb", 2);
+  await page("it", "Netzwerk-Übersicht", iBetrieb, [
+    "Die aktuelle Dokumentation von Geräten, IP-Adressen und Verkabelung steht im Bereich **IT & Netzwerk** dieser Anwendung.", "",
+    "## Grundaufbau", "", "- Internet → Firewall → Core-Switch → Server, Access Points, Arbeitsplätze", "- Getrennte VLANs für Büro, Werkstatt, Gäste und Management", "",
+    "## Regeln", "", "- Neue Geräte bekommen **immer** einen Eintrag im Geräte-Inventar", "- Statische Adressen nur außerhalb des DHCP-Bereichs", "- Änderungen an der Firewall werden hier dokumentiert", "",
+  ].join("\n"), true);
+  await page("it", "Neuer Mitarbeiter – Onboarding", iAnl, [
+    "## Checkliste", "", "- [ ] Benutzerkonto in **Verwaltung → Benutzer** anlegen und Rolle zuweisen", "- [ ] Mitarbeiter unter **Büro → Mitarbeiter** anlegen und mit dem Konto verknüpfen", "- [ ] Arbeitsplatz-PC im Geräte-Inventar erfassen", "- [ ] Erstpasswort übergeben (muss beim ersten Login geändert werden)", "",
+  ].join("\n"));
+  await page("it", "Backup-Konzept", iBetrieb, [
+    "## Was wird gesichert?", "", "| Was | Wie oft | Wohin |", "| --- | --- | --- |", "| Datenbank dieser Anwendung | täglich | NAS |", "| Server (Dateien) | täglich | NAS |", "", "```bash", "# Datenbank-Dump (Docker)", "docker compose exec db pg_dump -U schrauberos schrauberos > backup.sql", "```", "",
+    "Restore-Test: **vierteljährlich** durchführen und hier protokollieren.", "",
+  ].join("\n"));
+
+  // Büro
+  const bProzess = await cat("office", "Abläufe", 1);
+  const bVorlagen = await cat("office", "Vorlagen & Kontakte", 2);
+  await page("office", "Rechnungsprozess", bProzess, [
+    "## Eingangsrechnungen", "", "1. Rechnung im **Rechnungsarchiv → Eingang** erfassen (Beleg hochladen)", "2. Sachlich prüfen lassen (Werkstattleitung bei Material)", "3. Zur Fälligkeit bezahlen und als *bezahlt* markieren", "",
+    "## Ausgangsrechnungen", "", "1. Rechnung wird im Warenwirtschaftssystem erstellt", "2. Im Archiv unter **Ausgang** erfassen und dem Kunden zuordnen", "3. Zahlungseingang prüfen – überfällige Rechnungen erscheinen auf der Übersicht", "",
+  ].join("\n"), true);
+  await page("office", "Urlaub & Abwesenheiten", bProzess, [
+    "Urlaub, Schulungen und Krankheit werden unter **Büro → Abwesenheiten** eingetragen.", "", "- Urlaub bitte **2 Wochen** vorher mit der Geschäftsführung abstimmen", "- Krankmeldungen am ersten Tag bis 8 Uhr telefonisch melden", "- Der Kalender zeigt die Abwesenheiten aller Mitarbeiter im Monat", "",
+  ].join("\n"));
+  await page("office", "Wichtige Ansprechpartner", bVorlagen, [
+    "| Thema | Ansprechpartner |", "| --- | --- |", "| Steuerberater | *hier eintragen* |", "| Versicherung | *hier eintragen* |", "| IT-Störung | IT-Administration |", "",
+  ].join("\n"));
+}
+
 async function main() {
   await seedRoles();
+  await applyDefaultGrants();
   await seedAdmin();
   await seedWorkshopBasics();
+  await backfillOwnerships();
   if (process.env.SEED_DEMO === "true") {
     await seedDemo();
     await seedNetworkDemo();
+    await seedOfficeDemo();
+    await seedDocsDemo();
   }
 }
 

@@ -21,7 +21,7 @@ type SearchParams = { q?: string; status?: string; season?: string; attention?: 
 
 function haystack(s: TireSetRow) {
   const c = s.vehicle.customer;
-  return [s.vehicle.plate, s.vehicle.plateNorm, c.firstName, c.lastName, c.company, s.brand, s.model, s.storageLocation, s.vehicle.make, s.vehicle.model]
+  return [s.vehicle.plate, s.vehicle.plateNorm, c?.firstName, c?.lastName, c?.company, s.brand, s.model, s.storageLocation, s.vehicle.make, s.vehicle.model]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();

@@ -83,11 +83,11 @@ export function normalizeMac(input: string): string | null {
   return hex.toUpperCase().match(/.{2}/g)!.join(":");
 }
 
-export type WarrantyState = "expired" | "soon" | "ok";
+import { dueState, type DueState } from "./due";
 
-/** Garantie abgelaufen, läuft in den nächsten `soonDays` Tagen ab, oder in Ordnung. */
+export type WarrantyState = DueState;
+
+/** Garantie abgelaufen, läuft in den nächsten `soonDays` Tagen ab, oder in Ordnung (Standard: 90 Tage). */
 export function warrantyState(until: Date | null | undefined, soonDays = 90, now = new Date()): WarrantyState | null {
-  if (!until) return null;
-  const days = (until.getTime() - now.getTime()) / 86_400_000;
-  return days < 0 ? "expired" : days <= soonDays ? "soon" : "ok";
+  return dueState(until, soonDays, now);
 }
