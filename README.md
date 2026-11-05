@@ -40,8 +40,8 @@ npm run db:reset     # lokale Datenbank neu aufbauen (löscht alle Daten!)
 
 ## Produktion mit Docker (PostgreSQL)
 
-Auf GitHub baut eine Action bei jedem Push auf `main` zwei Images und legt sie in der GitHub Container Registry ab
-(`ghcr.io/veniplex/schrauberos` und `…-migrate`). Auf dem Server braucht es nur zwei Dateien: `docker-compose.yml` und `.env`.
+Auf GitHub baut eine Action bei jedem Push auf `main` das Image und legt es in der GitHub Container Registry ab
+(`ghcr.io/veniplex/schrauberos`). Auf dem Server braucht es nur zwei Dateien: `docker-compose.yml` und `.env`.
 
 ```bash
 # einmalig (Repo privat): am Server bei ghcr.io anmelden – Token mit Recht "read:packages"
@@ -54,8 +54,9 @@ docker compose pull
 docker compose up -d
 ```
 
-Das startet drei Dienste: `db` (PostgreSQL, Daten im Volume `db-data`, nicht nach außen veröffentlicht),
-`migrate` (einmalig: Migrationen + Basis-Seed, idempotent) und `app` (Port `APP_PORT`, Standard 3000).
+Das startet zwei Dienste: `db` (PostgreSQL, Daten im Volume `db-data`, nicht nach außen veröffentlicht) und `app`
+(Port `APP_PORT`, Standard 3000). Die App wendet beim Start selbst die Datenbank-Migrationen an und legt Rollen und den
+Erst-Admin an (idempotent, siehe `docker-entrypoint.sh`).
 Aus dem Quellcode bauen statt ziehen: `docker compose up -d --build`.
 
 Wichtig im Betrieb:
@@ -63,7 +64,7 @@ Wichtig im Betrieb:
 * **`POSTGRES_PASSWORD` ändern** (ohne Wert startet Compose gar nicht).
 * **HTTPS:** Ist die App über HTTPS erreichbar (Reverse Proxy/Tunnel), `SESSION_COOKIE_SECURE=true` setzen. Bei reinem HTTP im LAN muss es `false` bleiben, sonst ist kein Login möglich.
 * **Backups:** `docker compose exec db pg_dump -U schrauberos schrauberos > backup.sql`
-* **Update:** `docker compose pull && docker compose up -d` – neue Migrationen werden vom `migrate`-Dienst automatisch angewendet.
+* **Update:** `docker compose pull && docker compose up -d` – neue Migrationen werden beim Start der App automatisch angewendet.
 * **Version festlegen:** `SCHRAUBEROS_VERSION=1.0.0` in der `.env` (Tags `vX.Y.Z` im Repo erzeugen versionierte Images), sonst `latest`.
 * **Zeitzone:** Termine werden in der Zeitzone `TZ` (Standard `Europe/Berlin`) ein- und ausgegeben.
 
