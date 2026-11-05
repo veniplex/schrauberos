@@ -1,13 +1,16 @@
 # SchrauberOS – Produktivbetrieb mit PostgreSQL.
 #
-#   docker compose up -d --build
-#   -> App unter http://localhost:3000 (Port über APP_PORT änderbar)
+#   docker compose pull
+#   docker compose up -d
+#   -> App unter http://<server>:3000  (Port über APP_PORT änderbar)
 #
-# Konfiguration über eine `.env`-Datei neben dieser Datei (siehe docker.env.example):
-#   POSTGRES_PASSWORD   Datenbank-Passwort (UNBEDINGT ändern)
-#   APP_PORT            Port auf dem Host (Standard 3000)
-#   SESSION_COOKIE_SECURE  "true" hinter HTTPS (Reverse Proxy), "false" bei reinem HTTP im LAN
-#   SEED_ADMIN_USER / SEED_ADMIN_PASSWORD  Erst-Admin (Passwortwechsel beim ersten Login)
+# Die Images kommen aus der GitHub Container Registry (ghcr.io), gebaut von der GitHub-Action
+# (.github/workflows/docker-publish.yml). Ist das Repo privat, einmalig am Server anmelden:
+#   echo <TOKEN> | docker login ghcr.io -u <github-benutzer> --password-stdin
+#   (Token: GitHub → Settings → Developer settings → Personal access tokens (classic), Recht "read:packages")
+#
+# Konfiguration über eine `.env`-Datei neben dieser Datei (Vorlage: docker.env.example).
+# Lokal aus dem Quellcode bauen statt zu ziehen:  docker compose up -d --build
 #
 # Die Datenbank ist NICHT nach außen veröffentlicht – nur die App im Compose-Netz erreicht sie.
 
@@ -18,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: schrauberos
       POSTGRES_USER: schrauberos
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Bitte POSTGRES_PASSWORD in .env setzen}
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -29,11 +32,12 @@ services:
 
   # Einmaliger Job: Migrationen anwenden + Rollen/Admin/Stammdaten anlegen (idempotent)
   migrate:
+    image: ghcr.io/veniplex/schrauberos-migrate:${SCHRAUBEROS_VERSION:-latest}
     build:
       context: .
       target: migrator
     environment:
-      DATABASE_URL: postgresql://schrauberos:${POSTGRES_PASSWORD:-change-me}@db:5432/schrauberos
+      DATABASE_URL: postgresql://schrauberos:${POSTGRES_PASSWORD}@db:5432/schrauberos
       SEED_ADMIN_USER: ${SEED_ADMIN_USER:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin}
       SEED_DEMO: ${SEED_DEMO:-false}
@@ -43,13 +47,15 @@ services:
     restart: "no"
 
   app:
+    image: ghcr.io/veniplex/schrauberos:${SCHRAUBEROS_VERSION:-latest}
     build:
       context: .
       target: runner
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://schrauberos:${POSTGRES_PASSWORD:-change-me}@db:5432/schrauberos
+      DATABASE_URL: postgresql://schrauberos:${POSTGRES_PASSWORD}@db:5432/schrauberos
       TZ: ${TZ:-Europe/Berlin}
+      # "true", sobald die App über HTTPS erreichbar ist (Reverse Proxy/Tunnel); bei reinem HTTP "false"
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     ports:
       - "${APP_PORT:-3000}:3000"
