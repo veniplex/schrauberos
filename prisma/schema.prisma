@@ -281,3 +281,111 @@ model Tire {
 
   @@unique([tireSetId, position])
 }
+
+// ───────────── IT & Netzwerk (Dokumentation) ─────────────
+
+// Standort/Raum innerhalb des Unternehmens (z. B. Serverraum, Büro EG, Werkstatt)
+model NetLocation {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  sortOrder   Int     @default(0)
+
+  devices NetDevice[]
+}
+
+model NetVlan {
+  id          String  @id @default(cuid())
+  vlanId      Int     @unique
+  name        String
+  description String?
+
+  subnets NetSubnet[]
+}
+
+model NetSubnet {
+  id          String  @id @default(cuid())
+  name        String
+  // IPv4 in CIDR-Schreibweise, z. B. 192.168.10.0/24
+  cidr        String  @unique
+  gateway     String?
+  dnsServers  String?
+  dhcpStart   String?
+  dhcpEnd     String?
+  description String?
+  vlanId      String?
+
+  vlan NetVlan? @relation(fields: [vlanId], references: [id], onDelete: SetNull)
+  ips  NetIp[]
+}
+
+// Gerät im Netzwerk: Server, Switch, Access Point, PC, Drucker, ...
+model NetDevice {
+  id             String    @id @default(cuid())
+  name           String
+  // server | switch | router | firewall | access_point | patch_panel | workstation | laptop | printer | nas | phone | camera | other
+  type           String
+  manufacturer   String?
+  model          String?
+  serialNumber   String?
+  locationId     String?
+  // z. B. "Rack 1 / HE 12"
+  rackInfo       String?
+  // Anzahl Ports (Switch/Patchfeld) – für die Port-Übersicht
+  portCount      Int?
+  // active | planned | spare | retired
+  status         String    @default("active")
+  assignedTo     String?
+  purchaseDate   DateTime?
+  warrantyUntil  DateTime?
+  // Erreichbarkeits-Überwachung (aktuell nur Demo-Anzeige)
+  monitorEnabled Boolean   @default(false)
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  location        NetLocation?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  ips             NetIp[]
+  connectionsFrom NetConnection[] @relation("ConnFrom")
+  connectionsTo   NetConnection[] @relation("ConnTo")
+
+  @@index([type])
+  @@index([locationId])
+}
+
+model NetIp {
+  id        String   @id @default(cuid())
+  address   String   @unique
+  subnetId  String
+  deviceId  String?
+  hostname  String?
+  // static | dhcp_reservation | reserved | gateway
+  kind      String   @default("static")
+  mac       String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subnet NetSubnet  @relation(fields: [subnetId], references: [id], onDelete: Cascade)
+  device NetDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([subnetId])
+  @@index([deviceId])
+}
+
+// Kabel/Verbindung zwischen zwei Geräten (Ports als freie Bezeichnung, z. B. "Gi1/0/12" oder "12")
+model NetConnection {
+  id           String  @id @default(cuid())
+  fromDeviceId String
+  fromPort     String?
+  toDeviceId   String
+  toPort       String?
+  cableLabel   String?
+  notes        String?
+
+  from NetDevice @relation("ConnFrom", fields: [fromDeviceId], references: [id], onDelete: Cascade)
+  to   NetDevice @relation("ConnTo", fields: [toDeviceId], references: [id], onDelete: Cascade)
+
+  @@index([fromDeviceId])
+  @@index([toDeviceId])
+}

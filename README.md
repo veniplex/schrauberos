@@ -9,6 +9,7 @@ Dashboard für die Autowerkstatt – modular aufgebaut, damit mit der Zeit belie
 | Terminplanung | Wochen-, Tages- (Spalten = Arbeitsplätze) und Listenansicht, Termine per Klick anlegen, Doppelbelegung von Arbeitsplätzen wird verhindert |
 | Digitale Reifenliste | Eingelagerte Reifensätze je Fahrzeug, Einzelreifen mit DOT/Alter, Profiltiefe, Zustand und Lagerort; Hinweise „Bald erneuern/Erneuern“; „Wechsel fällig“ + Terminplanung direkt aus der Liste |
 | Kunden & Fahrzeuge | Stammdaten, Kennzeichen, Verknüpfung zu Reifen und Terminen; vorbereitet für den Import aus Werbas |
+| IT & Netzwerk | Eigener Bereich für IT-Admins: Geräte-Inventar, IP-Verwaltung (Subnetze, VLANs, freie Adressen), Verkabelung mit Port-Übersicht, Standorte, Garantie-Hinweise; Erreichbarkeits-Status derzeit **nur als Demo** |
 | Benutzer, Rollen, Rechte | Eigene Benutzerverwaltung, frei definierbare Rollen mit granularen Berechtigungen, Admin-Schutzregeln |
 | Personalisierung | Werkstattname, Logo, Akzentfarbe, Öffnungszeiten, Kalenderraster, Arbeitsplätze, Terminarten, Reifen-Regeln |
 | Darstellung | Deutsch (Standard) und Englisch · Hell, Dunkel und System (Standard), pro Benutzer gespeichert |
@@ -78,7 +79,7 @@ src/
   modules/              ein Ordner pro Feature  ← hier wächst die Anwendung
     permissions.ts      zentrale Liste aller Berechtigungen (+ Standardrollen)
     registry.ts         Liste aktiver Module → Navigation und Dashboard-Widgets
-    appointments/ tires/ customers/ core/
+    appointments/ tires/ customers/ network/ core/
   server/               serverseitige Infrastruktur
     db.ts, db-client.ts Prisma-Client (SQLite lokal / PostgreSQL produktiv, gewählt über DATABASE_URL)
     auth/               Sitzungen, Passwörter, Anmelde-Provider (Platz für Active Directory)
@@ -127,6 +128,16 @@ Case-insensitive Suche: `contains()` aus `src/server/search.ts` verwenden (kapse
 ### Active Directory (später)
 
 Jeder Benutzer hat eine `authSource` (`local` oder z. B. `ldap`). Für AD genügt es, in `src/server/auth/providers.ts` einen `AuthProvider` zu implementieren und zu registrieren; Rollen und Rechte bleiben in der eigenen Datenbank (z. B. Zuordnung AD-Gruppe → Rolle beim ersten Login). Die Benutzerverwaltung zeigt externe Konten bereits an und blendet Passwortfelder dafür aus.
+
+## IT & Netzwerk
+
+Eigener Navigationsbereich „IT & Netzwerk“ (Modul `src/modules/network/`), sichtbar nur mit dem Recht `network.view`. Die mitgelieferte Rolle **IT-Administrator** hat `network.view/edit/delete` und sonst nichts – IT-Admins sehen also weder Kunden noch Reifen oder Termine, und umgekehrt sieht das Werkstattpersonal den IT-Bereich nicht.
+
+* **Geräte:** Inventar mit Art, Hersteller/Modell, Seriennummer, Standort/Rack, Garantie (Hinweise bei abgelaufen/bald ablaufend), Notizen. Zugangsdaten werden bewusst **nicht** gespeichert.
+* **IP-Verwaltung:** VLANs, Subnetze (IPv4, /16–/30) mit Auslastung, Adressen (statisch, DHCP-Reservierung, reserviert, Gateway), freie Bereiche, „nächste freie Adresse“. Geprüft wird: gültige IPv4, liegt im Subnetz, keine Dopplung, gültige MAC.
+* **Verkabelung:** Kabelliste (Gerät/Port ↔ Gerät/Port), Port-Übersicht bei Geräten mit Port-Anzahl (Switch/Patchfeld), ein Port kann nur einmal belegt werden. Standorte/Räume werden unter „Verkabelung & Standorte“ gepflegt.
+* **Erreichbarkeit (Demo):** Die Status-Anzeige (online/langsam/offline, Dashboard-Widget und Übersicht) ist **simuliert** und überall als „Demo“ gekennzeichnet – es findet kein Netzwerkzugriff statt. Die Schnittstelle dafür ist `StatusProvider` in `src/modules/network/monitoring.ts`; für echte Checks (Ping/Port, Zeitplan, Verlauf) wird dort ein weiterer Anbieter implementiert und in `getStatusProvider()` ausgewählt. Dabei beachten: Der Docker-Container muss die Geräte im LAN erreichen können.
+* **Demo-Daten:** `SEED_DEMO=true` legt ein Beispielnetz an (Firewall, Switches, Server, PCs, Subnetze, Verkabelung). In Produktion (`SEED_DEMO=false`) startet der Bereich leer.
 
 ## Werbas-Anbindung (später)
 

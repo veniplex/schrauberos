@@ -5,10 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  Cable,
   CalendarDays,
   Disc3,
+  Globe,
   LayoutDashboard,
   Menu,
+  Network,
+  Server,
   Settings,
   ShieldCheck,
   UserCog,
@@ -28,9 +32,13 @@ const ICONS: Record<IconName, LucideIcon> = {
   users: UserCog,
   roles: ShieldCheck,
   settings: Settings,
+  network: Network,
+  server: Server,
+  ip: Globe,
+  cabling: Cable,
 };
 
-export type SidebarItem = { href: string; label: string; icon: IconName; section: "main" | "admin" };
+export type SidebarItem = { href: string; label: string; icon: IconName; section: "main" | "it" | "admin" };
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -61,6 +69,7 @@ export function Sidebar({
 
   const groups: Array<{ id: string; label: string | null; items: SidebarItem[] }> = [
     { id: "main", label: null, items: items.filter((i) => i.section === "main") },
+    { id: "it", label: t("nav.it"), items: items.filter((i) => i.section === "it") },
     { id: "admin", label: t("nav.administration"), items: items.filter((i) => i.section === "admin") },
   ].filter((g) => g.items.length > 0);
 

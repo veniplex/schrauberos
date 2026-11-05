@@ -2,7 +2,18 @@ import type { ReactNode } from "react";
 import type { MessageKey } from "@/i18n/translate";
 import type { Permission } from "./permissions";
 
-export type IconName = "dashboard" | "calendar" | "tires" | "customers" | "users" | "roles" | "settings";
+export type IconName =
+  | "dashboard"
+  | "calendar"
+  | "tires"
+  | "customers"
+  | "users"
+  | "roles"
+  | "settings"
+  | "network"
+  | "server"
+  | "ip"
+  | "cabling";
 
 export type NavItem = {
   id: string;
@@ -11,7 +22,7 @@ export type NavItem = {
   icon: IconName;
   /** Ohne Angabe: für alle eingeloggten Benutzer sichtbar */
   permission?: Permission;
-  section: "main" | "admin";
+  section: "main" | "it" | "admin";
   order: number;
 };
 

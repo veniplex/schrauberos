@@ -6,6 +6,7 @@ export const PERMISSION_GROUPS = {
   appointments: ["appointments.view", "appointments.create", "appointments.edit", "appointments.delete"],
   tires: ["tires.view", "tires.create", "tires.edit", "tires.delete"],
   customers: ["customers.view", "customers.edit", "customers.delete"],
+  network: ["network.view", "network.edit", "network.delete"],
   users: ["users.view", "users.manage"],
   roles: ["roles.manage"],
   settings: ["settings.manage"],
@@ -50,6 +51,12 @@ export const DEFAULT_ROLES: Array<{
     name: "Mechaniker",
     description: "Termine einsehen und Status pflegen, Reifenlager einsehen.",
     permissions: ["appointments.view", "appointments.edit", "tires.view", "customers.view"],
+  },
+  {
+    key: "it_admin",
+    name: "IT-Administrator",
+    description: "Netzwerk dokumentieren: Geräte, IP-Adressen, Verkabelung.",
+    permissions: ["network.view", "network.edit", "network.delete"],
   },
   {
     key: "warehouse",
