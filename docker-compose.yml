@@ -1,0 +1,61 @@
+# SchrauberOS – Produktivbetrieb mit PostgreSQL.
+#
+#   docker compose up -d --build
+#   -> App unter http://localhost:3000 (Port über APP_PORT änderbar)
+#
+# Konfiguration über eine `.env`-Datei neben dieser Datei (siehe docker.env.example):
+#   POSTGRES_PASSWORD   Datenbank-Passwort (UNBEDINGT ändern)
+#   APP_PORT            Port auf dem Host (Standard 3000)
+#   SESSION_COOKIE_SECURE  "true" hinter HTTPS (Reverse Proxy), "false" bei reinem HTTP im LAN
+#   SEED_ADMIN_USER / SEED_ADMIN_PASSWORD  Erst-Admin (Passwortwechsel beim ersten Login)
+#
+# Die Datenbank ist NICHT nach außen veröffentlicht – nur die App im Compose-Netz erreicht sie.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: schrauberos
+      POSTGRES_USER: schrauberos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U schrauberos -d schrauberos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Einmaliger Job: Migrationen anwenden + Rollen/Admin/Stammdaten anlegen (idempotent)
+  migrate:
+    build:
+      context: .
+      target: migrator
+    environment:
+      DATABASE_URL: postgresql://schrauberos:${POSTGRES_PASSWORD:-change-me}@db:5432/schrauberos
+      SEED_ADMIN_USER: ${SEED_ADMIN_USER:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin}
+      SEED_DEMO: ${SEED_DEMO:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://schrauberos:${POSTGRES_PASSWORD:-change-me}@db:5432/schrauberos
+      TZ: ${TZ:-Europe/Berlin}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:

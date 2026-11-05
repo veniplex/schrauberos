@@ -1,0 +1,283 @@
+// Quelle der Wahrheit für das Datenmodell (SQLite lokal).
+// Das Postgres-Schema wird daraus abgeleitet: `npm run db:sync-pg`.
+// Bewusst portabel gehalten: keine Enums/Json-Felder – Zustände sind Strings, die in
+// src/lib/domain/* als Konstanten + Zod-Schemas definiert sind.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ───────────── Benutzer, Rollen, Berechtigungen ─────────────
+
+model User {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  name               String
+  email              String?
+  passwordHash       String?
+  // "local" = eigene Verwaltung, "ldap" = später Active Directory
+  authSource         String    @default("local")
+  externalId         String?
+  active             Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime?
+  // persönliche Einstellungen (null = Standard)
+  locale             String?
+  theme              String?
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  roles        UserRole[]
+  sessions     Session[]
+  assigned     Appointment[] @relation("AppointmentAssignee")
+  createdAppts Appointment[] @relation("AppointmentCreator")
+
+  @@unique([authSource, externalId])
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  description String?
+  // Admin-Rollen haben immer alle Berechtigungen (auch zukünftige Module)
+  isAdmin     Boolean @default(false)
+  // Systemrollen können nicht gelöscht werden
+  isSystem    Boolean @default(false)
+
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model RolePermission {
+  roleId     String
+  permission String
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  userAgent  String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ───────────── Werkstatt-Profil (Singleton, id = "default") ─────────────
+
+model Workshop {
+  id                  String   @id @default("default")
+  name                String   @default("Meine Werkstatt")
+  tagline             String?
+  street              String?
+  zip                 String?
+  city                String?
+  phone               String?
+  email               String?
+  website             String?
+  // Logo als kleines Data-URL (PNG/SVG/JPEG, max. ~200 KB) – kein Dateispeicher nötig
+  logoDataUrl         String?
+  accentColor         String   @default("#2459c9")
+  // JSON: { "mon": ["07:30","17:00"], "sun": null }
+  openingHours        String   @default("{}")
+  // Kalender-Raster
+  dayStartHour        Int      @default(7)
+  dayEndHour          Int      @default(18)
+  slotMinutes         Int      @default(30)
+  // Reifenlager-Regeln
+  treadWarnMm         Float    @default(4.0)
+  treadReplaceMm      Float    @default(3.0)
+  tireAgeWarnYears    Int      @default(6)
+  tireAgeReplaceYears Int      @default(10)
+  updatedAt           DateTime @updatedAt
+}
+
+// ───────────── Kunden & Fahrzeuge (später aus Werbas) ─────────────
+
+model Customer {
+  id             String    @id @default(cuid())
+  customerNumber String?
+  firstName      String?
+  lastName       String
+  company        String?
+  email          String?
+  phone          String?
+  street         String?
+  zip            String?
+  city           String?
+  notes          String?
+  // Herkunft der Daten: null = lokal angelegt, sonst z. B. "werbas"
+  externalSource String?
+  externalId     String?
+  syncedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  vehicles     Vehicle[]
+  appointments Appointment[]
+
+  @@unique([externalSource, externalId])
+  @@index([lastName])
+}
+
+model Vehicle {
+  id             String    @id @default(cuid())
+  customerId     String
+  // normalisiert: Großbuchstaben, ohne Leerzeichen/Bindestriche (z. B. "BAB1234")
+  plateNorm      String
+  // wie eingegeben: "B-AB 1234"
+  plate          String
+  make           String?
+  model          String?
+  vin            String?
+  year           Int?
+  notes          String?
+  externalSource String?
+  externalId     String?
+  syncedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  customer     Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tireSets     TireSet[]
+  appointments Appointment[]
+
+  @@unique([externalSource, externalId])
+  @@index([plateNorm])
+  @@index([customerId])
+}
+
+// ───────────── Terminplanung ─────────────
+
+// Arbeitsplatz / Hebebühne / Stellplatz
+model Bay {
+  id        String  @id @default(cuid())
+  name      String
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  appointments Appointment[]
+}
+
+model AppointmentType {
+  id             String  @id @default(cuid())
+  name           String
+  color          String  @default("#2459c9")
+  defaultMinutes Int     @default(60)
+  active         Boolean @default(true)
+  sortOrder      Int     @default(0)
+  // "tire_change" markiert Reifenwechsel-Termine (Verknüpfung zur Reifenliste)
+  kind           String  @default("general")
+
+  appointments Appointment[]
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime
+  // scheduled | confirmed | in_progress | done | cancelled | no_show
+  status      String   @default("scheduled")
+  notes       String?
+  typeId      String?
+  bayId       String?
+  customerId  String?
+  vehicleId   String?
+  tireSetId   String?
+  assigneeId  String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  type      AppointmentType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  bay       Bay?             @relation(fields: [bayId], references: [id], onDelete: SetNull)
+  customer  Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  vehicle   Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  tireSet   TireSet?         @relation(fields: [tireSetId], references: [id], onDelete: SetNull)
+  assignee  User?            @relation("AppointmentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy User?            @relation("AppointmentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([startsAt])
+  @@index([vehicleId])
+  @@index([tireSetId])
+}
+
+// ───────────── Digitale Reifenliste ─────────────
+
+// Ein eingelagerter Reifensatz (i. d. R. 4 Reifen) eines Fahrzeugs
+model TireSet {
+  id              String   @id @default(cuid())
+  vehicleId       String
+  // summer | winter | allseason
+  season          String
+  brand           String?
+  model           String?
+  // Dimension, z. B. 205/55 R16 91H
+  width           Int?
+  aspect          Int?
+  rim             Int?
+  loadIndex       String?
+  speedIndex      String?
+  // none | steel | alloy
+  rimType         String   @default("none")
+  // stored | mounted | disposed
+  status          String   @default("stored")
+  // Lagerort, z. B. "Halle A / Regal 3 / Fach 2"
+  storageLocation String?
+  storedAt        DateTime @default(now())
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  tires        Tire[]
+  appointments Appointment[]
+
+  @@index([vehicleId])
+  @@index([status])
+}
+
+model Tire {
+  id           String    @id @default(cuid())
+  tireSetId    String
+  // FL | FR | RL | RR | SPARE
+  position     String
+  // DOT-Kürzel "WWYY" (Produktionswoche + Jahr), z. B. "2321"
+  dot          String?
+  producedYear Int?
+  producedWeek Int?
+  treadDepthMm Float?
+  // new | good | fair | worn | damaged
+  condition    String    @default("good")
+  notes        String?
+  measuredAt   DateTime?
+
+  tireSet TireSet @relation(fields: [tireSetId], references: [id], onDelete: Cascade)
+
+  @@unique([tireSetId, position])
+}

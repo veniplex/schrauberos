@@ -1,0 +1,53 @@
+import "server-only";
+import { db } from "@/server/db";
+import { getWorkshop } from "@/server/workshop";
+import { minTread, setHealth, wantedSeason, type Health, type TireHealth } from "@/lib/domain/tires";
+
+const OPEN_APPOINTMENT = { notIn: ["cancelled", "done", "no_show"] };
+
+export type TireSetRow = Awaited<ReturnType<typeof loadSets>>[number] & {
+  health: TireHealth;
+  minTreadMm: number | null;
+  /** Lagert und die aktuell passende Saison – Wechsel steht an */
+  swapDue: boolean;
+  nextAppointment: { id: string; startsAt: Date } | null;
+};
+
+function loadSets(where: object = {}) {
+  return db.tireSet.findMany({
+    where,
+    include: {
+      tires: true,
+      vehicle: { include: { customer: true } },
+      appointments: {
+        where: { startsAt: { gte: new Date() }, status: OPEN_APPOINTMENT },
+        orderBy: { startsAt: "asc" },
+        take: 1,
+        select: { id: true, startsAt: true },
+      },
+    },
+  });
+}
+
+/** Reifensätze inkl. berechnetem Zustand (Profil/Alter/Zustand) und Wechsel-Hinweis. */
+export async function listTireSets(where: object = {}): Promise<TireSetRow[]> {
+  const [sets, workshop] = await Promise.all([loadSets(where), getWorkshop()]);
+  const season = wantedSeason();
+  const now = new Date();
+  return sets.map((s) => {
+    const nextAppointment = s.appointments[0] ?? null;
+    return {
+      ...s,
+      health: setHealth(s.tires, workshop.tireRules, now),
+      minTreadMm: minTread(s.tires),
+      swapDue: s.status === "stored" && s.season === season && !nextAppointment,
+      nextAppointment,
+    };
+  });
+}
+
+const SEVERITY: Record<Health, number> = { replace: 3, warn: 2, unknown: 1, ok: 0 };
+
+export function bySeverity(a: TireSetRow, b: TireSetRow): number {
+  return SEVERITY[b.health.health] - SEVERITY[a.health.health] || (a.minTreadMm ?? 99) - (b.minTreadMm ?? 99);
+}

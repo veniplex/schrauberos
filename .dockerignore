@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.claude
+.hallmark
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+src/generated
+prisma/postgres/schema.prisma
+npm-debug.log*
+Dockerfile
+docker-compose.yml
+README.md

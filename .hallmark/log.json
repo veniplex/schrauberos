@@ -1,0 +1,11 @@
+[
+  {
+    "date": "2026-11-05",
+    "macrostructure": "App Shell (Sidebar + Topbar, Dashboard-Widgets)",
+    "theme": "custom",
+    "theme_axes": "light+dark via light-dark() / grotesk-sans (Geist) / chromatic (Werkstatt-Akzent, Standard Blau)",
+    "vibe": "sachlich, werkstatt-nah, utilitarian",
+    "enrichment": "none",
+    "brief": "SchrauberOS · Werkstatt-Dashboard (Termine, Reifenlager, Kunden, Benutzer/Rollen)"
+  }
+]
