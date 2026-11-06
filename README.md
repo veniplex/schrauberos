@@ -159,7 +159,10 @@ Einstellungs-Reiter und die Seite „Module & Funktionen“.
 
 ### Module und Funktionen ein-/ausschalten
 
-* Gespeichert werden nur **Abweichungen** vom Standard „an“ (Tabelle `FeatureSetting`).
+* Gespeichert werden nur **Abweichungen** vom Standard (Tabelle `FeatureSetting`). Der Standard ist je Modul/Funktion `defaultEnabled`
+  (`define.ts`, Vorgabe **true**): Der Bestand (Termine, Kunden, Fahrzeuge, Reifen, Rechnungsarchiv, Mitarbeiter, Handbuch) ist ohne Eintrag
+  an; **neue Funktionen setzen `defaultEnabled: false`** und werden erst über die Seite „Module & Funktionen“ (später Presets bei der Einrichtung)
+  eingeschaltet. Pflichtmodule/-funktionen sind immer an. Logik und Tests: `catalog-logic.ts` / `catalog-logic.test.ts`.
 * **Wirksam** ist eine Funktion, wenn ihr Modul an ist, sie selbst an ist **und** alle harten Abhängigkeiten (`requires`) wirksam sind.
 * Die Sitzung filtert die Rechte einer Person nach den **wirksamen** Funktionen. Ausgeschaltete Funktionen haben deshalb schlicht
   keine Rechte: `requirePermission()` liefert **404**, Navigation, Widgets und Einstellungs-Reiter erscheinen nicht, Server
@@ -200,6 +203,9 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
   Inhalt, nicht `DocVersion`) die Adresse `/api/docs/images/<id>` enthält; Bilder ohne Seite sehen nur Bearbeiter. Kapitel mit Seiten sind
   nicht löschbar (sonst würde eine Beschränkung aufgehoben).
 * **Fahrzeuge** (`Vehicle.customerId`) sind optional – nie `vehicle.customer.x` ohne Prüfung; Anzeigenamen über `customerDisplayName()`.
+* **Integrität:** Ausgangsrechnungsnummern sind eindeutig (Prüfung in der Transaktion **und** Unique-Schlüssel `Invoice.outgoingKey` = normalisierte Nummer, nur bei `outgoing`, bei Eingang NULL;
+  `src/lib/invoice-number.ts`). Kunden mit Fahrzeugen, Halter-Historie oder Rechnungen sind nicht löschbar (Code **und** `onDelete: Restrict` an `Vehicle.customer`, `VehicleOwnership.customer`,
+  `Invoice.customer`; Termine bleiben `SetNull`). Indizes auf den Fremdschlüsseln von Termin, Rechnung und Doku-Seite.
 * **Sensible Mitarbeiterdaten** (Notfallkontakt, Krankheit) nur mit `employees.sensitive`.
 * **Einstellungen zur Laufzeit** liegen in `AppSetting`; Geheimnisse (Update-Token) verschlüsselt über `setSecret/getSecret`
   (`src/server/settings.ts`), Schlüsseldatei `/data/secret.key` – bewusst nicht Teil der Backups.
@@ -262,6 +268,57 @@ Bearbeiten-Formulare tragen die Version der Zeile (`updatedAt`) als Feld `versio
 `src/lib/concurrency.ts`). Die Server Action belegt die Zeile mit `claimed(...)` und meldet sonst `common.conflict`, statt still
 zu überschreiben. Prüfung und Schreiben, die zusammengehören (z. B. Doppelbelegung eines Arbeitsplatzes), laufen in
 `db.$transaction`. Neue Bearbeiten-Formulare müssen das übernehmen (nur Tabellen mit `updatedAt`).
+
+### Aktionen und Operationen (Aktions-Rahmen)
+
+Jede schreibende Server Action läuft über den Rahmen in `src/server/operations` (Architekturtest: `architecture.test.ts`). Kern ist
+`defineOperation({ name, permission, input, audit, run })`; zwei Adapter machen daraus eine Aktion oder (Gerüst, Kern folgt in P1a-8) einen API-Handler:
+
+```ts
+const saveThingOperation = defineOperation({
+  name: "things.save",
+  permission: "things.edit",            // Pflicht, kein Standard; "authenticated" = jede angemeldete Person (ausgeschrieben)
+  input: schema,                        // Zod; Fehlermeldungen als Meldungsschlüssel (custom: message = Schlüssel, params = Platzhalter)
+  audit: (input) => (input.id ? "thing.update" : "thing.create"), // oder audit: false + auditReason: "Begründung"
+  prepare: async ({ input }) => …,      // optional: Aufwendiges vor der Transaktion (Passwort-Hash, Datei ablegen)
+  run: async ({ input, principal, prepared, tx, audit, emit, afterCommit }) => {
+    if (!(await claimRow(tx.thing, input.id, input.version))) fail("conflict");
+    audit({ target: "…", entityId: "…" });
+    return { id };
+  },
+});
+export const saveThing = defineAction(saveThingOperation, { form: …, revalidate: […], redirect: ({ id }) => …, message: "common.saved" });
+```
+
+* **Der Kern ist transportneutral:** `run` kennt weder `redirect` noch Flash noch Übersetzung noch `next/*` (Architekturtest). Fachfehler: `fail(code, schlüssel)` /
+  `failField(feld, schlüssel)` (`OperationError`, Codes `invalid`, `forbidden`, `notFound`, `conflict`, `duplicate`, `inUse`, `failed`). Datenbankfehler P2002/P2025/P2003 werden zu
+  `duplicate`/`notFound`/`inUse`. Unerwartete Fehler gelangen bis zum Adapter, der nur Art und Code protokolliert (`src/lib/log-safe.ts`: keine Meldung, kein Stack,
+  Steuerzeichen entfernt – auch in Audit-Bezeichnungen).
+* **Ablauf:** Recht → Eingabe (Zod, `fieldErrors()`: Code → Schlüssel) → `prepare` → **eine Transaktion** um `run`, synchrone Hooks und den Audit-Eintrag (keine Änderung ohne
+  Eintrag, kein Eintrag ohne Änderung) → `afterCommit`-Aufgaben. Nicht in der Transaktion (`transaction: false`): lange Vorgänge wie Backup und Update; dann kein Hook.
+  **Innerhalb von `run` nie `db` benutzen, sondern `ctx.tx`** (SQLite hat einen Schreiber – ein zweiter Zugriff über `db` wartet auf die eigene Transaktion). Helfer, die schreiben,
+  nehmen deshalb einen optionalen Client (`setSetting(key, value, tx)`, `setFeatureOverride(…, tx)`). Bearbeiten-Formulare: `claimRow(tx.modell, id, version)` in der Transaktion.
+* **Adapter Server Action** (`defineAction`): versteht `useActionState` (`(prev, formData)` → `ActionState`) **und** `<form action>` (`(formData)`). Ohne Formularzustand (Löschen,
+  Statuswechsel, Schalter) kommt die Rückmeldung als **Flash** (UX-06): Cookie `so_flash` (unter HTTPS `__Host-so_flash`) mit **nur einem Meldungsschlüssel** und einfachen Platzhaltern;
+  `FlashNotice` im Anwendungsrahmen übersetzt und zeigt ihn einmal (`FlashMessage`, löscht das Cookie; Erfolg blendet aus, Fehler bleiben). Der Toast (P2a-2) ersetzt diesen
+  minimalen Meldungsbereich. `redirect()`/`notFound()` werden nie verschluckt (`unstable_rethrow`, Test). Anmeldung/Recht prüft der Adapter wie bisher mit `requireSession`/`requirePermission`
+  (ohne Sitzung `/login`, `mustChangePassword` → `/account`, falsches Recht `/forbidden`, ausgeschaltete Funktion 404); der Kern prüft das Recht zusätzlich.
+* **Adapter API** (`defineApi`, Gerüst): JSON, `Authorization: Bearer` über `setApiAuthenticator` (Standard: lehnt alles mit 401 ab), Statuscodes je Fehlercode, Fehlerformat
+  `{ error: { code, message: <Schlüssel>, params, fields } }`. Das Sitzungs-Cookie wird hier nie gelesen. Formular- und API-Eingabeschemas bleiben getrennt (Formular: `form`-Funktion/
+  Text-Schemas wie `moneyCents`, `dateText` aus `src/lib/zod-fields.ts`); geteilt wird die Domänenebene (Prüfung, Audit).
+* **Audit:** `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Beschriftungen `audit.actions.*`) oder `audit: false` mit `auditReason` (Begründung Pflicht). Fehlschläge außerhalb der
+  Transaktion (z. B. `system.updateFailed`, `backup.restoreFailed`) schreibt `onFailure`. Das Audit-Log wird nach der eingestellten Frist (Standard 730 Tage, Einstellungen → Sicherheit,
+  `src/server/audit-retention.ts`) vom Scheduler täglich bereinigt.
+* **Outbox** (`OutboxEvent`, `src/server/outbox.ts`): `ctx.emit(type, payload, entityId)` schreibt ein Ereignis **in derselben Transaktion** – nach einem Rollback gibt es keines, nach dem
+  Commit genau eines. Der Runner (Job-Runner P1b-0) stellt zu; bis dahin emittiert noch keine Operation Ereignisse (sonst würde die Tabelle unbegrenzt wachsen).
+* **Transaktionale Hooks:** Eine Funktion meldet sich in ihrer `hooks.ts` für eine Operation einer anderen an (`OperationHookDef`), eingesammelt in `src/modules/operation-hooks.ts`
+  (von `registry.ts` wieder ausgegeben). Der Hook läuft **synchron in derselben Transaktion** (nur wenn seine Funktion aktiv ist) und kann mit einem Fehler die Operation verhindern; die
+  auslösende Funktion kennt ihre Abonnenten nicht. Asynchrone Wirkungen (Webhooks, Mail) gehören in die Outbox.
+* **Berechtigungs-Matrix** (`src/server/operations/matrix.test.ts`, generiert aus dem Quelltext): jede Action und jeder Route Handler wird ohne Sitzung, mit `mustChangePassword`, mit falschem Recht
+  (alle Rechte außer dem erforderlichen) und mit ausgeschalteter Funktion aufgerufen und muss ablehnen, ohne etwas zu verändern. Neue Aktionen/Routen sind automatisch dabei; öffentliche Routen
+  (`/api/health`) stehen in einer Ausnahmeliste im Test.
+* **Noch nicht umgestellt** (Liste `LEGACY_ACTION_FILES` in `architecture.test.ts`, darf nur schrumpfen): Anmeldung/Notzugang/Einrichtung (vor der Sitzung, eigene Pfade), Konto, Einstellungen der Person,
+  Dokumentation, Netzwerk, Mitarbeiter, Fuhrpark, Termine, Reifenlager.
 
 ### Anmeldung, Sitzung und Rechte-Hierarchie
 
@@ -392,8 +449,8 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
    Eine Funktion darf mehrere Kapitel beitragen (`id` dann mit Zusatz, z. B. `workshop.warranty.claims`).
 7. Soll eine andere Funktion etwas nutzen, exportiert `public.ts` genau das – und die andere deklariert `requires`/`uses`.
 8. Neue Rechte in `default-roles.ts` den passenden Rollen zuordnen (Administratoren haben sie sofort).
-9. Bearbeiten-Formulare: `version` mitschicken und in der Action `claimed(...)` nutzen (siehe oben); Dateien nur über `files.ts`;
-   löschende/wichtige Aktionen mit `audit(...)` protokollieren (Aktion in `src/lib/audit-actions.ts` + Texte `audit.actions.*`).
+9. Server Actions **immer** über den Aktions-Rahmen (`defineOperation` + `defineAction`, siehe „Aktionen und Operationen“): Bearbeiten-Formulare tragen `version` mit, `run` nutzt `claimRow(tx.modell, id, version)`;
+   Dateien nur über `files.ts`; jede Operation nennt `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Texte `audit.actions.*`) oder begründet den Verzicht. Neue Funktionen standardmäßig mit `defaultEnabled: false`.
 10. `npm run typecheck && npm run lint && npm test` – der Architektur-Test meldet verbotene Importe und fehlende Deklarationen.
 
 ## Konventionen
@@ -426,7 +483,7 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 Datenbank der Anwendung und ersetzt nur den Rand von Next.js (`redirect()`/`notFound()` werfen abfangbare Signale, `cookies()`/`headers()` lesen einen
 Fake-Browser, `server-only`/`next/cache` sind leer). Der zu testende Code wird **danach** mit `await import(...)` geladen; `env.role()`, `env.user()`,
 `env.signIn()`, `form({...})` und `redirectOf(() => action(...))` bilden Formulare und Sitzungen nach (Beispiele: `src/modules/admin/users/actions.test.ts`,
-`src/server/auth/login.test.ts`). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
+`src/server/auth/login.test.ts`). Der **Aktions-Rahmen** hat einen generierten Berechtigungs-Matrixtest (`src/server/operations/matrix.test.ts`) und Architekturregeln (`architecture.test.ts`: jede Action benutzt `defineAction`, `run` bleibt transportneutral). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden), Architekturregeln, Migrations-Läufer (inkl. Verträglichkeit mit der Prisma-CLI), Backups/Restore (echte
 SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle.
 

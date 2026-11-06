@@ -9,7 +9,8 @@ ihre eigenen Einstellungen mit.
   Reverse-Proxy davorsteht**, der die Client-Adresse als letzten Eintrag anhängt (nginx: `proxy_add_x_forwarded_for`). Ohne echten Proxy
   kann jeder die Adresse im Header beliebig vortäuschen und damit fremde Adressen sperren lassen. Auch mit Proxy gilt: Teilen sich
   viele Geräte eine Adresse (Büro-Netz hinter NAT), trifft die Begrenzung je Adresse alle gemeinsam – auch Administratoren, außer auf
-  Geräten, mit denen sie sich schon einmal angemeldet haben. Im Zweifel bleibt die Option aus.
+  Geräten, mit denen sie sich schon einmal angemeldet haben. Im Zweifel bleibt die Option aus. Außerdem: **Audit-Log aufbewahren (Tage)** –
+  ältere Einträge werden täglich gelöscht, Standard 730 Tage; `0` = unbegrenzt (siehe Hilfe „Audit-Log“).
 * **Backups:** Zeitplan der automatischen Backups (siehe Hilfe „Backups“).
 * **Updates:** Zugang für die Update-Prüfung (siehe Hilfe „Updates“).
 * **Termine** und **Reifenlager:** Kalender-Raster, Arbeitsplätze, Terminarten bzw. Ampel-Grenzwerte – beschrieben in der Hilfe

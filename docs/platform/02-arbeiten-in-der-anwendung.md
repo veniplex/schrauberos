@@ -8,6 +8,13 @@ geändert“* – es wird nichts überschrieben. Dann Seite neu laden und die Ä
 
 Bei Terminen kann ein Arbeitsplatz nie doppelt belegt werden, auch wenn zwei Personen gleichzeitig buchen.
 
+## Rückmeldung nach dem Speichern oder Löschen
+
+Aktionen ohne eigenes Formular – Löschen, „Als bezahlt markieren“, Module ein- und ausschalten – melden ihr Ergebnis in einem Kasten oben auf der
+Seite: grün bei Erfolg (verschwindet nach einigen Sekunden), rot bei einem Fehler (bleibt, bis man ihn schließt). Typische Fehler sind
+*„Dieser Eintrag existiert nicht mehr“* (jemand anderes war schneller), *„… wird noch verwendet“* (z. B. ein Kunde mit Fahrzeugen) oder ein fehlendes Recht.
+In Formularen erscheinen Fehler direkt am Feld.
+
 ## Suchen und Filtern
 
 Die Listen (Kunden, Fahrzeuge, Reifensätze, Rechnungen, Mitarbeiter …) haben oben ein Suchfeld und Filter. Die Suche findet
