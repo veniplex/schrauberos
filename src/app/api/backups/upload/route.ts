@@ -9,14 +9,21 @@ import { logError } from "@/lib/log-safe";
 import { audit } from "@/server/audit";
 import { backupsDir } from "@/server/backup/core";
 import { importBackupFile, RestoreError } from "@/server/backup/restore";
+import { startupState } from "@/server/startup-state";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Nimmt eine Sicherungsdatei als rohen Request-Body entgegen (kein Server-Action-Limit, die Datei wird gestreamt) und legt sie
  * nach der Prüfung in die Liste. Schutz vor Fremdaufrufen: Sitzung + Recht, gleiche Herkunft und ein eigener Header.
+ *
+ * Diese Route läuft **nicht** durch den Proxy (Matcher in `src/proxy.ts`): Der Proxy puffert den Body und schneidet ihn bei 10 MiB stumm ab.
+ * Deshalb beantwortet sie den Zustand „Neuinstallation nötig“ (fremde Datenbank, die App fasst sie nicht an) selbst mit 503 – vor allem anderen.
  */
 export async function POST(request: NextRequest) {
+  if (startupState().status === "reinstall") {
+    return NextResponse.json({ status: "reinstall" }, { status: 503, headers: { "cache-control": "no-store", "retry-after": "3600" } });
+  }
   const session = await getSession();
   if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!session.can("backup.manage")) return NextResponse.json({ error: "forbidden" }, { status: 403 });

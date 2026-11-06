@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, readdirSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { NextRequest } from "next/server";
 import * as tar from "tar";
+import { startupState } from "@/server/startup-state";
 import { createTestEnv, type TestEnv } from "@/test/harness";
 
 /**
@@ -198,6 +200,45 @@ describe("Sicherung hochladen", () => {
     assert.deepEqual(uploads(), []);
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "backup.upload" } });
     assert.equal(entry.target, name);
+  });
+
+  it("Zustand „Neuinstallation nötig“: 503, auch mit Sitzung – die Route läuft nicht durch den Proxy und beantwortet das selbst, es wird nichts angelegt", async () => {
+    await signInWith(["backup.manage"]);
+    const state = startupState();
+    const before = state.status;
+    const count = core.listBackups().length;
+    state.status = "reinstall";
+    try {
+      const res = await post(archive);
+      assert.equal(res.status, 503);
+      assert.deepEqual(await res.json(), { status: "reinstall" });
+    } finally {
+      state.status = before;
+    }
+    assert.equal(core.listBackups().length, count);
+    assert.deepEqual(uploads(), []);
+  });
+
+  it("eine Sicherung über 10 MiB (Puffergrenze des Proxys) kommt vollständig an und wird angelegt (ZP2-A-F1)", async () => {
+    await signInWith(["backup.manage"]);
+    const info = await core.createBackup("manual");
+    const dir = core.backupPath(info.name)!;
+    mkdirSync(path.join(dir, "files", "gross"), { recursive: true });
+    const big = path.join(dir, "files", "gross", "beleg.bin");
+    writeFileSync(big, randomBytes(11 * 1024 * 1024));
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      const pack = tar.c({ cwd: dir, portable: true }, ["."]);
+      pack.on("data", (c: Buffer) => chunks.push(c));
+      pack.on("end", resolve);
+      pack.on("error", reject);
+    });
+    const large = Buffer.concat(chunks);
+    assert.ok(large.length > 11 * 1024 * 1024);
+    const res = await post(large);
+    assert.equal(res.status, 200, await res.clone().text());
+    const { name } = (await res.json()) as { name: string };
+    assert.equal(statSync(path.join(core.backupPath(name)!, "files", "gross", "beleg.bin")).size, 11 * 1024 * 1024, "die Datei ist nicht abgeschnitten");
   });
 
   it("Müll, leerer Body und fremde Datenbanken: abgelehnt (422/400), Zwischendatei weg, Fehlschlag im Audit – nur mit Fehlercode", async () => {

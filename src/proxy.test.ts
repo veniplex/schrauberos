@@ -52,8 +52,15 @@ describe("Proxy: Anmeldeseite und Weiterleitungen", () => {
 
 describe("Proxy: Matcher", () => {
   it("nimmt Statik, Manifest, Service Worker, Icons und Health aus", () => {
-    for (const path of ["/_next/static/chunks/a.js", "/_next/image", "/favicon.ico", "/manifest.webmanifest", "/sw.js", "/icon.png", "/apple-icon.png", "/icons/192.png", "/api/health"]) {
+    for (const path of ["/_next/static/chunks/a.js", "/_next/image", "/favicon.ico", "/manifest.webmanifest", "/sw.js", "/icon.png", "/apple-icon.png", "/icons/192.png", "/api/health", "/api/backups/upload"]) {
       assert.equal(matched(path), false, `${path} darf nicht durch den Proxy laufen`);
+    }
+  });
+
+  it("/api/backups/upload läuft nicht durch den Proxy (Next puffert und kappt dort den Body bei 10 MiB), ähnliche Pfade schon", () => {
+    assert.equal(matched("/api/backups/upload"), false);
+    for (const path of ["/api/backups/upload/x", "/api/backups/uploads", "/api/backups/status", "/api/backups/schrauberos-1", "/api/docs/images"]) {
+      assert.equal(matched(path), true, `${path} muss durch den Proxy laufen`);
     }
   });
 

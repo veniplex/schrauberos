@@ -40,8 +40,12 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Ausgenommen (öffentlich): Statik, Manifest, Service Worker, Icons und der Health-Check. /api/v1 und /api/ical laufen durch den Proxy
+// Ausgenommen: Statik, Manifest, Service Worker, Icons, der Health-Check und der Upload von Sicherungen. /api/v1 und /api/ical laufen durch den Proxy
 // (wegen „Neuinstallation nötig“), brauchen aber kein Sitzungs-Cookie. Der Matcher muss ein Literal sein, Next liest ihn beim Build.
+//
+// `/api/backups/upload` läuft bewusst **nicht** durch den Proxy: Next puffert den Request-Body für den Proxy im Speicher und schneidet ihn bei
+// `experimental.proxyClientMaxBodySize` (Standard 10 MiB) **stumm** ab – eine größere Sicherung käme verstümmelt (und ein Gigabyte im Speicher) an.
+// Die Route prüft Sitzung, Recht, Herkunft und den Zustand „Neuinstallation nötig“ selbst und streamt den Body auf die Platte.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|sw\\.js|icon\\.|apple-icon\\.|icons/|api/health$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|sw\\.js|icon\\.|apple-icon\\.|icons/|api/health$|api/backups/upload$).*)"],
 };

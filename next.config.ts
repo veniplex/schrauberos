@@ -13,14 +13,22 @@ export const SECURITY_HEADERS = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy({ dev: process.env.NODE_ENV !== "production" }) },
 ];
 
+/** Grenzen für Anfrage-Bodies in Byte-Schreibweise von Next; der Proxy-Puffer muss größer sein als das Limit der Server Actions. */
+export const SERVER_ACTION_BODY_LIMIT = "12mb";
+export const PROXY_BODY_LIMIT = "13mb";
+
 const nextConfig: NextConfig = {
   // Das Dashboard ist komplett eingeloggt und datengetrieben -> klassisches dynamisches Rendering.
   cacheComponents: false,
   partialPrefetching: false,
   output: "standalone",
   experimental: {
-    // Rechnungs-Uploads (bis 10 MB) und Doku-Bilder laufen über Server Actions / Route Handler
-    serverActions: { bodySizeLimit: "12mb" },
+    // Rechnungs-Uploads (bis 10 MB) laufen über Server Actions (Datei + Formularfelder, mit Rand < 12 MB)
+    serverActions: { bodySizeLimit: SERVER_ACTION_BODY_LIMIT },
+    // Der Proxy läuft vor jeder Anfrage; Next puffert dafür den Body und schneidet ihn bei diesem Limit **stumm** ab (Standard 10 MiB:
+    // ein Beleg nahe 10 MB samt Formular käme abgeschnitten an). Etwas über dem Limit der Server Actions, nicht global hoch (Speicher je Anfrage).
+    // Die Sicherungs-Uploads (beliebig groß) laufen gar nicht durch den Proxy (`src/proxy.ts`, Matcher).
+    proxyClientMaxBodySize: PROXY_BODY_LIMIT,
   },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
