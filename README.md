@@ -300,8 +300,8 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
 ```
 
 * **Der Kern ist transportneutral:** `run` kennt weder `redirect` noch Flash noch Übersetzung noch `next/*` (Architekturtest). Fachfehler: `fail(code, schlüssel)` /
-  `failField(feld, schlüssel)` (`OperationError`, Codes `invalid`, `forbidden`, `notFound`, `conflict`, `duplicate`, `inUse`, `failed`). Datenbankfehler P2002/P2025/P2003 werden zu
-  `duplicate`/`notFound`/`inUse`. Unerwartete Fehler gelangen bis zum Adapter, der nur Art und Code protokolliert (`src/lib/log-safe.ts`: keine Meldung, kein Stack,
+  `failField(feld, schlüssel)` (`OperationError`, Codes `invalid`, `forbidden`, `notFound`, `conflict`, `duplicate`, `inUse`, `busy`, `failed`). Datenbankfehler werden zu Fachfehlern: P2002 → `duplicate`, P2025 → `notFound`, P2003 → `inUse` **beim Löschen** (Operationsname enthält `delete`/`remove`), sonst `invalid`
+  (ein Verweis ist ungültig geworden), P2028 (Transaktion kam nicht zustande) → `busy` (API: 503 mit `Retry-After`, Formular: „Datenbank ausgelastet“). Unerwartete Fehler gelangen bis zum Adapter, der nur Art und Code protokolliert (`src/lib/log-safe.ts`: keine Meldung, kein Stack,
   Steuerzeichen entfernt – auch in Audit-Bezeichnungen).
 * **Ablauf:** Recht → Eingabe (Zod, `fieldErrors()`: Code → Schlüssel) → `prepare` → **eine Transaktion** um `run`, synchrone Hooks und den Audit-Eintrag (keine Änderung ohne
   Eintrag, kein Eintrag ohne Änderung) → `afterCommit`-Aufgaben. Nicht in der Transaktion (`transaction: false`): lange Vorgänge wie Backup und Update; dann kein Hook.
@@ -314,8 +314,9 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
   (ohne Sitzung `/login`, `mustChangePassword` → `/account`, falsches Recht `/forbidden`, ausgeschaltete Funktion 404); der Kern prüft das Recht zusätzlich.
 * **Adapter API** (`runApiOperation` in `src/server/operations/api.ts`): übersetzt Ergebnis und Fehler einer Operation in HTTP-Semantik (Problem-Format, Statuscodes). Pipeline und Ressourcen: Abschnitt „Programmierschnittstelle“. Formular- und API-Eingabeschemas bleiben getrennt (Formular: Text-Schemas wie `moneyCents`, `dateText` aus `src/lib/zod-fields.ts`; API: JSON-Typen, Geld als Cent); geteilt wird die Domänenebene (Prüfung, Audit).
 * **Audit:** `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Beschriftungen `audit.actions.*`) oder `audit: false` mit `auditReason` (Begründung Pflicht). Fehlschläge außerhalb der
-  Transaktion (z. B. `system.updateFailed`, `backup.restoreFailed`) schreibt `onFailure`. Das Audit-Log wird nach der eingestellten Frist (Standard 730 Tage, Einstellungen → Sicherheit,
-  `src/server/audit-retention.ts`) vom Scheduler täglich bereinigt.
+  Transaktion (z. B. `system.updateFailed`, `backup.restoreFailed`) schreibt `onFailure`. Bei `transaction: false` (Wiederherstellung, Update, Backup) ist die Wirkung beim Protokollieren schon eingetreten: Ein Fehler im Audit-Eintrag wird **protokolliert, bricht die Operation aber nicht ab**
+  (sonst bliebe z. B. der vorgemerkte Neustart aus); innerhalb der Transaktion gilt weiter „keine Änderung ohne Eintrag“. Das Audit-Log wird nach der eingestellten Frist (Standard 730 Tage, **mindestens 30 Tage** oder 0 = unbegrenzt; Einstellungen → Sicherheit, die Änderung steht mit altem und neuem Wert im Log;
+  `src/server/audit-retention.ts`) vom Scheduler (`startScheduler`, `src/server/backup/scheduler.ts`) täglich bereinigt; ein Lauf gilt erst nach Erfolg als erledigt.
 * **Outbox** (`OutboxEvent`, `src/server/outbox.ts`): `ctx.emit(type, payload, entityId)` schreibt ein Ereignis **in derselben Transaktion** – nach einem Rollback gibt es keines, nach dem
   Commit genau eines. Der Runner (Job-Runner P1b-0) stellt zu; bis dahin emittiert noch keine Operation Ereignisse (sonst würde die Tabelle unbegrenzt wachsen).
 * **Transaktionale Hooks:** Eine Funktion meldet sich in ihrer `hooks.ts` für eine Operation einer anderen an (`OperationHookDef`), eingesammelt in `src/modules/operation-hooks.ts`
@@ -336,7 +337,7 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
 
 ### Programmierschnittstelle (API-Kern, `/api/v1`)
 
-Andere Systeme können Daten über `/api/v1` lesen und schreiben. Der **API-Kern** (Tokens, Authentifizierung, Rate-Limit, Idempotenz, Fehlerformat, OpenAPI) steht in `src/server/api`
+Andere Systeme können Daten über `/api/v1` lesen und schreiben. **Nur über HTTPS betreiben** (oder im vertrauenswürdigen LAN): Das Token steht bei jeder Anfrage im Header und ist ein Klartext-Geheimnis. Der **API-Kern** (Tokens, Authentifizierung, Rate-Limit, Idempotenz, Fehlerformat, OpenAPI) steht in `src/server/api`
 und `src/lib/api`; **jede fachliche Funktion bringt ihre Ressourcen in einer `api.ts` mit**. Noch nicht vorhanden (Block F11 „API & Webhooks“): Oberfläche zur Token-Verwaltung,
 Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen – bis dahin gibt es dafür weder Hilfe-Kapitel noch Bedienung in der App.
 
@@ -403,8 +404,11 @@ Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen 
   Klartext-Cookie zählt nicht – Cookie Tossing; `src/lib/session-cookie.ts`, gilt auch im Proxy). Abmelden löscht den `__Host-`-Cookie mit
   `Secure`, Pfad `/` und `Max-Age=0` (`cookies().delete()` täte das nicht, der Browser verwürfe es). Der Proxy (`src/proxy.ts`) prüft nur, ob ein Cookie da ist, und leitet
   **nie von `/login` weg** – die Anmeldeseite prüft die Sitzung selbst (totes Cookie → Formular statt Schleife). Ausgenommen vom Proxy
-  (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons und `/api/health`. `/api/v1/*` (Bearer-Token) und `/api/ical/*`
+  (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons, `/api/health` und der **Upload von Sicherungen** `/api/backups/upload`. `/api/v1/*` (Bearer-Token) und `/api/ical/*`
   (Token in der URL) laufen durch den Proxy (wegen „Neuinstallation nötig“), brauchen aber kein Sitzungs-Cookie; übrige `/api/*` ohne Cookie antworten mit 401.
+  **Warum der Upload nicht durch den Proxy läuft:** Next puffert den Request-Body für den Proxy im Speicher und **schneidet ihn bei `experimental.proxyClientMaxBodySize` (Standard 10 MiB) stumm ab** – eine größere Sicherung käme verstümmelt an (und ein Gigabyte läge im Speicher).
+  `/api/backups/upload` ist deshalb aus dem Matcher genommen und prüft Sitzung, Recht, Herkunft und den Zustand „Neuinstallation nötig“ (503) selbst; sie streamt den Body auf die Platte (Tests: `files.test.ts` mit 11 MiB, `proxy.test.ts`, `next-config.test.ts`). Für die Server Actions
+  (Belege bis 10 MiB plus Formular, `serverActions.bodySizeLimit` 12 MB) steht `proxyClientMaxBodySize` auf 13 MB – bewusst nicht global hoch (der Puffer liegt je Anfrage im Speicher). Doku-Bilder (`/api/docs/images`, höchstens 2 MiB) liegen darunter. Neue Upload-Wege über 10 MiB gehören ebenfalls aus dem Matcher.
   Der Titel einer Detailseite (`generateMetadata`) wird nur mit dem Recht der Seite aus der Datenbank gelesen (`sessionIfAllowed`, `src/server/auth/session.ts`; er steht sonst
   schon im gestreamten HTML, bevor die Seite prüft – Test `app/metadata.test.ts`, Architekturregel).
 * **Passwörter:** scrypt aus `node:crypto` (`src/server/auth/scrypt.ts`, N=2^15, r=8, p=1, Kosten stehen im Hash). Anmeldungen: höchstens **2** Berechnungen
