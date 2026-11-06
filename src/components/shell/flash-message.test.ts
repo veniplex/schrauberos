@@ -32,7 +32,7 @@ afterEach(async () => {
   cookieWrites = [];
 });
 
-const props = { id: "a1", cookieName: "so_flash", tone: "success" as const, text: "Gespeichert.", closeLabel: "Schließen" };
+const props = { id: "a1", cookieName: "so_flash", tone: "success" as "success" | "error", text: "Gespeichert.", closeLabel: "Schließen" };
 async function show(overrides: Partial<typeof props> = {}) {
   const { FlashMessage } = await import("./flash-message");
   view = await mount(createElement(FlashMessage, { ...props, ...overrides }));
@@ -120,11 +120,11 @@ describe("FlashNotice: Live-Regionen immer im DOM", () => {
     env.browser.reset();
     await flashCookie("success");
     let html = await render();
-    assert.match(html, /data-flash-region="polite"[^>]*>.*data-flash="success".*<\/div><div[^>]*data-flash-region="assertive"[^>]*><\/div>/s);
+    assert.match(html, /data-flash-region="polite"[^>]*>[\s\S]*data-flash="success"[\s\S]*<\/div><div[^>]*data-flash-region="assertive"[^>]*><\/div>/);
 
     env.browser.reset();
     await flashCookie("error");
     html = await render();
-    assert.match(html, /data-flash-region="polite"[^>]*><\/div><div[^>]*data-flash-region="assertive"[^>]*>.*data-flash="error"/s);
+    assert.match(html, /data-flash-region="polite"[^>]*><\/div><div[^>]*data-flash-region="assertive"[^>]*>[\s\S]*data-flash="error"/);
   });
 });

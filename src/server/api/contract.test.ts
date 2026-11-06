@@ -207,7 +207,7 @@ describe("Beschreibung gegen echte Antworten: Schreiben und Fehler", () => {
     for (const header of ["ratelimit-limit", "ratelimit-remaining", "ratelimit-reset"]) assert.ok(res.headers.get(header), header);
     problemSchema().parse(res.json);
     const op = doc.paths["/customers"].get.responses["429"];
-    assert.ok(deref(op).headers["Retry-After"], "Retry-After ist dokumentiert");
+    assert.ok((deref(op) as Json).headers["Retry-After"], "Retry-After ist dokumentiert");
   });
 
   it("alles, was beobachtet wurde, steht in der Beschreibung (Statuscode je Operation)", () => {
