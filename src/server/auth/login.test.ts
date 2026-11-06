@@ -559,15 +559,20 @@ describe("Anmeldeseite", () => {
 });
 
 describe("Passwörter", () => {
-  it("scrypt: Hashformat, Kosten im Hash, Anmeldezeit unter einer Sekunde", async () => {
+  it("scrypt: Hashformat, Kosten im Hash, Anmeldezeit nahe am Plan-Ziel (unter 300 ms, Median von drei Anmeldungen)", async () => {
     const user = await makeUser("anna");
     const row = await env.db.user.findUniqueOrThrow({ where: { id: user.id } });
     assert.match(row.passwordHash ?? "", /^scrypt\$32768\$8\$1\$/);
-    const started = performance.now();
-    assert.equal((await attempt("anna", "richtiges-passwort-1")).ok, true);
-    const ms = performance.now() - started;
-    console.log(`  Anmeldezeit (scrypt N=2^15) auf diesem Rechner: ${ms.toFixed(0)} ms`);
-    assert.ok(ms < 1000, `Anmeldung dauerte ${ms} ms`);
+    const times: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      browser.reset();
+      const started = performance.now();
+      assert.equal((await attempt("anna", "richtiges-passwort-1")).ok, true);
+      times.push(performance.now() - started);
+    }
+    const median = [...times].sort((a, b) => a - b)[1];
+    console.log(`  Anmeldezeit (scrypt N=2^15), Median von drei: ${median.toFixed(0)} ms (Ziel auf kleiner Hardware: unter ca. 300 ms)`);
+    assert.ok(median < 300, `Anmeldung dauerte im Median ${median} ms`);
   });
 
   it("überlange Passwörter werden abgewiesen, ohne zu hashen oder zu zählen", async () => {

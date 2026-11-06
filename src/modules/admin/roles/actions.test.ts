@@ -139,3 +139,61 @@ describe("deleteRole – Rechte-Hierarchie", () => {
     assert.equal(await env.db.role.count({ where: { id: ok.id } }), 0);
   });
 });
+
+describe("Rolle duplizieren (/admin/roles/new?from=…)", () => {
+  type Initial = { name: string; description: string; isAdmin: boolean; permissions: string[] };
+  /** Rendert die Seite nicht, sondern liest die Vorbelegung, die sie dem Formular übergibt. */
+  const initialOf = async (from: string): Promise<Initial> => {
+    const { default: NewRolePage } = await import("@/app/(app)/(admin)/admin/roles/new/page");
+    const element = (await NewRolePage({ searchParams: Promise.resolve({ from }) })) as { props: { children: Array<{ props: { initial?: Initial } }> } };
+    const form = element.props.children.find((c) => c?.props?.initial);
+    assert.ok(form, "das Formular erhält eine Vorbelegung");
+    return form.props.initial!;
+  };
+
+  it("übernimmt Namen („Kopie von …“), Beschreibung und die Rechte, die der Aufrufer vergeben darf", async () => {
+    const source = await env.role({ name: "Vorlage", permissions: ["appointments.view", "appointments.edit"] });
+    await env.db.role.update({ where: { id: source.id }, data: { description: "für Annahme" } });
+    const initial = await initialOf(source.id);
+    assert.match(initial.name, /Vorlage/);
+    assert.notEqual(initial.name, "Vorlage");
+    assert.equal(initial.description, "für Annahme");
+    assert.deepEqual([...initial.permissions].sort(), ["appointments.edit", "appointments.view"]);
+  });
+
+  it("lässt Rechte weg, die der Aufrufer selbst nicht vergeben darf (nicht besessen oder adminOnly)", async () => {
+    const source = await env.role({ name: "Mächtig", permissions: ["appointments.view", "invoices.edit", "users.manage"] });
+    const initial = await initialOf(source.id);
+    assert.deepEqual(initial.permissions, ["appointments.view"]);
+  });
+
+  it("die Kopie einer Administrator-Rolle enthält für Nicht-Admins keine Verwaltungsrechte, für Administratoren alle Rechte", async () => {
+    const asManager = await initialOf(adminRole.id);
+    assert.ok(asManager.permissions.every((p) => ["appointments.view", "appointments.edit", "tires.view"].includes(p)), asManager.permissions.join());
+    assert.ok(!asManager.permissions.includes("users.manage"));
+    await env.signIn(admin2);
+    const asAdmin = await initialOf(adminRole.id);
+    assert.ok(asAdmin.permissions.includes("users.manage") && asAdmin.permissions.includes("appointments.view"));
+  });
+
+  it("ohne Recht roles.manage ist die Seite gesperrt", async () => {
+    const plain = await env.user({ username: "plain", roles: [await env.role({ permissions: ["appointments.view"] })] });
+    await env.signIn(plain);
+    const { default: NewRolePage } = await import("@/app/(app)/(admin)/admin/roles/new/page");
+    assert.equal(await redirectOf(() => NewRolePage({ searchParams: Promise.resolve({}) })), "/forbidden");
+  });
+});
+
+describe("saveRole – gleichzeitiges Bearbeiten", () => {
+  it("drei gleichzeitige Speicherungen derselben Version: genau eine gewinnt, die anderen melden den Konflikt", async () => {
+    const target = await env.role({ name: "Gemeinsam", permissions: ["appointments.view"] });
+    const version = versionOf(await env.db.role.findUniqueOrThrow({ where: { id: target.id } }));
+    const submit = (name: string) => actions.saveRole({}, form({ id: target.id, version, name, permission: ["appointments.view"] }));
+    const results = await Promise.allSettled([submit("Name A"), submit("Name B"), submit("Name C")]);
+    const redirected = results.filter((r) => r.status === "rejected" && /NEXT_REDIRECT/.test(String(r.reason)));
+    const conflicts = results.filter((r) => r.status === "fulfilled" && r.value.error === de.common.conflict);
+    assert.equal(redirected.length, 1, JSON.stringify(results.map((r) => r.status)));
+    assert.equal(conflicts.length, 2);
+    assert.match((await env.db.role.findUniqueOrThrow({ where: { id: target.id } })).name, /^Name [ABC]$/);
+  });
+});

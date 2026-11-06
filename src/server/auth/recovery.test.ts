@@ -286,6 +286,25 @@ describe("Aktionen", () => {
     const failed = entries.filter((e) => e.action === "auth.recoveryFailed").length;
     assert.ok(failed >= 1 && failed <= 2, `Fehlversuche nur gedrosselt protokollieren, waren ${failed}`);
   });
+
+  it("ein Fehler im Audit-Log verhindert nicht, dass der neue Code angezeigt wird (der alte ist da schon verbraucht)", async () => {
+    const code = await issue();
+    const original = env.db.auditLog.create.bind(env.db.auditLog);
+    (env.db.auditLog as { create: unknown }).create = () => Promise.reject(new Error("Audit kaputt"));
+    const logged = console.error;
+    console.error = () => undefined;
+    try {
+      const state = await recoverActions.recoverAccess({}, recoverForm(code));
+      assert.ok(state.ok && state.recoveryCode, "der neue Code wird trotzdem angezeigt");
+      // dasselbe beim Erzeugen im Konto
+      await env.signIn(admin);
+      const created = await accountActions.createRecoveryCode({}, form({ password: NEW_PASSWORD }));
+      assert.ok(created.ok && created.recoveryCode);
+    } finally {
+      console.error = logged;
+      (env.db.auditLog as { create: unknown }).create = original;
+    }
+  });
 });
 
 describe("Hinweis „Notzugang wurde verwendet“", () => {
@@ -326,6 +345,14 @@ describe("Hinweis „Notzugang wurde verwendet“", () => {
     // bestätigen geht weiterhin, danach ist er weg
     await recovery.acknowledgeRecoveryNotice(notice.id, { id: admin2.id, isAdmin: true });
     assert.equal((await recovery.recoveryBannerData({ id: admin2.id, isAdmin: true })).notices.length, 0);
+  });
+
+  it("confirmRecoveryCode meldet ok, wenn der Code bestätigt ist (auch beim zweiten Mal), und nicht ok ohne Code", async () => {
+    await env.signIn(admin);
+    assert.deepEqual(await accountActions.confirmRecoveryCode(), { ok: false }, "ohne Code gibt es nichts zu bestätigen");
+    await issue();
+    assert.deepEqual(await accountActions.confirmRecoveryCode(), { ok: true });
+    assert.deepEqual(await accountActions.confirmRecoveryCode(), { ok: true }, "schon bestätigt bleibt ok");
   });
 
   it("zeigt Administratoren, dass der eigene Code noch nicht bestätigt ist", async () => {

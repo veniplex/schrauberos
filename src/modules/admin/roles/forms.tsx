@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { type ActionState, Checkbox, Field, FormMessage, Input } from "@/components/ui/form";
 import { Button, LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
+import { togglePermission, toggleGroupPermissions } from "@/lib/role-mask";
 import { useI18n } from "@/i18n/client";
 import { saveRole } from "./actions";
 
@@ -30,27 +31,9 @@ export function RoleForm({
   const err = state.fieldErrors ?? {};
 
   const locked = new Set(lockedPermissions);
-  // „Bearbeiten“ setzt „Ansehen“ (Rechte ohne Ansehen-Recht sind sinnlos); wer „Ansehen“ abwählt, verliert die übrigen Rechte der Gruppe
-  const toggle = (key: string, on: boolean, groupKeys: readonly string[]) =>
-    setSelected((s) => {
-      const next = new Set(s);
-      const [group, action] = key.split(".");
-      const view = `${group}.view`;
-      if (on) {
-        next.add(key);
-        if (action !== "view" && groupKeys.includes(view) && !locked.has(view)) next.add(view);
-      } else {
-        next.delete(key);
-        if (action === "view") groupKeys.filter((k) => !locked.has(k)).forEach((k) => next.delete(k));
-      }
-      return next;
-    });
-  const toggleGroup = (keys: readonly string[], on: boolean) =>
-    setSelected((s) => {
-      const next = new Set(s);
-      keys.filter((k) => !locked.has(k)).forEach((k) => (on ? next.add(k) : next.delete(k)));
-      return next;
-    });
+  // Regeln der Maske („Bearbeiten“ setzt „Ansehen“ …): src/lib/role-mask.ts, getestet
+  const toggle = (key: string, on: boolean, groupKeys: readonly string[]) => setSelected((s) => togglePermission(s, key, on, groupKeys, locked));
+  const toggleGroup = (keys: readonly string[], on: boolean) => setSelected((s) => toggleGroupPermissions(s, keys, on, locked));
 
   return (
     <form action={action} className="flex max-w-4xl flex-col gap-5">

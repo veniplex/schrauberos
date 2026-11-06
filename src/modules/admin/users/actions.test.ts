@@ -160,3 +160,99 @@ describe("deleteUser – Rechte-Hierarchie", () => {
     assert.equal(await env.db.user.count({ where: { id: basic.id } }), 0);
   });
 });
+
+describe("unlockUser – Rechte-Hierarchie", () => {
+  const lock = (u: User) => env.db.user.update({ where: { id: u.id }, data: { failedLogins: 6, lockedUntil: new Date(Date.now() + 60_000) } });
+  const state = async (u: User) => {
+    const row = await env.db.user.findUniqueOrThrow({ where: { id: u.id } });
+    return { failed: row.failedLogins, locked: row.lockedUntil !== null };
+  };
+
+  it("hebt die Wartezeit eines Kontos auf, dessen Rechte eine Teilmenge der eigenen sind, und protokolliert das Konto im Audit", async () => {
+    await lock(basic);
+    const target = await redirectOf(() => actions.unlockUser(form({ id: basic.id })));
+    assert.equal(target, `/admin/users/${basic.id}?unlocked=1`);
+    assert.deepEqual(await state(basic), { failed: 0, locked: false });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "user.unlock" } });
+    assert.equal(entry.target, "basic");
+    assert.equal(entry.entityId, basic.id);
+  });
+
+  it("lässt die Wartezeit eines mächtigeren Kontos und eines Administrator-Kontos stehen", async () => {
+    await lock(victim);
+    await lock(admin2);
+    for (const u of [victim, admin2]) {
+      const target = await redirectOf(() => actions.unlockUser(form({ id: u.id })));
+      assert.match(target ?? "", /^\/admin\/users\?error=/);
+      assert.deepEqual(await state(u), { failed: 6, locked: true });
+    }
+  });
+
+  it("ohne Recht users.manage geht es nach /forbidden; ein unbekanntes Konto führt zur Liste", async () => {
+    await lock(basic);
+    await env.signIn(basic);
+    assert.equal(await redirectOf(() => actions.unlockUser(form({ id: basic.id }))), "/forbidden");
+    assert.deepEqual(await state(basic), { failed: 6, locked: true });
+    await env.signIn(manager);
+    assert.equal(await redirectOf(() => actions.unlockUser(form({ id: "gibt-es-nicht" }))), "/admin/users");
+  });
+});
+
+describe("deleteUser und saveUser – Schutz der eigenen Person und des letzten Administrators", () => {
+  it("löscht das eigene Konto nicht", async () => {
+    assert.equal(await redirectOf(() => actions.deleteUser(form({ id: manager.id }))), "/admin/users");
+    assert.equal(await env.db.user.count({ where: { id: manager.id } }), 1);
+    await env.signIn(admin2);
+    await redirectOf(() => actions.deleteUser(form({ id: admin2.id })));
+    assert.equal(await env.db.user.count({ where: { id: admin2.id } }), 1);
+  });
+
+  it("ein Administrator löscht einen zweiten Administrator nur, solange er selbst als aktiver Administrator übrig bleibt", async () => {
+    const admin3 = await env.user({ username: "admin3", roles: [adminRole] });
+    await env.signIn(admin2);
+    assert.equal(await redirectOf(() => actions.deleteUser(form({ id: admin3.id }))), "/admin/users");
+    assert.equal(await env.db.user.count({ where: { id: admin3.id } }), 0);
+    assert.equal(await env.db.user.count({ where: { id: admin2.id } }), 1, "der letzte Administrator bleibt");
+  });
+
+  it("der einzige aktive Administrator kann sich weder die Rolle nehmen noch sich deaktivieren (saveUser)", async () => {
+    await env.signIn(admin2);
+    const noRole = await edit(admin2, { roleId: [] });
+    assert.equal(noRole.error, de.users.errors.lastAdmin);
+    const inactive = await edit(admin2, { active: false });
+    assert.equal(inactive.error, de.users.errors.lastAdmin);
+    assert.deepEqual(await rolesOf(admin2), [adminRole.id]);
+    // mit einem zweiten aktiven Administrator geht die Rollenänderung
+    await env.user({ username: "admin3", roles: [adminRole] });
+    const target = await redirectOf(() => edit(admin2, { roleId: [lowRole.id] }));
+    assert.match(target ?? "", /^\/admin\/users\?saved=/);
+  });
+});
+
+describe("saveUser – gleichzeitiges Bearbeiten", () => {
+  it("zwei gleichzeitige Speicherungen derselben Version: genau eine gewinnt, die andere meldet den Konflikt (nichts geht still verloren)", async () => {
+    const fresh = await env.db.user.findUniqueOrThrow({ where: { id: basic.id }, include: { roles: true } });
+    const { versionOf } = await import("@/lib/concurrency");
+    const submit = (name: string) =>
+      actions.saveUser({}, form({ id: basic.id, version: versionOf(fresh), username: basic.username, name, active: true, roleId: fresh.roles.map((r) => r.roleId) }));
+    const results = await Promise.allSettled([submit("Name A"), submit("Name B"), submit("Name C")]);
+    const redirected = results.filter((r) => r.status === "rejected" && /NEXT_REDIRECT/.test(String(r.reason)));
+    const conflicts = results.filter((r) => r.status === "fulfilled" && r.value.error === de.common.conflict);
+    assert.equal(redirected.length, 1, JSON.stringify(results.map((r) => r.status)));
+    assert.equal(conflicts.length, 2);
+    assert.match((await env.db.user.findUniqueOrThrow({ where: { id: basic.id } })).name, /^Name [ABC]$/);
+  });
+
+  it("eine Anmeldung zwischen Öffnen und Speichern erzeugt keinen Schein-Konflikt (Anmeldezähler ändern die Version nicht)", async () => {
+    const fresh = await env.db.user.findUniqueOrThrow({ where: { id: basic.id }, include: { roles: true } });
+    const { versionOf } = await import("@/lib/concurrency");
+    const { login } = await import("@/server/auth/session");
+    await login("basic", "falsches-passwort-1"); // Fehlversuch
+    await login("basic", "basic-pass-1"); // Anmeldung
+    await env.signIn(manager); // die Anmeldung hat den Fake-Browser auf „basic“ gestellt
+    const target = await redirectOf(() =>
+      actions.saveUser({}, form({ id: basic.id, version: versionOf(fresh), username: basic.username, name: "Neuer Name", active: true, roleId: fresh.roles.map((r) => r.roleId) })),
+    );
+    assert.match(target ?? "", /^\/admin\/users\?saved=/);
+  });
+});

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
-import { createTestEnv, form, type TestEnv } from "@/test/harness";
+import { browser, createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
 
 /** Werkstatt-Einstellungen: Die Zeitzone des Prozesses ändert sich nur, wenn tatsächlich gespeichert wurde. */
 let env: TestEnv;
@@ -15,6 +15,8 @@ after(() => env.cleanup());
 
 beforeEach(async () => {
   await env.db.user.deleteMany();
+  await env.db.appSetting.deleteMany();
+  browser.reset();
   const admin = await env.user({ username: "chef", roles: [await env.role({ key: `admin-${Math.random()}`, isAdmin: true })] });
   await env.signIn(admin);
   process.env.TZ = "Europe/Berlin";
@@ -40,5 +42,35 @@ describe("saveWorkshop", () => {
     const state = await actions.saveWorkshop({}, workshopForm({ timezone: "Mars/Olympus" }));
     assert.ok(state.fieldErrors?.timezone);
     assert.equal(process.env.TZ, "Europe/Berlin");
+  });
+});
+
+describe("saveSecurity (Hinter Reverse-Proxy)", () => {
+  it("speichert die Einstellung, wirkt auf die Client-Adresse und wird protokolliert", async () => {
+    const network = await import("@/server/auth/network");
+    browser.setHeaders({ "x-forwarded-for": "1.1.1.1, 7.7.7.7" });
+    assert.equal(await network.currentClientIp(), null, "ohne die Einstellung wird der Header ignoriert");
+
+    assert.equal((await actions.saveSecurity({}, form({ behindProxy: true }))).ok, true);
+    assert.equal(await network.isBehindProxy(), true);
+    assert.equal(await network.currentClientIp(), "7.7.7.7", "mit Einstellung zählt der letzte Eintrag");
+
+    assert.equal((await actions.saveSecurity({}, form({}))).ok, true);
+    assert.equal(await network.isBehindProxy(), false);
+    assert.equal(await network.currentClientIp(), null);
+    assert.equal(await env.db.auditLog.count({ where: { action: "settings.security" } }), 2);
+  });
+
+  it("verlangt das Recht settings.manage: ohne es wird nichts gespeichert", async () => {
+    const network = await import("@/server/auth/network");
+    const plain = await env.user({ username: "ohne-recht", roles: [await env.role({ permissions: ["appointments.view"] })] });
+    await env.signIn(plain);
+    assert.equal(await redirectOf(() => actions.saveSecurity({}, form({ behindProxy: true }))), "/forbidden");
+    assert.equal(await network.isBehindProxy(), false);
+    // auch mit anderem Verwaltungsrecht (Benutzer) nicht
+    const users = await env.user({ username: "nur-benutzer", roles: [await env.role({ permissions: ["users.manage"] })] });
+    await env.signIn(users);
+    assert.equal(await redirectOf(() => actions.saveSecurity({}, form({ behindProxy: true }))), "/forbidden");
+    assert.equal(await network.isBehindProxy(), false);
   });
 });

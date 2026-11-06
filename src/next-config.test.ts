@@ -1,16 +1,42 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import nextConfig from "../next.config";
+import { pathToRegexp } from "next/dist/compiled/path-to-regexp";
+import nextConfig, { SECURITY_HEADERS } from "../next.config";
+
+/**
+ * Die Basis-Header aus `next.config.ts`. Geprüft wird nicht nur der Inhalt der Konfiguration, sondern mit dem Mustervergleich, den auch
+ * Next selbst benutzt (path-to-regexp), dass die Regel für **jeden** Pfad gilt – Seiten, API, Statik, Service Worker, Dateien.
+ *
+ * Nicht geprüft wird hier die tatsächliche HTTP-Antwort eines laufenden Servers: Das bräuchte `next build` + `next start` (Minuten, eine
+ * Datenbank) und gehört in die Browser-CI (Paket P1a-6b), die die Header jeder Route der Inventur an der echten Antwort prüft.
+ */
+const PATHS = ["/", "/login", "/login/recover", "/setup", "/appointments", "/appointments/abc123/edit", "/admin/users", "/api/health", "/api/v1/customers", "/api/ical/abc.ics", "/api/files/invoice/xyz", "/_next/static/chunks/a.js", "/_next/image", "/sw.js", "/manifest.webmanifest", "/favicon.ico", "/icons/192.png"];
 
 describe("next.config: Basis-Header", () => {
-  it("setzt auf allen Pfaden nosniff, Referrer-Policy, X-Frame-Options SAMEORIGIN und frame-ancestors 'self'", async () => {
-    const rules = await nextConfig.headers!();
-    const all = rules.find((r) => r.source === "/:path*");
-    assert.ok(all, "Regel für alle Pfade fehlt");
-    const header = (key: string) => all.headers.find((h) => h.key === key)?.value;
+  it("setzt nosniff, Referrer-Policy, X-Frame-Options SAMEORIGIN und frame-ancestors 'self'", () => {
+    const header = (key: string) => SECURITY_HEADERS.find((h) => h.key === key)?.value;
     assert.equal(header("X-Content-Type-Options"), "nosniff");
     assert.equal(header("Referrer-Policy"), "strict-origin-when-cross-origin");
     assert.equal(header("X-Frame-Options"), "SAMEORIGIN");
     assert.equal(header("Content-Security-Policy"), "frame-ancestors 'self'");
+  });
+
+  it("die Regel gilt für alle Pfade (Seiten, API, Statik, Dateien), und keine andere Regel überschreibt die Header", async () => {
+    const rules = await nextConfig.headers!();
+    const matching = (path: string) => rules.filter((rule) => pathToRegexp(rule.source).test(path));
+    for (const path of PATHS) {
+      const rulesForPath = matching(path);
+      assert.equal(rulesForPath.length, 1, `${path}: genau eine Regel erwartet, waren ${rulesForPath.length}`);
+      for (const expected of SECURITY_HEADERS) {
+        assert.equal(rulesForPath[0].headers.find((h) => h.key === expected.key)?.value, expected.value, `${path}: ${expected.key}`);
+      }
+      assert.ok(!rulesForPath[0].has && !rulesForPath[0].missing, `${path}: die Regel hat keine Bedingung`);
+    }
+  });
+
+  it("verbietet das Einbetten von außen und die Typerkennung, ohne die PDF-Vorschau derselben Herkunft zu sperren", () => {
+    const csp = SECURITY_HEADERS.find((h) => h.key === "Content-Security-Policy")!.value;
+    assert.match(csp, /frame-ancestors 'self'/);
+    assert.doesNotMatch(csp, /frame-ancestors 'none'/);
   });
 });
