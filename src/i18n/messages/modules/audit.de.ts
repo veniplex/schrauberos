@@ -13,6 +13,7 @@ export const auditDe = {
   count_other: "{count} Einträge",
   page: "Seite {page} von {pages}",
   groups: {
+    apiToken: "API-Tokens",
     backup: "Backups",
     setup: "Einrichtung",
     system: "System",
@@ -33,6 +34,10 @@ export const auditDe = {
     docs: "Dokumentation",
   },
   actions: {
+    apiToken: {
+      create: "API-Token erzeugt",
+      revoke: "API-Token widerrufen",
+    },
     backup: {
       create: "Backup erstellt",
       delete: "Backup gelöscht",

@@ -33,6 +33,9 @@ import { runOperationHooks } from "./hooks";
 export type Tx = Prisma.TransactionClient;
 export type Principal = AppSession;
 
+/** Name im Audit-Log: bei Anfragen über die API mit der Kennung des Tokens (nie das Token selbst). */
+export const auditActorName = (principal: Principal): string => (principal.apiToken ? `${principal.user.name.slice(0, 50)} [API: ${principal.apiToken.name}]` : principal.user.name);
+
 /** Erforderliches Recht; `"authenticated"`: jede angemeldete Person (z. B. Konto, Einstellungen der eigenen Person). */
 export type PermissionRequirement = Permission | "authenticated";
 
@@ -181,7 +184,7 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
           if (def.transaction !== false) await runOperationHooks({ operation: def.name, input, result: data, principal, tx });
           if (def.audit !== false) {
             const action = typeof def.audit === "function" ? def.audit(input, data) : def.audit;
-            await writeAudit(tx, action, { ...details, actor: { id: principal.user.id, name: principal.user.name } });
+            await writeAudit(tx, action, { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } });
           }
           return data;
         };

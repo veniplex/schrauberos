@@ -15,6 +15,7 @@ export const auditEn: typeof auditDe = {
   count_other: "{count} entries",
   page: "Page {page} of {pages}",
   groups: {
+    apiToken: "API tokens",
     backup: "Backups",
     setup: "Setup",
     system: "System",
@@ -35,6 +36,10 @@ export const auditEn: typeof auditDe = {
     docs: "Documentation",
   },
   actions: {
+    apiToken: {
+      create: "API token created",
+      revoke: "API token revoked",
+    },
     backup: {
       create: "Backup created",
       delete: "Backup deleted",

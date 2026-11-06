@@ -13,6 +13,7 @@ import { rolesEn } from "./modules/roles.en";
 import { networkEn } from "./modules/network.en";
 import { modulesEn } from "./modules/admin-modules.en";
 import { auditEn } from "./modules/audit.en";
+import { apiEn } from "./modules/api.en";
 import { updatesEn } from "./modules/updates.en";
 import { backupEn } from "./modules/backup.en";
 
@@ -23,6 +24,7 @@ export const en: Messages = {
   employees: employeesEn,
   modules: modulesEn,
   audit: auditEn,
+  api: apiEn,
   updates: updatesEn,
   backup: backupEn,
   common: {

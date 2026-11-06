@@ -325,27 +325,33 @@ describe("Flash-Cookie", () => {
   });
 });
 
-describe("defineApi – Gerüst", () => {
-  it("lehnt ohne Authentifizierer mit 401 ab und kennt das Fehlerformat", async () => {
-    const op = ops.defineOperation({ name: "t.api", permission: "customers.edit", input: nameSchema, audit: false, auditReason: "Test", run: async (ctx) => ({ name: ctx.input.name }) });
-    const handler = ops.defineApi(op, { status: 201 });
-    const request = () => new Request("http://x/api/v1/t", { method: "POST", body: JSON.stringify({ name: "Api" }) });
-    const none = await handler(request(), { params: Promise.resolve({}) });
-    assert.equal(none.status, 401);
-    assert.equal(((await none.json()) as { error: { code: string } }).error.code, "unauthenticated");
+describe("Adapter API", () => {
+  it("der Standard-Authentifizierer lehnt mit 401 und Problem-Format ab", async () => {
+    const result = await ops.getApiAuthenticator()(new Request("http://x/api/v1/t"));
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.response.status, 401);
+    assert.match(result.response.headers.get("content-type") ?? "", /application\/problem\+json/);
+    assert.equal(((await result.response.json()) as { code: string }).code, "unauthenticated");
+  });
 
-    ops.setApiAuthenticator(async (r) => (r.headers.get("authorization") === "Bearer ok" ? admin : null));
-    try {
-      const ok = await handler(new Request("http://x", { method: "POST", headers: { authorization: "Bearer ok" }, body: JSON.stringify({ name: "Api" }) }), { params: Promise.resolve({}) });
-      assert.equal(ok.status, 201);
-      assert.deepEqual(await ok.json(), { data: { name: "Api" } });
-      const bad = await handler(new Request("http://x", { method: "POST", headers: { authorization: "Bearer ok" }, body: JSON.stringify({}) }), { params: Promise.resolve({}) });
-      assert.equal(bad.status, 422);
-      assert.equal(((await bad.json()) as { error: { fields: Record<string, { message: string }> } }).error.fields.name.message, "validation.required");
-      const notJson = await handler(new Request("http://x", { method: "POST", headers: { authorization: "Bearer ok" }, body: "kein json" }), { params: Promise.resolve({}) });
-      assert.equal(notJson.status, 400);
-    } finally {
-      ops.setApiAuthenticator(async () => null);
-    }
+  it("runApiOperation liefert Daten oder wirft ein Problem mit Statuscode und Feldern", async () => {
+    const op = ops.defineOperation({ name: "t.api", permission: "customers.edit", input: nameSchema, audit: false, auditReason: "Test", run: async (ctx) => ({ name: ctx.input.name }) });
+    assert.deepEqual(await ops.runApiOperation(op, admin, { name: "Api" }), { name: "Api" });
+    const invalid = await ops.runApiOperation(op, admin, {}).catch((e) => e);
+    assert.ok(invalid instanceof ops.ApiProblemError);
+    assert.equal(invalid.problem.status, 422);
+    assert.equal(invalid.problem.code, "validation_failed");
+    assert.equal(invalid.problem.fields?.name.code, "validation.required");
+    const forbidden = await ops.runApiOperation(op, nobody, { name: "x" }).catch((e) => e);
+    assert.equal(forbidden.problem.status, 403);
+  });
+
+  it("failureToProblem: Statuscodes je Fehlercode, Umbenennung von Feldern, keine Interna", () => {
+    const code = (c: Parameters<typeof ops.failureToProblem>[0]["code"]) => ops.failureToProblem({ code: c }).status;
+    assert.deepEqual([code("notFound"), code("conflict"), code("duplicate"), code("inUse"), code("forbidden"), code("failed"), code("invalid")], [404, 412, 409, 409, 403, 500, 422]);
+    const renamed = ops.failureToProblem({ code: "invalid", fields: { gross: { key: "invoices.errors.amount" } } }, { gross: "grossCents" });
+    assert.deepEqual(Object.keys(renamed.fields ?? {}), ["grossCents"]);
+    assert.deepEqual(Object.keys(ops.failureToProblem({ code: "failed" })).sort(), ["code", "detail", "status", "title", "type"]);
   });
 });

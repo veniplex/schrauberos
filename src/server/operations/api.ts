@@ -1,73 +1,86 @@
 import "server-only";
-import { logError } from "@/lib/log-safe";
-import { DEFAULT_KEYS, STATUS, type OperationFailure } from "./errors";
+import { problemOf, type Problem, type ProblemFields } from "@/lib/api/problem";
+import { DEFAULT_KEYS, type OperationFailure } from "./errors";
 import type { Operation, Principal } from "./operation";
 
 /**
- * Adapter „HTTP-API“ des Aktions-Rahmens – nur Gerüst und Typen. Der API-Kern (Token-Tabelle, Bearer-Authentifizierung, Rate-Limit,
- * Idempotenz, Fehlerformat im Detail, OpenAPI) folgt in P1a-8; bis dahin lehnt der Standard-Authentifizierer jede Anfrage mit 401 ab.
+ * Adapter „HTTP-API“ des Aktions-Rahmens. Er übersetzt nur zwischen Operation und HTTP-Semantik – die Pipeline (Authentifizierung, Rate-Limit,
+ * Idempotenz, Routing) liegt in `src/server/api`, die Ressourcen bringen die Funktionen in ihrer `api.ts` mit.
  *
- * Unterschiede zur Server Action: JSON statt FormData, Bearer-Token statt Sitzungs-Cookie (das Cookie wird hier **nie** gelesen,
- * ebenso wenig akzeptieren UI-Aktionen ein Token), Statuscodes statt Flash/Weiterleitung. Der Kern ist derselbe.
+ * Unterschiede zur Server Action: JSON statt FormData, Bearer-Token statt Sitzungs-Cookie (das Cookie wird hier **nie** gelesen, ebenso wenig
+ * akzeptieren UI-Aktionen ein Token), Statuscodes und Problem-Antworten statt Flash/Weiterleitung. Der Kern (`defineOperation`) ist derselbe: Recht,
+ * Eingabe der Sache, Transaktion, Hooks, Audit.
  */
 
-/** Liefert die Person/Token-Besitzer samt Rechten zu einer Anfrage, oder null (→ 401). Wird in P1a-8 durch die Token-Prüfung ersetzt. */
-export type ApiAuthenticator = (request: Request) => Promise<Principal | null>;
+/** Ergebnis der Authentifizierung einer API-Anfrage. */
+export type ApiAuthResult =
+  | { ok: true; principal: Principal; token: { id: string; rateLimitPerMinute: number } }
+  /** abgelehnt: fertige Antwort (401, oder 429 im Fehlerpfad ungültiger Tokens) */
+  | { ok: false; response: Response };
 
-let authenticator: ApiAuthenticator = async () => null;
+/** Prüft die Anmeldung einer API-Anfrage (Bearer-Token). Wird in `src/server/api/auth.ts` gesetzt; Standard: lehnt alles mit 401 ab. */
+export type ApiAuthenticator = (request: Request) => Promise<ApiAuthResult>;
+
+const unauthenticated = async (): Promise<ApiAuthResult> => ({ ok: false, response: problemResponse(problemOf("unauthenticated"), { "www-authenticate": 'Bearer realm="schrauberos"' }) });
+let authenticator: ApiAuthenticator = unauthenticated;
 
 export function setApiAuthenticator(next: ApiAuthenticator): void {
   authenticator = next;
 }
+export const getApiAuthenticator = (): ApiAuthenticator => authenticator;
 
-export type ApiContext = { params: Promise<Record<string, string>> };
-
-export type ApiOptions<I, R> = {
-  /** Erfolgsstatus (Standard 200; 201 beim Anlegen) */
-  status?: number;
-  /** Anfrage → rohe Eingabe der Operation (Standard: JSON-Body, Pfadparameter ergänzt). */
-  input?: (request: Request, params: Record<string, string>) => unknown | Promise<unknown>;
-  /** Ergebnis → Antwortkörper (Standard: `{ data }`) */
-  serialize?: (data: R, input: I) => unknown;
-};
-
-export type ApiHandler = (request: Request, context: ApiContext) => Promise<Response>;
-
-/** Fehlerformat der API: sprachneutral (Code, Meldungsschlüssel, Feldfehler); die Doku nennt die Schlüssel. */
-export function errorBody(failure: OperationFailure): { error: { code: string; message: string; params?: unknown; fields?: Record<string, { message: string; params?: unknown }> } } {
-  return {
-    error: {
-      code: failure.code,
-      message: failure.key ?? DEFAULT_KEYS[failure.code],
-      params: failure.params,
-      fields: failure.fields ? Object.fromEntries(Object.entries(failure.fields).map(([name, f]) => [name, { message: f.key, params: f.params }])) : undefined,
-    },
-  };
+/** Problem-Antwort (`application/problem+json`, nie zwischenspeichern). */
+export function problemResponse(problem: Problem, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(problem), {
+    status: problem.status,
+    headers: { "content-type": "application/problem+json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...headers },
+  });
 }
 
-const json = (status: number, body: unknown) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
+/** Fachlicher oder Protokoll-Fehler in einem Endpunkt: wird in der Pipeline zur Problem-Antwort. */
+export class ApiProblemError extends Error {
+  constructor(
+    readonly problem: Problem,
+    readonly headers: Record<string, string> = {},
+  ) {
+    super(`api:${problem.code}`);
+    this.name = "ApiProblemError";
+  }
+}
 
-export function defineApi<I, R>(operation: Operation<I, R>, options: ApiOptions<I, R> = {}): ApiHandler & { operation: Operation<I, R> } {
-  const handler: ApiHandler = async (request, context) => {
-    const principal = await authenticator(request);
-    if (!principal) return json(STATUS.unauthenticated, errorBody({ code: "unauthenticated" }));
+export const apiProblem = (code: Parameters<typeof problemOf>[0], extra?: Parameters<typeof problemOf>[1], headers?: Record<string, string>): ApiProblemError => new ApiProblemError(problemOf(code, extra), headers);
 
-    const params = await context.params.catch(() => ({}) as Record<string, string>);
-    let raw: unknown;
-    try {
-      raw = options.input ? await options.input(request, params) : { ...(request.method === "GET" || request.method === "DELETE" ? {} : ((await request.json()) as object)), ...params };
-    } catch {
-      return json(400, errorBody({ code: "invalid", key: "common.errors.badRequest" }));
-    }
+/** Fehler einer Operation → Problem. `rename`: Feldname der Operation → Feldname der API (wo beide abweichen). */
+export function failureToProblem(failure: OperationFailure, rename: Readonly<Record<string, string>> = {}): Problem {
+  const fields: ProblemFields | undefined = failure.fields
+    ? Object.fromEntries(Object.entries(failure.fields).map(([name, f]) => [rename[name] ?? name, { code: f.key, ...(f.params ? { params: f.params as Record<string, string | number> } : {}) }]))
+    : undefined;
+  const reason = failure.key ?? (failure.fields ? undefined : DEFAULT_KEYS[failure.code]);
+  const extra = { ...(fields ? { fields } : {}), ...(reason && failure.code !== "invalid" ? { reason } : {}), ...(failure.params && !fields ? { params: failure.params as Record<string, string | number> } : {}) };
+  switch (failure.code) {
+    case "invalid":
+      return problemOf("validation_failed", fields ? { fields } : { reason });
+    case "unauthenticated":
+      return problemOf("unauthenticated");
+    case "forbidden":
+      return problemOf("forbidden", extra);
+    case "notFound":
+      return problemOf("not_found");
+    // „conflict“ meldet nur die Versionsprüfung (claimRow): der Datensatz wurde zwischenzeitlich geändert
+    case "conflict":
+      return problemOf("precondition_failed");
+    case "duplicate":
+      return problemOf("conflict", extra);
+    case "inUse":
+      return problemOf("in_use", extra);
+    case "failed":
+      return problemOf("internal_error");
+  }
+}
 
-    try {
-      const outcome = await operation.execute(principal, raw);
-      if (!outcome.ok) return json(STATUS[outcome.failure.code], errorBody(outcome.failure));
-      return json(options.status ?? 200, options.serialize ? options.serialize(outcome.data, outcome.input) : { data: outcome.data });
-    } catch (error) {
-      logError(`api:${operation.name}`, error);
-      return json(STATUS.failed, errorBody({ code: "failed" }));
-    }
-  };
-  return Object.assign(handler, { operation });
+/** Führt eine Operation für den API-Principal aus: Daten bei Erfolg, sonst `ApiProblemError`. */
+export async function runApiOperation<I, R>(operation: Operation<I, R>, principal: Principal, raw: unknown, rename: Readonly<Record<string, string>> = {}): Promise<R> {
+  const outcome = await operation.execute(principal, raw);
+  if (!outcome.ok) throw new ApiProblemError(failureToProblem(outcome.failure, rename));
+  return outcome.data;
 }

@@ -12,6 +12,7 @@ import { rolesDe } from "./modules/roles.de";
 import { networkDe } from "./modules/network.de";
 import { modulesDe } from "./modules/admin-modules.de";
 import { auditDe } from "./modules/audit.de";
+import { apiDe } from "./modules/api.de";
 import { updatesDe } from "./modules/updates.de";
 import { backupDe } from "./modules/backup.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
@@ -23,6 +24,7 @@ export const de = {
   employees: employeesDe,
   modules: modulesDe,
   audit: auditDe,
+  api: apiDe,
   updates: updatesDe,
   backup: backupDe,
   common: {

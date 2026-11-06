@@ -53,6 +53,8 @@ export type AppSession = {
   /** Effektive Rechte: die Rollen des Benutzers, eingeschränkt auf aktive Funktionen */
   permissions: ReadonlySet<string>;
   can: (permission: Permission) => boolean;
+  /** Nur bei Anfragen über die API: das Token, mit dem die Anfrage kam (Sitzungen über das Cookie haben es nie). */
+  apiToken?: { id: string; name: string; hint: string };
 };
 
 type Account = { id: string; name: string };
