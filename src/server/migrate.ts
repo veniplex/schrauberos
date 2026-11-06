@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { BASELINE_NAME } from "../lib/migration-guard";
 
 /**
  * Eigener Migrations-Läufer: wendet die SQL-Dateien aus `prisma/migrations` auf die SQLite-Datei an und führt dieselbe
@@ -16,12 +17,21 @@ export type MigrationFile = { name: string; sql: string; checksum: string };
 
 export class MigrationError extends Error {
   constructor(
-    readonly code: "changed" | "failed" | "foreignKeys",
+    readonly code: "changed" | "failed" | "foreignKeys" | "foreignHistory",
     message: string,
   ) {
     super(message);
   }
 }
+
+/**
+ * Meldung bei fremder Migrationshistorie (Datenbank einer anderen, nicht verträglichen Version, z. B. 0.1.0): Die App startet dann
+ * nicht, sondern bleibt mit Status „reinstall“ stehen (siehe startup.ts) – kein Absturz in Dauerschleife, nichts wird verändert.
+ */
+export const REINSTALL_MESSAGE =
+  "Neuinstallation nötig: Die Datenbank stammt aus einer nicht verträglichen Version von SchrauberOS (fremde Migrationshistorie). " +
+  "Es wurden keine Daten verändert. Bitte mit einem neuen, leeren Volume starten (alte Daten werden nicht übernommen) – " +
+  "Reinstallation required: the database comes from an incompatible SchrauberOS version. No data was changed. Please start with a new, empty volume.";
 
 const CREATE_TABLE = `CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
   "id" TEXT PRIMARY KEY NOT NULL,
@@ -64,6 +74,10 @@ export function appliedMigrations(dbFile: string): string[] {
   }
 }
 
+function hasUserTables(db: Database.Database): boolean {
+  return (db.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '_prisma_migrations'`).get() as { n: number }).n > 0;
+}
+
 const timestamp = () => new Date().toISOString().replace("T", " ").replace("Z", "");
 
 /**
@@ -82,6 +96,12 @@ export async function runMigrations(dbFile: string, dir = migrationsDir(), befor
     const applied = new Map(
       (db.prepare(`SELECT migration_name AS name, checksum FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`).all() as { name: string; checksum: string }[]).map((r) => [r.name, r.checksum]),
     );
+    // Fremde Historie: Die Datenbank hat eine Historie, die nicht mit unserer Baseline beginnt (andere Prüfsumme/Namen, z. B. 0.1.0),
+    // oder Tabellen ganz ohne Historie. Unbekannte NEUERE Migrationen bleiben erlaubt (Rückfall auf eine ältere Version).
+    const baseline = files.find((f) => f.name === BASELINE_NAME);
+    if (baseline) {
+      if (applied.size > 0 ? applied.get(BASELINE_NAME) !== baseline.checksum : hasUserTables(db)) throw new MigrationError("foreignHistory", REINSTALL_MESSAGE);
+    }
     for (const f of files) {
       const known = applied.get(f.name);
       if (known && known !== f.checksum) throw new MigrationError("changed", `Die bereits angewendete Migration ${f.name} wurde verändert.`);

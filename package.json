@@ -16,7 +16,8 @@
     "db:studio": "prisma studio",
     "setup": "prisma generate && tsx prisma/seed.ts",
     "predev": "prisma generate",
-    "test": "tsx --test \"src/**/*.test.ts\""
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "db:baseline": "node scripts/db-baseline.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.1",

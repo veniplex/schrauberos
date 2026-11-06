@@ -5,7 +5,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import { appliedMigrations, listMigrations, MigrationError, runMigrations } from "./migrate";
+import { BASELINE_NAME } from "../lib/migration-guard";
+import { appliedMigrations, listMigrations, MigrationError, REINSTALL_MESSAGE, runMigrations } from "./migrate";
 
 const root = mkdtempSync(path.join(tmpdir(), "so-migrate-"));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -96,5 +97,54 @@ describe("Migrations-Läufer", () => {
     assert.doesNotThrow(() => status(`file:${file}`));
     // … und meldet bei einer nicht migrierten Datenbank einen Fehler (Gegenprobe, damit die Prüfung aussagekräftig ist)
     assert.throws(() => status(`file:${path.join(root, "leer.db")}`));
+  });
+});
+
+/** Eine Datenbank, wie sie eine ältere Version (0.1.0) hinterlässt: eigene Baseline-Prüfsumme, andere Migrationen, Tabellen mit Daten. */
+function oldVolume(name: string, history: { name: string; checksum: string }[], withTables = true) {
+  const file = path.join(root, name);
+  const db = new Database(file);
+  db.exec(`CREATE TABLE "_prisma_migrations" ("id" TEXT PRIMARY KEY NOT NULL, "checksum" TEXT NOT NULL, "finished_at" DATETIME, "migration_name" TEXT NOT NULL, "logs" TEXT, "rolled_back_at" DATETIME, "started_at" DATETIME NOT NULL DEFAULT current_timestamp, "applied_steps_count" INTEGER UNSIGNED NOT NULL DEFAULT 0)`);
+  if (withTables) db.exec(`CREATE TABLE "Customer" ("id" TEXT PRIMARY KEY); INSERT INTO "Customer" VALUES ('alt');`);
+  const insert = db.prepare(`INSERT INTO _prisma_migrations (id, checksum, finished_at, migration_name, started_at, applied_steps_count) VALUES (?, ?, ?, ?, ?, 1)`);
+  history.forEach((h, i) => insert.run(`id${i}`, h.checksum, "2026-11-06 10:00:00", h.name, "2026-11-06 10:00:00"));
+  db.close();
+  return file;
+}
+
+describe("Migrations-Läufer: fremde Migrationshistorie (alte Volumes)", () => {
+  const foreign = (e: unknown) => e instanceof MigrationError && e.code === "foreignHistory" && e.message === REINSTALL_MESSAGE;
+
+  it("verweigert ein Volume der Vorversion (gleiche Baseline-Namen, andere Prüfsumme, andere Migrationen) und verändert nichts", async () => {
+    const file = oldVolume("v010.db", [
+      { name: BASELINE_NAME, checksum: "a".repeat(64) },
+      { name: "20261106095620_settings_and_timezone", checksum: "b".repeat(64) },
+      { name: "20261106120000_files_on_disk", checksum: "c".repeat(64) },
+    ]);
+    const before = appliedMigrations(file);
+    await assert.rejects(runMigrations(file), foreign);
+    assert.deepEqual(appliedMigrations(file), before);
+    const db = new Database(file, { readonly: true });
+    assert.deepEqual(db.prepare(`SELECT id FROM "Customer"`).all(), [{ id: "alt" }]);
+    db.close();
+  });
+
+  it("verweigert eine Historie ohne unsere Baseline (fremde Namen) und Tabellen ganz ohne Historie", async () => {
+    await assert.rejects(runMigrations(oldVolume("fremd.db", [{ name: "20260101000000_init", checksum: "d".repeat(64) }])), foreign);
+    await assert.rejects(runMigrations(oldVolume("ohne-historie.db", [])), foreign);
+  });
+
+  it("nimmt unsere eigene Baseline samt unbekannter neuerer Migrationen an (Rückfall auf eine ältere Version)", async () => {
+    const baseline = listMigrations()[0];
+    assert.equal(baseline.name, BASELINE_NAME);
+    const file = oldVolume("neuer.db", [{ name: BASELINE_NAME, checksum: baseline.checksum }, { name: "20990101000000_kommt_spaeter", checksum: "e".repeat(64) }], false);
+    // Tabellen der Baseline sind nicht da, aber die Historie ist unsere – kein Fremdfall (die Migration gilt als angewendet)
+    assert.deepEqual(await runMigrations(file), []);
+  });
+
+  it("legt auf einer leeren Datei und auf einer frischen Datenbank ganz normal an", async () => {
+    const file = path.join(root, "frisch.db");
+    assert.ok((await runMigrations(file)).includes(BASELINE_NAME));
+    assert.deepEqual(await runMigrations(file), []);
   });
 });

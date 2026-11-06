@@ -3,15 +3,12 @@ import { createBackup } from "@/server/backup/core";
 import { startBackupScheduler } from "@/server/backup/scheduler";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
-import { appliedMigrations, runMigrations } from "@/server/migrate";
+import { appliedMigrations, MigrationError, runMigrations } from "@/server/migrate";
 import { ensureBaseData } from "@/server/seed/base";
 import { ensureSetupToken } from "@/server/setup-token";
+import { startupState, type StartupState } from "@/server/startup-state";
 
-/** Zustand des App-Starts; /api/health meldet erst „ok“, wenn die Datenbank bereit ist. */
-export type StartupState = { status: "starting" | "ready" | "failed"; error?: string };
-
-const globalForStartup = globalThis as unknown as { __startup?: StartupState };
-export const startupState = (): StartupState => (globalForStartup.__startup ??= { status: "starting" });
+export { startupState, type StartupState };
 
 /** Ist das ein gültiger Zeitzonen-Name? Ändert nichts. */
 export function isValidTimezone(timezone: string): boolean {
@@ -62,6 +59,13 @@ export async function startApp(): Promise<void> {
     startBackupScheduler();
     state.status = "ready";
   } catch (error) {
+    if (error instanceof MigrationError && error.code === "foreignHistory") {
+      // Kein Absturz (Neustart-Schleife), kein Eingriff in die fremde Datenbank: klar melden und stehen bleiben
+      state.status = "reinstall";
+      state.error = error.message;
+      console.error(`[start] ${error.message}`);
+      return;
+    }
     state.status = "failed";
     state.error = error instanceof Error ? error.message : String(error);
     console.error("[start] Start fehlgeschlagen:", error);

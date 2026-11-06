@@ -1,3 +1,4 @@
+-- schrauberos:baseline unreleased (erzeugt mit npm run db:baseline aus prisma/schema.prisma – nicht von Hand ändern)
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
@@ -19,13 +20,44 @@ CREATE TABLE "User" (
 );
 
 -- CreateTable
+CREATE TABLE "RecoveryCode" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "codeHash" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "confirmedAt" DATETIME,
+    CONSTRAINT "RecoveryCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RecoveryNotice" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT,
+    "userName" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RecoveryNotice_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RecoveryNoticeAck" (
+    "noticeId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY ("noticeId", "userId"),
+    CONSTRAINT "RecoveryNoticeAck_noticeId_fkey" FOREIGN KEY ("noticeId") REFERENCES "RecoveryNotice" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "RecoveryNoticeAck_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Role" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "key" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "isAdmin" BOOLEAN NOT NULL DEFAULT false,
-    "isSystem" BOOLEAN NOT NULL DEFAULT false
+    "isSystem" BOOLEAN NOT NULL DEFAULT false,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
@@ -60,6 +92,17 @@ CREATE TABLE "Session" (
 );
 
 -- CreateTable
+CREATE TABLE "KnownDevice" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tokenHash" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastUsedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userAgent" TEXT,
+    CONSTRAINT "KnownDevice_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Workshop" (
     "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
     "name" TEXT NOT NULL DEFAULT 'Meine Werkstatt',
@@ -73,6 +116,7 @@ CREATE TABLE "Workshop" (
     "logoDataUrl" TEXT,
     "accentColor" TEXT NOT NULL DEFAULT '#2459c9',
     "openingHours" TEXT NOT NULL DEFAULT '{}',
+    "timezone" TEXT NOT NULL DEFAULT 'Europe/Berlin',
     "updatedAt" DATETIME NOT NULL
 );
 
@@ -449,7 +493,7 @@ CREATE TABLE "InvoiceFile" (
     "name" TEXT NOT NULL,
     "mime" TEXT NOT NULL,
     "size" INTEGER NOT NULL,
-    "data" BLOB NOT NULL,
+    "path" TEXT NOT NULL,
     "uploadedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "InvoiceFile_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -460,6 +504,16 @@ CREATE TABLE "DocCategory" (
     "area" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "sortOrder" INTEGER NOT NULL DEFAULT 0
+);
+
+-- CreateTable
+CREATE TABLE "DocCategoryRole" (
+    "categoryId" TEXT NOT NULL,
+    "roleId" TEXT NOT NULL,
+
+    PRIMARY KEY ("categoryId", "roleId"),
+    CONSTRAINT "DocCategoryRole_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "DocCategory" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "DocCategoryRole_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -496,7 +550,7 @@ CREATE TABLE "DocImage" (
     "name" TEXT NOT NULL,
     "mime" TEXT NOT NULL,
     "size" INTEGER NOT NULL,
-    "data" BLOB NOT NULL,
+    "path" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -519,11 +573,24 @@ CREATE TABLE "AuditLog" (
     "entityId" TEXT
 );
 
+-- CreateTable
+CREATE TABLE "AppSetting" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_authSource_externalId_key" ON "User"("authSource", "externalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecoveryCode_userId_key" ON "RecoveryCode"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecoveryCode_codeHash_key" ON "RecoveryCode"("codeHash");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Role_key_key" ON "Role"("key");
@@ -536,6 +603,12 @@ CREATE INDEX "Session_userId_idx" ON "Session"("userId");
 
 -- CreateIndex
 CREATE INDEX "Session_expiresAt_idx" ON "Session"("expiresAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "KnownDevice_tokenHash_key" ON "KnownDevice"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "KnownDevice_userId_idx" ON "KnownDevice"("userId");
 
 -- CreateIndex
 CREATE INDEX "Customer_lastName_idx" ON "Customer"("lastName");
@@ -649,6 +722,9 @@ CREATE INDEX "Invoice_dueDate_idx" ON "Invoice"("dueDate");
 CREATE UNIQUE INDEX "InvoiceFile_invoiceId_key" ON "InvoiceFile"("invoiceId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "InvoiceFile_path_key" ON "InvoiceFile"("path");
+
+-- CreateIndex
 CREATE INDEX "DocCategory_area_idx" ON "DocCategory"("area");
 
 -- CreateIndex
@@ -661,6 +737,9 @@ CREATE UNIQUE INDEX "DocPage_area_slug_key" ON "DocPage"("area", "slug");
 CREATE INDEX "DocVersion_pageId_savedAt_idx" ON "DocVersion"("pageId", "savedAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "DocImage_path_key" ON "DocImage"("path");
+
+-- CreateIndex
 CREATE INDEX "DocImage_area_idx" ON "DocImage"("area");
 
 -- CreateIndex
@@ -671,4 +750,3 @@ CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
 
 -- CreateIndex
 CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
-

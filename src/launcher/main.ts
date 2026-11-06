@@ -16,6 +16,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
+import { healthVerdict } from "../lib/updates/health";
 import { compareVersions } from "../lib/updates/semver";
 import { applyPendingRestore, confirmRestore, readApplied, rollbackRestore } from "../lib/updates/restore";
 import { afterFailure, afterHealthy, isCompatible, RESTART_EXIT_CODE, versionsToKeep, type VersionMeta } from "../lib/updates/state";
@@ -60,7 +61,12 @@ async function waitHealthy(proc: ChildProcess): Promise<boolean> {
   while (!exited && !stopping && Date.now() < deadline) {
     try {
       const res = await fetch(`http://127.0.0.1:${PORT}/api/health`, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) return true;
+      const verdict = healthVerdict(res.status, await res.json().catch(() => null));
+      if (verdict === "ok") return true;
+      if (verdict === "fatal") {
+        log("Die App meldet „Neuinstallation nötig“ (fremde Datenbank) und wird nie gesund – nicht weiter warten.");
+        return false;
+      }
     } catch {
       /* noch nicht bereit */
     }
