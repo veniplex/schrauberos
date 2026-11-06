@@ -139,7 +139,7 @@ async function attempt(input: RedeemInput): Promise<RedeemResult> {
     await tx.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false, failedLogins: 0, lockedUntil: null } });
     await tx.session.deleteMany({ where: { userId: user.id } }); // alle Sitzungen des Kontos enden, kein automatisches Anmelden
     await resetSecondFactor(tx, user.id);
-    await tx.recoveryNotice.create({ data: { userId: user.id } });
+    await tx.recoveryNotice.create({ data: { userId: user.id, userName: user.name } });
     return replaceRecoveryCode(tx, user.id);
   });
   loginThrottle.accounts.reset(normalizeUsername(user.username)); // eine laufende Wartezeit des Kontos soll die Anmeldung nicht blockieren
@@ -162,20 +162,19 @@ export async function recoveryBannerData(viewer: { id: string; isAdmin: boolean 
   const [notices, code] = await Promise.all([
     db.recoveryNotice.findMany({
       where: { createdAt: { gte: since }, acks: { none: { userId: viewer.id } }, ...(viewer.isAdmin ? {} : { userId: viewer.id }) },
-      include: { user: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
     viewer.isAdmin ? db.recoveryCode.findUnique({ where: { userId: viewer.id }, select: { confirmedAt: true } }) : null,
   ]);
   return {
-    notices: notices.map((n) => ({ id: n.id, at: n.createdAt, userName: n.user.name, own: n.userId === viewer.id })),
+    notices: notices.map((n) => ({ id: n.id, at: n.createdAt, userName: n.userName, own: n.userId === viewer.id })),
     unconfirmed: code !== null && code.confirmedAt === null,
   };
 }
 
 export async function acknowledgeRecoveryNotice(noticeId: string, viewer: { id: string; isAdmin: boolean }): Promise<void> {
   const notice = await db.recoveryNotice.findUnique({ where: { id: noticeId }, select: { userId: true } });
-  if (!notice || (!viewer.isAdmin && notice.userId !== viewer.id)) return;
+  if (!notice || (!viewer.isAdmin && notice.userId !== viewer.id)) return; // Hinweise gelöschter Konten (userId null) bestätigen nur Administratoren
   await db.recoveryNoticeAck.upsert({ where: { noticeId_userId: { noticeId, userId: viewer.id } }, update: {}, create: { noticeId, userId: viewer.id } });
 }

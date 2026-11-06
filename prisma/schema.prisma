@@ -60,13 +60,16 @@ model RecoveryCode {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Hinweis „Notzugang wurde verwendet“: sichtbar für das Konto und alle Administratoren, bis sie ihn bestätigt haben
+// Hinweis „Notzugang wurde verwendet“: sichtbar für das Konto und alle Administratoren, bis sie ihn bestätigt haben.
+// Er überlebt das Löschen des Kontos (userId wird null, der Name bleibt in userName): Wer ein Konto nach einem Notzugang löscht,
+// soll den Hinweis damit nicht zum Verschwinden bringen.
 model RecoveryNotice {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String?
+  userName  String
   createdAt DateTime @default(now())
 
-  user User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   acks RecoveryNoticeAck[]
 }
 

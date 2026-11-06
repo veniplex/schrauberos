@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import type { Role, User } from "@/generated/prisma/client";
 import { bytesToDataChars, formatRecoveryCode } from "@/lib/recovery-code";
-import { browser, createTestEnv, form, type TestEnv } from "@/test/harness";
+import { browser, createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
 
 /**
  * Notzugang (Wiederherstellungs-Code): Einlösen, gleiche Antwort und Dauer für alle Fehler, globale Drosselung ohne Konto-Sperre,
@@ -18,6 +18,7 @@ let recoverActions: typeof import("@/app/login/recover/actions");
 let accountActions: typeof import("@/platform/account/recovery-actions");
 let setupActions: typeof import("@/app/setup/actions");
 let setupToken: typeof import("@/server/setup-token");
+let userActions: typeof import("@/modules/admin/users/actions");
 
 let adminRole: Role;
 let userRole: Role;
@@ -39,6 +40,7 @@ before(async () => {
   accountActions = await import("@/platform/account/recovery-actions");
   setupActions = await import("@/app/setup/actions");
   setupToken = await import("@/server/setup-token");
+  userActions = await import("@/modules/admin/users/actions");
   await (await import("@/server/seed/base")).ensureBaseData(env.db);
   runtime.authRuntime.now = () => clock;
   runtime.authRuntime.sleep = async (ms) => void sleeps.push(ms);
@@ -282,6 +284,24 @@ describe("Hinweis „Notzugang wurde verwendet“", () => {
     // ein Nicht-Admin kann fremde Hinweise nicht bestätigen
     await recovery.acknowledgeRecoveryNotice(notice.id, { id: worker.id, isAdmin: false });
     assert.equal(await env.db.recoveryNoticeAck.count({ where: { userId: worker.id } }), 0);
+  });
+
+  it("verschwindet nicht mit dem Löschen des Kontos: Administratoren sehen ihn weiter, mit dem Namen des gelöschten Kontos", async () => {
+    const admin2 = await env.user({ username: "admin2", name: "Zweite", roles: [adminRole] });
+    await redeem(await issue());
+    await env.signIn(admin2);
+    await redirectOf(() => userActions.deleteUser(form({ id: admin.id })));
+    assert.equal(await env.db.user.count({ where: { id: admin.id } }), 0, "Konto ist gelöscht");
+    const notice = await env.db.recoveryNotice.findFirstOrThrow();
+    assert.equal(notice.userId, null);
+    assert.equal(notice.userName, "Chef");
+    const data = await recovery.recoveryBannerData({ id: admin2.id, isAdmin: true });
+    assert.equal(data.notices.length, 1);
+    assert.equal(data.notices[0].userName, "Chef");
+    assert.equal(data.notices[0].own, false);
+    // bestätigen geht weiterhin, danach ist er weg
+    await recovery.acknowledgeRecoveryNotice(notice.id, { id: admin2.id, isAdmin: true });
+    assert.equal((await recovery.recoveryBannerData({ id: admin2.id, isAdmin: true })).notices.length, 0);
   });
 
   it("zeigt Administratoren, dass der eigene Code noch nicht bestätigt ist", async () => {
