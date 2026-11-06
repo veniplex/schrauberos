@@ -39,6 +39,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - name: Schema und Migrationen stimmen überein (Drift-Check)
+        run: npm run db:check
 
   publish:
     name: Image bauen und nach ghcr.io pushen

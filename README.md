@@ -102,7 +102,9 @@ Die Datenbank ist `dev.db` im Projektordner; Backups, Dateien und Update-Daten l
 | `npm run lint` | ESLint |
 | `npm test` | Unit-, Architektur- und Katalog-Tests |
 | `npm run build` | Produktions-Build |
-| `npm run db:migrate -- <name>` | neue Migration anlegen, lokal anwenden, Client neu erzeugen |
+| `npm run db:baseline` | **bis zur Veröffentlichung:** aus `schema.prisma` die eine Baseline-Migration neu erzeugen (ersetzt alle Migrationsordner) |
+| `npm run db:migrate -- <name>` | **ab der Veröffentlichung:** neue Migration anlegen, lokal anwenden, Client neu erzeugen |
+| `npm run db:check` | Drift-Check: stimmt `schema.prisma` mit den Migrationen überein? (läuft auch in der Pipeline) |
 | `npm run db:fresh` | lokale Datenbank löschen, neu anlegen und seeden |
 | `npm run db:studio` | Datenbank im Browser ansehen |
 
@@ -203,13 +205,30 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
 
 ### Migrationen
 
-Die Historie in `prisma/migrations` beginnt mit einer **eingefrorenen Baseline** (`00000000000000_baseline`). Diese und alle
-veröffentlichten Migrationen werden **nie verändert** (die App prüft Prüfsummen und verweigert veränderte). Nach einer
-Schema-Änderung:
+Es gibt immer **eine Baseline** (`prisma/migrations/00000000000000_baseline`). Ihre erste Zeile ist der Marker `-- schrauberos:baseline unreleased`
+(bzw. `frozen`); den Marker kennen Wächter und Skripte.
+
+* **Solange nichts veröffentlicht ist (`unreleased`, der Stand von v0.2.0):** keine einzelnen Migrationen. Nach **jeder** Schema-Änderung
+  `npm run db:baseline` – das Skript erzeugt die Baseline aus `schema.prisma` neu und ersetzt dabei alle anderen Migrationsordner; danach
+  `npm run db:fresh`. So laufen Migrations-, Backup-/Concurrency-Tests, Harness und Drift-Check immer gegen den aktuellen Stand. Es gibt
+  **keine Rückwärtskompatibilität zu 0.1.0**: Beim Start erkennt die App eine fremde Migrationshistorie (Baseline mit anderer Prüfsumme,
+  fremde Namen, Tabellen ohne Historie) und startet **nicht** (siehe unten). Unbekannte *neuere* Migrationen in der Datenbank bleiben erlaubt
+  (Rückfall auf eine ältere Version nach der Veröffentlichung).
+* **Mit der Veröffentlichung** (Release-Block): Marker auf `frozen` setzen (einziger Commit am Verlauf). Ab dann werden die Baseline und alle
+  veröffentlichten Migrationen **nie verändert** (die App prüft Prüfsummen und verweigert veränderte); `db:baseline` verweigert die
+  Arbeit, Schema-Änderungen gehen so:
 
 ```bash
 npm run db:migrate -- add_warranty    # legt die Migration an, wendet sie lokal an, erzeugt den Client neu
 ```
+
+* **Wächter** (`src/lib/migration-guard.ts`, Test `migration-guard.test.ts`): Jede Migration nach der Baseline darf kein `DROP`/`RENAME`, keine neue
+  Spalte `NOT NULL` ohne `DEFAULT`, keinen neuen `UNIQUE`-Index auf einer Bestandstabelle (Ausnahme: neue nullable Spalte) und kein
+  `DELETE`/`UPDATE` enthalten. Eine **begründete Ausnahme** steht als Kommentarzeile in der Migration:
+  `-- guard:allow <regel>: <Begründung>` (Regeln `drop`, `rename`, `not-null`, `unique`, `data-change`; Begründung Pflicht, fällt im Review auf).
+  Prisma-Tabellenumbauten (`RedefineTables`) enthalten `DROP`/`RENAME` – statt dessen additiv arbeiten.
+* **Drift-Check** `npm run db:check` (`prisma migrate diff --from-migrations … --to-schema … --exit-code`, Wegwerf-Datenbank legt Prisma selbst an): schlägt
+  an, wenn `schema.prisma` und Migrationen auseinanderlaufen; läuft in der Pipeline im Check-Job.
 
 Im Betrieb wendet die App offene Migrationen beim Start **selbst** an (`src/server/migrate.ts`, gleiche Tabelle
 `_prisma_migrations` wie die Prisma-CLI, vorher automatische Sicherung); es gibt keine Prisma-CLI im Container.
@@ -218,6 +237,13 @@ Web-Update bei Problemen auf die vorherige Version zurückfällt – auf dem dan
 Migrationen, die sie nicht kennt). Prisma verlangt bei Daten-verlustigen Änderungen eine Bestätigung im Terminal; geht das nicht
 (`migrate dev` bleibt dann stumm), SQL per `prisma migrate diff --from-schema … --to-schema … --script` erzeugen und als
 Migrationsordner ablegen.
+
+**Fremdes Volume („Neuinstallation nötig“):** Erkennt `runMigrations` eine fremde Historie, wirft es `MigrationError("foreignHistory")` *bevor* es irgendetwas
+anwendet oder sichert. `startApp` fängt das: Status `reinstall` (`src/server/startup-state.ts`), klare Meldung im Log, **kein** `process.exit` (das gäbe
+eine Neustart-Schleife über Starter/Docker), die Datenbank bleibt unangetastet. `/api/health` antwortet 503 `{"status":"reinstall"}`, das Root-Layout zeigt
+nur den Hinweis (`src/app/reinstall-notice.tsx`, zweisprachig), und der Launcher wertet das (`src/lib/updates/health.ts`) als endgültig: Bei einem Update oder
+einer Wiederherstellung fällt er sofort zurück statt 90 s zu warten, sonst läuft der Container ungesund weiter, ohne zu starten und ohne Schleife.
+Test: `src/server/startup.test.ts` (präpariertes altes Volume), `migrate.test.ts`.
 
 ### Ersteinrichtung und Einrichtungs-Token
 
