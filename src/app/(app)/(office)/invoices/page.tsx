@@ -65,7 +65,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     <Link
       href={keep({ dir: value })}
       aria-current={dir === value ? "page" : undefined}
-      className={clsx("-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", dir === value ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
+      className={clsx("-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", dir === value ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
     >
       {t(`invoices.tabs.${value}`)}
     </Link>
@@ -145,7 +145,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                     <tr key={inv.id} className="row-link">
                       <td className="whitespace-nowrap tabular text-sm">{date(inv.issueDate)}</td>
                       <td>
-                        <Link href={`/invoices/${inv.id}`} className="font-mono text-[13px] font-medium hover:underline">
+                        <Link href={`/invoices/${inv.id}`} className="font-mono text-[13px] font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                           {inv.number}
                         </Link>
                         {inv.file ? <Paperclip className="ml-1.5 inline size-3.5 text-ink-muted" aria-label={t("invoices.hasFile")} /> : null}

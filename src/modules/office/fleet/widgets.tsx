@@ -28,7 +28,7 @@ export async function FleetWidget() {
     .slice(0, 4);
 
   return (
-    <Card title={t("fleet.widgets.title")} actions={<Link href="/fleet?due=1" className="text-sm text-accent-text hover:underline">{t("common.showAll")}</Link>} padded={false}>
+    <Card title={t("fleet.widgets.title")} actions={<Link href="/fleet?due=1" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">{t("common.showAll")}</Link>} padded={false}>
       {dueVehicles.length === 0 && dueDrivers.length === 0 ? (
         <EmptyState title={t("fleet.widgets.allFine")} />
       ) : (

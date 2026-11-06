@@ -33,7 +33,7 @@ export async function InvoicesWidget() {
   );
 
   return (
-    <Card title={t("invoices.widgets.title")} actions={<Link href="/invoices" className="text-sm text-accent-text hover:underline">{t("common.showAll")}</Link>} padded={false}>
+    <Card title={t("invoices.widgets.title")} actions={<Link href="/invoices" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">{t("common.showAll")}</Link>} padded={false}>
       <div className="grid grid-cols-2 divide-x divide-line border-b border-line">
         {col(t("invoices.widgets.toPay"), incoming, "/invoices?dir=incoming&status=open")}
         {col(t("invoices.widgets.toReceive"), outgoing, "/invoices?dir=outgoing&status=open")}

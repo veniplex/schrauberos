@@ -30,7 +30,7 @@ export async function EmployeesWidget() {
   ]);
 
   return (
-    <Card title={t("employees.widgets.title")} actions={<Link href="/employees/absences" className="text-sm text-accent-text hover:underline">{t("nav.absences")}</Link>} padded={false}>
+    <Card title={t("employees.widgets.title")} actions={<Link href="/employees/absences" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">{t("nav.absences")}</Link>} padded={false}>
       <h3 className="px-5 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("employees.widgets.absentToday")}</h3>
       {absent.length === 0 ? (
         <p className="px-5 py-3 text-sm text-ink-muted">{t("employees.widgets.nobodyAbsent")}</p>
@@ -40,7 +40,7 @@ export async function EmployeesWidget() {
             const type = visibleAbsenceType(a.type, sensitive);
             return (
               <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                <Link href={`/employees/${a.employeeId}`} className="font-medium hover:underline">
+                <Link href={`/employees/${a.employeeId}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                   {employeeName(a.employee)}
                 </Link>
                 <span className="flex items-center gap-2">

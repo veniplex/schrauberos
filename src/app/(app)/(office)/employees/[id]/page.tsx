@@ -162,7 +162,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             <DefinitionList
               items={[
                 { label: t("employees.fields.personnelNumber"), value: e.personnelNumber },
-                { label: t("customers.fields.email"), value: e.email ? <a className="text-accent-text hover:underline" href={`mailto:${e.email}`}>{e.email}</a> : null },
+                { label: t("customers.fields.email"), value: e.email ? <a className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline" href={`mailto:${e.email}`}>{e.email}</a> : null },
                 { label: t("customers.fields.phone"), value: e.phone },
                 { label: t("employees.fields.mobile"), value: e.mobile },
                 { label: t("employees.fields.hireDate"), value: e.hireDate ? date(e.hireDate) : null },
@@ -176,7 +176,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             {e.user ? (
               <p className="text-sm">
                 {session.can("users.manage") ? (
-                  <Link href={`/admin/users/${e.user.id}`} className="font-medium text-accent-text hover:underline">
+                  <Link href={`/admin/users/${e.user.id}`} className="font-medium text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                     {e.user.name}
                   </Link>
                 ) : (

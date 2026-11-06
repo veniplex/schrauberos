@@ -90,7 +90,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
                   {employees.map((e) => (
                     <tr key={e.id} className="row-link">
                       <td>
-                        <Link href={`/employees/${e.id}`} className="font-medium hover:underline">
+                        <Link href={`/employees/${e.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                           {employeeName(e)}
                         </Link>
                         <div className="flex items-center gap-2 text-xs text-ink-muted">

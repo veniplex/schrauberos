@@ -126,7 +126,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 {
                   label: outgoing ? t("invoices.fields.recipient") : t("invoices.fields.supplier"),
                   value: inv.customer && session.can("customers.view") ? (
-                    <Link href={`/customers/${inv.customer.id}`} className="text-accent-text hover:underline">
+                    <Link href={`/customers/${inv.customer.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                       {customerDisplayName(inv.customer)}
                     </Link>
                   ) : (

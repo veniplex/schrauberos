@@ -101,7 +101,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                       </td>
                       <td className="text-sm">
                         {v.customer ? (
-                          <Link href={`/customers/${v.customer.id}`} className="hover:underline">
+                          <Link href={`/customers/${v.customer.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                             {customerDisplayName(v.customer)}
                           </Link>
                         ) : (

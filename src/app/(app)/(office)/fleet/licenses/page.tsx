@@ -44,7 +44,7 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={clsx("-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", active ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
+      className={clsx("-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", active ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
     >
       {label}
     </Link>
@@ -76,7 +76,7 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
                 {rows.map(({ d, last, state }) => (
                   <tr key={d.id}>
                     <td>
-                      <Link href={`/employees/${d.id}`} className="font-medium hover:underline">
+                      <Link href={`/employees/${d.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                         {employeeName(d)}
                       </Link>
                     </td>

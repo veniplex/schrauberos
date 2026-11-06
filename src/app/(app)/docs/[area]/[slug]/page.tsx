@@ -42,7 +42,7 @@ export default async function DocPage({ params }: { params: Promise<{ area: stri
         }
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <Link href={base} className="text-accent-text hover:underline">
+            <Link href={base} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
               {t(`docs.areas.${area}.title`)}
             </Link>
             {page.category ? <Badge>{page.category.name}</Badge> : null}

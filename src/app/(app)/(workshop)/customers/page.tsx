@@ -86,7 +86,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                   {customers.map((c) => (
                     <tr key={c.id} className="row-link">
                       <td>
-                        <Link href={`/customers/${c.id}`} className="font-medium hover:underline">
+                        <Link href={`/customers/${c.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                           {customerDisplayName(c)}
                         </Link>
                         <div className="flex items-center gap-2 text-xs text-ink-muted">

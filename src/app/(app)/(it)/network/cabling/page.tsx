@@ -34,7 +34,7 @@ export default async function CablingPage({ searchParams }: { searchParams: Prom
             href={`/network/cabling?tab=${id}`}
             aria-current={tab === id ? "page" : undefined}
             className={clsx(
-              "-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium",
+              "-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium",
               tab === id ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink",
             )}
           >
@@ -76,7 +76,7 @@ async function ConnectionsTab({ canEdit, canDelete }: { canEdit: boolean; canDel
                   {connections.map((c) => (
                     <tr key={c.id}>
                       <td>
-                        <Link href={`/network/devices/${c.from.id}`} className="font-medium hover:underline">
+                        <Link href={`/network/devices/${c.from.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                           {c.from.name}
                         </Link>
                         {c.fromPort ? <span className="ml-2 font-mono text-[13px] text-ink-muted">{c.fromPort}</span> : null}
@@ -85,7 +85,7 @@ async function ConnectionsTab({ canEdit, canDelete }: { canEdit: boolean; canDel
                         <ArrowRight className="size-4" aria-hidden />
                       </td>
                       <td>
-                        <Link href={`/network/devices/${c.to.id}`} className="font-medium hover:underline">
+                        <Link href={`/network/devices/${c.to.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                           {c.to.name}
                         </Link>
                         {c.toPort ? <span className="ml-2 font-mono text-[13px] text-ink-muted">{c.toPort}</span> : null}

@@ -129,7 +129,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         <td className="text-sm">{ip.hostname ?? <span className="text-ink-muted">–</span>}</td>
                         <td className="font-mono text-[13px]">{ip.mac ?? <span className="font-sans text-ink-muted">–</span>}</td>
                         <td className="text-sm">
-                          <Link href={`/network/ip/${ip.subnetId}`} className="text-accent-text hover:underline">
+                          <Link href={`/network/ip/${ip.subnetId}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                             {ip.subnet.name}
                           </Link>
                         </td>
@@ -152,7 +152,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                     >
                       <span className="tabular font-semibold">{p}</span>
                       {l ? (
-                        <Link href={`/network/devices/${l.other.id}`} className="mt-0.5 block truncate text-accent-text hover:underline" title={`${l.other.name}${l.otherPort ? ` · ${l.otherPort}` : ""}`}>
+                        <Link href={`/network/devices/${l.other.id}`} className="mt-0.5 flex min-h-(--tap-row) items-center truncate text-accent-text hover:underline" title={`${l.other.name}${l.otherPort ? ` · ${l.otherPort}` : ""}`}>
                           {l.other.name}
                         </Link>
                       ) : (
@@ -183,7 +183,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                       <tr key={l.id}>
                         <td className="font-mono text-[13px]">{l.port ?? "–"}</td>
                         <td>
-                          <Link href={`/network/devices/${l.other.id}`} className="font-medium hover:underline">
+                          <Link href={`/network/devices/${l.other.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                             {l.other.name}
                           </Link>
                         </td>

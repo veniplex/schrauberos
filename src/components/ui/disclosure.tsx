@@ -42,7 +42,7 @@ export function Disclosure({
         aria-controls={id}
         onClick={toggle}
         className={clsx(
-          "flex w-full cursor-pointer items-center gap-1.5 rounded-md text-left transition-colors",
+          "flex min-h-(--tap-row) w-full cursor-pointer items-center gap-1.5 rounded-md text-left transition-colors",
           variant === "panel" ? "px-1 py-1 text-xs font-medium text-ink-muted hover:text-ink" : "px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-muted hover:bg-surface-hover hover:text-ink",
         )}
       >

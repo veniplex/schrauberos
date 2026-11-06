@@ -129,7 +129,7 @@ export default async function AbsencesPage({
               employees.map((e) => (
                 <tr key={e.id}>
                   <th scope="row" className="sticky left-0 z-10 border-b border-line bg-surface px-3 py-1.5 text-left font-medium">
-                    <Link href={`/employees/${e.id}`} className="hover:underline">
+                    <Link href={`/employees/${e.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                       {employeeName(e)}
                     </Link>
                   </th>
@@ -166,7 +166,7 @@ export default async function AbsencesPage({
                 return (
                   <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                     <span className="flex flex-wrap items-center gap-2">
-                      <Link href={`/employees/${a.employeeId}`} className="font-medium hover:underline">
+                      <Link href={`/employees/${a.employeeId}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                         {employeeName(a.employee)}
                       </Link>
                       <Badge tone={TYPE_TONE[type]}>{type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}</Badge>

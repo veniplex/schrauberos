@@ -31,7 +31,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             href={`/settings?tab=${tab.id}`}
             aria-current={active?.id === tab.id ? "page" : undefined}
             className={clsx(
-              "-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium",
+              "-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium",
               active?.id === tab.id ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink",
             )}
           >

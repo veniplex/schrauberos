@@ -107,7 +107,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                       <ul className="mt-3 flex flex-col gap-1.5">
                         {v.tireSets.map((s) => (
                           <li key={s.id}>
-                            <Link href={`/tires/${s.id}`} className="flex flex-wrap items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm hover:bg-surface-hover">
+                            <Link href={`/tires/${s.id}`} className="flex min-h-(--tap-row) flex-wrap items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm hover:bg-surface-hover">
                               <SeasonBadge season={s.season} td={td} />
                               <span>{[s.brand, formatTireSize(s)].filter(Boolean).join(" · ")}</span>
                               <span className="text-ink-muted">{s.storageLocation}</span>
@@ -135,7 +135,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 <ul className="divide-y divide-line">
                   {customer.appointments.map((a) => (
                     <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-                      <Link href={`/appointments?date=${toDateInput(a.startsAt)}`} className="hover:underline">
+                      <Link href={`/appointments?date=${toDateInput(a.startsAt)}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                         <span className="tabular font-medium">{date(a.startsAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                         <span className="ml-2">{a.title}</span>
                         {a.vehicle ? <span className="ml-2 font-mono text-ink-muted">{a.vehicle.plate}</span> : null}
@@ -154,7 +154,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <DefinitionList
               items={[
                 { label: t("customers.fields.phone"), value: customer.phone },
-                { label: t("customers.fields.email"), value: customer.email ? <a className="text-accent-text hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a> : null },
+                { label: t("customers.fields.email"), value: customer.email ? <a className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a> : null },
                 { label: t("customers.fields.address"), value: address },
                 { label: t("common.notes"), value: customer.notes },
               ]}

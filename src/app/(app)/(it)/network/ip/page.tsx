@@ -60,7 +60,7 @@ export default async function IpamPage() {
                     return (
                       <tr key={s.id} className="row-link">
                         <td>
-                          <Link href={`/network/ip/${s.id}`} className="font-medium hover:underline">
+                          <Link href={`/network/ip/${s.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                             {s.name}
                           </Link>
                         </td>

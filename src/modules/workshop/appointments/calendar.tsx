@@ -366,7 +366,7 @@ export function ListView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
                   <tr key={a.id} className="row-link">
                     <td className="w-32 whitespace-nowrap tabular">
                       {ctx.canEdit ? (
-                        <Link href={calendarHref(ctx.view, ctx.date, { edit: a.id })} className="font-medium hover:underline">
+                        <Link href={calendarHref(ctx.view, ctx.date, { edit: a.id })} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                           {ctx.i18n.date(a.startsAt, { timeStyle: "short" })}–{ctx.i18n.date(a.endsAt, { timeStyle: "short" })}
                         </Link>
                       ) : (

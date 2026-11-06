@@ -58,7 +58,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 <tr key={u.id} className="row-link">
                   <td>
                     {canManage ? (
-                      <Link href={`/admin/users/${u.id}`} className="font-medium hover:underline">
+                      <Link href={`/admin/users/${u.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                         {u.name}
                       </Link>
                     ) : (

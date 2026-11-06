@@ -41,7 +41,7 @@ export default async function EditUserPage({ params, searchParams }: { params: P
             <span>{user.username}</span>
             {user.employee ? (
               session.can("employees.view") ? (
-                <Link href={`/employees/${user.employee.id}`} className="text-accent-text hover:underline">
+                <Link href={`/employees/${user.employee.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                   {t("users.linkedEmployee", { name: `${user.employee.firstName} ${user.employee.lastName}` })}
                 </Link>
               ) : (

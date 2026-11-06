@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string>({
           title={o.title}
           onClick={() => onChange(o.value)}
           className={clsx(
-            "grid min-h-8 min-w-8 cursor-pointer place-items-center rounded-sm px-2 text-xs font-medium transition-colors",
+            "grid min-h-(--tap-sm) min-w-(--tap-sm) cursor-pointer place-items-center rounded-sm px-2 text-xs font-medium transition-colors",
             value === o.value ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink",
           )}
         >

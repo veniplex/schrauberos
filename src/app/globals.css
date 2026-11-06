@@ -73,7 +73,7 @@ h1, h2, h3, h4 {
 
   /* Buttons: default · hover · focus-visible · active · disabled · loading (aria-busy) */
   .btn {
-    @apply inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-3.5 py-1.5 text-sm font-medium;
+    @apply inline-flex min-h-(--tap) min-w-(--tap) items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-3.5 py-1.5 text-sm font-medium;
     transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out),
       transform var(--dur-fast) var(--ease-out);
     cursor: pointer;
@@ -113,10 +113,10 @@ h1, h2, h3, h4 {
     @apply bg-danger-bg;
   }
   .btn-sm {
-    @apply min-h-8 px-2.5 py-1 text-[13px];
+    @apply min-h-(--tap-sm) min-w-(--tap-sm) px-2.5 py-1 text-[13px];
   }
   .btn-icon {
-    @apply min-h-9 w-9 px-0;
+    @apply min-h-(--tap) w-(--tap) px-0;
   }
 
   /* Formularfelder */
@@ -130,7 +130,8 @@ h1, h2, h3, h4 {
     @apply mt-1 text-xs text-danger-ink;
   }
   .input {
-    @apply block w-full min-h-9 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink;
+    @apply block w-full min-h-(--tap) rounded-md border border-line-strong bg-surface px-3 py-1.5 text-ink;
+    font-size: var(--input-font);
     transition: border-color var(--dur-fast) var(--ease-out);
   }
   .input::placeholder {

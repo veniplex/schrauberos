@@ -93,7 +93,7 @@ export default async function SubnetPage({
                       <tr key={ip.id} className="row-link">
                         <td className="font-mono text-[13px] whitespace-nowrap">
                           {canEdit ? (
-                            <Link href={`${base}?edit=${ip.id}`} className="font-medium hover:underline">
+                            <Link href={`${base}?edit=${ip.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                               {ip.address}
                             </Link>
                           ) : (
@@ -105,7 +105,7 @@ export default async function SubnetPage({
                         </td>
                         <td className="text-sm">
                           {ip.device ? (
-                            <Link href={`/network/devices/${ip.device.id}`} className="text-accent-text hover:underline">
+                            <Link href={`/network/devices/${ip.device.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                               {ip.device.name}
                             </Link>
                           ) : (
@@ -147,7 +147,7 @@ export default async function SubnetPage({
                   <li key={r.from} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
                     <span className="font-mono text-[13px]">{r.count === 1 ? r.from : `${r.from} – ${r.to}`}</span>
                     {canEdit ? (
-                      <Link href={`${base}?new=1&address=${r.from}`} className="text-accent-text hover:underline">
+                      <Link href={`${base}?new=1&address=${r.from}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                         {t("network.useAddress")}
                       </Link>
                     ) : null}

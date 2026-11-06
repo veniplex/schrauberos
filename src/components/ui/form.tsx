@@ -67,8 +67,24 @@ export function Field({
 
 type WithInvalid = { invalid?: boolean };
 
-export function Input({ invalid, className, ...props }: InputHTMLAttributes<HTMLInputElement> & WithInvalid) {
-  return <input {...props} aria-invalid={invalid || undefined} className={clsx("input", className)} />;
+/** Touch-Gerät oder schmaler Bildschirm (gleiche Bedingung wie die Tokens `--tap`/`--input-font` in tokens.css) */
+const isTouchLayout = () => window.matchMedia("(pointer: coarse), (max-width: 1023px)").matches;
+
+/**
+ * Eingabefeld. Zahlenfelder (`type="number"`) bekommen von selbst die passende Bildschirmtastatur (`inputMode` numeric bzw. decimal bei
+ * Nachkommastellen), und `autoFocus` wirkt nur am Desktop – auf Touch-Geräten springt sonst die Tastatur auf und verdeckt das Formular.
+ */
+export function Input({ invalid, className, autoFocus, inputMode, ...props }: InputHTMLAttributes<HTMLInputElement> & WithInvalid) {
+  const mode = inputMode ?? (props.type === "number" ? (/./.test(String(props.step ?? "")) ? "decimal" : "numeric") : undefined);
+  return (
+    <input
+      {...props}
+      inputMode={mode}
+      ref={autoFocus ? (el) => void (el && !isTouchLayout() && el.focus()) : undefined}
+      aria-invalid={invalid || undefined}
+      className={clsx("input", className)}
+    />
+  );
 }
 
 /** Suchfeld mit Lupe (für Listen und Filter). */
@@ -76,7 +92,7 @@ export function SearchInput({ className, ...props }: Omit<InputHTMLAttributes<HT
   return (
     <div className={clsx("relative", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-      <input {...props} type="search" className="input pl-9" />
+      <input enterKeyHint="search" {...props} type="search" className="input pl-9" />
     </div>
   );
 }
@@ -89,7 +105,7 @@ export function Checkbox({
   ...props
 }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "className"> & { label: ReactNode; hint?: ReactNode; className?: string }) {
   return (
-    <label className={clsx("flex items-start gap-2 text-sm", className)}>
+    <label className={clsx("flex min-h-(--tap-row) min-w-(--tap-row) items-center gap-2 text-sm", className)}>
       <input {...props} type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--accent)]" />
       <span>
         {label}
@@ -101,7 +117,7 @@ export function Checkbox({
 
 /** Farbauswahl. */
 export function ColorInput({ className, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
-  return <input {...props} type="color" className={clsx("h-9 w-14 cursor-pointer rounded-md border border-line-strong bg-surface p-1", className)} />;
+  return <input {...props} type="color" className={clsx("h-(--tap) w-14 cursor-pointer rounded-md border border-line-strong bg-surface p-1", className)} />;
 }
 
 /** Dateiauswahl. */
@@ -110,7 +126,7 @@ export function FileInput({ className, ...props }: Omit<InputHTMLAttributes<HTML
     <input
       {...props}
       type="file"
-      className={clsx("block w-full text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:bg-surface-hover", className)}
+      className={clsx("block min-h-(--tap) w-full text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:bg-surface-hover", className)}
     />
   );
 }
@@ -174,11 +190,11 @@ export function ColorPicker({
           onClick={() => onChange(c)}
           aria-label={c}
           aria-pressed={value.toLowerCase() === c}
-          className="size-8 cursor-pointer rounded-full border-2 border-surface outline outline-1 outline-line-strong aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ink"
+          className="size-(--tap-sm) cursor-pointer rounded-full border-2 border-surface outline outline-1 outline-line-strong aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ink"
           style={{ background: c }}
         />
       ))}
-      <ColorInput value={value} onChange={(e) => onChange(e.target.value)} aria-label={customLabel} className="size-8 w-8 p-0.5" />
+      <ColorInput value={value} onChange={(e) => onChange(e.target.value)} aria-label={customLabel} className="size-(--tap-sm) w-(--tap-sm) p-0.5" />
       <input type="hidden" name={name} value={value} />
     </div>
   );

@@ -147,7 +147,7 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
                       </td>
                       <td className="text-sm">
                         {s.nextAppointment ? (
-                          <Link href={`/appointments?date=${s.nextAppointment.startsAt.toISOString().slice(0, 10)}`} className="text-accent-text hover:underline">
+                          <Link href={`/appointments?date=${s.nextAppointment.startsAt.toISOString().slice(0, 10)}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                             {date(s.nextAppointment.startsAt, { dateStyle: "medium", timeStyle: "short" })}
                           </Link>
                         ) : s.swapDue && canPlan ? (

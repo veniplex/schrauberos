@@ -42,7 +42,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h2 className="mb-4 text-base font-semibold">{t("auth.signIn")}</h2>
           <LoginForm next={safeNext(next)} />
           <p className="mt-4 text-center text-sm">
-            <Link href="/login/recover" className="text-accent-text underline-offset-2 hover:underline">
+            <Link href="/login/recover" className="text-accent-text underline-offset-2 inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
               {t("recovery.link")}
             </Link>
           </p>

@@ -120,7 +120,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
                     return (
                       <tr key={d.id} className="row-link">
                         <td>
-                          <Link href={`/network/devices/${d.id}`} className="font-medium hover:underline">
+                          <Link href={`/network/devices/${d.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                             {d.name}
                           </Link>
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">

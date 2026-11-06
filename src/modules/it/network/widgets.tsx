@@ -31,7 +31,7 @@ export async function NetworkStatusWidget() {
         </span>
       }
       actions={
-        <Link href="/network" className="text-sm text-accent-text hover:underline">
+        <Link href="/network" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
           {t("common.showAll")}
         </Link>
       }

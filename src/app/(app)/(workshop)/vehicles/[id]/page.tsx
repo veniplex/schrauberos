@@ -125,7 +125,7 @@ export default async function VehiclePage({
                 <ul className="divide-y divide-line">
                   {vehicle.appointments.map((a) => (
                     <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-                      <Link href={`/appointments?date=${toDateInput(a.startsAt)}`} className="hover:underline">
+                      <Link href={`/appointments?date=${toDateInput(a.startsAt)}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                         <span className="tabular font-medium">{date(a.startsAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                         <span className="ml-2">{a.title}</span>
                       </Link>
@@ -142,7 +142,7 @@ export default async function VehiclePage({
           <Card title={t("vehicles.fields.owner")}>
             <p className="font-medium">
               {vehicle.customer ? (
-                <Link href={`/customers/${vehicle.customer.id}`} className="text-accent-text hover:underline">
+                <Link href={`/customers/${vehicle.customer.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                   {customerDisplayName(vehicle.customer)}
                 </Link>
               ) : (
@@ -158,7 +158,7 @@ export default async function VehiclePage({
                 {vehicle.ownerships.map((o) => (
                   <li key={o.id} className="relative text-sm">
                     <span aria-hidden className={`absolute -left-[1.3rem] top-1.5 size-2.5 rounded-full ${o.toDate ? "bg-line-strong" : "bg-accent"}`} />
-                    <Link href={`/customers/${o.customer.id}`} className="font-medium hover:underline">
+                    <Link href={`/customers/${o.customer.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                       {customerDisplayName(o.customer)}
                     </Link>
                     <p className="text-xs text-ink-muted tabular">

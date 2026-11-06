@@ -35,7 +35,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
           <ul className="flex flex-col gap-0.5">
             {s.topics.map((topic) => (
               <li key={topic.id}>
-                <NavLink href={`/help/${topic.id}`} active={topic.id === current?.id} className="min-h-0 py-1.5">
+                <NavLink href={`/help/${topic.id}`} active={topic.id === current?.id} className="min-h-(--tap-row) py-1.5">
                   {topic.page.title}
                 </NavLink>
               </li>
@@ -92,7 +92,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
               <ul className="flex flex-col gap-3">
                 {hits.map((hit) => (
                   <li key={hit.id}>
-                    <Link href={`/help/${hit.id}`} className="font-medium text-accent-text hover:underline">
+                    <Link href={`/help/${hit.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center font-medium text-accent-text hover:underline">
                       {hit.page.title}
                     </Link>
                     <span className="ml-2 text-sm text-ink-muted">{hit.section.title}</span>

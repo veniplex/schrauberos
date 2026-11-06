@@ -39,7 +39,7 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={clsx("-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", active ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
+      className={clsx("-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", active ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
     >
       {label}
     </Link>
@@ -114,7 +114,7 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
                       <td className="text-sm">{[v.make, v.model].filter(Boolean).join(" ") || <span className="text-ink-muted">–</span>}</td>
                       <td className="text-sm">
                         {v.driver ? (
-                          <Link href={`/employees/${v.driver.id}`} className="hover:underline">
+                          <Link href={`/employees/${v.driver.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                             {employeeName(v.driver)}
                           </Link>
                         ) : (

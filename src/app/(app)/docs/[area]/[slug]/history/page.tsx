@@ -39,7 +39,7 @@ export default async function DocHistoryPage({
       <PageHeader
         title={t("docs.history")}
         description={
-          <Link href={base} className="text-accent-text hover:underline">
+          <Link href={base} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
             {page.title}
           </Link>
         }
@@ -52,7 +52,7 @@ export default async function DocHistoryPage({
             <ul className="divide-y divide-line">
               {page.versions.map((v, i) => (
                 <li key={v.id} className={`flex items-center justify-between gap-3 px-5 py-3 text-sm ${selected?.id === v.id ? "bg-accent-subtle" : ""}`}>
-                  <Link href={`${base}/history?v=${v.id}`} className="min-w-0 hover:underline">
+                  <Link href={`${base}/history?v=${v.id}`} className="min-w-0 inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                     <span className="block tabular font-medium">{date(v.savedAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                     <span className="block truncate text-xs text-ink-muted">{v.savedByName ?? "–"}</span>
                   </Link>

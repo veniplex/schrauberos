@@ -82,7 +82,7 @@ export function Badge({ tone = "neutral", children, className }: { tone?: BadgeT
 export function ChipLink({ active, className, ...props }: ComponentProps<typeof Link> & { active?: boolean }) {
   const { children, ...rest } = props;
   return (
-    <Link {...rest} aria-current={active ? "true" : undefined} className={clsx("badge px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)}>
+    <Link {...rest} aria-current={active ? "true" : undefined} className={clsx("badge min-h-(--tap-chip) px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)}>
       {children}
       <LinkPending className="size-3" />
     </Link>
@@ -144,7 +144,7 @@ export function Table({
 /** Link im Fließtext/Kartenkopf („Alle anzeigen“, Verweise auf andere Seiten). */
 export function TextLink({ className, children, ...props }: ComponentProps<typeof Link>) {
   return (
-    <Link {...props} className={clsx("text-accent-text hover:underline", className)}>
+    <Link {...props} className={clsx("inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center text-accent-text hover:underline", className)}>
       {children}
       <LinkPending className="ml-1 inline size-3.5 align-[-0.1em]" />
     </Link>
@@ -180,7 +180,7 @@ export function NavLink({
       {...props}
       aria-current={active ? "page" : undefined}
       className={clsx(
-        "flex min-h-9 items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        "flex min-h-(--tap) items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
         active ? "bg-accent-subtle text-accent-text" : "text-ink-muted hover:bg-surface-hover hover:text-ink",
         className,
       )}

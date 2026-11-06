@@ -57,6 +57,14 @@
   /* Schatten (dezent; im Dunkeln über Linien statt Schatten getrennt) */
   --sh-pop: light-dark(0 8px 28px oklch(20% 0.02 255 / 0.16), 0 8px 28px oklch(0% 0 0 / 0.5));
 
+  /* Bedienelemente: Höhe der Ziele und Eingabeschrift. Desktop kompakt; bei Touch (grober Zeiger) und unter 1024 px mindestens 44 px
+     Ziel und 16 px Schrift (iOS zoomt bei kleinerer Eingabeschrift beim Fokus hinein). */
+  --tap: 36px;
+  --tap-sm: 32px;
+  --tap-chip: 28px;
+  --tap-row: 0px;
+  --input-font: 0.875rem;
+
   /* Bewegung */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 120ms;
@@ -68,4 +76,14 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+@media (pointer: coarse), (max-width: 1023px) {
+  :root {
+    --tap: 44px;
+    --tap-sm: 44px;
+    --tap-chip: 44px;
+    --tap-row: 44px;
+    --input-font: 1rem;
+  }
 }

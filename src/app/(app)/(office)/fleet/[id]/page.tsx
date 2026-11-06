@@ -181,7 +181,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                 {
                   label: t("fleet.fields.driver"),
                   value: v.driver ? (
-                    <Link href={`/employees/${v.driver.id}`} className="text-accent-text hover:underline">
+                    <Link href={`/employees/${v.driver.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                       {employeeName(v.driver)}
                     </Link>
                   ) : null,

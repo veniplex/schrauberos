@@ -22,7 +22,7 @@ export async function TireAttentionWidget() {
     <Card
       title={t("tires.widgets.attentionTitle")}
       actions={
-        <Link href="/tires?attention=1" className="text-sm text-accent-text hover:underline">
+        <Link href="/tires?attention=1" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
           {t("common.showAll")}
         </Link>
       }
@@ -67,7 +67,7 @@ export async function TireSwapWidget() {
     <Card
       title={t("tires.widgets.swapTitle")}
       actions={
-        <Link href="/tires?swap=1" className="text-sm text-accent-text hover:underline">
+        <Link href="/tires?swap=1" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
           {t("common.showAll")}
         </Link>
       }

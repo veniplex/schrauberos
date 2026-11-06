@@ -131,7 +131,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
               <ul className="divide-y divide-line">
                 {set.appointments.map((a) => (
                   <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-                    <Link href={`/appointments?date=${toDateInput(a.startsAt)}`} className="hover:underline">
+                    <Link href={`/appointments?date=${toDateInput(a.startsAt)}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                       <span className="tabular font-medium">{date(a.startsAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                       <span className="ml-2">{a.title}</span>
                     </Link>
@@ -160,7 +160,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
               {!set.vehicle.customer ? (
                 <span className="text-ink-muted">{t("vehicles.noOwner")}</span>
               ) : session.can("customers.view") ? (
-                <Link href={`/customers/${set.vehicle.customer.id}`} className="text-accent-text hover:underline">
+                <Link href={`/customers/${set.vehicle.customer.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                   {customerDisplayName(set.vehicle.customer)}
                 </Link>
               ) : (
@@ -169,7 +169,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
             </p>
             <p className="mt-1 text-sm">
               {session.can("vehicles.view") ? (
-                <Link href={`/vehicles/${set.vehicle.id}`} className="text-accent-text hover:underline">
+                <Link href={`/vehicles/${set.vehicle.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
                   {[set.vehicle.make, set.vehicle.model].filter(Boolean).join(" ") || set.vehicle.plate}
                 </Link>
               ) : (

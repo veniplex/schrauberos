@@ -183,7 +183,7 @@ export function DocEditor({
           spellCheck
           aria-label={t("docs.fields.content")}
           placeholder={t("docs.fields.contentPlaceholder")}
-          className="block min-h-[26rem] w-full resize-y bg-surface p-4 font-mono text-[13px] leading-relaxed text-ink outline-none focus-visible:outline-none"
+          className="block min-h-[26rem] w-full resize-y bg-surface p-4 font-mono text-[13px] leading-relaxed text-ink outline-none focus-visible:outline-none max-lg:text-base pointer-coarse:text-base"
         />
         {tab === "preview" ? (
           <div className="min-h-[26rem] bg-surface p-5">

@@ -19,7 +19,7 @@ export async function TodayAppointmentsWidget() {
     <Card
       title={t("appointments.widgets.todayTitle")}
       actions={
-        <Link href={`/appointments?view=day&date=${toDateInput(today)}`} className="text-sm text-accent-text hover:underline">
+        <Link href={`/appointments?view=day&date=${toDateInput(today)}`} className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
           {t("appointments.widgets.toCalendar")}
         </Link>
       }
