@@ -2,6 +2,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import { Button } from "./buttons";
+import { LinkPending } from "./link-pending";
 
 export function PageHeader({
   title,
@@ -79,7 +80,13 @@ export function Badge({ tone = "neutral", children, className }: { tone?: BadgeT
 
 /** Umschaltbarer Filter in Chip-Form (z. B. Status-Filter über einer Liste), als Link. */
 export function ChipLink({ active, className, ...props }: ComponentProps<typeof Link> & { active?: boolean }) {
-  return <Link {...props} aria-current={active ? "true" : undefined} className={clsx("badge px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)} />;
+  const { children, ...rest } = props;
+  return (
+    <Link {...rest} aria-current={active ? "true" : undefined} className={clsx("badge px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)}>
+      {children}
+      <LinkPending className="size-3" />
+    </Link>
+  );
 }
 
 export function Plate({ children }: { children: ReactNode }) {
@@ -135,8 +142,13 @@ export function Table({
 }
 
 /** Link im Fließtext/Kartenkopf („Alle anzeigen“, Verweise auf andere Seiten). */
-export function TextLink({ className, ...props }: ComponentProps<typeof Link>) {
-  return <Link {...props} className={clsx("text-accent-text hover:underline", className)} />;
+export function TextLink({ className, children, ...props }: ComponentProps<typeof Link>) {
+  return (
+    <Link {...props} className={clsx("text-accent-text hover:underline", className)}>
+      {children}
+      <LinkPending className="ml-1 inline size-3.5 align-[-0.1em]" />
+    </Link>
+  );
 }
 
 /**
@@ -176,11 +188,22 @@ export function NavLink({
       {icon}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {count != null ? <span className="text-xs tabular">{count}</span> : null}
+      <LinkPending />
     </Link>
   );
 }
 
 /** Karte, die als Ganzes ein Link ist (Übersichtskacheln, Trefferlisten). */
-export function CardLink({ className, ...props }: ComponentProps<typeof Link>) {
-  return <Link {...props} className={clsx("card card-pad block transition-colors hover:bg-surface-hover", className)} />;
+export function CardLink({ className, children, ...props }: ComponentProps<typeof Link>) {
+  return (
+    <Link {...props} className={clsx("card card-pad relative block transition-colors hover:bg-surface-hover", className)}>
+      {children}
+      <LinkPending className="absolute right-3 top-3" />
+    </Link>
+  );
+}
+
+/** Platzhalter für noch ladende Inhalte (Ladeseiten, Widgets). Nur dekorativ – die Ladeseite sagt „Wird geladen“ selbst an. */
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden className={clsx("animate-pulse rounded-md bg-surface-2", className)} />;
 }

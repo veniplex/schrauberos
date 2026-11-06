@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import clsx from "clsx";
+import { WidgetBoundary } from "@/components/shell/widget-boundary";
 import { Card, PageHeader } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { widgetsFor } from "@/modules/registry";
@@ -41,9 +42,11 @@ export default async function DashboardPage() {
               <div className="grid gap-5 lg:grid-cols-2">
                 {list.map(({ id, span, Component }) => (
                   <div key={id} className={clsx("min-w-0", span === 2 && "lg:col-span-2")}>
-                    <Suspense fallback={<WidgetSkeleton />}>
-                      <Component />
-                    </Suspense>
+                    <WidgetBoundary>
+                      <Suspense fallback={<WidgetSkeleton />}>
+                        <Component />
+                      </Suspense>
+                    </WidgetBoundary>
                   </div>
                 ))}
               </div>

@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
+import { NavProgress } from "@/components/ui/nav-progress";
 import { I18nProvider } from "@/i18n/client";
 import { getLocale, getMessages, getTheme } from "@/i18n/server";
 import { contrastInk, isHexColor } from "@/lib/color";
@@ -42,6 +43,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       style={{ "--workshop-accent": accent, "--workshop-accent-contrast": contrastInk(accent) } as CSSProperties}
     >
       <body>
+        <NavProgress />
         <I18nProvider locale={locale} messages={messages}>
           {children}
         </I18nProvider>

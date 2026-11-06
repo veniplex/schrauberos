@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
+import { LinkPending } from "./link-pending";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "md" | "sm" | "icon" | "icon-sm";
@@ -38,7 +39,15 @@ export function LinkButton({
   ...props
 }: ComponentProps<typeof Link> & ButtonLook & { external?: boolean }) {
   const classes = clsx(buttonClass(variant, size), className);
-  if (!external) return <Link {...props} className={classes} />;
+  if (!external) {
+    const { children, ...rest } = props;
+    return (
+      <Link {...rest} className={classes}>
+        {children}
+        <LinkPending />
+      </Link>
+    );
+  }
   const { href, children, download, target, rel, title, "aria-label": ariaLabel } = props;
   return (
     <a href={String(href)} download={download} target={target} rel={rel} title={title} aria-label={ariaLabel} className={classes}>

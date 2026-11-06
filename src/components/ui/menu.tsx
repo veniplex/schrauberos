@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type ReactNode } from "react";
 import { Button, type ButtonSize, type ButtonVariant } from "./buttons";
+import { LinkPending } from "./link-pending";
 
 /**
  * Aufklappmenü (Konto-Menü …). Schließt bei Klick daneben, Escape und Seitenwechsel.
@@ -75,8 +76,13 @@ export function MenuHeader({ children }: { children: ReactNode }) {
   return <div className="mb-1 border-b border-line px-3 py-2">{children}</div>;
 }
 
-export function MenuLink({ className, ...props }: ComponentProps<typeof Link>) {
-  return <Link role="menuitem" {...props} className={clsx(itemClass, className)} />;
+export function MenuLink({ className, children, ...props }: ComponentProps<typeof Link>) {
+  return (
+    <Link role="menuitem" {...props} className={clsx(itemClass, className)}>
+      {children}
+      <LinkPending />
+    </Link>
+  );
 }
 
 /** Menüeintrag, der ein Formular absendet (z. B. Abmelden). */
