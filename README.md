@@ -137,9 +137,10 @@ src/
     define.ts             Typen und defineModule()/defineFeature()
     features.ts           Aktivierung: Schalter lesen/schreiben (Datenbank)
     registry.ts           sammelt Dashboard-Bausteine und Einstellungs-Reiter der Funktionen ein
+    api.ts                sammelt die API-Endpunkte der Funktionen (`<funktion>/api.ts`) ein; api-exceptions.ts: UI-Aktionen ohne API-Pendant
     default-roles.ts      mitgelieferte Rollen
     workshop/ office/ it/ admin/      je Modul: module.ts + ein Ordner je Funktion
-      <funktion>/feature.ts, public.ts, actions.ts, queries.ts, domain.ts, forms.tsx, widgets.tsx, settings-tab.tsx …
+      <funktion>/feature.ts, public.ts, operations.ts, actions.ts, api.ts, queries.ts, domain.ts, forms.tsx, widgets.tsx, settings-tab.tsx …
   capabilities/docs/      Querschnittsfunktion Dokumentation
   platform/               Plattform-Bausteine (Konto, Hilfe)
   app/                    Next.js-Routen (dünn: laden Daten, setzen Bausteine zusammen)
@@ -280,7 +281,7 @@ zu überschreiben. Prüfung und Schreiben, die zusammengehören (z. B. Doppelbel
 ### Aktionen und Operationen (Aktions-Rahmen)
 
 Jede schreibende Server Action läuft über den Rahmen in `src/server/operations` (Architekturtest: `architecture.test.ts`). Kern ist
-`defineOperation({ name, permission, input, audit, run })`; zwei Adapter machen daraus eine Aktion oder (Gerüst, Kern folgt in P1a-8) einen API-Handler:
+`defineOperation({ name, permission, input, audit, run })`; zwei Adapter machen daraus eine Aktion oder einen API-Aufruf (siehe „Programmierschnittstelle“). Die Operationen liegen in `operations.ts` (ohne `"use server"`, damit auch `api.ts` sie benutzen kann), die Aktionen in `actions.ts` (nur `defineAction`, Rückmeldung/Weiterleitung):
 
 ```ts
 const saveThingOperation = defineOperation({
@@ -311,9 +312,7 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
   `FlashNotice` im Anwendungsrahmen übersetzt und zeigt ihn einmal (`FlashMessage`, löscht das Cookie; Erfolg blendet aus, Fehler bleiben). Der Toast (P2a-2) ersetzt diesen
   minimalen Meldungsbereich. `redirect()`/`notFound()` werden nie verschluckt (`unstable_rethrow`, Test). Anmeldung/Recht prüft der Adapter wie bisher mit `requireSession`/`requirePermission`
   (ohne Sitzung `/login`, `mustChangePassword` → `/account`, falsches Recht `/forbidden`, ausgeschaltete Funktion 404); der Kern prüft das Recht zusätzlich.
-* **Adapter API** (`defineApi`, Gerüst): JSON, `Authorization: Bearer` über `setApiAuthenticator` (Standard: lehnt alles mit 401 ab), Statuscodes je Fehlercode, Fehlerformat
-  `{ error: { code, message: <Schlüssel>, params, fields } }`. Das Sitzungs-Cookie wird hier nie gelesen. Formular- und API-Eingabeschemas bleiben getrennt (Formular: `form`-Funktion/
-  Text-Schemas wie `moneyCents`, `dateText` aus `src/lib/zod-fields.ts`); geteilt wird die Domänenebene (Prüfung, Audit).
+* **Adapter API** (`runApiOperation` in `src/server/operations/api.ts`): übersetzt Ergebnis und Fehler einer Operation in HTTP-Semantik (Problem-Format, Statuscodes). Pipeline und Ressourcen: Abschnitt „Programmierschnittstelle“. Formular- und API-Eingabeschemas bleiben getrennt (Formular: Text-Schemas wie `moneyCents`, `dateText` aus `src/lib/zod-fields.ts`; API: JSON-Typen, Geld als Cent); geteilt wird die Domänenebene (Prüfung, Audit).
 * **Audit:** `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Beschriftungen `audit.actions.*`) oder `audit: false` mit `auditReason` (Begründung Pflicht). Fehlschläge außerhalb der
   Transaktion (z. B. `system.updateFailed`, `backup.restoreFailed`) schreibt `onFailure`. Das Audit-Log wird nach der eingestellten Frist (Standard 730 Tage, Einstellungen → Sicherheit,
   `src/server/audit-retention.ts`) vom Scheduler täglich bereinigt.
@@ -324,7 +323,7 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
   auslösende Funktion kennt ihre Abonnenten nicht. Asynchrone Wirkungen (Webhooks, Mail) gehören in die Outbox.
 * **Berechtigungs-Matrix** (`src/server/operations/matrix.test.ts`, generiert aus dem Quelltext): jede Action und jeder Route Handler wird ohne Sitzung, mit `mustChangePassword`, mit falschem Recht
   (alle Rechte außer dem erforderlichen) und mit ausgeschalteter Funktion aufgerufen und muss ablehnen, ohne etwas zu verändern. Neue Aktionen/Routen sind automatisch dabei; öffentliche Routen
-  (`/api/health`) stehen in einer Ausnahmeliste im Test.
+  (`/api/health`) stehen in einer Ausnahmeliste im Test; `/api/v1` ist nur per Token erreichbar (eine Cookie-Sitzung ergibt 401) und hat eine eigene generierte Matrix (`src/server/api/matrix.test.ts`).
 * **Eingabeabhängiges Recht** (`permissionFor`): Hängt das Recht von der Eingabe ab (Dokumentationsbereich: `<gruppe>.edit`), wählt `permissionFor(raw)` es aus dem rohen Formular;
   `permission` bleibt der Standard und die Vertretung für Matrix und Funktions-Zuordnung. Die Aktion prüft das gewählte Recht, bevor etwas gelesen oder geschrieben wird.
 * **Konto-Operationen** (`permission: "authenticated"`, `allowPasswordChange: true`): Nur Profil, Passwort ändern, Notzugangs-Hinweise/-Code bestätigen und die Anzeigeeinstellungen (Sprache, Design)
@@ -334,6 +333,61 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
 * **Dynamische Werte aus Client-Code:** Aktionen nehmen `FormData`; wer einen einzelnen Wert schickt (Sprach-/Design-Umschalter), baut ein `FormData` mit einem Feld.
 * **Nicht umgestellt** (Liste `LEGACY_ACTION_FILES` in `architecture.test.ts`, darf nur schrumpfen): Anmeldung/Abmeldung, Notzugang einlösen und Ersteinrichtung – sie laufen vor der Sitzung auf eigenen
   Pfaden (Anmeldedrosselung, Einrichtungs-Token) und haben kein Recht, das der Rahmen prüfen könnte.
+
+### Programmierschnittstelle (API-Kern, `/api/v1`)
+
+Andere Systeme können Daten über `/api/v1` lesen und schreiben. Der **API-Kern** (Tokens, Authentifizierung, Rate-Limit, Idempotenz, Fehlerformat, OpenAPI) steht in `src/server/api`
+und `src/lib/api`; **jede fachliche Funktion bringt ihre Ressourcen in einer `api.ts` mit**. Noch nicht vorhanden (Block F11 „API & Webhooks“): Oberfläche zur Token-Verwaltung,
+Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen – bis dahin gibt es dafür weder Hilfe-Kapitel noch Bedienung in der App.
+
+* **Ein Eintrittspunkt:** `src/app/api/v1/[...path]/route.ts` → `handleApiRequest` (`src/server/api/router.ts`). Die Funktionen tragen ihre Endpunkte in `src/modules/api.ts` ein (Composition Root,
+  von `registry.ts` wieder ausgegeben). Reihenfolge der Pipeline: Token → Rate-Limit → Route → **Funktion aktiv (sonst 404)** → Methode (405) → **Recht (403)** → Filter/Körper prüfen
+  (1 MiB, `application/json`, strenge Schemas) → Idempotenz → Endpunkt. Ohne gültiges Token ist **alles** 401, auch unbekannte Pfade.
+* **Tokens** (`ApiToken`, `ApiTokenScope`): `sos_` + 32 Zufallsbytes; gespeichert wird **nur der SHA-256-Hash** (hochentropisch, ein langsamer Hash wäre sinnlos). Das Klartext-Token steht
+  einmalig im Ergebnis von `createApiTokenOperation` (`src/server/api/tokens.ts`), nie in Log, Audit, URL oder Datenbank. Besitzer, Ablauf (Pflicht, höchstens 365 Tage), `lastUsedAt`
+  (höchstens alle 10 Minuten, atomar, ohne `updatedAt`), Widerruf (`revokedAt`), Anfragen je Minute am Token. Besitzer gelöscht → Token weg (Cascade); Besitzer gesperrt oder mit
+  ausstehendem Passwortwechsel → Token ungültig. **Erzeugen/Widerrufen nur per Sitzung** mit dem Verwaltungsrecht `settings.manage` (F11 ersetzt es durch `api.manage` und verlangt die erneute
+  Passwortabfrage in `prepare`); ein Token kann nie ein Token verwalten. Beide Vorgänge stehen im Audit-Log (`apiToken.create/revoke`, Ziel = Name und Anfang des Tokens).
+* **Wirksame Rechte = Scope ∩ aktuelle Rechte des Besitzers**, bei **jeder** Anfrage neu berechnet (`src/lib/api/scope.ts`). Nie in einem Token: `adminOnly`-Rechte, alle Rechte der
+  Plattform-/Verwaltungsfunktionen (Pflichtfunktionen) und `API_NEVER` (`employees.sensitive`) – auch nicht, wenn ein Administrator das Token erzeugt. Der Scope darf beim Erzeugen höchstens
+  die Rohrechte des Erzeugers enthalten (Rechte-Hierarchie, `checkTokenScope`). Der API-Principal ist nie Administrator und trägt keine Rollen.
+* **Cookie und Token bleiben getrennt:** Die API liest nie das Sitzungs-Cookie (eine Cookie-Sitzung allein ist 401); Seiten und Server Actions lesen nie den `Authorization`-Header
+  (`src/modules/api.test.ts` erzwingt beides im Quelltext, `src/server/api/api.test.ts` und `matrix.test.ts` im Verhalten).
+* **Drosselung nur im Fehlerpfad:** Zuerst der Hash-Lookup; **nur ungültige** Tokens (und Anfragen ohne Token) laufen in die Drosselung (`auth.ts`, `state.ts`): 120 Fehlversuche pro Minute
+  insgesamt, 30 je Adresse – je Adresse nur mit der Proxy-Einstellung (`src/lib/client-ip.ts`, sonst wäre der Header fälschbar) – dann 429 mit `Retry-After`. Kein scrypt, nur ein Zähler im Speicher.
+  Gültige Tokens werden davon nie berührt. Zusätzlich je Token ein Fenster pro Minute (Standard 120, am Token einstellbar): 429, `Retry-After`, Header `RateLimit-Limit/-Remaining/-Reset`.
+* **Idempotenz** (`Idempotency-Key`, bei POST/PATCH/DELETE): je Token, `<Methode> <Pfad>` und Schlüssel (1–128 Zeichen `A-Za-z0-9._:~-`) eine Zeile (`ApiIdempotencyKey`, Unique); Körper-Hash. Gleicher
+  Schlüssel + anderer Körper → 422 `idempotency_key_reuse`; Wiederholung → gespeicherte Antwort mit `Idempotent-Replayed: true`; parallele Doppelanfrage → 409 `idempotency_in_progress` (die Unique-Zeile
+  entscheidet, wer läuft); eine Zeile ohne Antwort, die älter als 60 s ist, gilt als verwaist und wird übernommen. 24 Stunden gültig; Serverfehler (5xx) und 429 werden nicht festgehalten. Aufräumen im
+  Scheduler (`runApiCleanup`). Bekannte Grenze: Stürzt der Prozess zwischen Commit der Operation und dem Speichern der Antwort ab, kann die Wiederholung nach 60 s die Operation erneut ausführen.
+* **Fehlerformat** (`application/problem+json`, angelehnt an RFC 9457): `{ type, title, status, code, detail, fields?, reason?, params? }`; `code` ist maschinenlesbar (`src/lib/api/problem.ts`),
+  `fields` nennt je Eingabefeld einen Meldungsschlüssel (`code`, Pfad mit Punkten, z. B. `tires.FL.dot`). Fachliche Fehler der Operation: 422 (Eingabe), 404, 409 (Eindeutigkeit/„wird noch verwendet“),
+  **412** (Version veraltet). Keine Stacks, Pfade oder SQL.
+* **Lesen:** `GET /x` mit `page`/`limit` (Standard 50, höchstens 200), `sort` (`-name,city`, nur Whitelist der Ressource, höchstens 3 Schlüssel), Filter je Ressource (unbekannte Parameter → 422). Antwort
+  `{ data: [...], page: { number, limit, total, pages } }`; Element `{ data: {...} }` mit `ETag` und `version`; `If-None-Match` → 304.
+* **Schreiben:** `POST` (201, `Location`), `PATCH` (Teil-Update; **`If-Match` ist Pflicht** → 428 ohne, 412 bei veralteter Version; `null` löscht ein Feld), `DELETE` (204), Aktionen als `POST /x/{id}/<aktion>`.
+  Alles läuft über **dieselben Operationen** wie die Oberfläche (Recht, Prüfung der Sache, Konfliktprüfung, Transaktion, Hooks, **Audit** – der Handelnde heißt `<Name> [API: <Tokenname>]`, nie das Token).
+  Geld sind ganze Cent, Kalendertage `JJJJ-MM-TT`, Zeitpunkte ISO 8601.
+* **OpenAPI 3.1:** `GET /api/v1/openapi.json` (gültiges Token nötig), erzeugt aus den Zod-Schemas der Endpunkte (`z.toJSONSchema`), deterministisch, nur aktive Funktionen, ohne Daten und Interna.
+  `src/server/api/openapi-structure.txt` ist die Struktur-Momentaufnahme (Endpunkte, Rechte, Filter, Sortierungen, Körperfelder); Änderungen der API fallen im Review auf
+  (`UPDATE_API_SNAPSHOT=1 npx tsx --test src/server/api/openapi.test.ts`).
+* **Nie API-Ressourcen:** Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit-Log und die API selbst (Plattform/Verwaltung); Architekturtest `src/modules/api.test.ts`. **Vertragstest:** Jede
+  schreibende UI-Aktion hat ein API-Pendant (`ApiEndpoint.operations`) oder steht mit Begründung in `src/modules/api-exceptions.ts` (Konfiguration, Dokumentationsseiten …); Aktionen der Plattform
+  und des Kontos (`authenticated`) sind automatisch ausgenommen. Die Ausnahmeliste darf nur schrumpfen. Vergisst man bei einer neuen Funktion (Blöcke 5–11) die `api.ts`, schlägt der Test fehl.
+* **Besonderheiten:** Mitarbeiter ohne sensible Daten – kein Notfallkontakt, keine Benutzerverknüpfung, Krankheit gibt es in der API nicht (nicht lesbar, anlegbar, löschbar); der Kundenlöschstopp,
+  Ausgangsnummern, Doppelbelegung des Arbeitsplatzes (`findBayClash`) und die DOT-Prüfung gelten unverändert. Nach der Wiederherstellung einer Sicherung gelten die Tokens des Sicherungsstands
+  (Widerrufe seitdem sind weg) – Tokens danach prüfen.
+* **Tests:** `src/server/api/api.test.ts` (Authentifizierung, Drosselung, Rate-Limit, Idempotenz, Lesen/Schreiben, Fehler), `matrix.test.ts` (generierte Berechtigungs-Matrix über alle Endpunkte: ohne/ungültiges/abgelaufenes/
+  widerrufenes Token, Besitzer gesperrt, Cookie allein, Scope fehlt, Besitzer ohne Recht, Funktion aus), `tokens.test.ts`, `resources.test.ts` (Eigenheiten je Ressource), `openapi.test.ts`, `src/lib/api/api-lib.test.ts`.
+
+#### Neue API-Ressource anlegen (Rezept)
+
+1. Die Operationen der Funktion liegen in `operations.ts` (exportiert); `actions.ts` enthält nur `defineAction`. Die API ruft **dieselben** Operationen.
+2. `src/modules/<modul>/<funktion>/api.ts`: `export const endpoints = defineResource({ feature, tag, name, singular, path, read, model, item, toItem, version, list, create, update, remove, actions })`
+   (`@/server/api/resource`). `item` und die Körper sind Zod-Schemas (`z.strictObject`, JSON-Typen; Geld als Cent, `dateOnly` für Tage); `toInput` bringt den API-Körper in die rohe Eingabe der Operation,
+   `current` gibt den Stand einer Zeile in der Form des Körpers zurück (PATCH legt den Teil darüber), `rename` ordnet Feldnamen der Operation denen der API zu. Was die API nicht zeigen darf, filtert `visible`.
+3. In `src/modules/api.ts` eintragen. Rechte: nur Rechte der eigenen Funktion, nie `adminOnly`/sensible (`isApiForbidden`); Funktion mit `requires`/`uses` greift auf andere nur über `public.ts` zu.
+4. Schreibende UI-Aktionen ohne Endpunkt in `api-exceptions.ts` begründen. `UPDATE_API_SNAPSHOT=1 npx tsx --test src/server/api/openapi.test.ts`, dann Tests in `resources.test.ts` (Eigenheiten) – `matrix.test.ts` deckt die neuen Endpunkte automatisch ab.
 
 ### Anmeldung, Sitzung und Rechte-Hierarchie
 
@@ -471,7 +525,8 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 8. Neue Rechte in `default-roles.ts` den passenden Rollen zuordnen (Administratoren haben sie sofort).
 9. Server Actions **immer** über den Aktions-Rahmen (`defineOperation` + `defineAction`, siehe „Aktionen und Operationen“): Bearbeiten-Formulare tragen `version` mit, `run` nutzt `claimRow(tx.modell, id, version)`;
    Dateien nur über `files.ts`; jede Operation nennt `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Texte `audit.actions.*`) oder begründet den Verzicht. Neue Funktionen standardmäßig mit `defaultEnabled: false`.
-10. `npm run typecheck && npm run lint && npm test` – der Architektur-Test meldet verbotene Importe und fehlende Deklarationen.
+10. **API:** Operationen nach `operations.ts`, `api.ts` mit `defineResource` und Eintrag in `src/modules/api.ts` (siehe „Programmierschnittstelle“); schreibende UI-Aktionen ohne Endpunkt mit Begründung in `src/modules/api-exceptions.ts` – der Vertragstest `src/modules/api.test.ts` verlangt eines von beidem.
+11. `npm run typecheck && npm run lint && npm test` – der Architektur-Test meldet verbotene Importe und fehlende Deklarationen.
 
 ## Konventionen
 
@@ -749,6 +804,7 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 * Dateien wachsen mit dem Archiv; Backups verweisen per Hardlink darauf (kaum Zusatzplatz), schützen aber nicht vor dem Ausfall des
   Datenträgers – Kopien außerhalb des Servers über „Herunterladen“.
 * Backups sind unverschlüsselt.
+* API: noch ohne Oberfläche zur Token-Verwaltung, ohne Webhooks, ohne Datei-Upload (Rechnungsbelege) und ohne Doku-Seite der Ressourcen (F11); Tokens entstehen bis dahin nur über die Server-Funktion `createApiTokenOperation`. Rate-Limit und Drosselung liegen im Speicher des Prozesses (ein Prozess, eine Datenbank).
 * Die Suche unterscheidet bei Umlauten Groß-/Kleinschreibung (SQLite).
 * Urlaubstage zählen Mo–Fr ohne Feiertage; kein Genehmigungs-Workflow.
 * Nicht enthalten: E-Mail/SMS-Erinnerungen, Druck-Etiketten/QR-Codes für Lagerplätze, Ressourcen-Kalender pro Mitarbeiter, echte
