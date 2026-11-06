@@ -293,6 +293,8 @@ export const de = {
     security: {
       title: "Anmeldung & Netzwerk",
       behindProxy: "Die Anwendung läuft hinter einem Reverse-Proxy",
+      auditRetention: "Audit-Log aufbewahren (Tage)",
+      auditRetentionHint: "Ältere Einträge des Audit-Logs werden täglich gelöscht (Datensparsamkeit). Standard: 730 Tage (2 Jahre); 0 = unbegrenzt aufbewahren.",
       behindProxyHint: "Nur einschalten, wenn wirklich ein Reverse-Proxy davorsteht, der die Adresse des Clients als letzten Eintrag von X-Forwarded-For anhängt (nginx: proxy_add_x_forwarded_for). Dann begrenzt die Anmeldung Fehlversuche zusätzlich je Adresse. Ohne echten Proxy kann jeder die Adresse im Header vortäuschen und damit fremde Adressen sperren lassen. Auch mit Proxy gilt: Teilen sich viele Geräte eine Adresse (Büro-Netz hinter NAT), trifft die Begrenzung alle gemeinsam – auch Administratoren, außer auf Geräten, mit denen sie sich schon einmal angemeldet haben. Im Zweifel ausgeschaltet lassen.",
     },
     errors: {

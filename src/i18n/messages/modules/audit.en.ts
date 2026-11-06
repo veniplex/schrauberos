@@ -41,6 +41,9 @@ export const auditEn: typeof auditDe = {
       download: "Backup downloaded",
       restore: "Backup restored",
       upload: "Backup uploaded",
+      createFailed: "Backup failed",
+      restoreFailed: "Restore failed",
+      uploadFailed: "Backup import failed",
     },
     setup: {
       complete: "Initial setup completed",
@@ -48,6 +51,7 @@ export const auditEn: typeof auditDe = {
     system: {
       update: "Update installed",
       updateFailed: "Update failed",
+      auditPruned: "Old audit entries deleted",
     },
     auth: {
       login: "Signed in",
@@ -82,14 +86,20 @@ export const auditEn: typeof auditDe = {
       appointments: "Appointment settings changed",
       tires: "Tyre settings changed",
       security: "Security settings changed",
+      backupPlan: "Backup plan changed",
+      updateToken: "Update token changed",
     },
     appointment: {
       delete: "Appointment deleted",
     },
     customer: {
+      create: "Customer created",
+      update: "Customer changed",
       delete: "Customer deleted",
     },
     vehicle: {
+      create: "Vehicle created",
+      update: "Vehicle changed",
       delete: "Vehicle deleted",
       transfer: "Vehicle transferred",
     },
@@ -97,6 +107,10 @@ export const auditEn: typeof auditDe = {
       delete: "Tyre set deleted",
     },
     invoice: {
+      create: "Invoice created",
+      update: "Invoice changed",
+      pay: "Invoice marked as paid",
+      reopen: "Invoice reopened",
       delete: "Invoice deleted",
     },
     employee: {

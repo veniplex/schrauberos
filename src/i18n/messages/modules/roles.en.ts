@@ -27,4 +27,5 @@ export const rolesEn: typeof rolesDe = {
   copyOf: "Copy of {name}",
   selectAll: "All",
   selectNone: "None",
+  errors: { protected: "System roles and administrator roles cannot be deleted." },
 };

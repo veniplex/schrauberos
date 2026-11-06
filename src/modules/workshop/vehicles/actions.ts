@@ -1,24 +1,15 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { requirePermission } from "@/server/auth/session";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import { fieldErrors, formObject } from "@/lib/forms";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { claimRow } from "@/lib/concurrency";
+import { formObject } from "@/lib/forms";
 import { formatPlate, normalizePlate } from "@/lib/plate";
-import { audit } from "@/server/audit";
-import { claimed } from "@/lib/concurrency";
+import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 
-function refresh(id?: string) {
-  for (const p of ["/vehicles", "/customers", "/tires", "/appointments", "/"]) revalidatePath(p);
-  if (id) revalidatePath(`/vehicles/${id}`);
-}
+const refreshPaths = (id?: string) => [...["/vehicles", "/customers", "/tires", "/appointments", "/"], ...(id ? [`/vehicles/${id}`] : [])];
 
-const vehicleSchema = z.object({
+const vehicleInput = z.object({
   id: z.string().optional(),
   version: z.string().optional(),
   // nur beim Anlegen: Halter (optional). Spätere Wechsel laufen über den Halterwechsel.
@@ -35,59 +26,60 @@ const vehicleSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
-export async function saveVehicle(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("vehicles.edit");
-  const { t } = await getI18n();
-  const parsed = vehicleSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, customerId, plate, ...d } = parsed.data;
+const saveVehicleOperation = defineOperation({
+  name: "vehicles.save",
+  permission: "vehicles.edit",
+  input: vehicleInput,
+  audit: (input) => (input.id ? "vehicle.update" : "vehicle.create"),
+  run: async ({ input: { id, version, customerId, plate, ...d }, tx, audit }) => {
+    const plateNorm = normalizePlate(plate);
+    if (plateNorm.length < 2) failField("plate", "validation.invalid");
 
-  const plateNorm = normalizePlate(plate);
-  if (plateNorm.length < 2) return { fieldErrors: { plate: t("validation.invalid") } };
+    const duplicate = await tx.vehicle.findFirst({ where: { plateNorm, ...(id ? { id: { not: id } } : {}) }, include: { customer: true } });
+    if (duplicate) {
+      if (duplicate.customer) failField("plate", "vehicles.errors.plateExists", { customer: customerDisplayName(duplicate.customer) });
+      failField("plate", "vehicles.errors.plateExistsNoOwner");
+    }
 
-  const duplicate = await db.vehicle.findFirst({
-    where: { plateNorm, ...(id ? { id: { not: id } } : {}) },
-    include: { customer: true },
-  });
-  if (duplicate) {
-    const owner = duplicate.customer ? customerDisplayName(duplicate.customer) : t("vehicles.noOwner");
-    return { fieldErrors: { plate: t("vehicles.errors.plateExists", { customer: owner }) } };
-  }
+    if (customerId && !(await tx.customer.findUnique({ where: { id: customerId }, select: { id: true } }))) failField("customerId", "validation.invalid");
 
-  if (customerId && !(await db.customer.findUnique({ where: { id: customerId }, select: { id: true } }))) {
-    return { fieldErrors: { customerId: t("validation.invalid") } };
-  }
+    const data = {
+      plate: formatPlate(plate),
+      plateNorm,
+      make: d.make ?? null,
+      model: d.model ?? null,
+      vin: d.vin ?? null,
+      year: d.year ?? null,
+      notes: d.notes ?? null,
+    };
 
-  const data = {
-    plate: formatPlate(plate),
-    plateNorm,
-    make: d.make ?? null,
-    model: d.model ?? null,
-    vin: d.vin ?? null,
-    year: d.year ?? null,
-    notes: d.notes ?? null,
-  };
+    let savedId: string;
+    if (id) {
+      if (!(await claimRow(tx.vehicle, id, version))) fail("conflict");
+      await tx.vehicle.update({ where: { id }, data });
+      savedId = id;
+    } else {
+      const created = await tx.vehicle.create({
+        data: {
+          ...data,
+          customerId: customerId ?? null,
+          ownerships: customerId ? { create: [{ customerId }] } : undefined,
+        },
+      });
+      savedId = created.id;
+    }
+    audit({ target: data.plate, entityId: savedId });
+    return { id: savedId };
+  },
+});
 
-  let savedId: string;
-  if (id) {
-    if (!(await claimed(d.version, (stamp, next) => db.vehicle.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
-    await db.vehicle.update({ where: { id }, data });
-    savedId = id;
-  } else {
-    const created = await db.vehicle.create({
-      data: {
-        ...data,
-        customerId: customerId ?? null,
-        ownerships: customerId ? { create: [{ customerId }] } : undefined,
-      },
-    });
-    savedId = created.id;
-  }
-  refresh(savedId);
-  redirect(`/vehicles/${savedId}`);
-}
+export const saveVehicle = defineAction(saveVehicleOperation, {
+  form: formObject,
+  revalidate: ({ id }) => refreshPaths(id),
+  redirect: ({ id }) => `/vehicles/${id}`,
+});
 
-const transferSchema = z.object({
+const transferInput = z.object({
   vehicleId: z.string(),
   newCustomerId: z.string().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -95,38 +87,49 @@ const transferSchema = z.object({
 });
 
 /** Halterwechsel: aktuellen Halter-Eintrag beenden, neuen anlegen (oder Fahrzeug ohne Halter lassen). */
-export async function transferVehicle(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("vehicles.edit");
-  const { t } = await getI18n();
-  const parsed = transferSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const d = parsed.data;
+const transferVehicleOperation = defineOperation({
+  name: "vehicles.transfer",
+  permission: "vehicles.edit",
+  input: transferInput,
+  audit: "vehicle.transfer",
+  run: async ({ input: d, tx, audit }) => {
+    const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId } });
+    if (!vehicle) fail("notFound");
+    const newId = d.newCustomerId ?? null;
+    if (newId === vehicle.customerId) failField("newCustomerId", "vehicles.errors.sameOwner");
+    if (newId && !(await tx.customer.findUnique({ where: { id: newId }, select: { id: true } }))) failField("newCustomerId", "validation.invalid");
 
-  const vehicle = await db.vehicle.findUnique({ where: { id: d.vehicleId } });
-  if (!vehicle) return { error: t("validation.invalid") };
-  const newId = d.newCustomerId ?? null;
-  if (newId === vehicle.customerId) return { fieldErrors: { newCustomerId: t("vehicles.errors.sameOwner") } };
-  if (newId && !(await db.customer.findUnique({ where: { id: newId }, select: { id: true } }))) {
-    return { fieldErrors: { newCustomerId: t("validation.invalid") } };
-  }
-
-  const when = new Date(`${d.date}T12:00:00`);
-  await db.$transaction(async (tx) => {
+    const when = new Date(`${d.date}T12:00:00`);
     await tx.vehicleOwnership.updateMany({ where: { vehicleId: vehicle.id, toDate: null }, data: { toDate: when } });
     if (newId) await tx.vehicleOwnership.create({ data: { vehicleId: vehicle.id, customerId: newId, fromDate: when, note: d.note ?? null } });
     await tx.vehicle.update({ where: { id: vehicle.id }, data: { customerId: newId } });
-  });
-  await audit("vehicle.transfer", { target: vehicle.plate, entityId: vehicle.id });
-  refresh(vehicle.id);
-  redirect(`/vehicles/${vehicle.id}`);
-}
+    audit({ target: vehicle.plate, entityId: vehicle.id });
+    return { id: vehicle.id };
+  },
+});
 
-export async function deleteVehicle(formData: FormData) {
-  await requirePermission("vehicles.delete");
-  const id = String(formData.get("id") ?? "");
-  const vehicle = id ? await db.vehicle.findUnique({ where: { id }, select: { plate: true } }) : null;
-  if (id) await db.vehicle.deleteMany({ where: { id } });
-  if (vehicle) await audit("vehicle.delete", { target: vehicle.plate, entityId: id });
-  refresh();
-  redirect("/vehicles");
-}
+export const transferVehicle = defineAction(transferVehicleOperation, {
+  form: formObject,
+  revalidate: ({ id }) => refreshPaths(id),
+  redirect: ({ id }) => `/vehicles/${id}`,
+});
+
+const deleteVehicleOperation = defineOperation({
+  name: "vehicles.delete",
+  permission: "vehicles.delete",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "vehicle.delete",
+  run: async ({ input, tx, audit }) => {
+    const vehicle = await tx.vehicle.findUnique({ where: { id: input.id }, select: { plate: true } });
+    if (!vehicle) fail("notFound");
+    await tx.vehicle.delete({ where: { id: input.id } });
+    audit({ target: vehicle.plate, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteVehicle = defineAction(deleteVehicleOperation, {
+  revalidate: () => refreshPaths(),
+  redirect: "/vehicles",
+  message: "common.deleted",
+});

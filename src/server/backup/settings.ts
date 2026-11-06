@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { getSetting, setSetting } from "@/server/settings";
 
 /** Zeitplan der automatischen Backups. Standard: täglich um 02:00 Uhr, die letzten 14 behalten. */
@@ -20,6 +21,8 @@ export async function getBackupSettings(): Promise<BackupSettings> {
   };
 }
 
-export async function saveBackupSettings(s: BackupSettings): Promise<void> {
-  await Promise.all([setSetting("backup.enabled", String(s.enabled)), setSetting("backup.hour", String(s.hour)), setSetting("backup.keep", String(s.keep))]);
+export async function saveBackupSettings(s: BackupSettings, client?: Pick<PrismaClient | Prisma.TransactionClient, "appSetting">): Promise<void> {
+  await setSetting("backup.enabled", String(s.enabled), client);
+  await setSetting("backup.hour", String(s.hour), client);
+  await setSetting("backup.keep", String(s.keep), client);
 }

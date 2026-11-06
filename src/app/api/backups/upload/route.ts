@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/server/auth/session";
+import { logError } from "@/lib/log-safe";
 import { audit } from "@/server/audit";
 import { backupsDir } from "@/server/backup/core";
 import { importBackupFile, RestoreError } from "@/server/backup/restore";
@@ -34,8 +35,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ name });
   } catch (error) {
     rmSync(tmp, { force: true });
-    if (error instanceof RestoreError) return NextResponse.json({ error: error.code }, { status: 422 });
-    console.error("[backup] Upload fehlgeschlagen:", error);
+    // Fehlgeschlagene Importe gehören ins Audit-Log (nur der Fehlercode, nie Dateiinhalt oder -name)
+    if (error instanceof RestoreError) {
+      await audit("backup.uploadFailed", { target: error.code });
+      return NextResponse.json({ error: error.code }, { status: 422 });
+    }
+    logError("backup:upload", error);
+    await audit("backup.uploadFailed", { target: "uploadFailed" });
     return NextResponse.json({ error: "uploadFailed" }, { status: 500 });
   }
 }

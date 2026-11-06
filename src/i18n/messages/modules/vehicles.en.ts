@@ -46,6 +46,7 @@ export const vehiclesEn: typeof vehiclesDe = {
   },
   errors: {
     plateExists: "This plate already exists (owner: {customer}).",
+    plateExistsNoOwner: "This plate already exists (no owner).",
     sameOwner: "This is already the current owner.",
   },
 };

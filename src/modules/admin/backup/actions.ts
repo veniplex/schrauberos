@@ -1,67 +1,100 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import { fieldErrors, formObject } from "@/lib/forms";
-import { requirePermission } from "@/server/auth/session";
+import type { MessageKey } from "@/i18n/translate";
+import { formObject } from "@/lib/forms";
+import { logError } from "@/lib/log-safe";
 import { audit } from "@/server/audit";
 import { createBackup, deleteBackup, isBackupName } from "@/server/backup/core";
 import { RestoreError, stageRestore } from "@/server/backup/restore";
 import { saveBackupSettings } from "@/server/backup/settings";
+import { defineAction, defineOperation, fail } from "@/server/operations";
 import { scheduleRestart } from "@/server/restart";
 
-/** Legt sofort eine Sicherung an. */
-export async function createManualBackup(): Promise<ActionState> {
-  await requirePermission("backup.manage");
-  const { t } = await getI18n();
-  try {
-    const info = await createBackup("manual");
-    await audit("backup.create", { target: info.name });
-    revalidatePath("/admin/backup");
-    return { ok: true, message: t("backup.created") };
-  } catch (error) {
-    console.error("[backup] Manuelle Sicherung fehlgeschlagen:", error);
-    return { error: t("backup.errors.createFailed") };
-  }
-}
+const none = z.object({});
 
-export async function removeBackup(formData: FormData) {
-  await requirePermission("backup.manage");
-  const name = String(formData.get("name") ?? "");
-  if (isBackupName(name) && deleteBackup(name)) await audit("backup.delete", { target: name });
-  revalidatePath("/admin/backup");
-}
+/** Legt sofort eine Sicherung an. Langer Vorgang: ohne Transaktion. */
+const createManualBackupOperation = defineOperation({
+  name: "admin.backup.create",
+  permission: "backup.manage",
+  input: none,
+  audit: "backup.create",
+  transaction: false,
+  run: async ({ audit: setAudit }) => {
+    let name: string;
+    try {
+      name = (await createBackup("manual")).name;
+    } catch (error) {
+      logError("backup", error);
+      fail("failed", "backup.errors.createFailed");
+    }
+    setAudit({ target: name });
+    return { name };
+  },
+  onFailure: ({ principal, failure }) => (failure?.code === "failed" ? audit("backup.createFailed", { actor: { id: principal.user.id, name: principal.user.name } }) : undefined),
+});
+
+export const createManualBackup = defineAction(createManualBackupOperation, { revalidate: ["/admin/backup"], message: "backup.created" });
+
+const removeBackupOperation = defineOperation({
+  name: "admin.backup.remove",
+  permission: "backup.manage",
+  input: z.object({ name: z.string().min(1).max(200) }),
+  audit: "backup.delete",
+  transaction: false,
+  run: async ({ input, audit: setAudit }) => {
+    if (!isBackupName(input.name) || !deleteBackup(input.name)) fail("notFound", "backup.errors.notFound");
+    setAudit({ target: input.name });
+    return { name: input.name };
+  },
+});
+
+export const removeBackup = defineAction(removeBackupOperation, { revalidate: ["/admin/backup"], message: "common.deleted" });
 
 /** Stellt eine Sicherung wieder her: prüfen, aktuellen Stand sichern, vormerken – dann übernimmt der Launcher nach dem Neustart. */
-export async function restoreBackup(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("backup.manage");
-  const { t } = await getI18n();
-  const name = String(formData.get("name") ?? "");
-  try {
-    await stageRestore(name);
-  } catch (error) {
-    if (error instanceof RestoreError) return { error: t(`backup.errors.${error.code}`) };
-    console.error("[backup] Wiederherstellung fehlgeschlagen:", error);
-    return { error: t("backup.errors.restoreFailed") };
-  }
-  await audit("backup.restore", { target: name });
-  scheduleRestart();
-  return { ok: true, message: t("backup.restoring") };
-}
+const restoreBackupOperation = defineOperation({
+  name: "admin.backup.restore",
+  permission: "backup.manage",
+  input: z.object({ name: z.string().min(1).max(200) }),
+  audit: "backup.restore",
+  transaction: false,
+  run: async ({ input, audit: setAudit, afterCommit }) => {
+    try {
+      await stageRestore(input.name);
+    } catch (error) {
+      if (error instanceof RestoreError) fail("failed", `backup.errors.${error.code}` as MessageKey);
+      logError("backup", error);
+      fail("failed", "backup.errors.restoreFailed");
+    }
+    setAudit({ target: input.name });
+    afterCommit(() => scheduleRestart());
+    return { name: input.name };
+  },
+  onFailure: ({ input, principal, failure }) => (failure?.code === "failed" ? audit("backup.restoreFailed", { target: input.name, actor: { id: principal.user.id, name: principal.user.name } }) : undefined),
+});
 
-const settingsSchema = z.object({
+export const restoreBackup = defineAction(restoreBackupOperation, { message: "backup.restoring" });
+
+const planInput = z.object({
+  enabled: z.boolean(),
   hour: z.coerce.number().int().min(0).max(23),
   keep: z.coerce.number().int().min(1).max(365),
 });
 
-export async function saveBackupPlan(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("settings.manage");
-  const { t } = await getI18n();
-  const parsed = settingsSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  await saveBackupSettings({ enabled: formData.get("enabled") === "on", hour: parsed.data.hour, keep: parsed.data.keep });
-  revalidatePath("/admin/backup");
-  return { ok: true, message: t("common.saved") };
-}
+const saveBackupPlanOperation = defineOperation({
+  name: "admin.backup.savePlan",
+  permission: "settings.manage",
+  input: planInput,
+  audit: "settings.backupPlan",
+  run: async ({ input, tx, audit: setAudit }) => {
+    await saveBackupSettings({ enabled: input.enabled, hour: input.hour, keep: input.keep }, tx);
+    setAudit({ target: `enabled=${input.enabled} hour=${input.hour} keep=${input.keep}` });
+    return { saved: true };
+  },
+});
+
+export const saveBackupPlan = defineAction(saveBackupPlanOperation, {
+  form: (fd) => ({ ...formObject(fd), enabled: fd.get("enabled") === "on" }),
+  revalidate: ["/admin/backup"],
+  message: "common.saved",
+});

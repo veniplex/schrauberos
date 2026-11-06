@@ -38,6 +38,7 @@ export const usersDe = {
   errors: {
     lastAdmin: "Es muss mindestens ein aktiver Administrator bestehen bleiben.",
     selfDeactivate: "Das eigene Konto kann nicht deaktiviert werden.",
+    selfDelete: "Das eigene Konto kann nicht gelöscht werden.",
     usernameTaken: "Dieser Benutzername ist bereits vergeben.",
   },
 };

@@ -40,6 +40,7 @@ export const usersEn: typeof usersDe = {
   errors: {
     lastAdmin: "At least one active administrator must remain.",
     selfDeactivate: "You cannot disable your own account.",
+    selfDelete: "You cannot delete your own account.",
     usernameTaken: "This username is already taken.",
   },
 };

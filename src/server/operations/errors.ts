@@ -89,13 +89,16 @@ export function failFields(fields: Record<string, FieldMessage>): never {
  * Leere Formularfelder fehlen vorab im Objekt → „fehlt“ = Pflichtfeld. Eigene Prüfungen (`custom`) tragen den Meldungsschlüssel
  * als `message` und Platzhalter in `params`: `ctx.addIssue({ code: "custom", message: "account.errors.passwordShort", params: { min: 8 } })`.
  */
+const KEY_SHAPE = /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/;
+
 export function fieldErrors(error: ZodError): Record<string, FieldMessage> {
   const out: Record<string, FieldMessage> = {};
   for (const issue of error.issues) {
     const field = String(issue.path[0] ?? "_");
     if (out[field]) continue;
     if (issue.code === "custom") {
-      out[field] = { key: issue.message as MessageKey, params: (issue as { params?: Vars }).params };
+      // Eigene Prüfungen tragen den Meldungsschlüssel in `message`; ein `refine` ohne eigenen Schlüssel (Zod-Standardtext) wird „ungültig“
+      out[field] = KEY_SHAPE.test(issue.message) ? { key: issue.message as MessageKey, params: (issue as { params?: Vars }).params } : { key: "validation.invalid" };
       continue;
     }
     out[field] = { key: issue.code === "invalid_type" ? "validation.required" : issue.code === "too_big" ? "validation.tooLong" : "validation.invalid" };

@@ -62,3 +62,5 @@ export function invoiceFileLocation(inv: { direction: string; issueDate: Date; n
     name: `${day}_${safeName(inv.partyName, 40)}_${safeName(inv.number, 40)}.${FILE_EXTENSIONS[mime] ?? "bin"}`,
   };
 }
+
+export { normalizeInvoiceNumber, outgoingKeyOf } from "@/lib/invoice-number";

@@ -74,9 +74,11 @@ export const invoicesDe = {
     sumMismatch: "Netto + MwSt. ergeben nicht den Brutto-Betrag.",
     dueBeforeIssue: "Die Fälligkeit liegt vor dem Rechnungsdatum.",
     duplicate: "Diese Rechnung (Nummer und Partner) existiert bereits.",
+    numberTaken: "Diese Ausgangsrechnungsnummer ist bereits vergeben.",
     fileType: "Erlaubt sind PDF, PNG, JPEG oder WebP.",
     fileSize: "Die Datei darf höchstens 10 MB groß sein.",
   },
+  flash: { paid: "Als bezahlt markiert.", reopened: "Wieder geöffnet." },
   widgets: {
     title: "Rechnungen",
     toPay: "Noch zu zahlen",

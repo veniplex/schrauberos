@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { FEATURES, MODULES, featureById } from "./catalog";
 import { effectiveFeatureIds, type Overrides } from "./catalog-logic";
@@ -19,14 +20,14 @@ export type SetResult = "ok" | "unknown" | "required";
  * Schaltet ein Modul ("office") oder eine Funktion ("office.fleet") ein oder aus.
  * Pflichtmodule/-funktionen lassen sich nicht ausschalten. Daten bleiben immer erhalten.
  */
-export async function setFeatureOverride(key: string, enabled: boolean, updatedByName: string): Promise<SetResult> {
+export async function setFeatureOverride(key: string, enabled: boolean, updatedByName: string, client: Pick<PrismaClient | Prisma.TransactionClient, "featureSetting"> = db): Promise<SetResult> {
   const mod = MODULES.find((m) => m.id === key);
   const feature = mod ? undefined : featureById(key);
   if (!mod && !feature) return "unknown";
   const required = mod ? ("required" in mod && mod.required) : ("required" in feature! && feature.required);
   if (required && !enabled) return "required";
 
-  await db.featureSetting.upsert({
+  await client.featureSetting.upsert({
     where: { key },
     update: { enabled, updatedByName },
     create: { key, enabled, updatedByName },

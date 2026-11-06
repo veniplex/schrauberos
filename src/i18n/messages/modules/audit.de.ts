@@ -39,6 +39,9 @@ export const auditDe = {
       download: "Backup heruntergeladen",
       restore: "Backup wiederhergestellt",
       upload: "Backup hochgeladen",
+      createFailed: "Backup fehlgeschlagen",
+      restoreFailed: "Wiederherstellung fehlgeschlagen",
+      uploadFailed: "Backup-Import fehlgeschlagen",
     },
     setup: {
       complete: "Ersteinrichtung abgeschlossen",
@@ -46,6 +49,7 @@ export const auditDe = {
     system: {
       update: "Update installiert",
       updateFailed: "Update fehlgeschlagen",
+      auditPruned: "Alte Audit-Einträge gelöscht",
     },
     auth: {
       login: "Angemeldet",
@@ -80,14 +84,20 @@ export const auditDe = {
       appointments: "Termin-Einstellungen geändert",
       tires: "Reifen-Einstellungen geändert",
       security: "Sicherheits-Einstellungen geändert",
+      backupPlan: "Backup-Plan geändert",
+      updateToken: "Update-Token geändert",
     },
     appointment: {
       delete: "Termin gelöscht",
     },
     customer: {
+      create: "Kunde angelegt",
+      update: "Kunde geändert",
       delete: "Kunde gelöscht",
     },
     vehicle: {
+      create: "Fahrzeug angelegt",
+      update: "Fahrzeug geändert",
       delete: "Fahrzeug gelöscht",
       transfer: "Fahrzeug umgeschrieben",
     },
@@ -95,6 +105,10 @@ export const auditDe = {
       delete: "Reifensatz gelöscht",
     },
     invoice: {
+      create: "Rechnung angelegt",
+      update: "Rechnung geändert",
+      pay: "Rechnung als bezahlt markiert",
+      reopen: "Rechnung wieder geöffnet",
       delete: "Rechnung gelöscht",
     },
     employee: {

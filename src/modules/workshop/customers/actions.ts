@@ -1,71 +1,81 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { requirePermission } from "@/server/auth/session";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import { fieldErrors, formObject } from "@/lib/forms";
-import { audit } from "@/server/audit";
-import { customerDisplayName } from "./domain";
-import { claimed } from "@/lib/concurrency";
+import { claimRow } from "@/lib/concurrency";
+import { formObject } from "@/lib/forms";
+import { defineAction, defineOperation, fail } from "@/server/operations";
+import { customerDisplayName, customerHasLinks } from "./domain";
 
-const customerSchema = z.object({
-  id: z.string().optional(),
-  version: z.string().optional(),
-  customerNumber: z.string().max(40).optional(),
-  firstName: z.string().max(80).optional(),
-  lastName: z.string().max(120).optional(),
-  company: z.string().max(120).optional(),
-  email: z.string().email().max(200).optional(),
-  phone: z.string().max(60).optional(),
-  street: z.string().max(120).optional(),
-  zip: z.string().max(12).optional(),
-  city: z.string().max(80).optional(),
-  notes: z.string().max(2000).optional(),
+const customerInput = z
+  .object({
+    id: z.string().optional(),
+    version: z.string().optional(),
+    customerNumber: z.string().max(40).optional(),
+    firstName: z.string().max(80).optional(),
+    lastName: z.string().max(120).optional(),
+    company: z.string().max(120).optional(),
+    email: z.string().email().max(200).optional(),
+    phone: z.string().max(60).optional(),
+    street: z.string().max(120).optional(),
+    zip: z.string().max(12).optional(),
+    city: z.string().max(80).optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (!d.lastName && !d.company) ctx.addIssue({ code: "custom", message: "customers.errors.nameRequired", path: ["lastName"] });
+  });
+
+const saveCustomerOperation = defineOperation({
+  name: "customers.save",
+  permission: "customers.edit",
+  input: customerInput,
+  audit: (input) => (input.id ? "customer.update" : "customer.create"),
+  run: async ({ input: { id, version, ...d }, tx, audit }) => {
+    const data = {
+      customerNumber: d.customerNumber ?? null,
+      firstName: d.firstName ?? null,
+      // Bei reinen Firmenkunden dient der Firmenname als Nachname (Sortierung/Suche)
+      lastName: d.lastName ?? d.company!,
+      company: d.company ?? null,
+      email: d.email ?? null,
+      phone: d.phone ?? null,
+      street: d.street ?? null,
+      zip: d.zip ?? null,
+      city: d.city ?? null,
+      notes: d.notes ?? null,
+    };
+    if (id && !(await claimRow(tx.customer, id, version))) fail("conflict");
+    const saved = id ? await tx.customer.update({ where: { id }, data }) : await tx.customer.create({ data });
+    audit({ target: customerDisplayName(saved), entityId: saved.id });
+    return { id: saved.id };
+  },
 });
 
-export async function saveCustomer(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("customers.edit");
-  const { t } = await getI18n();
-  const parsed = customerSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, ...d } = parsed.data;
+export const saveCustomer = defineAction(saveCustomerOperation, {
+  form: formObject,
+  revalidate: ["/customers"],
+  redirect: ({ id }) => `/customers/${id}`,
+});
 
-  if (!d.lastName && !d.company) return { fieldErrors: { lastName: t("customers.errors.nameRequired") } };
+const deleteCustomerOperation = defineOperation({
+  name: "customers.delete",
+  permission: "customers.delete",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "customer.delete",
+  run: async ({ input, tx, audit }) => {
+    const customer = await tx.customer.findUnique({ where: { id: input.id }, include: { _count: { select: { vehicles: true, ownerships: true, invoices: true } } } });
+    if (!customer) fail("notFound");
+    // Kunden mit Fahrzeugen, Halter-Historie oder Rechnungen bleiben erhalten (Nachvollziehbarkeit); im Schema zusätzlich per Restrict gesichert
+    const links = customer._count;
+    if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles + links.ownerships, invoices: links.invoices });
+    await tx.customer.delete({ where: { id: input.id } });
+    audit({ target: customerDisplayName(customer), entityId: input.id });
+    return { id: input.id };
+  },
+});
 
-  const data = {
-    customerNumber: d.customerNumber ?? null,
-    firstName: d.firstName ?? null,
-    // Bei reinen Firmenkunden dient der Firmenname als Nachname (Sortierung/Suche)
-    lastName: d.lastName ?? d.company!,
-    company: d.company ?? null,
-    email: d.email ?? null,
-    phone: d.phone ?? null,
-    street: d.street ?? null,
-    zip: d.zip ?? null,
-    city: d.city ?? null,
-    notes: d.notes ?? null,
-  };
-  if (id && !(await claimed(d.version, (stamp, next) => db.customer.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
-  const saved = id
-    ? await db.customer.update({ where: { id }, data })
-    : await db.customer.create({ data });
-
-  revalidatePath("/customers");
-  redirect(`/customers/${saved.id}`);
-}
-
-export async function deleteCustomer(formData: FormData) {
-  await requirePermission("customers.delete");
-  const id = String(formData.get("id") ?? "");
-  const customer = id ? await db.customer.findUnique({ where: { id } }) : null;
-  if (id) await db.customer.deleteMany({ where: { id } });
-  if (customer) await audit("customer.delete", { target: customerDisplayName(customer), entityId: id });
-  revalidatePath("/customers");
-  revalidatePath("/tires");
-  revalidatePath("/vehicles");
-  redirect("/customers");
-}
+export const deleteCustomer = defineAction(deleteCustomerOperation, {
+  revalidate: ["/customers", "/tires", "/vehicles"],
+  redirect: "/customers",
+  message: "common.deleted",
+});

@@ -293,6 +293,8 @@ export const en: Messages = {
     security: {
       title: "Sign-in & network",
       behindProxy: "The application runs behind a reverse proxy",
+      auditRetention: "Keep audit log (days)",
+      auditRetentionHint: "Older audit log entries are deleted daily (data minimisation). Default: 730 days (2 years); 0 = keep forever.",
       behindProxyHint: "Turn this on only if a reverse proxy really sits in front that appends the client address as the last X-Forwarded-For entry (nginx: proxy_add_x_forwarded_for). Sign-in then additionally limits failed attempts per address. Without a real proxy anyone can forge the address in the header and get other people's addresses blocked. Even with a proxy: if many devices share one address (office network behind NAT), the limit hits all of them together – administrators included, except on devices they have signed in from before. When in doubt, leave it off.",
     },
     errors: {

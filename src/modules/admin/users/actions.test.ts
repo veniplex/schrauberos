@@ -14,6 +14,7 @@ const assertDenied = (state: { error?: string }) => assert.ok(Object.values(de.r
 
 let env: TestEnv;
 let actions: typeof import("./actions");
+let decodeFlash: typeof import("@/server/operations/flash").decodeFlash;
 
 let adminRole: Role;
 let managerRole: Role; // darf Benutzer verwalten (Admin hat es bewusst vergeben) + Termine bearbeiten
@@ -28,6 +29,7 @@ let admin2: User;
 before(async () => {
   env = await createTestEnv();
   actions = await import("./actions");
+  ({ decodeFlash } = await import("@/server/operations/flash"));
 });
 after(() => env.cleanup());
 
@@ -46,6 +48,12 @@ beforeEach(async () => {
   admin2 = await env.user({ username: "admin2", password: "admin2-pass-1", roles: [adminRole] });
   await env.signIn(manager);
 });
+
+/** Die zuletzt gesetzte Flash-Meldung (Rückmeldung der Aktionen ohne Formularzustand). */
+const lastFlash = () => {
+  const write = env.browser.writes.filter((w) => w.name === "so_flash").at(-1);
+  return write ? decodeFlash(write.value) : null;
+};
 
 const edit = async (target: User, extra: Record<string, string | boolean | string[] | undefined>) => {
   const fresh = await env.db.user.findUniqueOrThrow({ where: { id: target.id }, include: { roles: true } });
@@ -182,19 +190,22 @@ describe("unlockUser – Rechte-Hierarchie", () => {
     await lock(victim);
     await lock(admin2);
     for (const u of [victim, admin2]) {
-      const target = await redirectOf(() => actions.unlockUser(form({ id: u.id })));
-      assert.match(target ?? "", /^\/admin\/users\?error=/);
+      // ohne Formularzustand: keine Weiterleitung, die Ablehnung kommt als Flash-Meldung (Schlüssel der Rechte-Hierarchie)
+      assert.equal(await redirectOf(() => actions.unlockUser(form({ id: u.id }))), null);
+      assert.match(lastFlash()?.key ?? "", /^rbac\.denied\./);
+      assert.equal(lastFlash()?.tone, "error");
       assert.deepEqual(await state(u), { failed: 6, locked: true });
     }
   });
 
-  it("ohne Recht users.manage geht es nach /forbidden; ein unbekanntes Konto führt zur Liste", async () => {
+  it("ohne Recht users.manage geht es nach /forbidden; ein unbekanntes Konto wird gemeldet", async () => {
     await lock(basic);
     await env.signIn(basic);
     assert.equal(await redirectOf(() => actions.unlockUser(form({ id: basic.id }))), "/forbidden");
     assert.deepEqual(await state(basic), { failed: 6, locked: true });
     await env.signIn(manager);
-    assert.equal(await redirectOf(() => actions.unlockUser(form({ id: "gibt-es-nicht" }))), "/admin/users");
+    assert.equal(await redirectOf(() => actions.unlockUser(form({ id: "gibt-es-nicht" }))), null);
+    assert.equal(lastFlash()?.key, "common.errors.notFound");
   });
 });
 

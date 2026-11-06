@@ -1,5 +1,6 @@
 import { getWorkshop } from "@/server/workshop";
 import type { SettingsTabDef } from "@/modules/types";
+import { getAuditRetentionDays } from "@/server/audit-retention";
 import { isBehindProxy } from "@/server/auth/network";
 import { SecurityForm } from "./security-form";
 import { WorkshopForm } from "./workshop-form";
@@ -30,7 +31,7 @@ async function WorkshopSettingsTab() {
 }
 
 async function SecuritySettingsTab() {
-  return <SecurityForm behindProxy={await isBehindProxy()} />;
+  return <SecurityForm behindProxy={await isBehindProxy()} auditRetentionDays={await getAuditRetentionDays()} />;
 }
 
 export const settingsTabs: SettingsTabDef[] = [

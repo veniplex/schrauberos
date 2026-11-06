@@ -76,9 +76,11 @@ export const invoicesEn: typeof invoicesDe = {
     sumMismatch: "Net + VAT do not add up to the gross amount.",
     dueBeforeIssue: "The due date is before the invoice date.",
     duplicate: "This invoice (number and partner) already exists.",
+    numberTaken: "This outgoing invoice number is already in use.",
     fileType: "Allowed: PDF, PNG, JPEG or WebP.",
     fileSize: "The file may be at most 10 MB.",
   },
+  flash: { paid: "Marked as paid.", reopened: "Reopened." },
   widgets: {
     title: "Invoices",
     toPay: "Still to pay",

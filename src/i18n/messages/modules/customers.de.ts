@@ -34,5 +34,9 @@ export const customersDe = {
     city: "Ort",
     address: "Adresse",
   },
-  errors: { nameRequired: "Nachname oder Firma angeben." },
+  errors: {
+    nameRequired: "Nachname oder Firma angeben.",
+    inUse: "Dieser Kunde kann nicht gelöscht werden: Es gibt noch Fahrzeuge bzw. Halter-Einträge ({vehicles}) oder Rechnungen ({invoices}). Fahrzeuge zuerst umschreiben und Rechnungen entfernen.",
+  },
+  deleteBlocked: "Löschen nicht möglich, solange Fahrzeuge, Halter-Historie oder Rechnungen mit diesem Kunden verknüpft sind ({vehicles} Fahrzeug-Einträge, {invoices} Rechnungen).",
 };

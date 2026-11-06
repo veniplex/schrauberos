@@ -25,4 +25,5 @@ export const rolesDe = {
   copyOf: "Kopie von {name}",
   selectAll: "Alle",
   selectNone: "Keine",
+  errors: { protected: "Systemrollen und Administrator-Rollen können nicht gelöscht werden." },
 };

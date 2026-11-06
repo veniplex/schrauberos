@@ -44,6 +44,7 @@ export const vehiclesDe = {
   },
   errors: {
     plateExists: "Dieses Kennzeichen existiert bereits (Halter: {customer}).",
+    plateExistsNoOwner: "Dieses Kennzeichen existiert bereits (ohne Halter).",
     sameOwner: "Das ist bereits der aktuelle Halter.",
   },
 };

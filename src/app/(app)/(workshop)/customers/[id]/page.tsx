@@ -5,7 +5,7 @@ import { CalendarPlus, Disc3, Pencil, Plus } from "lucide-react";
 import { Badge, Card, DefinitionList, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
-import { customerDisplayName } from "@/modules/workshop/customers/domain";
+import { customerDisplayName, customerHasLinks } from "@/modules/workshop/customers/domain";
 import { toDateInput } from "@/lib/dates";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -30,7 +30,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     include: {
       vehicles: { orderBy: { plateNorm: "asc" }, include: { tireSets: { include: { tires: true } } } },
       appointments: { orderBy: { startsAt: "desc" }, take: 8, include: { vehicle: true } },
-      _count: { select: { appointments: true } },
+      _count: { select: { appointments: true, ownerships: true, invoices: true, vehicles: true } },
     },
   });
   if (!customer) notFound();
@@ -160,7 +160,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               ]}
             />
           </Card>
-          {canDelete ? (
+          {canDelete && customerHasLinks(customer._count) ? (
+            <p className="text-sm text-ink-muted">{t("customers.deleteBlocked", { vehicles: customer._count.vehicles + customer._count.ownerships, invoices: customer._count.invoices })}</p>
+          ) : canDelete ? (
             <form action={deleteCustomer}>
               <input type="hidden" name="id" value={customer.id} />
               <ConfirmSubmitButton message={`${t("customers.confirmDelete")}${customer._count.appointments > 0 ? ` ${tp("customers.confirmDeleteAppointments", customer._count.appointments)}` : ""}`}>{t("customers.delete")}</ConfirmSubmitButton>
