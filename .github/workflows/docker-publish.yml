@@ -2,9 +2,22 @@ name: Build & publish Docker image
 
 # Bei jedem Push auf main (Tag "latest") und bei Versions-Tags v1.2.3 (Tags "1.2.3", "1.2", "latest").
 # Versions-Tags erzeugen zusätzlich ein signiertes Release-Paket für Web-Updates (Job "release").
+#
+# Auf main läuft die Pipeline nur, wenn sich etwas ändert, das in Image oder Tests eingeht: reine Änderungen an README, CLAUDE.md, AGENTS.md,
+# .claude/, docker-compose.yml und den .env-Vorlagen lösen nichts aus (sie sind nicht im Image: siehe .dockerignore). Die Docs unter docs/
+# gehören dagegen zum Image (Hilfe in der App). Versions-Tags bauen immer; "Run workflow" erzwingt einen Lauf von Hand.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - README.md
+      - CLAUDE.md
+      - AGENTS.md
+      - .claude/**
+      - docker-compose.yml
+      - docker.env.example
+      - .env.example
+      - .gitignore
     tags: ["v*"]
   workflow_dispatch:
 
