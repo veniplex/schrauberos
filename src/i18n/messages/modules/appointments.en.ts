@@ -60,7 +60,7 @@ export const appointmentsEn: typeof appointmentsDe = {
     assignee: "Assigned to",
   },
   errors: {
-    bayBusy: "Bay is occupied from {from} to {to} ({title}).",
+    bayBusy: "Bay is occupied from {from|time} to {to|time} ({title}).",
     tireSetMismatch: "The linked tire set does not belong to this vehicle.",
   },
   widgets: {

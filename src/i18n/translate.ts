@@ -37,16 +37,25 @@ function lookup(messages: Messages, key: string): string | undefined {
   return typeof cur === "string" ? cur : undefined;
 }
 
-function interpolate(template: string, vars?: Vars): string {
+/**
+ * Platzhalter `{name}`; `{name|time}` formatiert einen Zeitpunkt (ISO-Text, Date-Zahl) als Uhrzeit der Sprache (de „14:30“, en „2:30 PM“) in der Zeitzone des Prozesses.
+ * So bleiben Operationen sprachneutral: Sie geben den Zeitpunkt weiter, nicht schon einen formatierten Text.
+ */
+function interpolate(template: string, vars: Vars | undefined, intl: string): string {
   if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (_, name: string) =>
-    name in vars ? String(vars[name]) : `{${name}}`,
-  );
+  return template.replace(/\{(\w+)(?:\|(time))?\}/g, (match, name: string, format?: string) => {
+    if (!(name in vars)) return `{${name}}`;
+    if (format === "time") {
+      const at = new Date(vars[name]);
+      return Number.isNaN(at.getTime()) ? String(vars[name]) : new Intl.DateTimeFormat(intl, { timeStyle: "short" }).format(at);
+    }
+    return String(vars[name]);
+  });
 }
 
 export function createTranslator(locale: Locale, messages: Messages): Translator {
   const intl = INTL_LOCALE[locale];
-  const t = (key: string, vars?: Vars) => interpolate(lookup(messages, key) ?? key, vars);
+  const t = (key: string, vars?: Vars) => interpolate(lookup(messages, key) ?? key, vars, intl);
   return {
     locale,
     t: t as Translator["t"],

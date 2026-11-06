@@ -133,6 +133,7 @@ describe("Seiten", () => {
     const page = await env.db.docPage.findFirstOrThrow();
     await actions.togglePin(form({ area: "handbook", id: page.id }));
     assert.equal((await env.db.docPage.findUniqueOrThrow({ where: { id: page.id } })).pinned, true);
+    assert.equal((await env.db.docPage.findUniqueOrThrow({ where: { id: page.id } })).updatedAt.getTime(), page.updatedAt.getTime(), "Anheften ändert die Version (updatedAt) nicht: ein geöffneter Editor meldet keinen Konflikt");
     await actions.togglePin(form({ area: "handbook", id: page.id }));
     assert.equal((await env.db.docPage.findUniqueOrThrow({ where: { id: page.id } })).pinned, false);
     assert.equal(await env.db.docVersion.count({ where: { pageId: page.id } }), 1);

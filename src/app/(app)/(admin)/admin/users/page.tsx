@@ -6,7 +6,7 @@ import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { hasAdminOnlyRights, isDenial } from "@/lib/rbac";
+import { hasAdminOnlyRights } from "@/lib/rbac";
 import { toRights } from "@/server/rbac/hierarchy";
 import { nowDate } from "@/lib/dates";
 
@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("nav.users") };
 }
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
+export default async function UsersPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   const session = await requirePermission("users.view");
   const [{ t, date }, sp] = await Promise.all([getI18n(), searchParams]);
   const users = await db.user.findMany({
@@ -39,8 +39,6 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         }
       />
       {sp.saved ? <div className="mb-4"><Alert tone="success">{t("common.saved")}</Alert></div> : null}
-      {sp.error === "lastAdmin" ? <div className="mb-4"><Alert tone="danger">{t("users.errors.lastAdmin")}</Alert></div> : null}
-      {isDenial(sp.error) ? <div className="mb-4"><Alert tone="danger">{t(`rbac.denied.${sp.error}`)}</Alert></div> : null}
 
       <Card as="div" padded={false} className="overflow-hidden">
         <Table className="min-w-[44rem]">

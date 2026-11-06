@@ -116,8 +116,8 @@ const togglePinOperation = defineOperation({
   run: async ({ input, tx }) => {
     const page = await tx.docPage.findFirst({ where: { id: input.id, area: input.area } });
     if (!page) fail("notFound");
-    // Die Änderung der Anheften-Markierung soll weder die Versionsprüfung noch „zuletzt geändert“ auslösen
-    await tx.docPage.update({ where: { id: page.id }, data: { pinned: !page.pinned } });
+    // Das Anheften soll weder die Versionsprüfung eines geöffneten Editors (Version = updatedAt) noch „zuletzt geändert“ berühren: updatedAt bleibt, wie es war
+    await tx.docPage.update({ where: { id: page.id }, data: { pinned: !page.pinned, updatedAt: page.updatedAt } });
     return { area: input.area, slug: page.slug };
   },
 });

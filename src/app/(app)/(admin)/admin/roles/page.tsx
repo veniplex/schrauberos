@@ -6,7 +6,7 @@ import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { ALL_PERMISSIONS } from "@/modules/catalog";
-import { hasAdminOnlyRights, isDenial } from "@/lib/rbac";
+import { hasAdminOnlyRights } from "@/lib/rbac";
 import { toRights } from "@/server/rbac/hierarchy";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("nav.roles") };
 }
 
-export default async function RolesPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
+export default async function RolesPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requirePermission("roles.manage");
   const [{ t, tp }, sp] = await Promise.all([getI18n(), searchParams]);
   const roles = await db.role.findMany({
@@ -34,7 +34,6 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
         }
       />
       {sp.saved ? <div className="mb-4"><Alert tone="success">{t("common.saved")}</Alert></div> : null}
-      {isDenial(sp.error) ? <div className="mb-4"><Alert tone="danger">{t(`rbac.denied.${sp.error}`)}</Alert></div> : null}
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {roles.map((r) => (
           <li key={r.id}>

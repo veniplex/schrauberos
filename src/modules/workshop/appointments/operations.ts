@@ -2,7 +2,6 @@ import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { isHexColor } from "@/lib/color";
-import { toTimeInput } from "@/lib/dates";
 import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { defineOperation, fail, failField, type RunContext } from "@/server/operations";
 import { appointmentWindow, findBayClash } from "./domain";
@@ -58,7 +57,7 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
       include: { vehicle: { select: { plate: true } } },
     });
     const clash = findBayClash({ id: d.id, bayId: d.bayId, status: d.status, startsAt, endsAt }, candidates);
-    if (clash) failField("bayId", "appointments.errors.bayBusy", { from: toTimeInput(clash.startsAt), to: toTimeInput(clash.endsAt), title: clash.vehicle?.plate ?? clash.title });
+    if (clash) failField("bayId", "appointments.errors.bayBusy", { from: clash.startsAt.toISOString(), to: clash.endsAt.toISOString(), title: clash.vehicle?.plate ?? clash.title });
   }
 
   const data = {

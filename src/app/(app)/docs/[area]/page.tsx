@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Lock, Pin, Plus, Trash2 } from "lucide-react";
-import { Alert, Badge, Card, CardLink, EmptyState, NavLink, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, CardLink, EmptyState, NavLink, PageHeader } from "@/components/ui/layout";
 import { Disclosure } from "@/components/ui/disclosure";
 import { SearchInput } from "@/components/ui/form";
 import { Button, ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
@@ -23,7 +23,7 @@ function snippet(md: string, max = 150) {
   return text.length > max ? `${text.slice(0, max).trimEnd()} …` : text;
 }
 
-export default async function DocsIndexPage({ params, searchParams }: { params: Promise<{ area: string }>; searchParams: Promise<{ q?: string; cat?: string; notice?: string }> }) {
+export default async function DocsIndexPage({ params, searchParams }: { params: Promise<{ area: string }>; searchParams: Promise<{ q?: string; cat?: string }> }) {
   const [{ area: areaParam }, sp] = await Promise.all([params, searchParams]);
   const { area, session, canEdit } = await requireDocArea(areaParam);
   const { t, tp, date } = await getI18n();
@@ -119,11 +119,6 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
         </aside>
 
         <div className="min-w-0">
-          {sp.notice === "categoryNotEmpty" ? (
-            <div className="mb-4">
-              <Alert tone="warning">{t("docs.categoryNotEmpty")}</Alert>
-            </div>
-          ) : null}
           <form method="get" role="search" className="mb-4">
             {sp.cat ? <input type="hidden" name="cat" value={sp.cat} /> : null}
             <SearchInput name="q" defaultValue={q} placeholder={t("docs.searchPlaceholder")} aria-label={t("common.search")} />
