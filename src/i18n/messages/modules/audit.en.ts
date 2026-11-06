@@ -15,6 +15,9 @@ export const auditEn: typeof auditDe = {
   count_other: "{count} entries",
   page: "Page {page} of {pages}",
   groups: {
+    backup: "Backups",
+    setup: "Setup",
+    system: "System",
     auth: "Sign-in",
     account: "Account",
     user: "Users",
@@ -32,6 +35,20 @@ export const auditEn: typeof auditDe = {
     docs: "Documentation",
   },
   actions: {
+    backup: {
+      create: "Backup created",
+      delete: "Backup deleted",
+      download: "Backup downloaded",
+      restore: "Backup restored",
+      upload: "Backup uploaded",
+    },
+    setup: {
+      complete: "Initial setup completed",
+    },
+    system: {
+      update: "Update installed",
+      updateFailed: "Update failed",
+    },
     auth: {
       login: "Signed in",
       loginFailed: "Sign-in failed",

@@ -4,6 +4,8 @@ import { WorkshopForm } from "./workshop-form";
 
 async function WorkshopSettingsTab() {
   const w = await getWorkshop();
+  const all = Intl.supportedValuesOf("timeZone");
+  const timezones = all.includes(w.timezone) ? all : [w.timezone, ...all];
   return (
     <WorkshopForm
       initial={{
@@ -18,7 +20,9 @@ async function WorkshopSettingsTab() {
         accentColor: w.accentColor,
         logoDataUrl: w.logoDataUrl,
         hours: w.hours,
+        timezone: w.timezone,
       }}
+      timezones={timezones}
     />
   );
 }

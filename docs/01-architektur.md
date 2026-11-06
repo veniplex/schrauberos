@@ -98,15 +98,58 @@ Diese Regeln prüft der Test `src/architecture.test.ts`; Verstöße lassen `npm 
 7. **Globale UI-Bausteine** (Buttons, Eingabefelder, Karten) liegen in `src/components/ui` und kennen keine
    Fachlogik.
 
+## Container, Start und Updates
+
+Ein Container, ein Volume (`/data`). Das Image ist **leer bis auf zwei Dinge**: den Starter und die eingebaute App-Version für
+den ersten Start. Es enthält kein Betriebssystem, keine Shell, keinen Paketmanager – also nichts, was veralten könnte.
+**Alles andere kommt mit den Web-Updates**, denn jede App-Version ist ein selbständiges, signiertes Paket:
+
+| Bestandteil | Wo | Aktualisierung |
+| --- | --- | --- |
+| **Starter** (`docker/bootstrap.c`, statisch, ~150 Zeilen) | Image | praktisch nie (nur wenn sich sein Vertrag ändert: `docker/BASE_VERSION`) |
+| **Launcher** (`src/launcher/main.ts`) | Paket | mit jedem Update |
+| **Node** und **Systembibliotheken** (glibc, libstdc++, Namensauflösung, Lader) | Paket (`runtime/`) | mit jedem Update |
+| **Anwendung** samt Abhängigkeiten, Migrationen, Handbuch | Paket | mit jedem Update |
+
+Vom Host kommt nur der Kernel. Die Laufzeit wird über den mitgelieferten Lader gestartet
+(`runtime/<lader> --library-path runtime/lib runtime/node …`).
+
+* **Starter:** wählt das Verzeichnis der aktiven Version (Zeiger `<DATA_DIR>/app/active`, sonst die eingebaute Version unter
+  `/app`) und startet dessen Launcher. Endet der Launcher mit Code 42, wählt er neu; stürzt der Launcher einer installierten
+  Version zweimal kurz hintereinander ab, nimmt er für diesen Lauf die eingebaute Version und vermerkt das. Außerdem beantwortet
+  er den Docker-Healthcheck (`/bootstrap --healthcheck`).
+* **Launcher:** startet nur die App seiner eigenen Version, wendet vorgemerkte Datenbank-Wiederherstellungen an und macht
+  Rückfälle: Startet eine frisch installierte Version nicht gesund, setzt er den Zeiger auf die Vorversion zurück und meldet
+  Code 42; startet eine wiederhergestellte Datenbank nicht gesund, spielt er die vorherige zurück. Eine installierte Version
+  verwirft sich selbst, wenn die eingebaute neuer ist (neues Image gezogen). Er kennt weder Datenbank-Schema noch Prisma.
+* **Die App migriert sich selbst:** `src/instrumentation.ts` ruft beim Start `startApp()` auf: Sicherung vor Migrationen,
+  Migrationen (`src/server/migrate.ts`, gleiche Tabelle `_prisma_migrations` wie die Prisma-CLI), Basisdaten, Zeitzone,
+  Zeitplan der Backups. `/api/health` meldet erst „ok“, wenn das durch ist. Scheitert etwas, beendet sich der Prozess – der
+  Launcher nimmt dann die frische Version bzw. Datenbank zurück.
+* **Keine Fremdprogramme:** Archive (Backups, Pakete) bearbeitet die Node-Bibliothek `tar`; es gibt kein System-`tar`, keine
+  Shell und keine Prisma-CLI im Container.
+* Logik zu Versionswahl, Rückfall und Wiederherstellung: reine, getestete Funktionen in `src/lib/updates`; Backups in
+  `src/server/backup`; die Oberflächen sind die Funktionen `admin.updates` und `admin.backup`.
+
 ## Datenhaltung
 
-* **Ein Schema, zwei Datenbanken:** SQLite lokal, PostgreSQL in Docker. Nur `prisma/schema.prisma` wird von Hand
-  geändert; das Postgres-Schema ist abgeleitet (`npm run db:sync-pg`).
-* Keine Enums und keine Json-Felder – Zustände sind Strings mit festen Werten im Code. Textsuche immer über
-  `contains()` aus `src/server/search.ts`.
-* **Geld** als ganze Cent (`Int`), **Dateien** (Rechnungsbelege, Doku-Bilder) als `Bytes` in eigenen Modellen, damit
-  Listen sie nie mitladen.
+* **Eine Datenbank: SQLite** (WAL-Modus, `synchronous=FULL`, eine Datei unter `/data`). Reicht für eine Werkstatt mit einigen
+  Dutzend Nutzern und viele Jahre Daten; Schreibvorgänge laufen nacheinander und dauern Millisekunden. Voraussetzung: lokale
+  Platte. Grenzen: keine mehreren App-Instanzen, keine Hochverfügbarkeit.
+* Keine Enums und keine Json-Felder – Zustände sind Strings mit festen Werten im Code (hält einen späteren Wechsel der
+  Datenbank offen). Textsuche immer über `contains()` aus `src/server/search.ts` (SQLite unterscheidet bei Umlauten Groß- und
+  Kleinschreibung: „MÜLLER“ findet „Müller“ nicht, „müller“ schon).
+* **Geld** als ganze Cent (`Int`). **Dateien** (Rechnungsbelege, Doku-Bilder) liegen als normale Dateien unter
+  `/data/files` (`src/server/files.ts`) mit lesbaren Pfaden, z. B. `rechnungen/2026/eingang/2026-03-14_Lieferant_RE-1234.pdf`;
+  die Datenbank kennt nur den relativen Pfad (`InvoiceFile.path`, `DocImage.path`). Dateien werden nie überschrieben oder
+  verändert (bei gleichem Namen kommt ein Zähler dazu, Umbenennen läuft über Hardlink) – deshalb genügen Hardlinks für Backups.
+  Ausgeliefert werden sie nur über Route Handler mit Rechteprüfung.
+* **Gleichzeitiges Bearbeiten:** Bearbeiten-Formulare tragen die Version der Zeile (`updatedAt`) mit; die Aktion „belegt“ die
+  Zeile nur, wenn sie unverändert ist (`src/lib/concurrency.ts`), sonst meldet sie einen Konflikt statt still zu überschreiben.
+  Prüfung und Speichern, die zusammengehören (z. B. Doppelbelegung eines Arbeitsplatzes), laufen in einer Transaktion.
 * Sensible Mitarbeiterdaten (Notfallkontakt, Krankheit) nur mit dem Recht `employees.sensitive`.
+* Einstellungen zur Laufzeit liegen in der Tabelle `AppSetting`; Geheimnisse verschlüsselt (Schlüsseldatei `/data/secret.key`,
+  nicht Teil von Backups).
 
 ## Sicherheit in Kürze
 

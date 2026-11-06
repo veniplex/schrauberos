@@ -12,9 +12,11 @@ import { isHexColor } from "@/lib/color";
 import { parseLocalDateTime } from "@/lib/dates";
 import { fieldErrors, formObject, safeReturn } from "@/lib/forms";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 const schema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   title: z.string().max(120),
   typeId: z.string().optional(),
   vehicleId: z.string().optional(),
@@ -44,31 +46,6 @@ export async function saveAppointment(_prev: ActionState, formData: FormData): P
   if (!startsAt) return { fieldErrors: { date: t("validation.invalid") } };
   const endsAt = new Date(startsAt.getTime() + d.duration * 60_000);
 
-  // Keine Doppelbelegung desselben Arbeitsplatzes
-  if (d.bayId && d.status !== "cancelled" && d.status !== "no_show") {
-    const clash = await db.appointment.findFirst({
-      where: {
-        bayId: d.bayId,
-        id: d.id ? { not: d.id } : undefined,
-        status: { notIn: ["cancelled", "no_show"] },
-        startsAt: { lt: endsAt },
-        endsAt: { gt: startsAt },
-      },
-      include: { vehicle: true },
-    });
-    if (clash) {
-      return {
-        fieldErrors: {
-          bayId: t("appointments.errors.bayBusy", {
-            from: i18n.date(clash.startsAt, { timeStyle: "short" }),
-            to: i18n.date(clash.endsAt, { timeStyle: "short" }),
-            title: clash.vehicle?.plate ?? clash.title,
-          }),
-        },
-      };
-    }
-  }
-
   const vehicle = d.vehicleId
     ? await db.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true } })
     : null;
@@ -88,10 +65,42 @@ export async function saveAppointment(_prev: ActionState, formData: FormData): P
     tireSetId: d.tireSetId ?? null,
   };
 
-  if (d.id) {
-    await db.appointment.update({ where: { id: d.id }, data });
-  } else {
-    await db.appointment.create({ data: { ...data, createdById: session.user.id } });
+  // Doppelbelegungs-Prüfung und Speichern gehören in eine Transaktion: Zwei gleichzeitige Buchungen desselben Arbeitsplatzes
+  // dürfen sich nicht beide an der Prüfung vorbeischieben.
+  const outcome = await db.$transaction(async (tx) => {
+    if (d.bayId && d.status !== "cancelled" && d.status !== "no_show") {
+      const clash = await tx.appointment.findFirst({
+        where: {
+          bayId: d.bayId,
+          id: d.id ? { not: d.id } : undefined,
+          status: { notIn: ["cancelled", "no_show"] },
+          startsAt: { lt: endsAt },
+          endsAt: { gt: startsAt },
+        },
+        include: { vehicle: true },
+      });
+      if (clash) return { clash };
+    }
+    if (d.id) {
+      if (!(await claimed(d.version, (stamp, next) => tx.appointment.updateMany({ where: { id: d.id!, updatedAt: stamp }, data: { updatedAt: next } })))) return { conflict: true as const };
+      await tx.appointment.update({ where: { id: d.id }, data });
+    } else {
+      await tx.appointment.create({ data: { ...data, createdById: session.user.id } });
+    }
+    return {};
+  });
+  if ("conflict" in outcome) return { error: t("common.conflict") };
+  if ("clash" in outcome && outcome.clash) {
+    const clash = outcome.clash;
+    return {
+      fieldErrors: {
+        bayId: t("appointments.errors.bayBusy", {
+          from: i18n.date(clash.startsAt, { timeStyle: "short" }),
+          to: i18n.date(clash.endsAt, { timeStyle: "short" }),
+          title: clash.vehicle?.plate ?? clash.title,
+        }),
+      },
+    };
   }
 
   revalidatePath("/appointments");

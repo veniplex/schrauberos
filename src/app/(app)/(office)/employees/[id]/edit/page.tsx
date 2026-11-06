@@ -7,6 +7,7 @@ import { employeeName } from "@/modules/office/employees/domain";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { EmployeeForm } from "@/modules/office/employees/forms";
+import { versionOf } from "@/lib/concurrency";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -34,6 +35,7 @@ export default async function EditEmployeePage({ params }: { params: Promise<{ i
         canSensitive={canSensitive}
         initial={{
           id: e.id,
+          version: versionOf(e),
           firstName: e.firstName,
           lastName: e.lastName,
           personnelNumber: e.personnelNumber ?? "",

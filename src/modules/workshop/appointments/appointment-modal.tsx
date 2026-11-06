@@ -8,6 +8,7 @@ import { formatTireSize } from "@/modules/workshop/tires/public";
 import { toVehicleOption } from "@/modules/workshop/vehicles/public";
 import { AppointmentForm, type AppointmentFormInitial } from "./appointment-form";
 import { appointmentFormOptions } from "./queries";
+import { versionOf } from "@/lib/concurrency";
 
 const toOption = toVehicleOption;
 
@@ -34,6 +35,7 @@ export async function AppointmentModal({
     if (!a) notFound();
     initial = {
       id: a.id,
+      version: versionOf(a),
       title: a.title,
       typeId: a.typeId ?? "",
       bayId: a.bayId ?? "",

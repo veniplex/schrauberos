@@ -10,6 +10,8 @@ import { saveVehicle, transferVehicle } from "./actions";
 
 export type VehicleFormValues = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   /** nur beim Anlegen wählbar */
   customer: SearchOption | null;
   plate: string;
@@ -26,7 +28,12 @@ export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValue
   const err = state.fieldErrors ?? {};
   return (
     <form action={action} className="card card-pad flex flex-col gap-4">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("vehicles.fields.plate")} htmlFor="plate" error={err.plate} required>
           <Input id="plate" name="plate" defaultValue={initial.plate} invalid={!!err.plate} className="font-mono uppercase" placeholder="B-AB 1234" autoComplete="off" required />

@@ -12,6 +12,7 @@ import { fieldErrors, formObject } from "@/lib/forms";
 import { formatPlate } from "@/lib/plate";
 import { parseMoneyToCents } from "@/lib/money";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 function refresh(id?: string) {
   for (const p of ["/fleet", "/fleet/licenses", "/"]) revalidatePath(p);
@@ -26,6 +27,7 @@ const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 const vehicleSchema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   plate: z.string().min(2).max(14),
   make: z.string().max(60).optional(),
   model: z.string().max(60).optional(),
@@ -92,6 +94,7 @@ export async function saveFleetVehicle(_prev: ActionState, formData: FormData): 
     fuelCardNo: d.fuelCardNo ?? null,
     notes: d.notes ?? null,
   };
+  if (id && !(await claimed(d.version, (stamp, next) => db.fleetVehicle.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
   const saved = id ? await db.fleetVehicle.update({ where: { id }, data }) : await db.fleetVehicle.create({ data });
   refresh(saved.id);
   redirect(`/fleet/${saved.id}`);

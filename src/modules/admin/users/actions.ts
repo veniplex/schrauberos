@@ -10,9 +10,11 @@ import { getI18n } from "@/i18n/server";
 import type { ActionState } from "@/components/ui/form";
 import { fieldErrors, formObject } from "@/lib/forms";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 const schema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   username: z
     .string()
     .trim()
@@ -80,6 +82,7 @@ export async function saveUser(_prev: ActionState, formData: FormData): Promise<
 
   let userId = d.id;
   if (d.id) {
+    if (!(await claimed(d.version, (stamp, next) => db.user.updateMany({ where: { id: d.id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
     await db.$transaction([
       db.userRole.deleteMany({ where: { userId: d.id } }),
       db.user.update({ where: { id: d.id }, data: { ...base, roles: { create: roles.map((r) => ({ roleId: r.id })) } } }),

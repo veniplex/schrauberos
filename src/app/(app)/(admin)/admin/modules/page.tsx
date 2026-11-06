@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Badge, Card, PageHeader } from "@/components/ui/layout";
+import { Alert, Badge, Card, PageHeader } from "@/components/ui/layout";
 import { ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -47,7 +47,9 @@ export default async function ModulesPage() {
     <>
       <PageHeader title={t("modules.title")} description={t("modules.description")} />
       <div className="flex max-w-4xl flex-col gap-6">
-        {MODULES.map((m) => {
+        <Alert tone="info">{t("modules.platformNote")}</Alert>
+        {/* Die Verwaltung gehört zur Plattform (Pflichtmodul) und ist nicht schaltbar – hier nur die schaltbaren Module */}
+        {MODULES.filter((m) => !("required" in m && m.required)).map((m) => {
           const features = featuresOfModule(m.id);
           const moduleRequired = "required" in m && m.required;
           const moduleOn = moduleRequired || overrides[m.id] !== false;

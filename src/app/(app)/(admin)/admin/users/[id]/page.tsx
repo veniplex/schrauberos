@@ -8,6 +8,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { UserForm } from "@/modules/admin/users/forms";
 import { deleteUser } from "@/modules/admin/users/actions";
+import { versionOf } from "@/lib/concurrency";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -47,6 +48,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
         <UserForm
           initial={{
             id: user.id,
+            version: versionOf(user),
             username: user.username,
             name: user.name,
             email: user.email ?? "",

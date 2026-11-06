@@ -11,6 +11,7 @@ import { fieldErrors, formObject } from "@/lib/forms";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 function refresh(id?: string) {
   for (const p of ["/vehicles", "/customers", "/tires", "/appointments", "/"]) revalidatePath(p);
@@ -19,6 +20,7 @@ function refresh(id?: string) {
 
 const vehicleSchema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   // nur beim Anlegen: Halter (optional). Spätere Wechsel laufen über den Halterwechsel.
   customerId: z.string().optional(),
   plate: z.string().min(2).max(14),
@@ -68,6 +70,7 @@ export async function saveVehicle(_prev: ActionState, formData: FormData): Promi
 
   let savedId: string;
   if (id) {
+    if (!(await claimed(d.version, (stamp, next) => db.vehicle.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
     await db.vehicle.update({ where: { id }, data });
     savedId = id;
   } else {

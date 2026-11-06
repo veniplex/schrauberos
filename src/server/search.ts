@@ -1,12 +1,10 @@
 import "server-only";
 
-const isPostgres = /^postgres(ql)?:/.test(process.env.DATABASE_URL ?? "");
-
 /**
- * Teilstring-Suche ohne Groß-/Kleinschreibung. SQLite (LIKE) ist für ASCII bereits unabhängig von der
- * Schreibweise; PostgreSQL braucht `mode: "insensitive"`. Das Prisma-Typsystem kennt `mode` nur beim
- * Postgres-Provider – daher hier zentral gekapselt.
+ * Teilstring-Suche (SQL LIKE). SQLite unterscheidet dabei bei ASCII-Buchstaben nicht zwischen Groß- und Kleinschreibung;
+ * bei Umlauten schon („MÜLLER“ findet „Müller“ nicht, „müller“ schon). Zentral gekapselt, damit sich das an einer Stelle
+ * verbessern lässt (z. B. über normalisierte Suchspalten).
  */
 export function contains(value: string) {
-  return isPostgres ? { contains: value, mode: "insensitive" as const } : { contains: value };
+  return { contains: value };
 }

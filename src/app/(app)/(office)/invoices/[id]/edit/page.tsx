@@ -8,6 +8,7 @@ import { centsToInput } from "@/lib/money";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { InvoiceForm } from "@/modules/office/invoices/invoice-form";
+import { versionOf } from "@/lib/concurrency";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -33,6 +34,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
         categories={cats.map((c) => c.category!).sort()}
         initial={{
           id: inv.id,
+          version: versionOf(inv),
           direction,
           number: inv.number,
           partyName: inv.partyName,

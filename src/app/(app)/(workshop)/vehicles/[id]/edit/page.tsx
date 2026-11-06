@@ -5,6 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { VehicleForm } from "@/modules/workshop/vehicles/forms";
+import { versionOf } from "@/lib/concurrency";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -25,6 +26,7 @@ export default async function EditVehiclePage({ params }: { params: Promise<{ id
           cancelHref={`/vehicles/${v.id}`}
           initial={{
             id: v.id,
+            version: versionOf(v),
             customer: null,
             plate: v.plate,
             make: v.make ?? "",

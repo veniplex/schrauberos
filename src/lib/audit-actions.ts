@@ -29,6 +29,14 @@ export const AUDIT_ACTIONS = [
   "fleet.delete",
   "network.delete",
   "docs.delete",
+  "backup.create",
+  "backup.delete",
+  "backup.download",
+  "backup.restore",
+  "backup.upload",
+  "setup.complete",
+  "system.update",
+  "system.updateFailed",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -9,6 +9,7 @@ import { saveUser } from "./actions";
 
 export type UserFormInitial = {
   id?: string;
+  version?: string;
   username: string;
   name: string;
   email: string;
@@ -39,6 +40,7 @@ export function UserForm({
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
           <input type="hidden" name="username" value={initial.username} />
         </>
       ) : null}

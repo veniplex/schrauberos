@@ -1,4 +1,4 @@
-// Geldbeträge werden überall als ganze Cent (Int) gespeichert – keine Rundungsfehler, portabel SQLite/Postgres.
+// Geldbeträge werden überall als ganze Cent (Int) gespeichert – keine Rundungsfehler, portabel und exakt.
 
 /**
  * Eingabe wie "1.234,56", "1234,5", "12.50", "1 234,56 €" oder "-20" -> Cent. null bei ungültiger Eingabe.

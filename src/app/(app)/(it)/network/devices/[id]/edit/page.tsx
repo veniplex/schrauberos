@@ -6,6 +6,7 @@ import { toDateInput } from "@/lib/dates";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { DeviceForm } from "@/modules/it/network/device-form";
+import { versionOf } from "@/lib/concurrency";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -29,6 +30,7 @@ export default async function EditDevicePage({ params }: { params: Promise<{ id:
         locations={locations}
         initial={{
           id: device.id,
+          version: versionOf(device),
           name: device.name,
           type: device.type,
           status: device.status,

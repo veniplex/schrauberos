@@ -15,6 +15,8 @@ export type TireRowInitial = { dot: string; tread: string; condition: string };
 
 export type TireSetFormInitial = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   vehicle: VehicleOption | null;
   season: string;
   status: string;
@@ -64,7 +66,12 @@ export function TireSetForm({
 
   return (
     <form action={action} className="flex flex-col gap-5">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
 
       <Card title={t("tires.sections.vehicle")}>
         <Field label={t("tires.fields.vehicle")} error={err.vehicleId} required>

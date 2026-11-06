@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Field, FormMessage, Input, type ActionState } from "@/components/ui/form";
+import { Field, FormMessage, Input, Select, type ActionState } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { ACCENT_PRESETS } from "@/lib/color";
@@ -22,9 +22,10 @@ export type WorkshopFormInitial = {
   accentColor: string;
   logoDataUrl: string | null;
   hours: OpeningHours;
+  timezone: string;
 };
 
-export function WorkshopForm({ initial }: { initial: WorkshopFormInitial }) {
+export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInitial; timezones: string[] }) {
   const { t } = useI18n();
   const [state, action] = useActionState<ActionState, FormData>(saveWorkshop, {});
   const [accent, setAccent] = useState(initial.accentColor);
@@ -106,6 +107,18 @@ export function WorkshopForm({ initial }: { initial: WorkshopFormInitial }) {
             {err.accentColor ? <p className="field-error">{err.accentColor}</p> : <p className="field-hint">{t("settings.workshop.accentHint")}</p>}
           </div>
         </div>
+      </Card>
+
+      <Card title={t("settings.workshop.timezoneTitle")}>
+        <Field label={t("settings.workshop.timezone")} htmlFor="timezone" error={err.timezone} hint={t("settings.workshop.timezoneHint")}>
+          <Select id="timezone" name="timezone" defaultValue={initial.timezone}>
+            {timezones.map((z) => (
+              <option key={z} value={z}>
+                {z}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </Card>
 
       <Card title={t("settings.workshop.hours")}>

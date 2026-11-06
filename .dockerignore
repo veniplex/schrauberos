@@ -9,7 +9,6 @@ node_modules
 *.db
 *.db-journal
 src/generated
-prisma/postgres/schema.prisma
 npm-debug.log*
 Dockerfile
 docker-compose.yml

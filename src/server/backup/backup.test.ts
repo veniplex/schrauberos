@@ -1,0 +1,196 @@
+import assert from "node:assert/strict";
+import Database from "better-sqlite3";
+import * as tar from "tar";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { after, describe, it } from "node:test";
+import { gzipSync } from "node:zlib";
+import { applyPendingRestore, readPending } from "@/lib/updates/restore";
+import { runMigrations } from "@/server/migrate";
+import { filesDir, resolveRel, storeFile } from "@/server/files";
+import { backupPath, backupsDir, createBackup, deleteBackup, isBackupName, listBackups, pruneAutomaticBackups } from "./core";
+import { importBackupFile, readDatabaseArchive, RestoreError, stageRestore, validateDatabase } from "./restore";
+
+const data = mkdtempSync(path.join(tmpdir(), "so-backup-"));
+process.env.DATA_DIR = data;
+const dbFile = path.join(data, "live.db");
+after(() => rmSync(data, { recursive: true, force: true }));
+
+const codeOf = async (fn: () => unknown) => {
+  try {
+    await fn();
+  } catch (e) {
+    return e instanceof RestoreError ? e.code : "other";
+  }
+  return null;
+};
+const bytes = (s: string) => new TextEncoder().encode(s);
+let manual = "";
+
+describe("Backups", () => {
+  it("legt konsistente, prüfbare Sicherungen mit Datenbank und Dateien im laufenden Betrieb an", async () => {
+    await runMigrations(dbFile);
+    const live = new Database(dbFile);
+    live.exec(`INSERT INTO "Workshop" (id, name, updatedAt) VALUES ('default', 'Meine Firma', CURRENT_TIMESTAMP)`);
+    const beleg = await storeFile("rechnungen/2026/eingang", "2026-01-05_Lieferant_RE-1.pdf", bytes("BELEG EINS"));
+    const info = await createBackup("manual", dbFile);
+    manual = info.name;
+    assert.match(info.name, /^schrauberos-\d{8}T\d{6}Z-manual$/);
+    assert.ok(info.size > 0);
+    assert.equal(info.fileCount, 1);
+    assert.equal(info.fileBytes, 10);
+
+    // Datenbank: enthält den Stand und ist gültig
+    const copy = path.join(data, "check.db");
+    writeFileSync(copy, readDatabaseArchive(info.name));
+    const check = new Database(copy, { readonly: true });
+    assert.equal((check.prepare(`SELECT name FROM "Workshop"`).get() as { name: string }).name, "Meine Firma");
+    check.close();
+    live.close();
+
+    // Dateien: als Hardlink – derselbe Inhalt, aber kein zusätzlicher Platz
+    const inBackup = path.join(backupPath(info.name)!, "files", ...beleg.split("/"));
+    assert.equal(readFileSync(inBackup, "utf8"), "BELEG EINS");
+    assert.equal(statSync(inBackup).ino, statSync(resolveRel(beleg)).ino);
+  });
+
+  it("ein Backup behält Dateien, die später aus dem Live-Bestand verschwinden", async () => {
+    const belegPfad = "rechnungen/2026/eingang/2026-01-05_Lieferant_RE-1.pdf";
+    rmSync(resolveRel(belegPfad));
+    const inBackup = path.join(backupPath(manual)!, "files", "rechnungen", "2026", "eingang", "2026-01-05_Lieferant_RE-1.pdf");
+    assert.equal(readFileSync(inBackup, "utf8"), "BELEG EINS");
+  });
+
+  it("akzeptiert nur feste Namen (kein Pfad-Trick)", () => {
+    assert.equal(isBackupName("schrauberos-20260101T020000Z-auto"), true);
+    for (const bad of ["../x", "schrauberos-20260101T020000Z-auto/../../etc", "x", "schrauberos-1-auto", "schrauberos-20260101T020000Z-auto.db.gz"]) {
+      assert.equal(isBackupName(bad), false);
+      assert.equal(backupPath(bad), null);
+    }
+    assert.equal(deleteBackup("../../etc"), false);
+  });
+
+  it("behält von den automatischen Sicherungen nur die neuesten", async () => {
+    for (let i = 1; i <= 4; i++) await createBackup("auto", dbFile, new Date(Date.UTC(2026, 0, i, 2, 0, 0)));
+    assert.equal(pruneAutomaticBackups(2).length, 2);
+    assert.deepEqual(listBackups().filter((b) => b.kind === "auto").map((b) => b.createdAt.getUTCDate()), [4, 3]);
+    assert.ok(listBackups().some((b) => b.kind === "manual"));
+  });
+
+  it("prüft Sicherungen vor der Wiederherstellung", async () => {
+    const foreign = path.join(data, "foreign.db");
+    const f = new Database(foreign);
+    f.exec(`CREATE TABLE x (a)`);
+    f.close();
+    assert.equal(await codeOf(() => validateDatabase(foreign)), "notBackup");
+
+    const garbage = path.join(data, "garbage.db");
+    writeFileSync(garbage, "das ist keine datenbank");
+    assert.equal(await codeOf(() => validateDatabase(garbage)), "corrupt");
+
+    const newer = path.join(data, "newer.db");
+    await runMigrations(newer);
+    const n = new Database(newer);
+    n.exec(`INSERT INTO _prisma_migrations (id, checksum, finished_at, migration_name, applied_steps_count) VALUES ('x','y',CURRENT_TIMESTAMP,'29990101000000_zukunft',1)`);
+    n.close();
+    assert.equal(await codeOf(() => validateDatabase(newer)), "newer");
+    assert.equal(await codeOf(() => validateDatabase(dbFile)), null);
+  });
+
+  it("bereitet die Wiederherstellung vor: sichert den Ist-Stand, stellt Datenbank und Dateien bereit, merkt vor", async () => {
+    await stageRestore(manual);
+    assert.deepEqual(readPending() && { from: readPending()!.from, files: readPending()!.files }, { from: manual, files: true });
+    assert.ok(listBackups().some((b) => b.kind === "pre-restore"));
+
+    const staged = path.join(data, "restore", "pending.db");
+    assert.equal(existsSync(`${staged}-wal`), false);
+    assert.equal(existsSync(`${staged}-shm`), false);
+    const peek = new Database(staged, { readonly: true });
+    assert.equal(peek.pragma("journal_mode", { simple: true }), "delete");
+    peek.close();
+    assert.equal(readFileSync(path.join(data, "restore", "pending-files", "rechnungen", "2026", "eingang", "2026-01-05_Lieferant_RE-1.pdf"), "utf8"), "BELEG EINS");
+
+    // Der Launcher tauscht: danach ist der gesicherte Beleg wieder da (er war inzwischen gelöscht)
+    assert.ok(applyPendingRestore(dbFile));
+    assert.equal(readFileSync(resolveRel("rechnungen/2026/eingang/2026-01-05_Lieferant_RE-1.pdf"), "utf8"), "BELEG EINS");
+    const db = new Database(dbFile, { readonly: true });
+    assert.equal((db.prepare(`SELECT name FROM "Workshop"`).get() as { name: string }).name, "Meine Firma");
+    db.close();
+  });
+
+  it("verweigert unbekannte oder beschädigte Sicherungen und hinterlässt nichts Vorgemerktes", async () => {
+    assert.equal(await codeOf(() => stageRestore("schrauberos-20200101T000000Z-auto")), "notFound");
+    const bad = path.join(backupsDir(), "schrauberos-20200102T000000Z-manual");
+    mkdirSync(bad, { recursive: true });
+    writeFileSync(path.join(bad, "database.db.gz"), gzipSync(Buffer.from("kein sqlite")));
+    assert.equal(await codeOf(() => stageRestore("schrauberos-20200102T000000Z-manual")), "corrupt");
+    assert.equal(readPending(), null);
+    assert.equal(existsSync(path.join(data, "restore", "pending-files")), false);
+  });
+
+  it("Archiv-Rundlauf: Herunterladen (tar) und wieder Hochladen ergibt eine gleichwertige Sicherung", async () => {
+    const tarFile = path.join(data, "download.tar");
+    tar.c({ file: tarFile, cwd: backupPath(manual)!, sync: true, portable: true }, ["."]);
+    const name = await importBackupFile(tarFile);
+    assert.match(name, /-upload$/);
+    assert.equal(existsSync(tarFile), false);
+    const imported = listBackups().find((b) => b.name === name)!;
+    assert.equal(imported.fileCount, 1);
+    assert.equal(readFileSync(path.join(backupPath(name)!, "files", "rechnungen", "2026", "eingang", "2026-01-05_Lieferant_RE-1.pdf"), "utf8"), "BELEG EINS");
+  });
+
+  it("nimmt auch .tar.gz und reine Datenbanken (roh/gzip, dann ohne Dateien) an", async () => {
+    const tgz = path.join(data, "download.tar.gz");
+    tar.c({ file: tgz, cwd: backupPath(manual)!, sync: true, gzip: true, portable: true }, ["."]);
+    assert.match(await importBackupFile(tgz), /-upload$/);
+
+    const raw = path.join(data, "raw.db");
+    writeFileSync(raw, readDatabaseArchive(manual));
+    const rawName = await importBackupFile(raw);
+    assert.equal(listBackups().find((b) => b.name === rawName)!.fileCount, 0);
+    assert.equal(existsSync(path.join(backupPath(rawName)!, "files")), false); // Wiederherstellen lässt Dateien dann unberührt
+
+    const gz = path.join(data, "raw.db.gz");
+    writeFileSync(gz, gzipSync(readDatabaseArchive(manual)));
+    assert.match(await importBackupFile(gz), /-upload$/);
+  });
+
+  it("lehnt Unbrauchbares ab: Müll, fremde Datenbank, Archiv ohne Datenbank, Symlinks im Archiv", async () => {
+    const junk = path.join(data, "junk.bin");
+    writeFileSync(junk, "kein backup");
+    assert.equal(await codeOf(() => importBackupFile(junk)), "notBackup");
+    assert.equal(existsSync(junk), false);
+
+    // Archiv ohne database.db.gz
+    const empty = path.join(data, "empty-src");
+    mkdirSync(path.join(empty, "files"), { recursive: true });
+    writeFileSync(path.join(empty, "files", "x.txt"), "x");
+    const noDb = path.join(data, "no-db.tar");
+    tar.c({ file: noDb, cwd: empty, sync: true, portable: true }, ["."]);
+    assert.equal(await codeOf(() => importBackupFile(noDb)), "notBackup");
+
+    // Archiv mit Symlink (könnte auf fremde Dateien zeigen)
+    const evil = path.join(data, "evil-src");
+    mkdirSync(path.join(evil, "files"), { recursive: true });
+    writeFileSync(path.join(evil, "database.db.gz"), readFileSync(path.join(backupPath(manual)!, "database.db.gz")));
+    try {
+      symlinkSync("/etc/passwd", path.join(evil, "files", "link"));
+      const evilTar = path.join(data, "evil.tar");
+      tar.c({ file: evilTar, cwd: evil, sync: true, portable: true }, ["."]);
+      assert.notEqual(await codeOf(() => importBackupFile(evilTar)), null);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error; // Windows ohne Symlink-Recht: Fall nicht prüfbar
+    }
+    assert.equal(lstatSync(backupsDir()).isDirectory(), true);
+    // Es bleiben keine Zwischenordner liegen
+    assert.deepEqual(
+      (await import("node:fs")).readdirSync(backupsDir()).filter((n) => n.startsWith(".import-")),
+      [],
+    );
+  });
+
+  it("filesDir liegt im Datenverzeichnis", () => {
+    assert.equal(filesDir(), path.join(data, "files"));
+  });
+});

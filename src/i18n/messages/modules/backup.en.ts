@@ -1,0 +1,68 @@
+import type { backupDe } from "./backup.de";
+
+export const backupEn: typeof backupDe = {
+  feature: {
+    name: "Backups",
+    description: "Back up, download, upload and restore the database – automatically and on demand.",
+  },
+  title: "Backups",
+  description: "Backups of the whole application: database (customers, appointments, documentation, settings …) and all files (invoice receipts, images).",
+  created: "Backup created.",
+  restoring: "Restore in progress – the application is restarting. You may have to sign in again afterwards.",
+  restoreTimeout: "The application is not reachable yet. Please reload the page in a minute. If it does not start with the restored data, it returns to the previous state automatically.",
+  create: { title: "Create backup", button: "Create backup now" },
+  schedule: {
+    on: "Automatically every night from {hour}:00, the latest {keep} automatic backups are kept (Settings → Backups).",
+    off: "Automatic backups are switched off (Settings → Backups).",
+  },
+  list: {
+    title: "Existing backups",
+    empty: "No backups yet.",
+    time: "Time",
+    kind: "Kind",
+    size: "Database",
+    files: "Files",
+    download: "Download",
+    restore: "Restore",
+    confirmRestore: "Restore the state of {date}? All changes since then are lost (a backup of the current state is created first). The application restarts.",
+    confirmDelete: "Delete this backup permanently?",
+  },
+  kinds: {
+    auto: "Automatic",
+    manual: "Manual",
+    upload: "Uploaded",
+    "pre-update": "Before update",
+    "pre-restore": "Before restore",
+    "pre-migration": "Before database change",
+  },
+  upload: {
+    title: "Upload backup",
+    hint: "Upload a previously downloaded backup (.tar), e.g. when moving to a new server. A plain SQLite file is possible too (then without files). The backup then appears in the list and can be restored.",
+    button: "Choose file …",
+    uploading: "Uploading and checking …",
+    done: "Backup accepted and added to the list.",
+  },
+  last: {
+    ok: "Last restored: {name} ({date}).",
+    rolledBack: "Restoring {name} ({date}) failed and was rolled back: {reason}",
+  },
+  errors: {
+    createFailed: "The backup could not be created. Please check free disk space.",
+    restoreFailed: "The restore could not be prepared.",
+    notFound: "This backup no longer exists.",
+    corrupt: "The file is damaged and cannot be used.",
+    notBackup: "This is not a backup file of this application.",
+    newer: "This backup comes from a newer version of the application. Please update the application first.",
+    uploadFailed: "The upload failed.",
+  },
+  note: "A backup contains all data of the application (including invoice receipts and documentation images) and is not encrypted: keep it safe. Files are not stored twice (only links), so a backup costs hardly any space. It does not protect against failure of the disk, though: keep a copy away from the server now and then (download).",
+  settings: {
+    tab: "Backups",
+    title: "Automatic backups",
+    enabled: "Create a backup automatically every night",
+    hour: "Not before (hour)",
+    hourHint: "The backup is created as soon as this time has been reached (and the application is running).",
+    keep: "Automatic backups to keep",
+    keepHint: "Older automatic backups are deleted. Manual and uploaded ones are always kept.",
+  },
+};

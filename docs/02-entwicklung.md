@@ -7,12 +7,13 @@ Voraussetzung: Node.js 22 oder neuer (getestet mit 24).
 ```bash
 npm install
 cp .env.example .env     # Windows: copy .env.example .env
-npm run setup            # Prisma-Client, Datenbank, Seed (inkl. Demo-Daten)
+npm run setup            # Prisma-Client, Datenbank anlegen und seeden (Entwicklungs-Admin, Beispieldaten)
 npm run dev
 ```
 
-Danach <http://localhost:3000>, Login `admin` / `admin` (beim ersten Login muss ein eigenes Passwort vergeben werden).
-Demo-Daten entfallen mit `SEED_DEMO="false"` in der `.env`.
+Danach <http://localhost:3000>, Login `admin` / `admin` (nur die Entwicklung: dort legt der Seed den Administrator an; in
+Produktion richtet man ihn über die Ersteinrichtung im Browser ein). Beispieldaten entfallen mit `SEED_DEMO="false"` in der `.env`.
+Die Datenbank ist `dev.db` im Projektordner; Backups und Update-Daten liegen lokal unter `.data/`.
 
 ## Befehle
 
@@ -22,25 +23,29 @@ Demo-Daten entfallen mit `SEED_DEMO="false"` in der `.env`.
 | `npm run lint` | ESLint |
 | `npm test` | Unit-Tests und Architektur-Test |
 | `npm run build` | Produktions-Build |
-| `npm run db:baseline` | Schema ableiten und die Baseline-Migrationen neu erzeugen |
-| `npm run db:fresh` | lokale SQLite-Datenbank löschen, neu anlegen und seeden |
+| `npm run db:migrate -- <name>` | neue Migration anlegen und lokal anwenden |
+| `npm run db:fresh` | lokale Datenbank löschen, neu anlegen und seeden |
 | `npm run db:studio` | Datenbank im Browser ansehen |
 
 Vor jedem Abschluss: `npm run typecheck && npm run lint && npm test` – bei größeren Änderungen zusätzlich `npm run build`.
 
-## Datenbank in der Entwicklungsphase
+## Datenbank und Migrationen
 
-Solange nur Demodaten existieren, gibt es **keine Migrationshistorie**: je Datenbank (SQLite und PostgreSQL) genau
-eine Baseline-Migration, die aus dem aktuellen Schema erzeugt wird. Nach einer Schema-Änderung:
+Die Anwendung nutzt ausschließlich SQLite. Die Migrationshistorie in `prisma/migrations` beginnt mit einer **eingefrorenen Baseline**
+(`00000000000000_baseline`). Diese und alle später veröffentlichten Migrationen werden **nie verändert** – sonst passen bestehende
+Installationen und Web-Updates nicht mehr zusammen (die App prüft die Prüfsummen und verweigert veränderte Migrationen).
+Nach einer Schema-Änderung in `prisma/schema.prisma`:
 
 ```bash
-npm run db:baseline    # leitet das Postgres-Schema ab und erzeugt beide Baselines neu
-npm run db:fresh       # lokale Datenbank neu aufbauen und seeden
+npm run db:migrate -- add_warranty    # legt die Migration an, wendet sie lokal an und erzeugt den Client neu
 ```
 
-Bestehende Datenbanken (z. B. ein laufender Docker-Stack) müssen nach einer Schema-Änderung neu angelegt werden
-(`docker compose down -v`). Sobald echte Daten existieren, wird auf normale Migrationen (`prisma migrate dev`)
-umgestellt und diese Baseline als Ausgangspunkt eingefroren.
+Im Betrieb wendet die App offene Migrationen beim Start selbst an (`src/server/migrate.ts`, vorher mit automatischer Sicherung);
+es gibt keine Prisma-CLI im Container. In der Entwicklung tut das ebenfalls der Start der App bzw. `npm run db:fresh`.
+
+Migrationen sollten **abwärtskompatibel zur Vorversion** des Codes sein (erst Spalte hinzufügen, später entfernen), weil ein
+Web-Update bei Problemen automatisch auf die vorherige Version zurückfällt – auf dem dann bereits migrierten Schema. Die
+Rückfall-Version toleriert Migrationen, die sie nicht kennt.
 
 ## Eine neue Funktion anlegen (Rezept)
 
@@ -87,3 +92,26 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 Getestet wird die Fachlogik (`*.test.ts` neben dem Code, `node:test` via `tsx`), die Aktivierungslogik
 (`catalog-logic.test.ts`), der Katalog selbst (`catalog.test.ts`: gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden) und die Architekturregeln (`architecture.test.ts`).
+
+## Eine Version veröffentlichen (Release)
+
+Jede Version, die per Web-Update installierbar sein soll, entsteht aus einem Git-Tag:
+
+1. `version` in `package.json` auf die neue Nummer setzen (z. B. `0.2.0`), committen, pushen.
+2. Tag setzen und pushen: `git tag v0.2.0 && git push origin v0.2.0`.
+3. Die GitHub-Action (Job *Release*) baut den Code als Paket, erzeugt `manifest.json`, **signiert** es mit dem Secret
+   `RELEASE_SIGNING_KEY` und legt ein GitHub-Release an (Änderungen werden automatisch aus den Commits erzeugt). Zusätzlich
+   entsteht wie immer das Docker-Image (`0.2.0`, `0.2`, `latest`).
+
+Einmalig nötig: das Repository-Secret `RELEASE_SIGNING_KEY` (privater Ed25519-Schlüssel im PEM-Format, z. B. `gh secret set RELEASE_SIGNING_KEY < schluessel.pem`). Er gehört nirgends ins Repository. Die Pipeline prüft vor dem Veröffentlichen, dass er zum eingebauten öffentlichen Schlüssel passt.
+
+Die Pipeline bricht ab, wenn Tag und `package.json` nicht übereinstimmen. Das Release-Paket ist selbständig: Es enthält die Anwendung samt `node_modules`, die Node-Laufzeit, die dazugehörigen
+Systembibliotheken und den Launcher. Neue Abhängigkeiten, ein neues Node und Änderungen am Launcher sind deshalb
+**gewöhnliche Releases** – kein neues Image nötig. Nur wenn sich der Vertrag des Starters im Image ändert
+(`docker/bootstrap.c`: Dateiformate des Zeigers, Exit-Codes, Aufrufweise der Laufzeit), muss `docker/BASE_VERSION` erhöht
+werden; solche Releases bieten kein Web-Update an, sondern verlangen ein neues Image. Dasselbe gilt für eine andere
+CPU-Architektur (derzeit wird `linux/amd64` gebaut).
+
+Der öffentliche Schlüssel zur Signaturprüfung steht in `src/modules/admin/updates/release-key.ts`. Das Schlüsselpaar
+tauscht man aus, indem man ein neues Ed25519-Paar erzeugt, den öffentlichen Teil dort einträgt und den privaten als Secret
+hinterlegt – bereits installierte Apps verlangen danach allerdings ein neues Image, weil sie den alten Schlüssel kennen.

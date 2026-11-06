@@ -2,6 +2,7 @@ import { toDateInput } from "@/lib/dates";
 import { TIRE_POSITIONS, type TirePosition } from "@/modules/workshop/tires/constants";
 import { toVehicleOption } from "@/modules/workshop/vehicles/public";
 import type { TireSetFormInitial } from "./tire-set-form";
+import { versionOf } from "@/lib/concurrency";
 
 type VehicleArg = Parameters<typeof toVehicleOption>[0];
 
@@ -31,6 +32,7 @@ export function newTireSetInitial(vehicle: VehicleArg | null): TireSetFormInitia
 
 export function editTireSetInitial(set: {
   id: string;
+  updatedAt: Date;
   vehicle: VehicleArg;
   season: string;
   status: string;
@@ -57,6 +59,7 @@ export function editTireSetInitial(set: {
   }
   return {
     id: set.id,
+    version: versionOf(set),
     vehicle: toVehicleOption(set.vehicle),
     season: set.season,
     status: set.status,

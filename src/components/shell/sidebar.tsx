@@ -8,6 +8,9 @@ import {
   BookOpen,
   Blocks,
   ScrollText,
+  Download,
+  CircleHelp,
+  HardDriveDownload,
   Cable,
   CalendarDays,
   CalendarOff,
@@ -52,6 +55,9 @@ const ICONS: Record<IconName, LucideIcon> = {
   docs: BookOpen,
   modules: Blocks,
   audit: ScrollText,
+  updates: Download,
+  backup: HardDriveDownload,
+  help: CircleHelp,
 };
 
 export type SidebarItem = { href: string; label: string; icon: IconName };

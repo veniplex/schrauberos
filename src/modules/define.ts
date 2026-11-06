@@ -27,7 +27,10 @@ export type IconName =
   | "fleet"
   | "docs"
   | "modules"
-  | "audit";
+  | "audit"
+  | "updates"
+  | "backup"
+  | "help";
 
 export type ModuleDef = {
   /** Kurze ID, z. B. "workshop" */

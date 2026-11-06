@@ -5,6 +5,7 @@ export const auditFeature = defineFeature({
   module: "admin",
   nameKey: "audit.feature.name",
   descriptionKey: "audit.feature.description",
+  required: true,
   order: 135,
   permissions: { group: "audit", keys: ["audit.view"] },
   nav: [

@@ -1,6 +1,7 @@
 name: Build & publish Docker image
 
 # Bei jedem Push auf main (Tag "latest") und bei Versions-Tags v1.2.3 (Tags "1.2.3", "1.2", "latest").
+# Versions-Tags erzeugen zusätzlich ein signiertes Release-Paket für Web-Updates (Job "release").
 on:
   push:
     branches: [main]
@@ -35,6 +36,16 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+      - id: ver
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            v="${GITHUB_REF_NAME#v}"
+            [ "$v" = "$pkg" ] || { echo "Tag v$v passt nicht zur Version in package.json ($pkg)"; exit 1; }
+          else
+            v="$pkg-dev.${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -54,7 +65,43 @@ jobs:
         with:
           context: .
           push: true
+          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    name: Release-Paket signieren und veröffentlichen
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: ver
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          v="${GITHUB_REF_NAME#v}"
+          [ "$v" = "$pkg" ] || { echo "Tag v$v passt nicht zur Version in package.json ($pkg)"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Paket bauen (nur Code, identisch mit dem Image-Inhalt)
+        run: |
+          # Als tar exportieren: bewahrt Symlinks (.next/node_modules) unverändert
+          docker buildx build --target bundle --build-arg APP_VERSION=${{ steps.ver.outputs.version }} --output type=tar,dest=bundle.tar .
+          mkdir release bundle
+          tar -xf bundle.tar -C bundle version.json
+          gzip -c bundle.tar > "release/schrauberos-${{ steps.ver.outputs.version }}.tar.gz"
+      - name: Manifest erzeugen und signieren
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: node scripts/make-release.mjs --archive "release/schrauberos-${{ steps.ver.outputs.version }}.tar.gz" --bundle bundle --out release
+      - name: GitHub-Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --title "$GITHUB_REF_NAME" --generate-notes

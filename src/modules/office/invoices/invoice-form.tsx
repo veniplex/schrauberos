@@ -12,6 +12,8 @@ import { saveInvoice } from "./actions";
 
 export type InvoiceFormInitial = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   direction: "incoming" | "outgoing";
   number: string;
   partyName: string;
@@ -38,7 +40,12 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
 
   return (
     <form action={action} className="flex max-w-4xl flex-col gap-5">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
       <input type="hidden" name="direction" value={initial.direction} />
 
       <Card title={outgoing ? t("invoices.sections.outgoing") : t("invoices.sections.incoming")}>

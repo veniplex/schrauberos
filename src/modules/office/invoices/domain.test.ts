@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { amountsConsistent, invoiceTotals, paymentState } from "./domain";
+import { amountsConsistent, invoiceFileLocation, invoiceTotals, paymentState } from "./domain";
 
 const now = new Date("2026-11-05T12:00:00");
 const d = (s: string) => new Date(`${s}T12:00:00`);
@@ -38,5 +38,20 @@ describe("amountsConsistent", () => {
     assert.equal(amountsConsistent(10000, 1900, 11901), true);
     assert.equal(amountsConsistent(10000, 1900, 12000), false);
     assert.equal(amountsConsistent(null, 1900, 12000), true);
+  });
+});
+
+describe("Beleg-Ablage", () => {
+  const inv = { direction: "incoming", issueDate: new Date("2026-03-14T12:00:00Z"), number: "RE 2026/0042", partyName: "Müller & Söhne GmbH" };
+
+  test("legt Belege lesbar nach Jahr und Richtung ab", () => {
+    assert.deepEqual(invoiceFileLocation(inv, "application/pdf"), { dir: "rechnungen/2026/eingang", name: "2026-03-14_Mueller-Soehne-GmbH_RE-2026-0042.pdf" });
+    assert.equal(invoiceFileLocation({ ...inv, direction: "outgoing" }, "image/jpeg").dir, "rechnungen/2026/ausgang");
+    assert.equal(invoiceFileLocation(inv, "image/jpeg").name.endsWith(".jpg"), true);
+  });
+
+  test("macht aus Nummer und Partner nie einen Pfad", () => {
+    const loc = invoiceFileLocation({ ...inv, number: "../../etc/passwd", partyName: "a/b\c" }, "application/pdf");
+    assert.ok(!loc.name.includes("/") && !loc.name.includes("\\") && !loc.name.includes(".."));
   });
 });

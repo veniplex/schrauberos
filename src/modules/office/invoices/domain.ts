@@ -1,4 +1,5 @@
 import { startOfDay } from "date-fns";
+import { safeName } from "@/lib/filename";
 
 export const INVOICE_DIRECTIONS = ["incoming", "outgoing"] as const;
 export type InvoiceDirection = (typeof INVOICE_DIRECTIONS)[number];
@@ -45,4 +46,19 @@ export const INVOICE_FILE_MAX_BYTES = 10 * 1024 * 1024;
 export function amountsConsistent(netCents: number | null, vatCents: number | null, grossCents: number): boolean {
   if (netCents == null || vatCents == null) return true;
   return Math.abs(netCents + vatCents - grossCents) <= 1;
+}
+
+/** Dateiendung je erlaubtem Beleg-Typ. */
+const FILE_EXTENSIONS: Record<string, string> = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
+
+/**
+ * Ort eines Belegs im Dateispeicher – lesbar und auffindbar:
+ * `rechnungen/<Jahr>/<eingang|ausgang>/<Rechnungsdatum>_<Geschäftspartner>_<Nummer>.<Endung>`.
+ */
+export function invoiceFileLocation(inv: { direction: string; issueDate: Date; number: string; partyName: string }, mime: string): { dir: string; name: string } {
+  const day = inv.issueDate.toISOString().slice(0, 10);
+  return {
+    dir: `rechnungen/${day.slice(0, 4)}/${inv.direction === "incoming" ? "eingang" : "ausgang"}`,
+    name: `${day}_${safeName(inv.partyName, 40)}_${safeName(inv.number, 40)}.${FILE_EXTENSIONS[mime] ?? "bin"}`,
+  };
 }

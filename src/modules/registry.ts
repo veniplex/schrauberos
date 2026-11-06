@@ -16,6 +16,8 @@ import { widgets as officeDocsWidgets } from "./office/docs/widgets";
 import { widgets as networkWidgets } from "./it/network/widgets";
 import { widgets as itDocsWidgets } from "./it/docs/widgets";
 import { settingsTabs as workshopProfileSettings } from "./admin/settings/settings-tab";
+import { settingsTabs as backupSettings } from "./admin/backup/settings-tab";
+import { settingsTabs as updatesSettings } from "./admin/updates/settings-tab";
 
 /**
  * Composition Root: hier – und nur hier – werden die Beiträge der Funktionen (Dashboard-Bausteine,
@@ -33,7 +35,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   ...itDocsWidgets,
 ];
 
-const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings];
+const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...backupSettings, ...updatesSettings];
 
 export type NavEntry = { id: string; href: string; labelKey: MessageKey; icon: IconName; module: ModuleId; order: number };
 

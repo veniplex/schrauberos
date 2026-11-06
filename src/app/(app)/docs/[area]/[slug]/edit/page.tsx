@@ -7,6 +7,7 @@ import { db } from "@/server/db";
 import { requireDocEdit } from "@/capabilities/docs/access";
 import { deleteDocPage } from "@/capabilities/docs/actions";
 import { DocEditor } from "@/capabilities/docs/doc-editor";
+import { versionOf } from "@/lib/concurrency";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -32,7 +33,7 @@ export default async function EditDocPage({ params }: { params: Promise<{ area: 
           area={area}
           categories={categories}
           cancelHref={`/docs/${area}/${page.slug}`}
-          initial={{ id: page.id, title: page.title, categoryId: page.categoryId ?? "", content: page.content, pinned: page.pinned }}
+          initial={{ id: page.id, version: versionOf(page), title: page.title, categoryId: page.categoryId ?? "", content: page.content, pinned: page.pinned }}
         />
         <form action={deleteDocPage} className="border-t border-line pt-4">
           <input type="hidden" name="area" value={area} />

@@ -11,6 +11,8 @@ import { saveDevice } from "./actions";
 
 export type DeviceFormInitial = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   name: string;
   type: string;
   status: string;
@@ -42,7 +44,12 @@ export function DeviceForm({
 
   return (
     <form action={action} className="flex max-w-4xl flex-col gap-5">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
 
       <Card title={t("network.sections.device")}>
         <div className="grid gap-4 sm:grid-cols-2">

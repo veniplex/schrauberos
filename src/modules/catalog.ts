@@ -18,13 +18,14 @@ import { rolesFeature } from "./admin/roles/feature";
 import { settingsFeature } from "./admin/settings/feature";
 import { modulesFeature } from "./admin/modules/feature";
 import { auditFeature } from "./admin/audit/feature";
-import { handbookFeature } from "./admin/handbook/feature";
+import { updatesFeature } from "./admin/updates/feature";
+import { backupFeature } from "./admin/backup/feature";
 import { featureKey } from "./catalog-logic";
 
 /**
  * Der Katalog: alle Module und Funktionen der Anwendung – rein statisch (keine UI, keine DB).
  * Neue Funktion = feature.ts anlegen und hier eintragen. Alles andere (Rechte-Typen, Rechte-Gruppen,
- * Aktivierung, Admin-Seite, Handbuch) wird daraus abgeleitet.
+ * Aktivierung, Admin-Seite) wird daraus abgeleitet.
  */
 export const MODULES = [workshopModule, officeModule, itModule, adminModule] as const;
 
@@ -45,7 +46,8 @@ export const FEATURES = [
   settingsFeature,
   modulesFeature,
   auditFeature,
-  handbookFeature,
+  updatesFeature,
+  backupFeature,
 ] as const;
 
 export type ModuleId = (typeof MODULES)[number]["id"];

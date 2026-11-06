@@ -10,8 +10,9 @@ import { usersDe } from "./modules/users.de";
 import { rolesDe } from "./modules/roles.de";
 import { networkDe } from "./modules/network.de";
 import { modulesDe } from "./modules/admin-modules.de";
-import { handbookDe } from "./modules/handbook.de";
 import { auditDe } from "./modules/audit.de";
+import { updatesDe } from "./modules/updates.de";
+import { backupDe } from "./modules/backup.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
@@ -21,8 +22,10 @@ export const de = {
   employees: employeesDe,
   modules: modulesDe,
   audit: auditDe,
-  handbook: handbookDe,
+  updates: updatesDe,
+  backup: backupDe,
   common: {
+    conflict: "Dieser Datensatz wurde inzwischen von jemand anderem geändert. Bitte die Seite neu laden und die Änderung erneut vornehmen – nichts wurde überschrieben.",
     sortOrder: "Reihenfolge",
     save: "Speichern",
     saved: "Gespeichert.",
@@ -48,8 +51,10 @@ export const de = {
   },
   nav: {
     modules: "Module & Funktionen",
+    backup: "Backups",
+    updates: "Updates",
     audit: "Audit-Log",
-    handbook: "Handbuch",
+    help: "Hilfe",
     main: "Hauptnavigation",
     menu: "Menü öffnen",
     administration: "Verwaltung",
@@ -80,6 +85,25 @@ export const de = {
     office: "Büro",
     it: "IT & Netzwerk",
     admin: "Verwaltung",
+  },
+  help: {
+    title: "Hilfe",
+    description: "So funktioniert die Anwendung – Schritt für Schritt für alle Bereiche.",
+    contents: "Kapitel",
+    onThisPage: "Auf dieser Seite",
+  },
+  setup: {
+    title: "Ersteinrichtung",
+    intro: "Willkommen! Zwei Minuten, dann ist die Anwendung einsatzbereit.",
+    workshopName: "Name der Werkstatt",
+    timezone: "Zeitzone",
+    timezoneHint: "Termine werden in dieser Zeitzone angezeigt und eingegeben.",
+    adminTitle: "Administrator-Konto",
+    demo: "Mit Beispieldaten starten",
+    demoHint: "Legt Beispiel-Kunden, -Fahrzeuge, -Termine usw. zum Ausprobieren an (nur sinnvoll für einen Test).",
+    submit: "Einrichtung abschließen",
+    warning: "Bitte die Einrichtung durchführen, bevor die Anwendung von außen erreichbar ist: Wer sie zuerst aufruft, wird Administrator.",
+    errors: { notReady: "Die Anwendung ist noch nicht bereit. Bitte in einem Moment erneut versuchen." },
   },
   auth: {
     signIn: "Anmelden",
@@ -130,9 +154,10 @@ export const de = {
     fleet: "Fuhrpark",
     docsOffice: "Dokumentation Büro",
     docsIt: "Dokumentation IT",
+    backup: "Backups",
+    updates: "Updates",
     audit: "Audit-Log",
     modules: "Module & Funktionen",
-    handbook: "Handbuch",
   },
   permissions: {
     appointments: {
@@ -203,11 +228,14 @@ export const de = {
     audit: {
       view: "Audit-Log einsehen",
     },
+    updates: {
+      manage: "Updates installieren",
+    },
+    backup: {
+      manage: "Backups verwalten und wiederherstellen",
+    },
     modules: {
       manage: "Module und Funktionen ein-/ausschalten",
-    },
-    handbook: {
-      view: "Handbuch lesen",
     },
   },
   network: networkDe,
@@ -229,6 +257,9 @@ export const de = {
       name: "Name der Werkstatt",
       tagline: "Untertitel",
       website: "Webseite",
+      timezoneTitle: "Zeitzone",
+      timezone: "Zeitzone der Werkstatt",
+      timezoneHint: "Termine werden in dieser Zeitzone angezeigt und eingegeben. Die Änderung gilt sofort.",
       branding: "Erscheinungsbild",
       logo: "Logo",
       logoHint: "PNG, JPEG, WebP oder SVG, max. 200 KB.",

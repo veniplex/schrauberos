@@ -11,11 +11,13 @@ import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STAT
 import { parseDot } from "@/modules/workshop/tires/domain";
 import { fieldErrors, formObject } from "@/lib/forms";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 const optInt = (min: number, max: number) => z.coerce.number().int().min(min).max(max).optional();
 
 const schema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   vehicleId: z.string(),
   season: z.enum(TIRE_SEASONS),
   status: z.enum(TIRE_SET_STATUSES).default("stored"),
@@ -97,6 +99,7 @@ export async function saveTireSet(_prev: ActionState, formData: FormData): Promi
 
   const id = await db.$transaction(async (tx) => {
     if (d.id) {
+      if (!(await claimed(d.version, (stamp, next) => tx.tireSet.updateMany({ where: { id: d.id!, updatedAt: stamp }, data: { updatedAt: next } })))) return null;
       await tx.tireSet.update({ where: { id: d.id }, data });
       await tx.tire.deleteMany({ where: { tireSetId: d.id } });
       await tx.tire.createMany({ data: tires.map((x) => ({ ...x, tireSetId: d.id! })) });
@@ -107,6 +110,7 @@ export async function saveTireSet(_prev: ActionState, formData: FormData): Promi
     return created.id;
   });
 
+  if (!id) return { error: t("common.conflict") };
   revalidateAll(id);
   redirect(`/tires/${id}`);
 }

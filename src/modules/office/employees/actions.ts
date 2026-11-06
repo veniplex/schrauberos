@@ -10,6 +10,7 @@ import type { ActionState } from "@/components/ui/form";
 import { ABSENCE_TYPES, DEPARTMENTS, employeeName } from "@/modules/office/employees/domain";
 import { fieldErrors, formObject, safeReturn } from "@/lib/forms";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 function refresh(id?: string) {
   for (const p of ["/employees", "/employees/absences", "/fleet", "/admin/users", "/"]) revalidatePath(p);
@@ -23,6 +24,7 @@ const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 const employeeSchema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   firstName: z.string().trim().min(1).max(60),
   lastName: z.string().trim().min(1).max(60),
   personnelNumber: z.string().max(30).optional(),
@@ -82,6 +84,7 @@ export async function saveEmployee(_prev: ActionState, formData: FormData): Prom
       ? { emergencyName: d.emergencyName ?? null, emergencyPhone: d.emergencyPhone ?? null, emergencyRelation: d.emergencyRelation ?? null }
       : {}),
   };
+  if (id && !(await claimed(d.version, (stamp, next) => db.employee.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
   const saved = id ? await db.employee.update({ where: { id }, data }) : await db.employee.create({ data });
   refresh(saved.id);
   redirect(`/employees/${saved.id}`);

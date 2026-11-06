@@ -18,11 +18,15 @@ const LOCK_MINUTES = 15;
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 
-/** Secure-Cookies nur über HTTPS. Für reinen HTTP-Betrieb im LAN: SESSION_COOKIE_SECURE=false. */
-function secureCookies() {
+/**
+ * Secure-Cookies nur über HTTPS – automatisch erkannt am Header des Reverse Proxys (`x-forwarded-proto`). Ohne Proxy (reines
+ * HTTP im LAN) bleibt das Flag aus, sonst wäre kein Login möglich. SESSION_COOKIE_SECURE=true|false erzwingt einen Wert.
+ */
+async function secureCookies(): Promise<boolean> {
   const flag = process.env.SESSION_COOKIE_SECURE;
   if (flag) return flag === "true";
-  return process.env.NODE_ENV === "production";
+  const proto = (await headers()).get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return proto === "https";
 }
 
 export type SessionUser = {
@@ -109,7 +113,7 @@ async function startSession(userId: string) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: secureCookies(),
+    secure: await secureCookies(),
     sameSite: "lax",
     path: "/",
     expires: expiresAt,

@@ -15,7 +15,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const entries = navFor(session);
   const groups: SidebarGroup[] = [
     // Dashboard steht immer an erster Stelle
-    { id: "top", label: null, items: [{ href: "/", label: t("nav.dashboard"), icon: "dashboard" }] },
+    {
+      id: "top",
+      label: null,
+      // Plattform: für alle angemeldeten Benutzer, unabhängig von Modulen und Rechten
+      items: [
+        { href: "/", label: t("nav.dashboard"), icon: "dashboard" },
+        { href: "/help", label: t("nav.help"), icon: "help" },
+      ],
+    },
     ...MODULES.map((m) => ({
       id: m.id,
       label: t(m.nameKey),

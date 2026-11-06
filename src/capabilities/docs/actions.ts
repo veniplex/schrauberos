@@ -12,6 +12,7 @@ import { fieldErrors, formObject } from "@/lib/forms";
 import { slugify, uniqueSlug } from "@/lib/slug";
 import { DOC_MAX_VERSIONS, DOC_PERMISSIONS, isDocArea, type DocArea } from "./areas";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 /** Prüft den Bereich aus dem Formular und das Bearbeitungsrecht dafür (jede Action prüft selbst). */
 async function requireEdit(areaRaw: string): Promise<{ area: DocArea; session: AppSession }> {
@@ -35,6 +36,7 @@ async function snapshot(pageId: string, title: string, content: string, savedByN
 
 const pageSchema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   area: z.string(),
   title: z.string().trim().min(1).max(120),
   categoryId: z.string().optional(),
@@ -60,6 +62,7 @@ export async function saveDocPage(_prev: ActionState, formData: FormData): Promi
   if (d.id) {
     const page = await db.docPage.findFirst({ where: { id: d.id, area } });
     if (!page) return { error: t("validation.invalid") };
+    if (!(await claimed(d.version, (stamp, next) => db.docPage.updateMany({ where: { id: page.id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
     slug = page.slug; // Adresse bleibt stabil, auch wenn der Titel geändert wird (Links in anderen Seiten)
     await db.docPage.update({
       where: { id: page.id },

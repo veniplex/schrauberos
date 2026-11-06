@@ -11,6 +11,7 @@ import { WEEKDAYS } from "@/lib/constants";
 import { isValidTime } from "@/lib/opening-hours";
 import { fieldErrors, formObject } from "@/lib/forms";
 import { audit } from "@/server/audit";
+import { applyTimezone } from "@/server/startup";
 
 const MAX_LOGO_BYTES = 200 * 1024;
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
@@ -25,6 +26,7 @@ const workshopSchema = z.object({
   email: z.string().email().max(200).optional(),
   website: z.string().max(200).optional(),
   accentColor: z.string().refine(isHexColor),
+  timezone: z.string().max(60),
 });
 
 export async function saveWorkshop(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -33,6 +35,7 @@ export async function saveWorkshop(_prev: ActionState, formData: FormData): Prom
   const parsed = workshopSchema.safeParse(formObject(formData));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
   const d = parsed.data;
+  if (!applyTimezone(d.timezone)) return { fieldErrors: { timezone: t("validation.invalid") } };
 
   // Öffnungszeiten
   const hours: Record<string, [string, string] | null> = {};
@@ -73,6 +76,7 @@ export async function saveWorkshop(_prev: ActionState, formData: FormData): Prom
     email: d.email ?? null,
     website: d.website ?? null,
     accentColor: d.accentColor.toLowerCase(),
+    timezone: d.timezone,
     openingHours: JSON.stringify(hours),
     ...(logoDataUrl !== undefined ? { logoDataUrl } : {}),
   };

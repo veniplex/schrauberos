@@ -1,7 +1,6 @@
-// Quelle der Wahrheit für das Datenmodell (SQLite lokal).
-// Das Postgres-Schema wird daraus abgeleitet: `npm run db:sync-pg`.
-// Bewusst portabel gehalten: keine Enums/Json-Felder – Zustände sind Strings, die in
-// src/lib/domain/* als Konstanten + Zod-Schemas definiert sind.
+// Datenmodell (SQLite, eine Datei). Änderungen nur über `npm run db:migrate -- <name>`.
+// Bewusst portabel gehalten: keine Enums/Json-Felder – Zustände sind Strings, die als Konstanten + Zod-Schemas
+// im Code definiert sind (ein späterer Wechsel der Datenbank bliebe damit möglich).
 
 generator client {
   provider = "prisma-client"
@@ -106,6 +105,8 @@ model Workshop {
   accentColor         String   @default("#2459c9")
   // JSON: { "mon": ["07:30","17:00"], "sun": null }
   openingHours        String   @default("{}")
+  // IANA-Zeitzone der Werkstatt (Termine werden darin ein- und ausgegeben); wird beim App-Start auf den Prozess angewendet
+  timezone            String   @default("Europe/Berlin")
   updatedAt           DateTime @updatedAt
 }
 
@@ -611,7 +612,8 @@ model InvoiceFile {
   name       String
   mime       String
   size       Int
-  data       Bytes
+  // Relativer Pfad unter <Datenverzeichnis>/files (lesbar, z. B. rechnungen/2026/eingang/2026-03-14_Lieferant_RE-1234.pdf)
+  path       String   @unique
   uploadedAt DateTime @default(now())
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -664,14 +666,14 @@ model DocVersion {
   @@index([pageId, savedAt])
 }
 
-// Bilder in Dokumentationsseiten (in der Datenbank gespeichert)
+// Bilder in Dokumentationsseiten (Datei unter <Datenverzeichnis>/files/doku/<bereich>/)
 model DocImage {
   id        String   @id @default(cuid())
   area      String
   name      String
   mime      String
   size      Int
-  data      Bytes
+  path      String   @unique
   createdAt DateTime @default(now())
 
   @@index([area])
@@ -702,4 +704,12 @@ model AuditLog {
   @@index([createdAt])
   @@index([action])
   @@index([actorId])
+}
+
+// Einstellungen, die zur Laufzeit in der Oberfläche geändert werden (Schlüssel/Wert). Geheimnisse liegen verschlüsselt darin
+// (Schlüsseldatei im Datenverzeichnis, nicht Teil von Backups).
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

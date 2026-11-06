@@ -9,6 +9,8 @@ import { saveCustomer } from "./actions";
 
 export type CustomerFormValues = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   customerNumber: string;
   firstName: string;
   lastName: string;
@@ -27,7 +29,12 @@ export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormVal
   const err = state.fieldErrors ?? {};
   return (
     <form action={action} className="card card-pad flex flex-col gap-4">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("customers.fields.firstName")} htmlFor="firstName" error={err.firstName}>
           <Input id="firstName" name="firstName" defaultValue={initial.firstName} autoComplete="off" />

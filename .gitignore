@@ -46,7 +46,7 @@ next-env.d.ts
 /prisma/*.db
 /prisma/*.db-journal
 /src/generated
-/prisma/postgres/schema.prisma
 /.hallmark/preflight.json
 /*.db
 /*.db-journal
+.data/

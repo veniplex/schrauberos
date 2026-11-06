@@ -8,9 +8,12 @@ import { requirePermission } from "@/server/auth/session";
 import { getI18n } from "@/i18n/server";
 import type { ActionState } from "@/components/ui/form";
 import { fieldErrors, formObject } from "@/lib/forms";
-import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent } from "@/modules/office/invoices/domain";
+import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, invoiceFileLocation } from "@/modules/office/invoices/domain";
 import { parseMoneyToCents } from "@/lib/money";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
+import { storeFile } from "@/server/files";
+import { removeInvoiceFile, syncInvoiceFile } from "./files";
 
 function refresh(id?: string) {
   for (const p of ["/invoices", "/"]) revalidatePath(p);
@@ -22,6 +25,7 @@ const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 const schema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   direction: z.enum(INVOICE_DIRECTIONS),
   number: z.string().trim().min(1).max(60),
   partyName: z.string().trim().min(1).max(120),
@@ -99,18 +103,40 @@ export async function saveInvoice(_prev: ActionState, formData: FormData): Promi
     notes: d.notes ?? null,
   };
 
-  const id = await db.$transaction(async (tx) => {
-    const saved = d.id ? await tx.invoice.update({ where: { id: d.id }, data }) : await tx.invoice.create({ data });
-    if (formData.get("removeFile") === "on" && !upload) await tx.invoiceFile.deleteMany({ where: { invoiceId: saved.id } });
-    if (upload) {
-      await tx.invoiceFile.upsert({
-        where: { invoiceId: saved.id },
-        update: { ...upload, uploadedAt: new Date() },
-        create: { invoiceId: saved.id, ...upload },
-      });
-    }
-    return saved.id;
-  });
+  // Der Beleg kommt als normale Datei in den Dateispeicher (lesbarer Pfad), in der Datenbank steht nur der Pfad.
+  const location = upload ? invoiceFileLocation({ direction: d.direction, issueDate: data.issueDate, number: d.number, partyName: d.partyName }, upload.mime) : null;
+  const stored = upload && location ? await storeFile(location.dir, location.name, upload.data) : null;
+  let replacedPath: string | null = null;
+  let id: string | null;
+  try {
+    id = await db.$transaction(async (tx) => {
+      if (d.id && !(await claimed(d.version, (stamp, next) => tx.invoice.updateMany({ where: { id: d.id, updatedAt: stamp }, data: { updatedAt: next } })))) return null;
+      const saved = d.id ? await tx.invoice.update({ where: { id: d.id }, data }) : await tx.invoice.create({ data });
+      const existing = await tx.invoiceFile.findUnique({ where: { invoiceId: saved.id } });
+      if (formData.get("removeFile") === "on" && !upload && existing) {
+        await tx.invoiceFile.delete({ where: { invoiceId: saved.id } });
+        replacedPath = existing.path;
+      }
+      if (upload && stored) {
+        await tx.invoiceFile.upsert({
+          where: { invoiceId: saved.id },
+          update: { name: upload.name, mime: upload.mime, size: upload.size, path: stored, uploadedAt: new Date() },
+          create: { invoiceId: saved.id, name: upload.name, mime: upload.mime, size: upload.size, path: stored },
+        });
+        replacedPath = existing?.path ?? null;
+      }
+      return saved.id;
+    });
+  } catch (error) {
+    if (stored) await removeInvoiceFile(stored).catch(() => undefined);
+    throw error;
+  }
+  if (!id) {
+    if (stored) await removeInvoiceFile(stored).catch(() => undefined);
+    return { error: t("common.conflict") };
+  }
+  if (replacedPath) await removeInvoiceFile(replacedPath).catch((e) => console.error("[invoices] Alter Beleg konnte nicht gelöscht werden:", e));
+  await syncInvoiceFile(id).catch((e) => console.error("[invoices] Beleg konnte nicht umbenannt werden:", e));
   refresh(id);
   redirect(`/invoices/${id}`);
 }
@@ -135,8 +161,9 @@ export async function reopenInvoice(formData: FormData) {
 export async function deleteInvoice(formData: FormData) {
   await requirePermission("invoices.delete");
   const id = String(formData.get("id") ?? "");
-  const inv = id ? await db.invoice.findUnique({ where: { id }, select: { direction: true, number: true } }) : null;
+  const inv = id ? await db.invoice.findUnique({ where: { id }, select: { direction: true, number: true, file: { select: { path: true } } } }) : null;
   if (id) await db.invoice.deleteMany({ where: { id } });
+  if (inv?.file) await removeInvoiceFile(inv.file.path).catch((e) => console.error("[invoices] Beleg konnte nicht gelöscht werden:", e));
   if (inv) await audit("invoice.delete", { target: inv.number, entityId: id });
   refresh();
   redirect(`/invoices?dir=${inv?.direction ?? "incoming"}`);

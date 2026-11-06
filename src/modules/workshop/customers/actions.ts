@@ -10,9 +10,11 @@ import type { ActionState } from "@/components/ui/form";
 import { fieldErrors, formObject } from "@/lib/forms";
 import { audit } from "@/server/audit";
 import { customerDisplayName } from "./domain";
+import { claimed } from "@/lib/concurrency";
 
 const customerSchema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   customerNumber: z.string().max(40).optional(),
   firstName: z.string().max(80).optional(),
   lastName: z.string().max(120).optional(),
@@ -47,6 +49,7 @@ export async function saveCustomer(_prev: ActionState, formData: FormData): Prom
     city: d.city ?? null,
     notes: d.notes ?? null,
   };
+  if (id && !(await claimed(d.version, (stamp, next) => db.customer.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
   const saved = id
     ? await db.customer.update({ where: { id }, data })
     : await db.customer.create({ data });

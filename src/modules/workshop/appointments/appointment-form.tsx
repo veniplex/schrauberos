@@ -12,6 +12,8 @@ import { deleteAppointment, saveAppointment } from "./actions";
 
 export type AppointmentFormInitial = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   title: string;
   typeId: string;
   bayId: string;
@@ -64,7 +66,12 @@ export function AppointmentForm({
   return (
     <div className="flex flex-col gap-5">
       <form action={action} className="flex flex-col gap-4">
-        {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+        {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
         <input type="hidden" name="returnTo" value={returnTo} />
         {initial.tireSet ? <input type="hidden" name="tireSetId" value={initial.tireSet.id} /> : null}
 

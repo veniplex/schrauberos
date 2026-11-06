@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/server/db";
+import { removeFile, storeFile } from "@/server/files";
 import { getSession } from "@/server/auth/session";
 import { DOC_IMAGE_MAX_BYTES, DOC_IMAGE_TYPES, DOC_PERMISSIONS, isDocArea } from "@/capabilities/docs/areas";
 
@@ -16,8 +17,15 @@ export async function POST(request: NextRequest) {
   if (!(DOC_IMAGE_TYPES as readonly string[]).includes(file.type)) return NextResponse.json({ error: "type" }, { status: 415 });
   if (file.size === 0 || file.size > DOC_IMAGE_MAX_BYTES) return NextResponse.json({ error: "size" }, { status: 413 });
 
-  const image = await db.docImage.create({
-    data: { area, name: file.name.slice(0, 120), mime: file.type, size: file.size, data: new Uint8Array(await file.arrayBuffer()) },
-  });
-  return NextResponse.json({ id: image.id, url: `/api/docs/images/${image.id}` });
+  // Als normale Datei ablegen (doku/<bereich>/<Name>.<Endung>), in der Datenbank steht nur der Pfad
+  // Die Endung richtet sich nach dem geprüften Typ, nicht nach dem hochgeladenen Namen
+  const ext = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" }[file.type] ?? "img";
+  const path = await storeFile(`doku/${area}`, `${file.name.replace(/\.[^.]*$/, "") || "bild"}.${ext}`, new Uint8Array(await file.arrayBuffer()));
+  try {
+    const image = await db.docImage.create({ data: { area, name: file.name.slice(0, 120), mime: file.type, size: file.size, path } });
+    return NextResponse.json({ id: image.id, url: `/api/docs/images/${image.id}` });
+  } catch (error) {
+    await removeFile(path).catch(() => undefined);
+    throw error;
+  }
 }

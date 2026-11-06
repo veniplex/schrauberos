@@ -13,6 +13,9 @@ export const auditDe = {
   count_other: "{count} Einträge",
   page: "Seite {page} von {pages}",
   groups: {
+    backup: "Backups",
+    setup: "Einrichtung",
+    system: "System",
     auth: "Anmeldung",
     account: "Konto",
     user: "Benutzer",
@@ -30,6 +33,20 @@ export const auditDe = {
     docs: "Dokumentation",
   },
   actions: {
+    backup: {
+      create: "Backup erstellt",
+      delete: "Backup gelöscht",
+      download: "Backup heruntergeladen",
+      restore: "Backup wiederhergestellt",
+      upload: "Backup hochgeladen",
+    },
+    setup: {
+      complete: "Ersteinrichtung abgeschlossen",
+    },
+    system: {
+      update: "Update installiert",
+      updateFailed: "Update fehlgeschlagen",
+    },
     auth: {
       login: "Angemeldet",
       loginFailed: "Anmeldung fehlgeschlagen",

@@ -11,8 +11,9 @@ import { usersEn } from "./modules/users.en";
 import { rolesEn } from "./modules/roles.en";
 import { networkEn } from "./modules/network.en";
 import { modulesEn } from "./modules/admin-modules.en";
-import { handbookEn } from "./modules/handbook.en";
 import { auditEn } from "./modules/audit.en";
+import { updatesEn } from "./modules/updates.en";
+import { backupEn } from "./modules/backup.en";
 
 export const en: Messages = {
   docs: docsEn,
@@ -21,8 +22,10 @@ export const en: Messages = {
   employees: employeesEn,
   modules: modulesEn,
   audit: auditEn,
-  handbook: handbookEn,
+  updates: updatesEn,
+  backup: backupEn,
   common: {
+    conflict: "This record has been changed by someone else in the meantime. Please reload the page and make your change again – nothing was overwritten.",
     sortOrder: "Order",
     save: "Save",
     saved: "Saved.",
@@ -48,8 +51,10 @@ export const en: Messages = {
   },
   nav: {
     modules: "Modules & features",
+    backup: "Backups",
+    updates: "Updates",
     audit: "Audit log",
-    handbook: "Handbook",
+    help: "Help",
     main: "Main navigation",
     menu: "Open menu",
     administration: "Administration",
@@ -80,6 +85,25 @@ export const en: Messages = {
     office: "Office",
     it: "IT & network",
     admin: "Administration",
+  },
+  help: {
+    title: "Help",
+    description: "How the application works – step by step for all areas.",
+    contents: "Chapters",
+    onThisPage: "On this page",
+  },
+  setup: {
+    title: "Initial setup",
+    intro: "Welcome! Two minutes and the application is ready to use.",
+    workshopName: "Workshop name",
+    timezone: "Time zone",
+    timezoneHint: "Appointments are shown and entered in this time zone.",
+    adminTitle: "Administrator account",
+    demo: "Start with sample data",
+    demoHint: "Creates sample customers, vehicles, appointments etc. for trying things out (only sensible for a test).",
+    submit: "Finish setup",
+    warning: "Please complete the setup before the application is reachable from outside: whoever opens it first becomes administrator.",
+    errors: { notReady: "The application is not ready yet. Please try again in a moment." },
   },
   auth: {
     signIn: "Sign in",
@@ -130,9 +154,10 @@ export const en: Messages = {
     fleet: "Fleet",
     docsOffice: "Office documentation",
     docsIt: "IT documentation",
+    backup: "Backups",
+    updates: "Updates",
     audit: "Audit log",
     modules: "Modules & features",
-    handbook: "Handbook",
   },
   permissions: {
     appointments: {
@@ -203,11 +228,14 @@ export const en: Messages = {
     audit: {
       view: "View the audit log",
     },
+    updates: {
+      manage: "Install updates",
+    },
+    backup: {
+      manage: "Manage and restore backups",
+    },
     modules: {
       manage: "Switch modules and features on/off",
-    },
-    handbook: {
-      view: "Read the handbook",
     },
   },
   network: networkEn,
@@ -229,6 +257,9 @@ export const en: Messages = {
       name: "Workshop name",
       tagline: "Tagline",
       website: "Website",
+      timezoneTitle: "Time zone",
+      timezone: "Workshop time zone",
+      timezoneHint: "Appointments are shown and entered in this time zone. The change applies immediately.",
       branding: "Appearance",
       logo: "Logo",
       logoHint: "PNG, JPEG, WebP or SVG, max. 200 KB.",

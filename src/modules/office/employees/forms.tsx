@@ -11,6 +11,8 @@ import { saveAbsence, saveEmployee, saveQualification } from "./actions";
 
 export type EmployeeFormInitial = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   firstName: string;
   lastName: string;
   personnelNumber: string;
@@ -46,7 +48,12 @@ export function EmployeeForm({
   const err = state.fieldErrors ?? {};
   return (
     <form action={action} className="flex max-w-4xl flex-col gap-5">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
 
       <Card title={t("employees.sections.person")}>
         <div className="grid gap-4 sm:grid-cols-2">

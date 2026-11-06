@@ -11,6 +11,7 @@ import { fieldErrors, formObject, safeReturn } from "@/lib/forms";
 import { DEVICE_STATUSES, DEVICE_TYPES, IP_KINDS } from "@/modules/it/network/constants";
 import { formatIPv4, ipInCidr, normalizeMac, parseCidr, parseIPv4 } from "@/modules/it/network/domain";
 import { audit } from "@/server/audit";
+import { claimed } from "@/lib/concurrency";
 
 function refresh(...extra: string[]) {
   for (const p of ["/network", "/network/devices", "/network/ip", "/network/cabling", "/", ...extra]) revalidatePath(p);
@@ -22,6 +23,7 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
 
 const deviceSchema = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   name: z.string().trim().min(1).max(80),
   type: z.enum(DEVICE_TYPES),
   status: z.enum(DEVICE_STATUSES).default("active"),
@@ -60,6 +62,7 @@ export async function saveDevice(_prev: ActionState, formData: FormData): Promis
     monitorEnabled: formData.get("monitorEnabled") === "on",
     notes: d.notes ?? null,
   };
+  if (id && !(await claimed(d.version, (stamp, next) => db.netDevice.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
   const saved = id ? await db.netDevice.update({ where: { id }, data }) : await db.netDevice.create({ data });
 
   refresh();

@@ -11,6 +11,8 @@ import { addCost, addMileage, saveFleetVehicle, saveLicenseCheck } from "./actio
 
 export type FleetFormInitial = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   plate: string;
   make: string;
   model: string;
@@ -40,7 +42,12 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
   const err = state.fieldErrors ?? {};
   return (
     <form action={action} className="flex max-w-4xl flex-col gap-5">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
 
       <Card title={t("fleet.sections.vehicle")}>
         <div className="grid gap-4 sm:grid-cols-3">

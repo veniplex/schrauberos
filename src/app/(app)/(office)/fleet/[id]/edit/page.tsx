@@ -8,6 +8,7 @@ import { centsToInput } from "@/lib/money";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { FleetForm } from "@/modules/office/fleet/forms";
+import { versionOf } from "@/lib/concurrency";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -32,6 +33,7 @@ export default async function EditFleetVehiclePage({ params }: { params: Promise
         drivers={employees.map((e) => ({ id: e.id, name: employeeName(e) }))}
         initial={{
           id: v.id,
+          version: versionOf(v),
           plate: v.plate,
           make: v.make ?? "",
           model: v.model ?? "",

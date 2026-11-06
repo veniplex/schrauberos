@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Wrench } from "lucide-react";
 import { getI18n } from "@/i18n/server";
+import { db } from "@/server/db";
 import { getWorkshop } from "@/server/workshop";
 import { LoginForm } from "./login-form";
 
@@ -10,6 +12,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  // Frische Installation: erst den Administrator einrichten
+  if ((await db.user.count()) === 0) redirect("/setup");
   const [{ t }, workshop, { next }] = await Promise.all([getI18n(), getWorkshop(), searchParams]);
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
