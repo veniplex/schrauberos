@@ -16,8 +16,12 @@ Dazu die Plattform: Anmeldung, Rechte, **Hilfe** für alle Benutzer, Deutsch/Eng
 ## Zwei Arten von Dokumentation
 
 * **Anwendungsdokumentation** (für die Nutzer): in der App unter **Hilfe**, für alle angemeldeten Benutzer sichtbar. Sie
-  beschreibt nur, was man in der Anwendung tut. Die Quellen sind Markdown-Dateien in [`docs/`](docs) (`NN-name.md`; die erste
-  `# Überschrift` ist der Kapitelname). Neue Kapitel = neue Datei, sonst ist nichts zu tun.
+  beschreibt nur, was man in der Anwendung tut. Die Quellen sind Markdown-Dateien in [`docs/`](docs) (die erste
+  `# Überschrift` ist der Kapitelname), **gegliedert nach Modulen**:
+  * `docs/platform/NN-name.md`: allgemeine Kapitel („Allgemein“), immer sichtbar – neue Datei genügt.
+  * `docs/<modul>/<funktion>.md`: Kapitel einer Funktion. Jede Funktion meldet ihre Kapitel selbst an (`help.ts`, siehe unten) –
+    sie erscheinen unter dem Modul der Funktion und **verschwinden, wenn die Funktion ausgeschaltet ist** oder die Anmeldung das
+    Recht nicht hat. Der Test `src/modules/help.test.ts` verhindert verwaiste Dateien und kaputte Verweise.
 * **Entwicklerdokumentation:** diese README.
 
 ## Inhalt dieser README
@@ -89,7 +93,7 @@ src/
   server/ components/ i18n/ lib/   Plattform
   launcher/               Launcher (siehe unten)
 docker/                   Starter (bootstrap.c) und BASE_VERSION
-docs/                     Anwendungsdokumentation (Hilfe in der App)
+docs/                     Anwendungsdokumentation (Hilfe in der App): platform/, <modul>/<funktion>.md
 prisma/                   schema.prisma, migrations/, seed.ts (nur Entwicklung)
 ```
 
@@ -233,6 +237,9 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
    Action ebenfalls.**
 6. Optional: `widgets.tsx` (`export const widgets: WidgetDef[]`) und `settings-tab.tsx` (`export const settingsTabs`), beides in
    `registry.ts` eintragen.
+   **Hilfe:** `help.ts` (`export const help: HelpTopicDef[]` mit `id`, `feature`, `permission`, `doc`), Kapitel als Markdown unter
+   `docs/workshop/warranty.md` (nur Bedienung in der App, kein Entwicklerthema), `help.ts` in **`src/modules/help.ts`** eintragen.
+   Eine Funktion darf mehrere Kapitel beitragen (`id` dann mit Zusatz, z. B. `workshop.warranty.claims`).
 7. Soll eine andere Funktion etwas nutzen, exportiert `public.ts` genau das – und die andere deklariert `requires`/`uses`.
 8. Neue Rechte in `default-roles.ts` den passenden Rollen zuordnen (Administratoren haben sie sofort).
 9. Bearbeiten-Formulare: `version` mitschicken und in der Action `claimed(...)` nutzen (siehe oben); Dateien nur über `files.ts`;

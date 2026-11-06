@@ -16,6 +16,19 @@ export type WidgetDef = {
   Component: ServerComponent;
 };
 
+/**
+ * Hilfe-Thema einer Funktion: eine Markdown-Datei unter `docs/` (ohne `.md`, z. B. "workshop/tires").
+ * Erscheint in der Hilfe unter dem Modul der Funktion – nur, wenn die Funktion aktiv ist und das Recht vorliegt.
+ */
+export type HelpTopicDef = {
+  /** Adresse in der Hilfe (`/help/<id>`), eindeutig; üblich: die Funktions-ID, bei mehreren Themen mit Zusatz */
+  id: string;
+  feature: FeatureId;
+  /** Wer die Funktion nutzen darf, bekommt auch ihre Hilfe (Recht muss zur Funktion gehören) */
+  permission: Permission;
+  doc: string;
+};
+
 /** Reiter auf der Einstellungsseite: jede Funktion bringt ihre eigenen Einstellungen selbst mit. */
 export type SettingsTabDef = {
   id: string;

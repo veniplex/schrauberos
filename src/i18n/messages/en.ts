@@ -91,6 +91,10 @@ export const en: Messages = {
     description: "How the application works – step by step for all areas.",
     contents: "Chapters",
     onThisPage: "On this page",
+    general: "General",
+    searchPlaceholder: "Search the help …",
+    results: "Search results",
+    noResults: "No help chapters match.",
   },
   setup: {
     title: "Initial setup",

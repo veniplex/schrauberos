@@ -1,7 +1,7 @@
 import type { MessageKey } from "@/i18n/translate";
 
 /**
- * Begriffe (siehe docs/ARCHITECTURE.md):
+ * Begriffe (siehe README.md, Abschnitt Architektur):
  *  - Plattform:  immer an, kennt keine Fachlogik (Login, Rechte-Engine, Layout, DB, i18n, UI-Kit).
  *  - Modul:      fachlicher Bereich (Werkstatt, Büro, IT, Verwaltung); als Ganzes ein-/ausschaltbar.
  *  - Funktion:   abgegrenzter Teil eines Moduls (Termine, Reifenlager, Rechnungen …); einzeln schaltbar.

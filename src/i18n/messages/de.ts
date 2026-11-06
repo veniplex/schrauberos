@@ -91,6 +91,10 @@ export const de = {
     description: "So funktioniert die Anwendung – Schritt für Schritt für alle Bereiche.",
     contents: "Kapitel",
     onThisPage: "Auf dieser Seite",
+    general: "Allgemein",
+    searchPlaceholder: "In der Hilfe suchen …",
+    results: "Suchergebnisse",
+    noResults: "Dazu gibt es keine Hilfe-Kapitel.",
   },
   setup: {
     title: "Ersteinrichtung",

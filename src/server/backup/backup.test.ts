@@ -15,6 +15,7 @@ import { importBackupFile, readDatabaseArchive, RestoreError, stageRestore, vali
 const data = mkdtempSync(path.join(tmpdir(), "so-backup-"));
 process.env.DATA_DIR = data;
 const dbFile = path.join(data, "live.db");
+process.env.DATABASE_URL = `file:${dbFile}`; // stageRestore sichert den Ist-Stand der „laufenden“ Datenbank
 after(() => rmSync(data, { recursive: true, force: true }));
 
 const codeOf = async (fn: () => unknown) => {

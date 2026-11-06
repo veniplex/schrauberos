@@ -1,6 +1,7 @@
-# IT & Netzwerk
+# Netzwerk
 
 Dieser Bereich dokumentiert das Firmennetz und ist für die IT-Administration gedacht. **Zugangsdaten werden bewusst nicht gespeichert.**
+
 
 ## Geräte
 

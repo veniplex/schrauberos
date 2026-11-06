@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getI18n } from "@/i18n/server";
+import { helpFor } from "@/modules/help";
 import { requireSession } from "@/server/auth/session";
 import { HelpView } from "@/platform/help/view";
 
@@ -8,8 +9,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("help.title") };
 }
 
-/** Hilfe: für alle angemeldeten Benutzer (Plattform, kein Recht nötig). */
-export default async function HelpPage() {
-  await requireSession();
-  return <HelpView />;
+/** Hilfe: für alle angemeldeten Benutzer (Plattform, kein Recht nötig); die Kapitel der Funktionen nur bei aktiver Funktion und Recht. */
+export default async function HelpPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const session = await requireSession();
+  const { q } = await searchParams;
+  return <HelpView groups={helpFor(session)} query={q} />;
 }

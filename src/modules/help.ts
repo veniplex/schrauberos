@@ -1,0 +1,73 @@
+import type { MessageKey } from "@/i18n/translate";
+import { FEATURES, MODULES, fullFeatureId, type ModuleId, type Permission } from "./catalog";
+import type { HelpTopicDef } from "./types";
+
+import { help as appointments } from "./workshop/appointments/help";
+import { help as tires } from "./workshop/tires/help";
+import { help as customers } from "./workshop/customers/help";
+import { help as vehicles } from "./workshop/vehicles/help";
+import { help as workshopDocs } from "./workshop/docs/help";
+import { help as invoices } from "./office/invoices/help";
+import { help as employees } from "./office/employees/help";
+import { help as fleet } from "./office/fleet/help";
+import { help as officeDocs } from "./office/docs/help";
+import { help as network } from "./it/network/help";
+import { help as itDocs } from "./it/docs/help";
+import { help as users } from "./admin/users/help";
+import { help as roles } from "./admin/roles/help";
+import { help as settings } from "./admin/settings/help";
+import { help as modules } from "./admin/modules/help";
+import { help as backup } from "./admin/backup/help";
+import { help as updates } from "./admin/updates/help";
+import { help as audit } from "./admin/audit/help";
+
+/**
+ * Composition Root der Hilfe: hier werden die Themen aller Funktionen eingesammelt (angezeigt wird in der Reihenfolge
+ * der Funktionen, `order` im Katalog). Neue Funktion mit Hilfe: `help.ts` anlegen, Zeile ergänzen, Markdown-Datei unter `docs/` ablegen.
+ */
+export const ALL_HELP_TOPICS: readonly HelpTopicDef[] = [
+  ...appointments,
+  ...tires,
+  ...customers,
+  ...vehicles,
+  ...workshopDocs,
+  ...invoices,
+  ...employees,
+  ...fleet,
+  ...officeDocs,
+  ...network,
+  ...itDocs,
+  ...users,
+  ...roles,
+  ...settings,
+  ...modules,
+  ...backup,
+  ...updates,
+  ...audit,
+];
+
+export type HelpTopic = { id: string; doc: string };
+export type HelpGroup = { module: ModuleId; nameKey: MessageKey; topics: HelpTopic[] };
+
+/** Was die Hilfe von der Anmeldung braucht (`AppSession` erfüllt das). */
+type HelpAccess = { features: ReadonlySet<string>; can: (permission: Permission) => boolean };
+
+const featureOrder = (id: string) => FEATURES.find((f) => fullFeatureId(f) === id)?.order ?? 0;
+
+/**
+ * Die Hilfe-Themen, die diese Anmeldung sehen darf, nach Modulen gegliedert (Reihenfolge wie in der Navigation).
+ * Themen ausgeschalteter Funktionen oder ohne Recht fehlen, Module ohne Themen ebenso.
+ */
+export function helpFor(session: HelpAccess): HelpGroup[] {
+  const visible = ALL_HELP_TOPICS.filter((t) => session.features.has(t.feature) && session.can(t.permission)).sort(
+    (a, b) => featureOrder(a.feature) - featureOrder(b.feature),
+  );
+  return [...MODULES]
+    .sort((a, b) => a.order - b.order)
+    .map((m) => ({
+      module: m.id,
+      nameKey: m.nameKey,
+      topics: visible.filter((t) => t.feature.startsWith(`${m.id}.`)).map(({ id, doc }) => ({ id, doc })),
+    }))
+    .filter((g) => g.topics.length > 0);
+}
