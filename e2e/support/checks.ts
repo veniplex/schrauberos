@@ -95,11 +95,23 @@ export function findSmallInputFont(page: Page, min = 16): Promise<string[]> {
   }, min);
 }
 
-/** Wartet, bis Layout und Farben (nach einem Wechsel von Hell/Dunkel, Schriften, Animationen) zur Ruhe gekommen sind – sonst messen axe und Co. Zwischenzustände. */
+/**
+ * Wartet, bis Layout und Farben (nach einem Wechsel von Hell/Dunkel, Schriften, Animationen) zur Ruhe gekommen sind – sonst messen axe und Co. Zwischenzustände.
+ * Statt einer festen Wartezeit: Schriften, zwei Frames, dann alle laufenden Animationen und Übergänge (höchstens eine Sekunde; Endlosanimationen enden nie).
+ */
 export async function settle(page: Page) {
   await page.evaluate(() => document.fonts.ready);
-  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-  await page.waitForTimeout(250);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            const running = Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
+            void Promise.race([running, new Promise((done) => setTimeout(done, 1000))]).then(() => requestAnimationFrame(() => resolve()));
+          }),
+        );
+      }),
+  );
 }
 
 /** axe-core (WCAG 2 A/AA): Kennungen der verletzten Regeln. */

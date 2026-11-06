@@ -1,6 +1,7 @@
 import { expect, type TestInfo } from "@playwright/test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { Baseline } from "./baseline-merge";
 import { BASELINE_DIR, FOUND_DIR, UPDATE_BASELINE } from "./env";
 
 /**
@@ -9,7 +10,6 @@ import { BASELINE_DIR, FOUND_DIR, UPDATE_BASELINE } from "./env";
  * Ein Lauf schlägt fehl, wenn ein Verstoß NEU ist (nicht in der Liste) – und ebenso, wenn die Liste Einträge enthält, die es nicht
  * mehr gibt (die Liste soll mit jedem Paket schrumpfen). `E2E_UPDATE_BASELINE=1` schreibt die Liste aus den gefundenen Werten neu.
  */
-export type Baseline = Record<string, Record<string, Record<string, string[]>>>;
 export const BASELINE_FILE = path.join(BASELINE_DIR, "known-violations.json");
 
 let cached: Baseline | null = null;

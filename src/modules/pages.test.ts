@@ -53,8 +53,9 @@ describe("Routen-Inventur (Seitenlisten der Funktionen)", () => {
   });
 
   it("jede Seite unter src/app (Anwendungsrahmen) ist gemeldet – keine Seite fehlt in der Inventur", () => {
-    // Außerhalb der Inventur: die Ersteinrichtung (nur vor dem ersten Benutzer erreichbar, eigener Test)
-    const exempt = new Set(["/setup"]);
+    // Außerhalb der Inventur: die Ersteinrichtung (nur vor dem ersten Benutzer erreichbar, eigener Test) und die Testseiten der Browser-CI
+    // für absichtliche Fehlerzustände (nur mit SCHRAUBEROS_E2E=1 erreichbar, sonst 404; geprüft in e2e/tests/states.spec.ts)
+    const exempt = new Set(["/setup", "/e2e-state/[state]", "/e2e-fault/[state]"]);
     const unlisted = disk.map((d) => d.route).filter((r) => !claimed.has(r) && !exempt.has(r));
     assert.deepEqual(unlisted, [], "Diese Seiten fehlen in einer pages.ts (oder PLATFORM_PAGES)");
   });

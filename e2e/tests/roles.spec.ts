@@ -1,6 +1,7 @@
 import { expect, test, request } from "@playwright/test";
 import { DEFAULT_ROLES } from "../../src/modules/default-roles";
 import { BASE_URL, ROLE_KEYS, authFile } from "../support/env";
+import { looksLikeErrorPage } from "../support/page-checks";
 import { loadInventory } from "../support/inventory";
 
 /**
@@ -14,9 +15,11 @@ import { loadInventory } from "../support/inventory";
 const entries = loadInventory().filter((e) => !e.public && e.kind !== "modal");
 const permissionsOf = (role: string) => new Set<string>(DEFAULT_ROLES.find((r) => r.key === role)?.permissions ?? []);
 
-type Outcome = "sichtbar" | "gesperrt" | "nicht gefunden";
+// "gesperrt" = Weiterleitung auf /forbidden („Kein Zugriff“), nicht „nicht gefunden“
+type Outcome = "sichtbar" | "gesperrt" | "nicht gefunden" | "Fehlerseite";
 function outcomeOf(status: number, body: string): Outcome {
   if (status >= 300 && status < 400) return "gesperrt"; // klassische Weiterleitung
+  if (status >= 500 || looksLikeErrorPage(body)) return "Fehlerseite"; // nie ein erwartetes Ergebnis, auch nicht für gesperrte Seiten
   if (/<meta[^>]*id="__next-page-redirect"[^>]*\/forbidden|<meta[^>]*\/forbidden[^>]*id="__next-page-redirect"/.test(body)) return "gesperrt";
   if (status === 404 || /<meta name="robots" content="noindex"\/?>/.test(body)) return "nicht gefunden";
   return "sichtbar";

@@ -4,6 +4,9 @@ import path from "node:path";
 export const ROOT = process.cwd();
 export const PORT = Number(process.env.E2E_PORT ?? 3100);
 export const BASE_URL = `http://127.0.0.1:${PORT}`;
+/** TLS-Proxy mit selbstsigniertem Zertifikat vor der App (e2e/tests/https.spec.ts) */
+export const HTTPS_PORT = PORT + 1;
+export const HTTPS_URL = `https://127.0.0.1:${HTTPS_PORT}`;
 export const DATA_DIR = path.join(ROOT, ".e2e-data");
 export const DB_FILE = path.join(DATA_DIR, "schrauberos.db");
 export const AUTH_DIR = path.join(ROOT, "e2e", ".auth");

@@ -19,8 +19,12 @@ export type InventoryEntry = {
   screenshot: boolean;
 };
 
-function lookup(db: Database.Database, param: PageParam): string | null {
+/** Platzhalter, wenn es noch keine Datenbank gibt (`playwright test --list` ohne laufende App): nur die Namen der Tests werden gebraucht. */
+const PLACEHOLDER_ID = "0";
+
+function lookup(db: Database.Database | null, param: PageParam): string | null {
   if ("value" in param) return param.value;
+  if (!db) return PLACEHOLDER_ID;
   const column = param.column ?? "id";
   const row = db.prepare(`SELECT "${column}" AS v FROM "${param.table}"${param.where ? ` WHERE ${param.where}` : ""} ORDER BY "${column}" LIMIT 1`).get() as { v: string } | undefined;
   return row?.v ?? null;
@@ -31,8 +35,8 @@ function lookup(db: Database.Database, param: PageParam): string | null {
  * mit IDs aus dem Demo-Seed. Fehlt eine Seed-Zeile, bricht die Inventur ab – die Seed-Daten müssen jede Seite abdecken.
  */
 export function loadInventory(): InventoryEntry[] {
-  if (!existsSync(DB_FILE)) throw new Error(`Datenbank ${DB_FILE} fehlt – die App wird von der Playwright-Konfiguration gestartet und eingerichtet.`);
-  const db = new Database(DB_FILE, { readonly: true });
+  // Ohne Datenbank (nur Auflisten, `--list`) gelten Platzhalter-IDs; in einem echten Lauf stehen App und Demo-Daten vor dem Laden der Tests bereit
+  const db = existsSync(DB_FILE) ? new Database(DB_FILE, { readonly: true }) : null;
   try {
     const entries: InventoryEntry[] = [];
     const add = (
@@ -54,6 +58,6 @@ export function loadInventory(): InventoryEntry[] {
     for (const page of PLATFORM_PAGES) add(page, { permission: null, public: page.public ?? false, feature: null });
     return entries;
   } finally {
-    db.close();
+    db?.close();
   }
 }
