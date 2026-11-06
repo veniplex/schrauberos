@@ -2,9 +2,8 @@
 
 import { z } from "zod";
 import { formObject } from "@/lib/forms";
-import { revokeDevices } from "@/server/auth/devices";
 import { hashPassword, MAX_PASSWORD_CHARS, MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from "@/server/auth/password";
-import { revokeSessions } from "@/server/auth/session";
+import { revokeAccess } from "@/server/auth/revoke";
 import { loginThrottle } from "@/server/auth/throttle";
 import { db } from "@/server/db";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
@@ -69,14 +68,11 @@ const changePasswordOperation = defineOperation({
     if (input.next === input.current) failField("next", "account.errors.sameAsOld");
     return { passwordHash: await hashPassword(input.next), wasForced: user.mustChangePassword };
   },
-  run: async ({ principal, prepared, tx, audit, afterCommit }) => {
+  run: async ({ principal, prepared, tx, audit }) => {
     await tx.user.update({ where: { id: principal.user.id }, data: { passwordHash: prepared.passwordHash, mustChangePassword: false } });
     audit({ target: principal.user.username, entityId: principal.user.id });
-    // Alle anderen Geräte abmelden
-    afterCommit(async () => {
-      await revokeSessions(principal.user.id, true);
-      await revokeDevices(principal.user.id, true);
-    });
+    // Alle anderen Geräte abmelden und die API-Tokens des Kontos widerrufen – in derselben Transaktion
+    await revokeAccess(tx, principal.user.id, { exceptCurrent: true });
     return { wasForced: prepared.wasForced };
   },
 });

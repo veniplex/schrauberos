@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { getAuthProvider } from "./providers";
 import { QueueFullError, verifyPassword } from "./password";
@@ -204,8 +205,14 @@ async function recordSuccess(userId: string, resetCounters: boolean): Promise<vo
 
 /** Wartezeit eines Kontos aufheben (Administration): Zähler in Datenbank und Speicher zurücksetzen. */
 export async function resetAccountThrottle(userId: string): Promise<void> {
-  const user = await db.user.update({ where: { id: userId }, data: { failedLogins: 0, lockedUntil: null }, select: { username: true } });
-  loginThrottle.accounts.reset(normalizeUsername(user.username));
+  let username: string | null = null;
+  await db.$transaction(async (tx) => {
+    const current = await tx.user.findUnique({ where: { id: userId }, select: { username: true, updatedAt: true } });
+    if (!current) return;
+    username = current.username;
+    await tx.user.update({ where: { id: userId }, data: { failedLogins: 0, lockedUntil: null, updatedAt: current.updatedAt } }); // `updatedAt` bleibt (Formular-Version)
+  });
+  if (username) loginThrottle.accounts.reset(normalizeUsername(username));
 }
 
 async function startSession(userId: string) {
@@ -237,14 +244,17 @@ export async function logout() {
   if (secure && jar.has(SESSION_COOKIE)) jar.set(SESSION_COOKIE, "", clearingAttributes(false));
 }
 
-/** Alle Sessions eines Benutzers beenden (z. B. nach Passwortänderung/Deaktivierung). */
-export async function revokeSessions(userId: string, exceptCurrent = false) {
+/**
+ * Alle Sessions eines Benutzers beenden (z. B. nach Passwortänderung/Deaktivierung). Innerhalb einer Operation immer mit `client = tx` (gleiche Transaktion
+ * wie die Passwortänderung – sonst bliebe nach einem Fehler dazwischen die alte Sitzung gültig); `revokeAccess` (`revoke.ts`) fasst Sitzungen, Geräte und Tokens zusammen.
+ */
+export async function revokeSessions(userId: string, exceptCurrent = false, client: Pick<PrismaClient | Prisma.TransactionClient, "session"> = db) {
   let keep: string | undefined;
   if (exceptCurrent) {
     const token = await currentSessionToken();
     keep = token ? sha256(token) : undefined;
   }
-  await db.session.deleteMany({ where: { userId, ...(keep ? { NOT: { tokenHash: keep } } : {}) } });
+  await client.session.deleteMany({ where: { userId, ...(keep ? { NOT: { tokenHash: keep } } : {}) } });
 }
 
 /** Aktuelle Sitzung inkl. effektiver Berechtigungen (pro Request gecacht). */

@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { cookieAttributes, deviceCookieName, isSecureRequest, readDeviceToken as pickDeviceToken } from "@/lib/session-cookie";
 import { authRuntime } from "./runtime";
@@ -66,8 +67,8 @@ export async function rememberDevice(userId: string, presented?: { token: string
 }
 
 /** Alle bekannten Geräte eines Kontos vergessen (nach Passwortänderung/Deaktivierung durch die Administration); `exceptCurrent`: das eigene behalten. */
-export async function revokeDevices(userId: string, exceptCurrent = false): Promise<void> {
+export async function revokeDevices(userId: string, exceptCurrent = false, client: Pick<PrismaClient | Prisma.TransactionClient, "knownDevice"> = db): Promise<void> {
   const token = exceptCurrent ? await readDeviceToken() : undefined;
   const keep = token ? sha256(token) : undefined;
-  await db.knownDevice.deleteMany({ where: { userId, ...(keep ? { NOT: { tokenHash: keep } } : {}) } });
+  await client.knownDevice.deleteMany({ where: { userId, ...(keep ? { NOT: { tokenHash: keep } } : {}) } });
 }

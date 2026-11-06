@@ -5,9 +5,8 @@ import type { MessageKey } from "@/i18n/translate";
 import { formObject } from "@/lib/forms";
 import { claimRow } from "@/lib/concurrency";
 import { checkGrantRole, checkManageUser, type Denial } from "@/lib/rbac";
-import { revokeDevices } from "@/server/auth/devices";
 import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
-import { revokeSessions } from "@/server/auth/session";
+import { revokeAccess } from "@/server/auth/revoke";
 import { loginThrottle, normalizeUsername } from "@/server/auth/throttle";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { loadActor, loadRoles, toRights } from "@/server/rbac/hierarchy";
@@ -55,7 +54,7 @@ const saveUserOperation = defineOperation({
   audit: (input) => (input.id ? "user.update" : "user.create"),
   // aufwendig, deshalb vor der Transaktion
   prepare: async ({ input }) => ({ passwordHash: input.password ? await hashPassword(input.password) : undefined }),
-  run: async ({ input: d, principal, prepared, tx, audit, afterCommit }) => {
+  run: async ({ input: d, principal, prepared, tx, audit }) => {
     // Prüfen und Schreiben gehören zusammen: Rechte-Hierarchie, Schutz des letzten Administrators und Speichern in einer Transaktion
     const actor = await loadActor(tx, principal.user.id);
     const roles = await loadRoles(tx, d.roleIds);
@@ -100,13 +99,9 @@ const saveUserOperation = defineOperation({
     }
     audit({ target: d.username, entityId: userId });
 
-    // Passwort geändert oder deaktiviert -> bestehende Sitzungen beenden
-    if (d.id && (d.password || !d.active)) {
-      afterCommit(async () => {
-        await revokeSessions(d.id!, d.id === principal.user.id);
-        await revokeDevices(d.id!, d.id === principal.user.id);
-      });
-    }
+    // Passwort geändert oder deaktiviert -> Sitzungen, bekannte Geräte und API-Tokens beenden – in derselben Transaktion (kein Zustand dazwischen,
+    // kein verschlucktes Fehlschlagen nach dem Commit)
+    if (d.id && (d.password || !d.active)) await revokeAccess(tx, d.id, { exceptCurrent: d.id === principal.user.id });
     return { userId };
   },
 });
@@ -135,7 +130,8 @@ const unlockUserOperation = defineOperation({
     if (!user) fail("notFound");
     const denied = checkManageUser(await loadActor(tx, principal.user.id), user.roles.map((r) => toRights(r.role)));
     if (denied) fail("forbidden", deniedKey(denied));
-    await tx.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
+    // Ohne `updatedAt` zu ändern (das Benutzerformular nutzt es als Version; wie die Anmeldezähler in `updateLoginState`)
+    await tx.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, updatedAt: user.updatedAt } });
     afterCommit(() => loginThrottle.accounts.reset(normalizeUsername(user.username)));
     audit({ target: user.username, entityId: user.id });
     return { id: user.id };

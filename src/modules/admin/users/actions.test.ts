@@ -186,6 +186,13 @@ describe("unlockUser – Rechte-Hierarchie", () => {
     assert.equal(entry.entityId, basic.id);
   });
 
+  it("ändert die Version (updatedAt) des Kontos nicht: ein geöffnetes Benutzerformular meldet danach keinen Konflikt", async () => {
+    await lock(basic);
+    const before = (await env.db.user.findUniqueOrThrow({ where: { id: basic.id } })).updatedAt.getTime();
+    await redirectOf(() => actions.unlockUser(form({ id: basic.id })));
+    assert.equal((await env.db.user.findUniqueOrThrow({ where: { id: basic.id } })).updatedAt.getTime(), before);
+  });
+
   it("lässt die Wartezeit eines mächtigeren Kontos und eines Administrator-Kontos stehen", async () => {
     await lock(victim);
     await lock(admin2);

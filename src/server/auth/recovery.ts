@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { bytesToDataChars, formatRecoveryCode, parseRecoveryCode } from "@/lib/recovery-code";
 import { db } from "@/server/db";
 import { hashPassword } from "./password";
+import { revokeAccess } from "./revoke";
 import { authRuntime } from "./runtime";
 import { loginThrottle, normalizeUsername } from "./throttle";
 
@@ -138,8 +139,8 @@ async function attempt(input: RedeemInput): Promise<RedeemResult> {
     const used = await tx.recoveryCode.deleteMany({ where: { id: found.id, codeHash: found.codeHash } });
     if (used.count !== 1) throw new Invalid();
     await tx.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false, failedLogins: 0, lockedUntil: null } });
-    await tx.session.deleteMany({ where: { userId: user.id } }); // alle Sitzungen des Kontos enden, kein automatisches Anmelden
-    await tx.knownDevice.deleteMany({ where: { userId: user.id } }); // Zugang verloren: auch die bekannten Geräte gelten nicht mehr
+    // Zugang verloren: alle Sitzungen enden (kein automatisches Anmelden), bekannte Geräte gelten nicht mehr und API-Tokens des Kontos werden widerrufen
+    await revokeAccess(tx, user.id);
     await resetSecondFactor(tx, user.id);
     await tx.recoveryNotice.create({ data: { userId: user.id, userName: user.name } });
     return replaceRecoveryCode(tx, user.id);
