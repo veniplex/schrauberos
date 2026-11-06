@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
@@ -132,6 +132,26 @@ describe("Migrations-Läufer: fremde Migrationshistorie (alte Volumes)", () => {
   it("verweigert eine Historie ohne unsere Baseline (fremde Namen) und Tabellen ganz ohne Historie", async () => {
     await assert.rejects(runMigrations(oldVolume("fremd.db", [{ name: "20260101000000_init", checksum: "d".repeat(64) }])), foreign);
     await assert.rejects(runMigrations(oldVolume("ohne-historie.db", [])), foreign);
+  });
+
+  it("fasst eine fremde Datenbank byteweise nicht an: kein WAL-Modus, keine neue Tabelle, keine Nebendateien", async () => {
+    // Eine fremde Datenbank im WAL-Modus (wie jede Datenbank dieser App), ohne Migrationstabelle, mit Daten
+    const lonely = path.join(root, "fremd-wal.db");
+    const db = new Database(lonely);
+    db.pragma("journal_mode = WAL");
+    db.exec(`CREATE TABLE "Kunde" ("id" TEXT PRIMARY KEY); INSERT INTO "Kunde" VALUES ('alt');`);
+    db.close();
+    const history = oldVolume("fremd-historie.db", [{ name: "20260101000000_init", checksum: "d".repeat(64) }]);
+    for (const file of [lonely, history]) {
+      const before = readFileSync(file);
+      const filesBefore = readdirSync(root).sort();
+      await assert.rejects(runMigrations(file), foreign);
+      assert.ok(readFileSync(file).equals(before), `${path.basename(file)} wurde verändert`);
+      assert.deepEqual(readdirSync(root).sort(), filesBefore, "es dürfen keine Nebendateien (-wal, -shm) entstehen");
+    }
+    const check = new Database(lonely, { readonly: true });
+    assert.equal((check.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE name = '_prisma_migrations'`).get() as { n: number }).n, 0);
+    check.close();
   });
 
   it("nimmt unsere eigene Baseline samt unbekannter neuerer Migrationen an (Rückfall auf eine ältere Version)", async () => {

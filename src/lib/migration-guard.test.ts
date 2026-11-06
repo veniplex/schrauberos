@@ -75,6 +75,81 @@ describe("Migrations-Wächter: Regeln", () => {
   });
 });
 
+describe("Migrations-Wächter: Umgehungsversuche (R2A-3)", () => {
+  it("Unique-Index mit IF NOT EXISTS, Schema-Präfix, anderer Schreibweise und eckigen Klammern", () => {
+    for (const sql of [
+      `CREATE UNIQUE INDEX IF NOT EXISTS "Customer_email_key" ON "Customer"("email");`,
+      `CREATE UNIQUE INDEX "Customer_email_key" ON main."Customer"("email");`,
+      `CREATE UNIQUE INDEX "Customer_email_key" ON "main"."Customer"("email");`,
+      `CREATE UNIQUE INDEX main."Customer_email_key" ON main.Customer(email);`,
+      `CREATE UNIQUE INDEX Customer_email_key ON customer(email);`, // Tabellennamen sind unabhängig von der Schreibweise
+      `CREATE UNIQUE INDEX [Customer_email_key] ON [Customer]([email]);`,
+      `CREATE UNIQUE INDEX "x" ON "Customer"("email") WHERE "email" IS NOT NULL;`,
+      `CREATE UNIQUE INDEX "x" ON "Customer"(lower("email"));`,
+    ]) {
+      assert.deepEqual(rulesOf(sql), ["unique"], sql);
+    }
+  });
+
+  it("Blockkommentar vor oder mitten in einer verbotenen Anweisung", () => {
+    assert.deepEqual(rulesOf(`/* harmlos */ DROP TABLE "Customer";`), ["drop"]);
+    assert.deepEqual(rulesOf(`/* a
+b */
+DROP /* x */ TABLE "Customer";`), ["drop"]);
+    assert.deepEqual(rulesOf(`/*! DROP TABLE "Customer"; */ DELETE FROM "Customer";`), ["data-change"]);
+    // ein Kommentar, der Verbotenes nur erwähnt, ist harmlos – und ein nie geschlossener verschluckt den Rest, statt etwas zu verstecken
+    assert.deepEqual(rulesOf(`/* DROP TABLE "Customer"; */ CREATE INDEX "i" ON "Customer"("a");`), []);
+    assert.deepEqual(rulesOf(`CREATE INDEX "i" ON "Customer"("a"); /* DROP TABLE "Customer";`), []);
+  });
+
+  it("ADD und DROP ohne das Wort COLUMN", () => {
+    assert.deepEqual(rulesOf(`ALTER TABLE "Customer" DROP "name";`), ["drop"]);
+    assert.deepEqual(rulesOf(`ALTER TABLE main."Customer" DROP COLUMN "name";`), ["drop"]);
+    assert.deepEqual(rulesOf(`ALTER TABLE "Customer" ADD "x" TEXT NOT NULL;`), ["not-null"]);
+    assert.deepEqual(rulesOf(`ALTER TABLE "Customer" ADD "x" TEXT NOT NULL DEFAULT NULL;`), ["not-null"]);
+    assert.deepEqual(rulesOf(`ALTER TABLE "Customer" ADD "x" TEXT NOT NULL DEFAULT 'a';`), []);
+    assert.deepEqual(rulesOf(`-- guard:allow unique: Eindeutiger Schlüssel, nullable
+ALTER TABLE "Customer" ADD "key" TEXT;
+CREATE UNIQUE INDEX "k" ON "Customer"("key");`), []);
+  });
+
+  it("DELETE/UPDATE in einem Trigger, über WITH und als Upsert", () => {
+    const trigger = `CREATE TRIGGER "t" AFTER INSERT ON "Customer" BEGIN UPDATE "Customer" SET "name" = 'x' WHERE "id" = NEW."id"; DELETE FROM "Vehicle"; END;`;
+    assert.deepEqual(rulesOf(trigger), ["trigger"]);
+    assert.deepEqual(rulesOf(`CREATE TEMP TRIGGER "t" AFTER INSERT ON "Customer" BEGIN SELECT 1; END;`), ["trigger"]);
+    assert.deepEqual(rulesOf(`-- guard:allow trigger: Protokoll der Einfügungen, nur lesend
+${trigger}`), []);
+    // der Rumpf bleibt eine Anweisung: danach geht es normal weiter
+    assert.deepEqual(rulesOf(`${trigger}
+DROP TABLE "Customer";`), ["trigger", "drop"]);
+    assert.deepEqual(rulesOf(`WITH x AS (SELECT 1) DELETE FROM "Customer" WHERE "id" IN (SELECT * FROM x);`), ["data-change"]);
+    assert.deepEqual(rulesOf(`INSERT INTO "Customer" ("id") VALUES ('1') ON CONFLICT("id") DO UPDATE SET "id" = 'x';`), ["data-change"]);
+    assert.deepEqual(rulesOf(`INSERT INTO "Customer" ("id") VALUES ('1') ON CONFLICT("id") DO NOTHING;`), []);
+  });
+
+  it("PRAGMA, ATTACH, DETACH und VACUUM brauchen eine begründete Ausnahme", () => {
+    for (const sql of [`PRAGMA writable_schema = ON;`, `PRAGMA foreign_keys=OFF;`, `ATTACH DATABASE 'x.db' AS x;`, `DETACH DATABASE x;`, `VACUUM;`]) {
+      assert.deepEqual(rulesOf(sql), ["pragma"], sql);
+      assert.deepEqual(rulesOf(`-- guard:allow pragma: Einmalig nötig für den Umbau
+${sql}`), [], sql);
+    }
+  });
+
+  it("Schlüsselwörter in Zeichenketten und Bezeichnern lösen keinen Fehlalarm aus", () => {
+    assert.deepEqual(rulesOf(`INSERT INTO "Setting" ("key", "value") VALUES ('RENAME', 'DROP TABLE x');`), []);
+    assert.deepEqual(rulesOf(`ALTER TABLE "Customer" ADD COLUMN "rename" TEXT;`), []);
+    assert.deepEqual(rulesOf(`ALTER TABLE "Customer" ADD COLUMN "note" TEXT DEFAULT 'UPDATE and DELETE FROM';`), []);
+    assert.deepEqual(rulesOf(`INSERT INTO "Setting" ("key") VALUES ('a;b');
+CREATE INDEX "i" ON "Customer"("a");`), []);
+  });
+
+  it("zerlegt Anweisungen mit Kommentaren in Zeichenketten und Trigger richtig", () => {
+    assert.deepEqual(statementsOf(`A /* x; y */ B; 'a -- b'; C -- Rest
+;`), ["A   B", "'a -- b'", "C"]);
+    assert.equal(statementsOf(`CREATE TRIGGER t AFTER INSERT ON x BEGIN UPDATE y SET a = CASE WHEN 1 THEN 2 END; SELECT 1; END; SELECT 2;`).length, 2);
+  });
+});
+
 describe("Migrations-Wächter: echte Migrationen", () => {
   const dir = path.join(process.cwd(), "prisma", "migrations");
   const names = readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
@@ -102,11 +177,5 @@ describe("Migrations-Wächter: echte Migrationen", () => {
     const tables = new Set(tablesCreatedBy(readFileSync(path.join(dir, BASELINE_NAME, "migration.sql"), "utf8")));
     const bad = checkMigration(`ALTER TABLE "User" RENAME TO "Benutzer";`, tables);
     assert.deepEqual(bad.map((v) => v.rule), ["rename"]);
-  });
-
-  it("db:baseline und db:check kennen den Marker", () => {
-    const script = readFileSync(path.join(process.cwd(), "scripts", "db-baseline.mjs"), "utf8");
-    assert.ok(script.includes(`"${BASELINE_MARKER}"`));
-    assert.ok(script.includes(`"${BASELINE_NAME}"`) || script.includes(BASELINE_NAME));
   });
 });

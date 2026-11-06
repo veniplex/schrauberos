@@ -19,6 +19,8 @@
     "test": "tsx --test \"src/**/*.test.ts\"",
     "db:baseline": "node scripts/db-baseline.mjs",
     "db:check": "node scripts/db-check.mjs",
+    "db:freeze": "tsx scripts/db-freeze.ts freeze",
+    "db:release-check": "tsx scripts/db-freeze.ts check-release",
     "e2e": "playwright test",
     "e2e:build": "npm run build && playwright test"
   },

@@ -1,22 +1,28 @@
 // Erzeugt aus prisma/schema.prisma genau EINE Baseline-Migration (00000000000000_baseline) neu und ersetzt dabei alle bisherigen
 // Migrationsordner. Gilt nur, solange die Baseline nicht veröffentlicht ist (erste Zeile "-- schrauberos:baseline unreleased"):
 //   npm run db:baseline      nach jeder Schema-Änderung dieses Releases (danach: npm run db:fresh)
-// Mit der Veröffentlichung wird die Baseline auf "frozen" gesetzt (Release-Block); ab dann verweigert dieses Skript die Arbeit und
+// Mit der Veröffentlichung wird die Baseline mit `npm run db:freeze` auf "frozen sha256:…" gesetzt; ab dann verweigert dieses Skript die Arbeit und
 // Schema-Änderungen laufen über `npm run db:migrate -- <name>` (nur additiv, vom Wächter src/lib/migration-guard.ts geprüft).
+// Es verweigert die Arbeit auch, wenn die vorhandene Baseline keinen Marker trägt (von Hand verändert oder fremd): dann nichts überschreiben.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const migrations = resolve(root, "prisma/migrations");
+// MIGRATIONS_DIR: nur für Tests (anderer Ordner)
+const migrations = process.env.MIGRATIONS_DIR ? resolve(process.env.MIGRATIONS_DIR) : resolve(root, "prisma/migrations");
 const BASELINE = "00000000000000_baseline";
 const MARKER = "-- schrauberos:baseline";
 const file = resolve(migrations, BASELINE, "migration.sql");
 
 if (existsSync(file)) {
   const first = readFileSync(file, "utf8").split(/\r?\n/, 1)[0];
-  if (first.startsWith(MARKER) && first.includes("frozen")) {
+  if (!first.startsWith(MARKER)) {
+    console.error(`Die vorhandene Baseline trägt keinen Marker "${MARKER} unreleased" in der ersten Zeile – sie wird nicht überschrieben. Bitte prüfen (Git-Verlauf), nicht von Hand ändern.`);
+    process.exit(1);
+  }
+  if (!/^unreleased/.test(first.slice(MARKER.length).trim())) {
     console.error("Die Baseline ist veröffentlicht (frozen) und wird nie neu erzeugt. Schema-Änderung: npm run db:migrate -- <name>");
     process.exit(1);
   }

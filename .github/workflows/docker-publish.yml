@@ -59,6 +59,12 @@ jobs:
       - run: npm test
       - name: Schema und Migrationen stimmen überein (Drift-Check)
         run: npm run db:check
+      # Versions-Tag: Baseline und Migrationen müssen eingefroren sein (npm run db:freeze) und seit dem letzten eingefrorenen Release unverändert bleiben
+      - name: Migrationen eingefroren und seit dem letzten Release unverändert
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git fetch --tags --force --unshallow || git fetch --tags --force
+          npm run db:release-check -- --tag "$GITHUB_REF_NAME"
 
   e2e:
     name: Browser-Tests (Playwright)

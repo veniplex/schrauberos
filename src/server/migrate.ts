@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { BASELINE_NAME } from "../lib/migration-guard";
 
@@ -78,6 +78,29 @@ function hasUserTables(db: Database.Database): boolean {
   return (db.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '_prisma_migrations'`).get() as { n: number }).n > 0;
 }
 
+/**
+ * Liest den Stand einer bestehenden Datenbank **ausschließlich lesend** (kein Journal-Modus, keine Tabelle, keine Nebendateien).
+ * `null`, wenn es die Datei noch nicht gibt.
+ */
+function inspectDatabase(dbFile: string): { applied: Map<string, string>; hasUserTables: boolean } | null {
+  if (!existsSync(dbFile)) return null;
+  // Auch ein lesender Zugriff auf eine Datenbank im WAL-Modus legt -wal/-shm an; was es vorher nicht gab, räumen wir danach wieder weg
+  const sidecars = ["-wal", "-shm"].map((suffix) => dbFile + suffix).filter((file) => !existsSync(file));
+  const db = new Database(dbFile, { readonly: true, fileMustExist: true });
+  try {
+    const hasHistory = (db.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = '_prisma_migrations'`).get() as { n: number }).n > 0;
+    const applied = new Map(
+      hasHistory
+        ? (db.prepare(`SELECT migration_name AS name, checksum FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`).all() as { name: string; checksum: string }[]).map((r) => [r.name, r.checksum] as const)
+        : [],
+    );
+    return { applied, hasUserTables: hasUserTables(db) };
+  } finally {
+    db.close();
+    for (const file of sidecars) rmSync(file, { force: true });
+  }
+}
+
 const timestamp = () => new Date().toISOString().replace("T", " ").replace("Z", "");
 
 /**
@@ -85,8 +108,21 @@ const timestamp = () => new Date().toISOString().replace("T", " ").replace("Z", 
  * eine Sicherungskopie), aber nur, wenn tatsächlich etwas anzuwenden ist.
  */
 export async function runMigrations(dbFile: string, dir = migrationsDir(), beforeApply?: (pending: string[]) => Promise<void> | void): Promise<string[]> {
-  mkdirSync(path.dirname(dbFile), { recursive: true });
   const files = listMigrations(dir);
+  // Erst nur lesen und prüfen: Eine fremde Datenbank wird nie angefasst (kein WAL-Modus, keine neue Tabelle, keine neuen Dateien).
+  const inspected = inspectDatabase(dbFile);
+  const baseline = files.find((f) => f.name === BASELINE_NAME);
+  // Fremde Historie: Die Datenbank hat eine Historie, die nicht mit unserer Baseline beginnt (andere Prüfsumme/Namen, z. B. 0.1.0),
+  // oder Tabellen ganz ohne Historie. Unbekannte NEUERE Migrationen bleiben erlaubt (Rückfall auf eine ältere Version).
+  if (inspected && baseline) {
+    if (inspected.applied.size > 0 ? inspected.applied.get(BASELINE_NAME) !== baseline.checksum : inspected.hasUserTables) throw new MigrationError("foreignHistory", REINSTALL_MESSAGE);
+  }
+  for (const f of files) {
+    const known = inspected?.applied.get(f.name);
+    if (known && known !== f.checksum) throw new MigrationError("changed", `Die bereits angewendete Migration ${f.name} wurde verändert.`);
+  }
+
+  mkdirSync(path.dirname(dbFile), { recursive: true });
   const db = new Database(dbFile);
   try {
     db.pragma("journal_mode = WAL");
@@ -96,16 +132,6 @@ export async function runMigrations(dbFile: string, dir = migrationsDir(), befor
     const applied = new Map(
       (db.prepare(`SELECT migration_name AS name, checksum FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`).all() as { name: string; checksum: string }[]).map((r) => [r.name, r.checksum]),
     );
-    // Fremde Historie: Die Datenbank hat eine Historie, die nicht mit unserer Baseline beginnt (andere Prüfsumme/Namen, z. B. 0.1.0),
-    // oder Tabellen ganz ohne Historie. Unbekannte NEUERE Migrationen bleiben erlaubt (Rückfall auf eine ältere Version).
-    const baseline = files.find((f) => f.name === BASELINE_NAME);
-    if (baseline) {
-      if (applied.size > 0 ? applied.get(BASELINE_NAME) !== baseline.checksum : hasUserTables(db)) throw new MigrationError("foreignHistory", REINSTALL_MESSAGE);
-    }
-    for (const f of files) {
-      const known = applied.get(f.name);
-      if (known && known !== f.checksum) throw new MigrationError("changed", `Die bereits angewendete Migration ${f.name} wurde verändert.`);
-    }
     const pending = files.filter((f) => !applied.has(f.name));
     if (pending.length === 0) return [];
 
