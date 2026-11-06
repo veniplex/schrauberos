@@ -79,6 +79,10 @@ function ownerOf(rel: string): string | null {
 
 const files = walk(SRC);
 
+/** `defineOperation(...)` bzw. `defineOperation<...>(...)` (Aufruf, nicht Import/Definition) und der Rumpf bis `});` am Zeilenanfang. */
+const OPERATION_CALL = /^(?:export\s+)?(?:const|let|var)\s+\w+(?:\s*:[^=]+)?\s*=\s*defineOperation\s*(?:<[^(]*>)?\s*\(/gm;
+const OPERATION_BODY = /defineOperation\s*(?:<[^(]*>)?\s*\(\{([\s\S]*?)\n\}\)/g;
+
 describe("Architektur", () => {
   it("Plattform-Code importiert keine einzelne Funktion", () => {
     const platform = /^(server|components|i18n|lib|platform|capabilities)\//;
@@ -210,7 +214,7 @@ describe("Aktions-Rahmen", () => {
     for (const file of files) {
       const source = readFileSync(file, "utf8");
       if (rel(file).startsWith("server/operations/")) continue;
-      for (const m of source.matchAll(/defineOperation\(\{([\s\S]*?)\n\}\);/g)) {
+      for (const m of source.matchAll(OPERATION_BODY)) {
         const body = m[1];
         const name = /name:\s*"([^"]+)"/.exec(body)?.[1] ?? "?";
         // Recht als Zeichenkette oder als benannte Konstante (GROSSBUCHSTABEN, z. B. bei eingabeabhängigem Recht mit `permissionFor`)
@@ -221,6 +225,41 @@ describe("Aktions-Rahmen", () => {
       }
     }
     assert.deepEqual(violations, []);
+  });
+});
+
+describe("Operationen: Namen und Erkennung", () => {
+  const rel = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
+  const sources = files.filter((f) => !rel(f).startsWith("server/operations/")).map((f) => ({ file: rel(f), source: readFileSync(f, "utf8") }));
+
+  it("jeder Aufruf von defineOperation wird von den Mustern der Architekturtests erkannt (auch mit Typargumenten) – keiner entgeht der Prüfung", () => {
+    const missed: string[] = [];
+    for (const { file, source } of sources) {
+      const calls = [...source.matchAll(OPERATION_CALL)].length;
+      const bodies = [...source.matchAll(OPERATION_BODY)].length;
+      if (calls !== bodies) missed.push(`${file}: ${calls} Aufrufe, ${bodies} erkannt`);
+    }
+    assert.deepEqual(missed, []);
+  });
+
+  it("Operationsnamen sind eindeutig (sie sind Schlüssel für Hooks, Matrix, API-Zuordnung und Protokoll; die Registry überschriebe sonst still)", () => {
+    const seen = new Map<string, string>();
+    const duplicates: string[] = [];
+    for (const { file, source } of sources) {
+      for (const m of source.matchAll(OPERATION_BODY)) {
+        const name = /name:\s*"([^"]+)"/.exec(m[1])?.[1];
+        if (!name) continue;
+        if (seen.has(name)) duplicates.push(`${name}: ${seen.get(name)} und ${file}`);
+        else seen.set(name, file);
+      }
+    }
+    assert.ok(seen.size > 50, `nur ${seen.size} Operationen gefunden`);
+    assert.deepEqual(duplicates, []);
+  });
+
+  it("kein Modul heißt wie eine Datei im Modulordner (api, catalog, registry …): sonst würde featureTarget() seine Funktionen übersehen", () => {
+    const clashes = [...new Set(FEATURES.map((f) => f.module))].filter((module) => MODULE_ROOT_FILES.has(module));
+    assert.deepEqual(clashes, []);
   });
 });
 
