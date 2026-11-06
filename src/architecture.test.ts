@@ -143,3 +143,92 @@ describe("Architektur", () => {
     assert.deepEqual(violations, []);
   });
 });
+
+/**
+ * Aktions-Rahmen (README, „Aktionen und Operationen“): Jede schreibende Server Action läuft über `defineAction(defineOperation(...))`.
+ * Dateien mit `"use server"`, die noch eigene `export async function`s haben, stehen mit Begründung in dieser Liste. Sie darf nur
+ * schrumpfen: Ein Eintrag, der nichts mehr verletzt, bricht den Test (dann bitte streichen).
+ */
+const LEGACY_ACTION_FILES: Record<string, string> = {
+  "app/login/actions.ts": "Anmeldung/Abmeldung vor der Sitzung: eigener Drosselungspfad (Anmeldung), kein Recht prüfbar",
+  "app/login/recover/actions.ts": "Notzugang vor der Sitzung: eigener Pfad ohne Konto-Drosselung",
+  "app/setup/actions.ts": "Ersteinrichtung vor dem ersten Benutzer: Einrichtungs-Token statt Recht",
+  "platform/account/actions.ts": "Plattform (Konto): folgt mit der Umstellung der übrigen Bereiche",
+  "platform/account/recovery-actions.ts": "Plattform (Notzugang im Konto): folgt mit der Umstellung der übrigen Bereiche",
+  "platform/account/recovery-banner.tsx": "Plattform (Hinweisleiste mit Inline-Aktion): folgt mit der Umstellung der übrigen Bereiche",
+  "server/actions/preferences.ts": "Persönliche Einstellungen (Sprache, Design): folgt mit der Umstellung der übrigen Bereiche",
+  "capabilities/docs/actions.ts": "Dokumentation (docs): folgt mit der Umstellung der übrigen Funktionen",
+  "modules/it/network/actions.ts": "Netzwerk: folgt mit der Umstellung der übrigen Funktionen",
+  "modules/office/employees/actions.ts": "Mitarbeiter: folgt mit der Umstellung der übrigen Funktionen",
+  "modules/office/fleet/actions.ts": "Fuhrpark: folgt mit der Umstellung der übrigen Funktionen",
+  "modules/workshop/appointments/actions.ts": "Termine: folgt mit der Umstellung der übrigen Funktionen",
+  "modules/workshop/tires/actions.ts": "Reifenlager: folgt mit der Umstellung der übrigen Funktionen",
+};
+
+/** Verstöße einer Datei mit `"use server"`: alles, was exportiert wird, aber nicht mit `defineAction(` erzeugt ist, sowie Inline-Aktionen. */
+function actionViolations(source: string): string[] {
+  const found: string[] = [];
+  for (const m of source.matchAll(/^export\s+(?:async\s+)?function\s+(\w+)/gm)) found.push(`export function ${m[1]}`);
+  for (const m of source.matchAll(/^export\s+(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=(?!\s*defineAction\()/gm)) found.push(`export ${m[1]} ohne defineAction`);
+  if (/^export\s+default\b/m.test(source)) found.push("export default");
+  for (const m of source.matchAll(/^export\s*\{[^}]*\}(?:\s*from)?/gm)) found.push(`Re-Export ${m[0].slice(0, 40)}`);
+  // Inline-Aktionen in Komponenten: die Direktive steht in einem Funktionsrumpf (eingerückt)
+  if (/^[ \t]+["']use server["']/m.test(source)) found.push("Inline-Aktion (use server im Funktionsrumpf)");
+  return found;
+}
+
+describe("Aktions-Rahmen", () => {
+  const hasDirective = (source: string) => /^[ \t]*["']use server["'];?[ \t]*$/m.test(source);
+  const actionFiles = files.filter((file) => hasDirective(readFileSync(file, "utf8")));
+  const rel = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
+
+  it("jede schreibende Server Action benutzt den Rahmen (defineAction)", () => {
+    const violations: string[] = [];
+    for (const file of actionFiles) {
+      const name = rel(file);
+      if (name in LEGACY_ACTION_FILES) continue;
+      for (const v of actionViolations(readFileSync(file, "utf8"))) violations.push(`${name}: ${v}`);
+    }
+    assert.deepEqual(violations, []);
+  });
+
+  it("die Liste der Altlasten schrumpft nur: jeder Eintrag verletzt die Regel noch und die Datei existiert", () => {
+    const stale: string[] = [];
+    for (const [name, reason] of Object.entries(LEGACY_ACTION_FILES)) {
+      const file = files.find((f) => rel(f) === name);
+      if (!file) stale.push(`${name}: Datei existiert nicht mehr`);
+      else if (actionViolations(readFileSync(file, "utf8")).length === 0) stale.push(`${name}: erfüllt die Regel schon – bitte aus LEGACY_ACTION_FILES streichen`);
+      assert.ok(reason.length > 10, `${name}: Begründung fehlt`);
+    }
+    assert.deepEqual(stale, []);
+  });
+
+  it("umgestellte Aktionsdateien kennen weder redirect noch Flash noch Cookies: run bleibt transportneutral", () => {
+    const violations: string[] = [];
+    for (const file of files) {
+      const source = readFileSync(file, "utf8");
+      if (!/\bdefineOperation\(/.test(source) || rel(file).startsWith("server/operations/")) continue;
+      for (const imp of importsOf(file)) {
+        if (/^next\/(navigation|cache|headers)$/.test(imp.spec) || /operations\/flash$/.test(imp.spec)) violations.push(`${rel(file)}:${imp.line} importiert ${imp.spec}`);
+      }
+    }
+    assert.deepEqual(violations, []);
+  });
+
+  it("jede Operation nennt Recht, Eingabe und Audit (oder begründet den Verzicht)", () => {
+    const violations: string[] = [];
+    for (const file of files) {
+      const source = readFileSync(file, "utf8");
+      if (rel(file).startsWith("server/operations/")) continue;
+      for (const m of source.matchAll(/defineOperation\(\{([\s\S]*?)\n\}\);/g)) {
+        const body = m[1];
+        const name = /name:\s*"([^"]+)"/.exec(body)?.[1] ?? "?";
+        if (!/\bpermission:\s*"/.test(body)) violations.push(`${rel(file)}: ${name} ohne permission`);
+        if (!/\binput:/.test(body)) violations.push(`${rel(file)}: ${name} ohne input`);
+        if (!/\baudit:/.test(body)) violations.push(`${rel(file)}: ${name} ohne audit`);
+        if (/\baudit:\s*false/.test(body) && !/\bauditReason:\s*"[^"]{10,}/.test(body)) violations.push(`${rel(file)}: ${name} verzichtet auf Audit ohne Begründung`);
+      }
+    }
+    assert.deepEqual(violations, []);
+  });
+});
