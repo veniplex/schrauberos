@@ -269,7 +269,7 @@ export const en: Messages = {
     security: {
       title: "Sign-in & network",
       behindProxy: "The application runs behind a reverse proxy",
-      behindProxyHint: "Only then does sign-in read the client address from the X-Forwarded-For header and additionally limit failed attempts per address. Without a proxy leave this off – the header could be forged otherwise. The proxy must append the client address as the last entry (nginx: proxy_add_x_forwarded_for).",
+      behindProxyHint: "Turn this on only if a reverse proxy really sits in front that appends the client address as the last X-Forwarded-For entry (nginx: proxy_add_x_forwarded_for). Sign-in then additionally limits failed attempts per address. Without a real proxy anyone can forge the address in the header and get other people's addresses blocked. Even with a proxy: if many devices share one address (office network behind NAT), the limit hits all of them together – administrators included, except on devices they have signed in from before. When in doubt, leave it off.",
     },
     errors: {
       hoursInvalid: "Please enter valid times (end after start).",

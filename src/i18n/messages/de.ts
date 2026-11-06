@@ -269,7 +269,7 @@ export const de = {
     security: {
       title: "Anmeldung & Netzwerk",
       behindProxy: "Die Anwendung läuft hinter einem Reverse-Proxy",
-      behindProxyHint: "Nur dann wertet die Anmeldung die Client-Adresse aus dem Header X-Forwarded-For aus und begrenzt Fehlversuche zusätzlich je Adresse. Ohne Proxy bleibt die Option aus – der Header ließe sich sonst fälschen. Der Proxy muss die Adresse des Clients als letzten Eintrag anhängen (bei nginx: proxy_add_x_forwarded_for).",
+      behindProxyHint: "Nur einschalten, wenn wirklich ein Reverse-Proxy davorsteht, der die Adresse des Clients als letzten Eintrag von X-Forwarded-For anhängt (nginx: proxy_add_x_forwarded_for). Dann begrenzt die Anmeldung Fehlversuche zusätzlich je Adresse. Ohne echten Proxy kann jeder die Adresse im Header vortäuschen und damit fremde Adressen sperren lassen. Auch mit Proxy gilt: Teilen sich viele Geräte eine Adresse (Büro-Netz hinter NAT), trifft die Begrenzung alle gemeinsam – auch Administratoren, außer auf Geräten, mit denen sie sich schon einmal angemeldet haben. Im Zweifel ausgeschaltet lassen.",
     },
     errors: {
       hoursInvalid: "Bitte gültige Zeiten angeben (Ende nach Beginn).",
