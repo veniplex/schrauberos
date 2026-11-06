@@ -4,6 +4,7 @@ import { LocaleSwitch, ThemeSwitch } from "@/components/shell/switches";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { requireSession } from "@/server/auth/session";
 import { PasswordForm, ProfileForm } from "@/platform/account/forms";
+import { FieldHint, FieldLabel } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -32,13 +33,13 @@ export default async function AccountPage() {
             <Card title={t("account.appearance")}>
               <div className="flex flex-col gap-4">
                 <div>
-                  <p className="field-label">{t("preferences.language")}</p>
+                  <FieldLabel>{t("preferences.language")}</FieldLabel>
                   <LocaleSwitch current={locale} />
                 </div>
                 <div>
-                  <p className="field-label">{t("preferences.theme")}</p>
+                  <FieldLabel>{t("preferences.theme")}</FieldLabel>
                   <ThemeSwitch current={theme} />
-                  <p className="field-hint">{t("preferences.themeHint")}</p>
+                  <FieldHint>{t("preferences.themeHint")}</FieldHint>
                 </div>
               </div>
             </Card>

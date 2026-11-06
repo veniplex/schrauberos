@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
 import { ShieldCheck, Trash2 } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
-import { ConfirmSubmitButton } from "@/components/ui/buttons";
+import { Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { todayInput } from "@/lib/dates";
@@ -62,8 +62,7 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
         {rows.length === 0 ? (
           <EmptyState title={t("fleet.noDrivers")} hint={t("fleet.noDriversHint")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="table min-w-[44rem]">
+          <Table className="min-w-[44rem]">
               <thead>
                 <tr>
                   <th>{t("fleet.fields.driver")}</th>
@@ -97,16 +96,15 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
                     </td>
                     {canEdit ? (
                       <td className="text-right">
-                        <Link href={`/fleet/licenses?check=${d.id}`} className="btn btn-secondary btn-sm">
+                        <LinkButton size="sm" href={`/fleet/licenses?check=${d.id}`}>
                           <ShieldCheck className="size-3.5" aria-hidden /> {t("fleet.checkNow")}
-                        </Link>
+                        </LinkButton>
                       </td>
                     ) : null}
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
         )}
       </Card>
 

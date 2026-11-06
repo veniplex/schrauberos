@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
-import { Badge, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Plus } from "lucide-react";
+import { Badge, Card, EmptyState, FilterBar, PageHeader, Plate, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
@@ -9,6 +9,7 @@ import { normalizePlate } from "@/lib/plate";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
+import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -59,21 +60,15 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         }
       />
 
-      <form method="get" className="mb-5 flex max-w-2xl flex-wrap gap-3">
-        <div className="relative min-w-60 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <input name="q" defaultValue={q} className="input pl-9" placeholder={t("vehicles.searchList")} aria-label={t("common.search")} />
-        </div>
-        <select name="owner" defaultValue={noOwnerOnly ? "none" : ""} className="input w-48" aria-label={t("vehicles.fields.owner")}>
+      <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_12rem_auto]" submitLabel={t("common.filter")}>
+        <SearchInput name="q" defaultValue={q} placeholder={t("vehicles.searchList")} aria-label={t("common.search")} />
+        <Select name="owner" defaultValue={noOwnerOnly ? "none" : ""} aria-label={t("vehicles.fields.owner")}>
           <option value="">{t("vehicles.filters.anyOwner")}</option>
           <option value="none">{t("vehicles.filters.noOwner")}</option>
-        </select>
-        <button type="submit" className="btn btn-secondary">
-          {t("common.filter")}
-        </button>
-      </form>
+        </Select>
+      </FilterBar>
 
-      <section className="card overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         {vehicles.length === 0 ? (
           <EmptyState title={t("vehicles.listEmpty")} hint={q ? t("common.noResults") : t("vehicles.listEmptyHint")} />
         ) : (
@@ -82,8 +77,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
               {tp("vehicles.count", total)}
               {total > LIMIT ? ` · ${t("common.limited", { limit: LIMIT })}` : ""}
             </p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[44rem]">
+            <Table className="min-w-[44rem]">
                 <thead>
                   <tr>
                     <th>{t("vehicles.fields.plate")}</th>
@@ -119,11 +113,10 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
-      </section>
+      </Card>
     </>
   );
 }

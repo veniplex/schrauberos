@@ -73,7 +73,8 @@ export const de = {
     employees: "Mitarbeiter",
     absences: "Abwesenheiten",
     fleet: "Fuhrpark",
-    docs: "Dokumentation",
+    docsIt: "IT-Dokumentation",
+    handbook: "Handbuch",
     it: "IT & Netzwerk",
     network: "Netzwerk",
     devices: "Geräte",
@@ -84,6 +85,7 @@ export const de = {
     workshop: "Werkstatt",
     office: "Büro",
     it: "IT & Netzwerk",
+    handbook: "Handbuch",
     admin: "Verwaltung",
   },
   help: {
@@ -152,11 +154,10 @@ export const de = {
     roles: "Rollen",
     settings: "Einstellungen",
     network: "IT & Netzwerk",
-    docsWorkshop: "Dokumentation Werkstatt",
     invoices: "Rechnungsarchiv",
     employees: "Mitarbeiter",
     fleet: "Fuhrpark",
-    docsOffice: "Dokumentation Büro",
+    handbook: "Handbuch",
     docsIt: "Dokumentation IT",
     backup: "Backups",
     updates: "Updates",
@@ -191,10 +192,6 @@ export const de = {
       edit: "Netzwerk-Dokumentation bearbeiten",
       delete: "Netzwerk-Einträge löschen",
     },
-    docsWorkshop: {
-      view: "Werkstatt-Dokumentation lesen",
-      edit: "Werkstatt-Dokumentation bearbeiten",
-    },
     invoices: {
       view: "Rechnungen ansehen",
       edit: "Rechnungen erfassen und bearbeiten",
@@ -211,9 +208,9 @@ export const de = {
       edit: "Fuhrpark bearbeiten",
       delete: "Fuhrpark-Einträge löschen",
     },
-    docsOffice: {
-      view: "Büro-Dokumentation lesen",
-      edit: "Büro-Dokumentation bearbeiten",
+    handbook: {
+      view: "Handbuch lesen",
+      edit: "Handbuch bearbeiten",
     },
     docsIt: {
       view: "IT-Dokumentation lesen",

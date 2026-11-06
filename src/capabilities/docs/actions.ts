@@ -131,11 +131,15 @@ export async function saveDocCategory(_prev: ActionState, formData: FormData): P
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
   const { id, name, sortOrder } = parsed.data;
 
+  // Nur existierende Rollen übernehmen; leer = das Kapitel sehen alle mit Leserecht
+  const roleIds = (await db.role.findMany({ where: { id: { in: formData.getAll("roleIds").map(String) } }, select: { id: true } })).map((r) => r.id);
+  const roles = { deleteMany: {}, create: roleIds.map((roleId) => ({ roleId })) };
+
   if (id) {
     const cat = await db.docCategory.findFirst({ where: { id, area } });
-    if (cat) await db.docCategory.update({ where: { id }, data: { name, sortOrder } });
+    if (cat) await db.docCategory.update({ where: { id }, data: { name, sortOrder, roles } });
   } else {
-    await db.docCategory.create({ data: { area, name, sortOrder } });
+    await db.docCategory.create({ data: { area, name, sortOrder, roles: { create: roles.create } } });
   }
   refresh(area);
   return { ok: true, message: t("common.saved") };

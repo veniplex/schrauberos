@@ -5,7 +5,7 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
 import { ConfirmSubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
-import { requireDocArea } from "@/capabilities/docs/access";
+import { requireDocArea, visiblePages } from "@/capabilities/docs/access";
 import { restoreDocVersion } from "@/capabilities/docs/actions";
 import { Markdown } from "@/components/ui/markdown";
 
@@ -22,11 +22,12 @@ export default async function DocHistoryPage({
   searchParams: Promise<{ v?: string }>;
 }) {
   const [{ area: areaParam, slug }, sp] = await Promise.all([params, searchParams]);
-  const { area, canEdit } = await requireDocArea(areaParam);
+  const { area, session, canEdit } = await requireDocArea(areaParam);
   const { t, date } = await getI18n();
 
-  const page = await db.docPage.findUnique({
-    where: { area_slug: { area, slug } },
+  // Seiten in Kapiteln, die der Benutzer nicht lesen darf, gibt es für ihn nicht
+  const page = await db.docPage.findFirst({
+    where: { area, slug, ...visiblePages(session, area) },
     include: { versions: { orderBy: { savedAt: "desc" } } },
   });
   if (!page) notFound();
@@ -81,9 +82,9 @@ export default async function DocHistoryPage({
               {selected.content.trim() ? <Markdown source={selected.content} /> : <p className="text-sm text-ink-muted">{t("docs.emptyPage")}</p>}
             </Card>
           ) : (
-            <div className="card">
+            <Card as="div" padded={false}>
               <EmptyState title={t("docs.pickVersion")} />
-            </div>
+            </Card>
           )}
         </div>
       </div>

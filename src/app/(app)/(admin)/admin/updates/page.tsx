@@ -12,6 +12,7 @@ import { runningMeta, runsFromVolume, updateConfig, updaterEnabled } from "@/mod
 import { InstallForm, UpdateWatcher } from "@/modules/admin/updates/install-panel";
 import { needsNewImage } from "@/modules/admin/updates/manifest";
 import { checkLatestRelease } from "@/modules/admin/updates/releases";
+import { FieldLabel } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -92,7 +93,7 @@ export default async function UpdatesPage() {
               </div>
               {release.notes.trim() ? (
                 <div>
-                  <p className="field-label">{t("updates.check.notes")}</p>
+                  <FieldLabel>{t("updates.check.notes")}</FieldLabel>
                   <div className="max-h-72 overflow-y-auto rounded-md border border-line p-4">
                     <Markdown source={release.notes} />
                   </div>

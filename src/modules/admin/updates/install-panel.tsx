@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { SubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/buttons";
 import { Alert } from "@/components/ui/layout";
 import type { ActionState } from "@/components/ui/form";
 import { installUpdate } from "./actions";
@@ -14,17 +14,13 @@ const GIVE_UP_MS = 3 * 60 * 1000;
 export function InstallForm({ version, labels }: { version: string; labels: { button: string; confirm: string } }) {
   const [state, action] = useActionState<ActionState, FormData>(installUpdate, {});
   return (
-    <form
-      action={action}
-      className="flex flex-col gap-3"
-      onSubmit={(e) => {
-        if (!window.confirm(labels.confirm)) e.preventDefault();
-      }}
-    >
+    <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="version" value={version} />
       {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
       <div>
-        <SubmitButton>{labels.button}</SubmitButton>
+        <ConfirmSubmitButton message={labels.confirm} variant="primary" size="md">
+          {labels.button}
+        </ConfirmSubmitButton>
       </div>
     </form>
   );

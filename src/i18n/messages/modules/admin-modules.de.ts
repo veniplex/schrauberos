@@ -7,6 +7,7 @@ export const modulesDe = {
     workshop: "Termine, Reifenlager, Kunden und Fahrzeuge der Werkstatt.",
     office: "Rechnungsarchiv, Mitarbeiter und Fuhrpark.",
     it: "Netzwerk-Dokumentation für IT-Administratoren.",
+    handbook: "Unternehmenshandbuch: Prozesse, Anweisungen und Wissen in Kapiteln – Kapitel lassen sich auf Rollen beschränken.",
     admin: "Benutzer, Rollen, Einstellungen, Module, Backups, Updates und Audit-Log – gehört zur Plattform.",
   },
   title: "Module & Funktionen",

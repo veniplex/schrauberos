@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Alert, Badge, PageHeader } from "@/components/ui/layout";
+import { Alert, Badge, Card, PageHeader, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -37,9 +37,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       {sp.saved ? <div className="mb-4"><Alert tone="success">{t("common.saved")}</Alert></div> : null}
       {sp.error === "lastAdmin" ? <div className="mb-4"><Alert tone="danger">{t("users.errors.lastAdmin")}</Alert></div> : null}
 
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="table min-w-[44rem]">
+      <Card as="div" padded={false} className="overflow-hidden">
+        <Table className="min-w-[44rem]">
             <thead>
               <tr>
                 <th>{t("users.cols.user")}</th>
@@ -75,9 +74,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
-      </div>
+          </Table>
+      </Card>
     </>
   );
 }

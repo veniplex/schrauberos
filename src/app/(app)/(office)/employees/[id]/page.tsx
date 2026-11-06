@@ -71,9 +71,9 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             padded={false}
             actions={
               canEdit ? (
-                <Link href={`/employees/absences?new=1&employee=${e.id}`} className="btn btn-secondary btn-sm">
+                <LinkButton size="sm" href={`/employees/absences?new=1&employee=${e.id}`}>
                   <CalendarPlus className="size-3.5" aria-hidden /> {t("employees.absenceNew")}
-                </Link>
+                </LinkButton>
               ) : null
             }
           >

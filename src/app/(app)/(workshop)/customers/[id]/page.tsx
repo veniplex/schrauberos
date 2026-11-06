@@ -67,9 +67,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             padded={false}
             actions={
               canEditVehicles ? (
-                <Link href={`/vehicles/new?customer=${customer.id}`} className="btn btn-secondary btn-sm">
+                <LinkButton size="sm" href={`/vehicles/new?customer=${customer.id}`}>
                   <Plus className="size-3.5" aria-hidden /> {t("vehicles.new")}
-                </Link>
+                </LinkButton>
               ) : null
             }
           >
@@ -86,19 +86,19 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {session.can("appointments.create") ? (
-                          <Link href={`/appointments?new=1&vehicle=${v.id}`} className="btn btn-secondary btn-sm">
+                          <LinkButton size="sm" href={`/appointments?new=1&vehicle=${v.id}`}>
                             <CalendarPlus className="size-3.5" aria-hidden /> {t("appointments.new")}
-                          </Link>
+                          </LinkButton>
                         ) : null}
                         {session.can("tires.create") ? (
-                          <Link href={`/tires/new?vehicle=${v.id}`} className="btn btn-secondary btn-sm">
+                          <LinkButton size="sm" href={`/tires/new?vehicle=${v.id}`}>
                             <Disc3 className="size-3.5" aria-hidden /> {t("tires.new")}
-                          </Link>
+                          </LinkButton>
                         ) : null}
                         {canEditVehicles ? (
-                          <Link href={`/vehicles/${v.id}/edit`} className="btn btn-ghost btn-sm">
+                          <LinkButton variant="ghost" size="sm" href={`/vehicles/${v.id}/edit`}>
                             {t("common.edit")}
-                          </Link>
+                          </LinkButton>
                         ) : null}
                       </div>
                     </div>

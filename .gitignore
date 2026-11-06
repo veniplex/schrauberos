@@ -49,4 +49,6 @@ next-env.d.ts
 /.hallmark/preflight.json
 /*.db
 /*.db-journal
+/*.db-shm
+/*.db-wal
 .data/

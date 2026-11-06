@@ -3,7 +3,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, isSameDay, startOfDay } from "date-fns";
 import { CalendarPlus, Trash2 } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
@@ -74,15 +74,15 @@ export default async function AbsencesPage({
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
-          <Link href={`/employees/absences?month=${format(addMonths(monthStart, -1), "yyyy-MM")}`} className="btn btn-secondary btn-icon" aria-label={t("common.previous")}>
+          <LinkButton size="icon" href={`/employees/absences?month=${format(addMonths(monthStart, -1), "yyyy-MM")}`} aria-label={t("common.previous")}>
             ‹
-          </Link>
-          <Link href="/employees/absences" className="btn btn-secondary">
+          </LinkButton>
+          <LinkButton href="/employees/absences">
             {t("common.today")}
-          </Link>
-          <Link href={`/employees/absences?month=${format(addMonths(monthStart, 1), "yyyy-MM")}`} className="btn btn-secondary btn-icon" aria-label={t("common.next")}>
+          </LinkButton>
+          <LinkButton size="icon" href={`/employees/absences?month=${format(addMonths(monthStart, 1), "yyyy-MM")}`} aria-label={t("common.next")}>
             ›
-          </Link>
+          </LinkButton>
         </div>
         <h2 className="text-base font-semibold">{date(monthStart, { month: "long", year: "numeric" })}</h2>
         <ul className="ml-auto flex flex-wrap gap-3 text-xs text-ink-muted" aria-label={t("employees.legend")}>
@@ -99,8 +99,8 @@ export default async function AbsencesPage({
         </ul>
       </div>
 
-      <section className="card overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
+      <Card padded={false}>
+        <Table variant="grid">
           <thead>
             <tr>
               <th className="sticky left-0 z-10 min-w-40 border-b border-line bg-surface-2 px-3 py-2 text-left font-medium text-ink-muted">{t("employees.title")}</th>
@@ -152,8 +152,8 @@ export default async function AbsencesPage({
               ))
             )}
           </tbody>
-        </table>
-      </section>
+        </Table>
+      </Card>
 
       <div className="mt-5">
         <Card title={t("employees.absencesInMonth", { count: absences.length })} padded={false}>

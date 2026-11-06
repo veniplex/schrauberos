@@ -9,6 +9,7 @@ export const modulesEn: typeof modulesDe = {
     workshop: "Appointments, tyre storage, customers and vehicles of the workshop.",
     office: "Invoice archive, employees and fleet.",
     it: "Network documentation for IT administrators.",
+    handbook: "Company handbook: processes, instructions and knowledge in chapters – chapters can be restricted to roles.",
     admin: "Users, roles, settings, modules, backups, updates and audit log – part of the platform.",
   },
   title: "Modules & features",

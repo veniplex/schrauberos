@@ -1,6 +1,6 @@
 # Module & Funktionen
 
-Die fachlichen Bereiche (Werkstatt, Büro, IT & Netzwerk) bestehen aus **Funktionen** (Termine, Reifenlager, Rechnungsarchiv …).
+Die fachlichen Bereiche (Werkstatt, Büro, IT & Netzwerk, Handbuch) bestehen aus **Funktionen** (Termine, Reifenlager, Rechnungsarchiv …).
 Unter **Module & Funktionen** schalten Administratoren ganze Module oder einzelne Funktionen ein und aus – etwa, wenn ein Betrieb
 den Fuhrpark nicht nutzt.
 

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Menu, MenuLink } from "@/components/ui/menu";
+import { Badge, Card, DefinitionList, EmptyState, PageHeader, Table } from "@/components/ui/layout";
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { compareIPv4, nextFreeIp, warrantyState } from "@/modules/it/network/domain";
@@ -83,32 +84,36 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             padded={false}
             actions={
               canEdit && subnets.length ? (
-                <details className="relative">
-                  <summary className="btn btn-secondary btn-sm list-none [&::-webkit-details-marker]:hidden">
-                    <Plus className="size-3.5" aria-hidden /> {t("network.assignIp")}
-                  </summary>
-                  <ul className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-line bg-surface p-1 shadow-pop">
-                    {subnets.map((s) => (
-                      <li key={s.id}>
-                        <Link
-                          href={`/network/ip/${s.id}?new=1&device=${device.id}&address=${nextFreeIp(s.cidr, s.ips.map((i) => i.address)) ?? ""}`}
-                          className="flex min-h-9 flex-col justify-center rounded-md px-3 py-1 text-sm hover:bg-surface-hover"
-                        >
-                          <span className="font-medium">{s.name}</span>
-                          <span className="font-mono text-xs text-ink-muted">{s.cidr}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
+                <Menu
+                  label={t("network.assignIp")}
+                  variant="secondary"
+                  size="sm"
+                  align="end"
+                  panelClassName="w-64"
+                  trigger={
+                    <>
+                      <Plus className="size-3.5" aria-hidden /> {t("network.assignIp")}
+                    </>
+                  }
+                >
+                  {subnets.map((s) => (
+                    <MenuLink
+                      key={s.id}
+                      href={`/network/ip/${s.id}?new=1&device=${device.id}&address=${nextFreeIp(s.cidr, s.ips.map((i) => i.address)) ?? ""}`}
+                      className="flex-col items-start justify-center gap-0 py-1"
+                    >
+                      <span className="font-medium">{s.name}</span>
+                      <span className="font-mono text-xs text-ink-muted">{s.cidr}</span>
+                    </MenuLink>
+                  ))}
+                </Menu>
               ) : null
             }
           >
             {ips.length === 0 ? (
               <EmptyState title={t("network.noIps")} />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="table min-w-[32rem]">
+              <Table className="min-w-[32rem]">
                   <thead>
                     <tr>
                       <th>{t("network.cols.address")}</th>
@@ -131,8 +136,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                </Table>
             )}
           </Card>
 
@@ -165,8 +169,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             {links.length === 0 ? (
               <EmptyState title={t("network.noConnections")} />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="table min-w-[32rem]">
+              <Table className="min-w-[32rem]">
                   <thead>
                     <tr>
                       <th>{t("network.cols.port")}</th>
@@ -189,8 +192,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                </Table>
             )}
           </Card>
         </div>

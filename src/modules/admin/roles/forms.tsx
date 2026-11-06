@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
-import { Field, FormMessage, Input, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Checkbox, Field, FormMessage, Input } from "@/components/ui/form";
+import { Button, LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
 import { saveRole } from "./actions";
@@ -73,26 +72,16 @@ export function RoleForm({
                       key={group.group}
                       title={group.label}
                       actions={
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleGroup(keys, !allOn)}>
+                        <Button variant="ghost" size="sm" onClick={() => toggleGroup(keys, !allOn)}>
                           {allOn ? t("roles.selectNone") : t("roles.selectAll")}
-                        </button>
+                        </Button>
                       }
                     >
                       {group.inactive ? <p className="mb-2 text-xs text-warning-ink">{t("roles.featureInactive")}</p> : null}
                       <ul className="flex flex-col gap-2">
                         {group.keys.map(({ key, label }) => (
                           <li key={key}>
-                            <label className="flex cursor-pointer items-center gap-3 text-sm">
-                              <input
-                                type="checkbox"
-                                name="permission"
-                                value={key}
-                                checked={selected.has(key)}
-                                onChange={(e) => toggle(key, e.target.checked)}
-                                className="size-4 accent-[var(--accent)]"
-                              />
-                              {label}
-                            </label>
+                            <Checkbox name="permission" value={key} checked={selected.has(key)} onChange={(e) => toggle(key, e.target.checked)} label={label} />
                           </li>
                         ))}
                       </ul>
@@ -107,9 +96,9 @@ export function RoleForm({
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href="/admin/roles" className="btn btn-secondary">
+        <LinkButton href="/admin/roles">
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>

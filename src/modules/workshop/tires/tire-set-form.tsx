@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Copy } from "lucide-react";
-import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
-import { Card } from "@/components/ui/layout";
+import { type ActionState, Checkbox, Field, FieldError, FieldLabel, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
+import { Button, LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Card, Plate, Table } from "@/components/ui/layout";
 import { VehicleCombobox, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
 import { useI18n } from "@/i18n/client";
@@ -79,7 +78,7 @@ export function TireSetForm({
             <>
               <input type="hidden" name="vehicleId" value={initial.vehicle.id} />
               <p className="text-sm">
-                <span className="plate">{initial.vehicle.plate}</span>{" "}
+                <Plate>{initial.vehicle.plate}</Plate>{" "}
                 <span className="ml-2 text-ink-muted">{[initial.vehicle.description, initial.vehicle.customer].filter(Boolean).join(" · ")}</span>
               </p>
             </>
@@ -118,7 +117,7 @@ export function TireSetForm({
         </div>
 
         <fieldset className="mt-4">
-          <legend className="field-label">{t("tires.fields.size")}</legend>
+          <FieldLabel as="legend">{t("tires.fields.size")}</FieldLabel>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <Field label={t("tires.fields.width")} htmlFor="width" error={err.width}>
               <Input id="width" name="width" type="number" inputMode="numeric" defaultValue={initial.width} placeholder="205" invalid={!!err.width} />
@@ -142,14 +141,13 @@ export function TireSetForm({
       <Card
         title={t("tires.sections.tires")}
         actions={
-          <button type="button" className="btn btn-ghost btn-sm" onClick={copyFirstToAll}>
+          <Button variant="ghost" size="sm" onClick={copyFirstToAll}>
             <Copy className="size-3.5" aria-hidden /> {t("tires.copyFirst")}
-          </button>
+          </Button>
         }
       >
         <p className="mb-3 text-sm text-ink-muted">{t("tires.dotHint")}</p>
-        <div className="overflow-x-auto">
-          <table className="table min-w-[34rem]">
+        <Table className="min-w-[34rem]">
             <thead>
               <tr>
                 <th>{t("tires.fields.position")}</th>
@@ -173,7 +171,7 @@ export function TireSetForm({
                       maxLength={4}
                       invalid={!!err[`tire.${pos}.dot`]}
                     />
-                    {err[`tire.${pos}.dot`] ? <p className="field-error">{err[`tire.${pos}.dot`]}</p> : null}
+                    {err[`tire.${pos}.dot`] ? <FieldError>{err[`tire.${pos}.dot`]}</FieldError> : null}
                   </td>
                   <td className="w-32">
                     <Input
@@ -189,7 +187,7 @@ export function TireSetForm({
                       placeholder="6.5"
                       invalid={!!err[`tire.${pos}.tread`]}
                     />
-                    {err[`tire.${pos}.tread`] ? <p className="field-error">{err[`tire.${pos}.tread`]}</p> : null}
+                    {err[`tire.${pos}.tread`] ? <FieldError>{err[`tire.${pos}.tread`]}</FieldError> : null}
                   </td>
                   <td>
                     <Select
@@ -208,12 +206,8 @@ export function TireSetForm({
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" name="spare" checked={spare} onChange={(e) => setSpare(e.target.checked)} className="size-4 accent-[var(--accent)]" />
-          {t("tires.fields.spare")}
-        </label>
+          </Table>
+        <Checkbox name="spare" checked={spare} onChange={(e) => setSpare(e.target.checked)} label={t("tires.fields.spare")} className="mt-3" />
       </Card>
 
       <Card title={t("tires.sections.storage")}>
@@ -246,9 +240,9 @@ export function TireSetForm({
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>

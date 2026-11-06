@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Field, FormMessage, Input, Select, type ActionState } from "@/components/ui/form";
+import { type ActionState, Checkbox, ColorPicker, Field, FieldError, FieldHint, FieldLabel, FileInput, FormMessage, Input, Select } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { ACCENT_PRESETS } from "@/lib/color";
@@ -68,7 +68,7 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
       <Card title={t("settings.workshop.branding")}>
         <div className="grid gap-6 sm:grid-cols-2">
           <div>
-            <p className="field-label">{t("settings.workshop.logo")}</p>
+            <FieldLabel>{t("settings.workshop.logo")}</FieldLabel>
             <div className="flex items-center gap-4">
               {initial.logoDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- Data-URL
@@ -77,34 +77,18 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
                 <span className="grid size-14 place-items-center rounded-md border border-dashed border-line-strong text-xs text-ink-muted">–</span>
               )}
               <div className="min-w-0 flex-1">
-                <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="block w-full text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm" aria-label={t("settings.workshop.logo")} />
-                {err.logo ? <p className="field-error">{err.logo}</p> : <p className="field-hint">{t("settings.workshop.logoHint")}</p>}
+                <FileInput name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" aria-label={t("settings.workshop.logo")} />
+                {err.logo ? <FieldError>{err.logo}</FieldError> : <FieldHint>{t("settings.workshop.logoHint")}</FieldHint>}
               </div>
             </div>
             {initial.logoDataUrl ? (
-              <label className="mt-3 flex items-center gap-2 text-sm">
-                <input type="checkbox" name="removeLogo" className="size-4 accent-[var(--accent)]" /> {t("settings.workshop.removeLogo")}
-              </label>
+              <Checkbox name="removeLogo" label={t("settings.workshop.removeLogo")} className="mt-3" />
             ) : null}
           </div>
           <div>
-            <p className="field-label">{t("settings.workshop.accent")}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {ACCENT_PRESETS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setAccent(c)}
-                  aria-label={c}
-                  aria-pressed={accent.toLowerCase() === c}
-                  className="size-8 rounded-full border-2 border-surface outline outline-1 outline-line-strong aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ink"
-                  style={{ background: c }}
-                />
-              ))}
-              <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} aria-label={t("settings.workshop.accentCustom")} className="size-8 cursor-pointer rounded-md border border-line-strong bg-surface p-0.5" />
-              <input type="hidden" name="accentColor" value={accent} />
-            </div>
-            {err.accentColor ? <p className="field-error">{err.accentColor}</p> : <p className="field-hint">{t("settings.workshop.accentHint")}</p>}
+            <FieldLabel>{t("settings.workshop.accent")}</FieldLabel>
+            <ColorPicker name="accentColor" value={accent} presets={ACCENT_PRESETS} onChange={setAccent} customLabel={t("settings.workshop.accentCustom")} />
+            {err.accentColor ? <FieldError>{err.accentColor}</FieldError> : <FieldHint>{t("settings.workshop.accentHint")}</FieldHint>}
           </div>
         </div>
       </Card>
@@ -126,22 +110,19 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
           {WEEKDAYS.map((day) => (
             <li key={day} className="grid grid-cols-[6rem_1fr] items-center gap-3 sm:grid-cols-[8rem_auto_auto_1fr]">
               <span className="text-sm font-medium">{t(`enums.weekday.${day}`)}</span>
-              <label className="flex items-center gap-2 text-sm sm:order-4">
-                <input
-                  type="checkbox"
-                  name={`hours.${day}.closed`}
-                  checked={closed[day]}
-                  onChange={(e) => setClosed((c) => ({ ...c, [day]: e.target.checked }))}
-                  className="size-4 accent-[var(--accent)]"
-                />
-                {t("settings.workshop.closed")}
-              </label>
+              <Checkbox
+                name={`hours.${day}.closed`}
+                checked={closed[day]}
+                onChange={(e) => setClosed((c) => ({ ...c, [day]: e.target.checked }))}
+                label={t("settings.workshop.closed")}
+                className="sm:order-4"
+              />
               <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:contents">
                 <Input type="time" name={`hours.${day}.from`} defaultValue={initial.hours[day]?.[0] ?? "07:30"} disabled={closed[day]} aria-label={`${t(`enums.weekday.${day}`)} – ${t("settings.workshop.from")}`} className="w-28" />
                 <span className="text-ink-muted sm:hidden">–</span>
                 <Input type="time" name={`hours.${day}.to`} defaultValue={initial.hours[day]?.[1] ?? "17:00"} disabled={closed[day]} aria-label={`${t(`enums.weekday.${day}`)} – ${t("settings.workshop.to")}`} className="w-28" />
               </div>
-              {err[`hours.${day}`] ? <p className="field-error col-span-full">{err[`hours.${day}`]}</p> : null}
+              {err[`hours.${day}`] ? <FieldError className="col-span-full">{err[`hours.${day}`]}</FieldError> : null}
             </li>
           ))}
         </ul>

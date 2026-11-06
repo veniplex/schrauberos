@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { parseCidr } from "@/modules/it/network/domain";
@@ -42,8 +42,7 @@ export default async function IpamPage() {
           {subnets.length === 0 ? (
             <EmptyState title={t("network.subnetsEmpty")} hint={t("network.subnetsEmptyHint")} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table min-w-[44rem]">
+            <Table className="min-w-[44rem]">
                 <thead>
                   <tr>
                     <th>{t("network.cols.subnet")}</th>
@@ -82,8 +81,7 @@ export default async function IpamPage() {
                     );
                   })}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           )}
         </Card>
 

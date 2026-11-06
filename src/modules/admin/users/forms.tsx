@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
-import { Field, FormMessage, Input, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Checkbox, Field, FieldLabel, FormCard, FormMessage, Input } from "@/components/ui/form";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { useI18n } from "@/i18n/client";
 import { saveUser } from "./actions";
 
@@ -36,7 +35,7 @@ export function UserForm({
   const external = initial.authSource !== "local";
 
   return (
-    <form action={action} className="card card-pad flex max-w-3xl flex-col gap-5">
+    <FormCard action={action} className="max-w-3xl">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -56,7 +55,7 @@ export function UserForm({
         </Field>
         {external ? (
           <Field label={t("users.fields.authSource")}>
-            <p className="input flex items-center bg-surface-2">{initial.authSource}</p>
+            <Input value={initial.authSource} readOnly disabled />
           </Field>
         ) : (
           <Field
@@ -72,26 +71,21 @@ export function UserForm({
       </div>
 
       <fieldset>
-        <legend className="field-label">{t("users.fields.roles")}</legend>
+        <FieldLabel as="legend">{t("users.fields.roles")}</FieldLabel>
         <ul className="mt-1 grid gap-2 sm:grid-cols-2">
           {roles.map((r) => {
             const locked = r.isAdmin && !canAssignAdmin;
             return (
               <li key={r.id}>
-                <label className={`flex items-start gap-3 rounded-md border border-line p-3 ${locked ? "opacity-60" : "cursor-pointer hover:bg-surface-hover"}`}>
-                  <input
-                    type="checkbox"
-                    name="roleId"
-                    value={r.id}
-                    defaultChecked={initial.roleIds.includes(r.id)}
-                    disabled={locked}
-                    className="mt-0.5 size-4 accent-[var(--accent)]"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium">{r.name}</span>
-                    {r.description ? <span className="block text-xs text-ink-muted">{r.description}</span> : null}
-                  </span>
-                </label>
+                <Checkbox
+                  name="roleId"
+                  value={r.id}
+                  defaultChecked={initial.roleIds.includes(r.id)}
+                  disabled={locked}
+                  label={<span className="font-medium">{r.name}</span>}
+                  hint={r.description}
+                  className={locked ? "rounded-md border border-line p-3 opacity-60" : "cursor-pointer rounded-md border border-line p-3 hover:bg-surface-hover"}
+                />
                 {locked && initial.roleIds.includes(r.id) ? <input type="hidden" name="roleId" value={r.id} /> : null}
               </li>
             );
@@ -100,26 +94,20 @@ export function UserForm({
       </fieldset>
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="active" defaultChecked={initial.active} disabled={isSelf} className="size-4 accent-[var(--accent)]" />
-          {t("users.fields.active")}
-          {isSelf ? <input type="hidden" name="active" value="on" /> : null}
-        </label>
+        <Checkbox name="active" defaultChecked={initial.active} disabled={isSelf} label={t("users.fields.active")} />
+        {isSelf ? <input type="hidden" name="active" value="on" /> : null}
         {!external ? (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="mustChangePassword" defaultChecked={initial.mustChangePassword} className="size-4 accent-[var(--accent)]" />
-            {t("users.fields.mustChangePassword")}
-          </label>
+          <Checkbox name="mustChangePassword" defaultChecked={initial.mustChangePassword} label={t("users.fields.mustChangePassword")} />
         ) : null}
       </div>
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href="/admin/users" className="btn btn-secondary">
+        <LinkButton href="/admin/users">
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
-    </form>
+    </FormCard>
   );
 }

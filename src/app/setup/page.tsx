@@ -4,6 +4,7 @@ import { Wrench } from "lucide-react";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import { SetupForm } from "./setup-form";
+import { Card } from "@/components/ui/layout";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -28,9 +29,9 @@ export default async function SetupPage() {
             <p className="text-sm text-ink-muted">{t("setup.intro")}</p>
           </div>
         </div>
-        <div className="card card-pad">
+        <Card as="div">
           <SetupForm timezones={timezones.includes("Europe/Berlin") ? timezones : ["Europe/Berlin", ...timezones]} />
-        </div>
+        </Card>
         <p className="mt-4 text-center text-xs text-ink-muted">{t("setup.warning")}</p>
       </div>
     </main>

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarOff, Plus, Search } from "lucide-react";
-import { Badge, EmptyState, PageHeader } from "@/components/ui/layout";
+import { CalendarOff, Plus } from "lucide-react";
+import { Badge, Card, EmptyState, FilterBar, PageHeader, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { DEPARTMENTS, employeeName } from "@/modules/office/employees/domain";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
+import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -53,37 +54,30 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_10rem_auto]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <input name="q" defaultValue={q} className="input pl-9" placeholder={t("employees.searchPlaceholder")} aria-label={t("common.search")} />
-        </div>
-        <select name="department" defaultValue={department} className="input" aria-label={t("employees.fields.department")}>
+      <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_11rem_10rem_auto]" submitLabel={t("common.filter")}>
+        <SearchInput name="q" defaultValue={q}  className="pl-9" placeholder={t("employees.searchPlaceholder")} aria-label={t("common.search")} />
+        <Select name="department" defaultValue={department}  aria-label={t("employees.fields.department")}>
           <option value="">{t("employees.filters.anyDepartment")}</option>
           {DEPARTMENTS.map((x) => (
             <option key={x} value={x}>
               {td(`employees.departments.${x}`, x)}
             </option>
           ))}
-        </select>
-        <select name="status" defaultValue={status} className="input" aria-label={t("common.status")}>
+        </Select>
+        <Select name="status" defaultValue={status}  aria-label={t("common.status")}>
           <option value="active">{t("employees.filters.active")}</option>
           <option value="inactive">{t("employees.filters.inactive")}</option>
           <option value="all">{t("employees.filters.all")}</option>
-        </select>
-        <button type="submit" className="btn btn-secondary">
-          {t("common.filter")}
-        </button>
-      </form>
+        </Select>
+</FilterBar>
 
-      <section className="card overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         {employees.length === 0 ? (
           <EmptyState title={t("employees.empty")} hint={t("employees.emptyHint")} />
         ) : (
           <>
             <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("employees.count", employees.length)}</p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[44rem]">
+            <Table className="min-w-[44rem]">
                 <thead>
                   <tr>
                     <th>{t("employees.cols.name")}</th>
@@ -116,11 +110,10 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
-      </section>
+      </Card>
     </>
   );
 }

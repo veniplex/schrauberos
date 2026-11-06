@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, CardLink, ChipLink, EmptyState, PageHeader } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { warrantyState } from "@/modules/it/network/domain";
 import { DEVICE_TYPES } from "@/modules/it/network/constants";
@@ -43,10 +43,10 @@ export default async function NetworkOverviewPage() {
   const byType = DEVICE_TYPES.map((type) => ({ type, n: devices.filter((d) => d.type === type && d.status !== "retired").length })).filter((x) => x.n > 0);
 
   const stat = (href: string, value: number, label: string) => (
-    <Link href={href} className="card card-pad block transition-colors hover:bg-surface-hover">
+    <CardLink href={href}>
       <p className="text-3xl font-semibold tabular">{value}</p>
       <p className="mt-1 text-sm text-ink-muted">{label}</p>
-    </Link>
+    </CardLink>
   );
 
   return (
@@ -136,9 +136,9 @@ export default async function NetworkOverviewPage() {
             <ul className="flex flex-wrap gap-2">
               {byType.map(({ type, n }) => (
                 <li key={type}>
-                  <Link href={`/network/devices?type=${type}`} className="badge badge-neutral px-3 py-1 text-sm hover:bg-surface-hover">
+                  <ChipLink href={`/network/devices?type=${type}`}>
                     {td(`enums.deviceType.${type}`, type)} <span className="tabular font-semibold text-ink">{n}</span>
-                  </Link>
+                  </ChipLink>
                 </li>
               ))}
             </ul>

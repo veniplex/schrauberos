@@ -78,9 +78,9 @@ export default async function VehiclePage({
               padded={false}
               actions={
                 session.can("tires.create") ? (
-                  <Link href={`/tires/new?vehicle=${vehicle.id}`} className="btn btn-secondary btn-sm">
+                  <LinkButton size="sm" href={`/tires/new?vehicle=${vehicle.id}`}>
                     <Disc3 className="size-3.5" aria-hidden /> {t("tires.new")}
-                  </Link>
+                  </LinkButton>
                 ) : null
               }
             >
@@ -112,9 +112,9 @@ export default async function VehiclePage({
               padded={false}
               actions={
                 session.can("appointments.create") ? (
-                  <Link href={`/appointments?new=1&vehicle=${vehicle.id}`} className="btn btn-secondary btn-sm">
+                  <LinkButton size="sm" href={`/appointments?new=1&vehicle=${vehicle.id}`}>
                     <CalendarPlus className="size-3.5" aria-hidden /> {t("appointments.new")}
-                  </Link>
+                  </LinkButton>
                 ) : null
               }
             >

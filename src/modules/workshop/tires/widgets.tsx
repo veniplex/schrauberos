@@ -7,6 +7,7 @@ import { formatTireSize } from "@/modules/workshop/tires/domain";
 import { bySeverity, listTireSets } from "./queries";
 import { HealthBadge, SeasonBadge } from "./ui";
 import type { WidgetDef } from "@/modules/types";
+import { LinkButton } from "@/components/ui/buttons";
 
 const LIMIT = 6;
 
@@ -91,9 +92,9 @@ export async function TireSwapWidget() {
                   </p>
                 </div>
                 {canPlan ? (
-                  <Link href={`/appointments?new=1&tireSet=${s.id}`} className="btn btn-secondary btn-sm">
+                  <LinkButton size="sm" href={`/appointments?new=1&tireSet=${s.id}`}>
                     {t("tires.planChange")}
-                  </Link>
+                  </LinkButton>
                 ) : null}
               </li>
             ))}

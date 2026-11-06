@@ -14,11 +14,14 @@ es unter **Verwaltung → Benutzer** zurückzusetzen.
 
 ## Die Oberfläche
 
-* **Navigation links:** Oben die **Übersicht** und diese **Hilfe**, darunter die Bereiche **Werkstatt**, **Büro**, **IT & Netzwerk**
-  und **Verwaltung**. Sie sehen nur, was Ihre Rolle erlaubt – fehlt ein Eintrag, ist er für Sie nicht freigeschaltet.
+* **Navigation links:** Oben die **Übersicht** und diese **Hilfe**, darunter die Bereiche **Werkstatt**, **Büro**, **IT & Netzwerk**,
+  das **Handbuch** und die **Verwaltung**. Ein Klick auf den Namen eines Bereichs klappt ihn auf oder zu; der Bereich der
+  aktuellen Seite ist von selbst aufgeklappt. Sie sehen nur, was Ihre Rolle erlaubt – fehlt ein Eintrag, ist er für Sie nicht
+  freigeschaltet.
 * **Übersicht:** Heute anstehende Termine, einzulagernde oder zu prüfende Reifen, offene Rechnungen, Fälligkeiten und angeheftete
-  Dokumentationsseiten – je nachdem, was Sie sehen dürfen.
-* **Oben rechts:** Sprache (Deutsch/Englisch), Darstellung (Hell, Dunkel oder wie das Gerät) und Ihr Konto.
+  angeheftete Seiten aus Handbuch und IT-Dokumentation – je nachdem, was Sie sehen dürfen.
+* **Unten in der Navigation:** Ihr Name und Ihre Rollen. Ein Klick öffnet das Benutzer-Menü: Sprache (Deutsch/Englisch),
+  Darstellung (Hell, Dunkel oder wie das Gerät), **Mein Konto** und **Abmelden**.
 * **Am Handy:** Die Navigation klappt hinter dem Menü-Knopf links oben auf.
 
 ## Die Hilfe
@@ -29,5 +32,5 @@ Installation eingeschaltet sind und die Ihre Rolle nutzen darf.
 
 ## Ihr Konto
 
-Unter Ihrem Namen oben rechts finden Sie **Mein Konto**: Name und E-Mail-Adresse ändern, Passwort ändern, Sprache und Darstellung
+Im Benutzer-Menü unten in der Navigation finden Sie **Mein Konto**: Name und E-Mail-Adresse ändern, Passwort ändern, Sprache und Darstellung
 wählen. Beim Ändern des Passworts werden Sie auf allen anderen Geräten abgemeldet.

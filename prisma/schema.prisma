@@ -55,6 +55,7 @@ model Role {
 
   permissions RolePermission[]
   users       UserRole[]
+  chapters    DocCategoryRole[]
 }
 
 model RolePermission {
@@ -621,16 +622,28 @@ model InvoiceFile {
 
 // ───────────── Dokumentation (Markdown) ─────────────
 
+// Kapitel einer Dokumentation (Handbuch, IT-Dokumentation)
 model DocCategory {
   id        String @id @default(cuid())
-  // workshop | it | office
+  // handbook | it
   area      String
   name      String
   sortOrder Int    @default(0)
 
   pages DocPage[]
+  // Rollen, die dieses Kapitel lesen dürfen; leer = alle mit Leserecht auf die Dokumentation
+  roles DocCategoryRole[]
 
   @@index([area])
+}
+
+model DocCategoryRole {
+  categoryId String
+  roleId     String
+  category   DocCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  role       Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, roleId])
 }
 
 model DocPage {

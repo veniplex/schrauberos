@@ -78,7 +78,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
 
       {showModal ? (
         <AppointmentModal
-          // Neuer Schlüssel je Termin/Slot, damit der <dialog> und das Formular frisch initialisiert werden
+          // Neuer Schlüssel je Termin/Slot, damit das Dialogfenster und das Formular frisch initialisiert werden
           key={`${sp.edit ?? "new"}-${sp.at ?? ""}-${sp.tireSet ?? ""}`}
           params={{ edit: sp.edit, at: sp.at, bay: sp.bay, tireSet: sp.tireSet, vehicle: sp.vehicle, date: toDateInput(date) }}
           closeHref={closeHref}

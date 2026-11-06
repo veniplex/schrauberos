@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { addDays, getISOWeek, isSameDay, startOfDay, startOfWeek } from "date-fns";
 import { Check } from "lucide-react";
 import { STATUS_TONE } from "./status-tone";
-import { Badge, EmptyState, Plate } from "@/components/ui/layout";
+import { Badge, Card, EmptyState, Plate, Table } from "@/components/ui/layout";
 import type { Translator } from "@/i18n/translate";
 import { isHexColor } from "@/lib/color";
 import { toDateInput } from "@/lib/dates";
@@ -12,6 +12,7 @@ import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { weekdayKey, type OpeningHours } from "@/lib/opening-hours";
 import type { AppointmentRow } from "./queries";
 import { assignLanes } from "./calendar-layout";
+import { LinkButton } from "@/components/ui/buttons";
 
 export type CalendarView = "week" | "day" | "list";
 
@@ -52,15 +53,15 @@ export function CalendarToolbar({ i18n, view, date, canCreate }: Pick<Ctx, "i18n
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-1">
-        <Link href={calendarHref(view, addDays(date, -step))} className="btn btn-secondary btn-icon" aria-label={t("common.previous")}>
+        <LinkButton size="icon" href={calendarHref(view, addDays(date, -step))} aria-label={t("common.previous")}>
           ‹
-        </Link>
-        <Link href={calendarHref(view, startOfDay(new Date()))} className="btn btn-secondary">
+        </LinkButton>
+        <LinkButton href={calendarHref(view, startOfDay(new Date()))}>
           {t("common.today")}
-        </Link>
-        <Link href={calendarHref(view, addDays(date, step))} className="btn btn-secondary btn-icon" aria-label={t("common.next")}>
+        </LinkButton>
+        <LinkButton size="icon" href={calendarHref(view, addDays(date, step))} aria-label={t("common.next")}>
           ›
-        </Link>
+        </LinkButton>
       </div>
       <h2 className="min-w-0 flex-1 text-base font-semibold tabular">{label}</h2>
       <div role="group" aria-label={t("appointments.view")} className="flex gap-0.5 rounded-md bg-surface-2 p-0.5">
@@ -79,9 +80,9 @@ export function CalendarToolbar({ i18n, view, date, canCreate }: Pick<Ctx, "i18n
         ))}
       </div>
       {canCreate ? (
-        <Link href={calendarHref(view, date, { new: "1" })} className="btn btn-primary">
+        <LinkButton variant="primary" href={calendarHref(view, date, { new: "1" })}>
           {t("appointments.new")}
-        </Link>
+        </LinkButton>
       ) : null}
     </div>
   );
@@ -264,7 +265,7 @@ export function WeekView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
   const { startHour, endHour } = visibleHours(ctx, events);
 
   return (
-    <div className="card overflow-x-auto">
+    <Card as="div" padded={false} className="overflow-x-auto">
       <div className="min-w-[44rem]">
         <div className="flex border-b border-line">
           <div className="w-12 shrink-0" />
@@ -299,7 +300,7 @@ export function WeekView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
           ))}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -315,7 +316,7 @@ export function DayView({ ctx, events, bays }: { ctx: Ctx; events: AppointmentRo
   const closed = ctx.hours[weekdayKey(ctx.date)] === null;
 
   return (
-    <div className="card overflow-x-auto">
+    <Card as="div" padded={false} className="overflow-x-auto">
       <div style={{ minWidth: `${Math.max(columns.length * 11, 22)}rem` }}>
         <div className="flex border-b border-line">
           <div className="w-12 shrink-0" />
@@ -332,7 +333,7 @@ export function DayView({ ctx, events, bays }: { ctx: Ctx; events: AppointmentRo
           ))}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -342,9 +343,9 @@ export function ListView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
   const { t, td } = ctx.i18n;
   if (events.length === 0) {
     return (
-      <div className="card">
+      <Card as="div" padded={false}>
         <EmptyState title={t("appointments.emptyList")} />
-      </div>
+      </Card>
     );
   }
   const groups = new Map<string, AppointmentRow[]>();
@@ -355,12 +356,11 @@ export function ListView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
   return (
     <div className="flex flex-col gap-4">
       {[...groups.entries()].map(([key, items]) => (
-        <section key={key} className="card overflow-hidden">
+        <Card padded={false} key={key} className="overflow-hidden">
           <h3 className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold">
             {ctx.i18n.date(items[0].startsAt, { weekday: "long", day: "numeric", month: "long" })}
           </h3>
-          <div className="overflow-x-auto">
-            <table className="table">
+          <Table>
               <tbody>
                 {items.map((a) => (
                   <tr key={a.id} className="row-link">
@@ -388,9 +388,8 @@ export function ListView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </section>
+            </Table>
+        </Card>
       ))}
     </div>
   );

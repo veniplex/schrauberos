@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Field, FormMessage, Input, type ActionState } from "@/components/ui/form";
+import { type ActionState, Checkbox, Field, FormMessage, Input } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
@@ -18,9 +18,7 @@ export function UpdateTokenForm({ configured }: { configured: boolean }) {
           <Input id="token" name="token" type="password" autoComplete="off" placeholder={configured ? "••••••••" : "github_pat_…"} />
         </Field>
         {configured ? (
-          <label className="mt-3 flex items-center gap-2 text-sm">
-            <input type="checkbox" name="remove" className="size-4 accent-[var(--accent)]" /> {t("updates.settings.remove")}
-          </label>
+          <Checkbox name="remove" label={t("updates.settings.remove")} className="mt-3" />
         ) : null}
       </Card>
       <FormMessage state={state} />

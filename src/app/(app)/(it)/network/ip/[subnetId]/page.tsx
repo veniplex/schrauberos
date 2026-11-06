@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, PageHeader, Table } from "@/components/ui/layout";
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
@@ -78,8 +78,7 @@ export default async function SubnetPage({
             {ips.length === 0 ? (
               <EmptyState title={t("network.ipsEmpty")} />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="table min-w-[40rem]">
+              <Table className="min-w-[40rem]">
                   <thead>
                     <tr>
                       <th>{t("network.cols.address")}</th>
@@ -118,8 +117,7 @@ export default async function SubnetPage({
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                </Table>
             )}
           </Card>
         </div>

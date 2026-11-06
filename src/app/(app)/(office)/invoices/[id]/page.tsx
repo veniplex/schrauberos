@@ -14,6 +14,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteInvoice, markInvoicePaid, reopenInvoice } from "@/modules/office/invoices/actions";
 import { PaymentBadge } from "@/modules/office/invoices/ui";
+import { Input } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -64,7 +65,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               ) : state !== "cancelled" ? (
                 <form action={markInvoicePaid} className="flex items-center gap-2">
                   <input type="hidden" name="id" value={inv.id} />
-                  <input type="date" name="paidAt" defaultValue={todayInput()} aria-label={t("invoices.fields.paidAt")} className="input w-40" />
+                  <Input type="date" name="paidAt" defaultValue={todayInput()} aria-label={t("invoices.fields.paidAt")}  className="w-40" />
                   <SubmitButton variant="primary">{t("invoices.markPaid")}</SubmitButton>
                 </form>
               ) : null}
@@ -86,12 +87,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     <strong>{inv.file.name}</strong> <span className="text-ink-muted">({number(inv.file.size / 1024, { maximumFractionDigits: 0 })} KB)</span>
                   </span>
                   <span className="flex gap-2">
-                    <a href={`/api/invoices/${inv.id}/file`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                    <LinkButton size="sm" external href={`/api/invoices/${inv.id}/file`} target="_blank" rel="noreferrer">
                       <ExternalLink className="size-3.5" aria-hidden /> {t("invoices.open")}
-                    </a>
-                    <a href={`/api/invoices/${inv.id}/file?download=1`} className="btn btn-secondary btn-sm">
+                    </LinkButton>
+                    <LinkButton size="sm" external href={`/api/invoices/${inv.id}/file?download=1`}>
                       <Download className="size-3.5" aria-hidden /> {t("invoices.download")}
-                    </a>
+                    </LinkButton>
                   </span>
                 </div>
                 {isImage ? (

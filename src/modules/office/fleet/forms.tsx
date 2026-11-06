@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useRef } from "react";
-import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Field, FieldError, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { COST_CATEGORIES, FLEET_STATUSES, FUEL_TYPES } from "@/modules/office/fleet/domain";
 import { useI18n } from "@/i18n/client";
@@ -149,9 +148,9 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>
@@ -175,7 +174,7 @@ export function MileageForm({ fleetVehicleId, today }: { fleetVehicleId: string;
       <Input name="date" type="date" defaultValue={today} aria-label={t("fleet.fields.date")} className="w-40" required />
       <div>
         <Input name="km" type="number" min={0} placeholder="km" aria-label={t("fleet.fields.km")} className="w-36" required invalid={!!err.km} />
-        {err.km ? <p className="field-error max-w-56">{err.km}</p> : null}
+        {err.km ? <FieldError className="max-w-56">{err.km}</FieldError> : null}
       </div>
       <Input name="note" placeholder={t("common.notes")} aria-label={t("common.notes")} className="min-w-32 flex-1" maxLength={100} />
       <SubmitButton size="sm" className="mt-0.5">
@@ -209,7 +208,7 @@ export function CostForm({ fleetVehicleId, today }: { fleetVehicleId: string; to
       </Select>
       <div>
         <Input name="amount" inputMode="decimal" placeholder="0,00 €" aria-label={t("fleet.fields.amount")} className="w-32" required invalid={!!err.amount} />
-        {err.amount ? <p className="field-error max-w-40">{err.amount}</p> : null}
+        {err.amount ? <FieldError className="max-w-40">{err.amount}</FieldError> : null}
       </div>
       <Input name="km" type="number" min={0} placeholder="km" aria-label={t("fleet.fields.km")} className="w-28" />
       <Input name="note" placeholder={t("common.notes")} aria-label={t("common.notes")} className="min-w-32 flex-1" maxLength={100} />
@@ -264,9 +263,9 @@ export function LicenseCheckForm({
       <p className="text-sm text-ink-muted">{t("fleet.licenseNextHint")}</p>
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={closeHref} className="btn btn-secondary">
+        <LinkButton href={closeHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>

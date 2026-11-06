@@ -1,17 +1,24 @@
 import Link from "next/link";
 import { Pin } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui/layout";
+import { Card, EmptyState, TextLink } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
+import { requireSession } from "@/server/auth/session";
 import { db } from "@/server/db";
+import { visiblePages } from "./access";
 import type { DocArea } from "./areas";
 
-/** Angeheftete Dokumentationsseiten eines Bereichs (z. B. Notfall-Checklisten) direkt auf der Übersicht. */
+/** Angeheftete Seiten eines Bereichs (z. B. Notfall-Checklisten) direkt auf der Übersicht – nur aus Kapiteln, die der Benutzer lesen darf. */
 export async function PinnedDocs({ area }: { area: DocArea }) {
-  const { t } = await getI18n();
-  const pages = await db.docPage.findMany({ where: { area, pinned: true }, orderBy: { title: "asc" }, take: 8, select: { id: true, slug: true, title: true } });
+  const [{ t }, session] = await Promise.all([getI18n(), requireSession()]);
+  const pages = await db.docPage.findMany({
+    where: { area, pinned: true, ...visiblePages(session, area) },
+    orderBy: { title: "asc" },
+    take: 8,
+    select: { id: true, slug: true, title: true },
+  });
 
   return (
-    <Card title={t(`docs.areas.${area}.title`)} actions={<Link href={`/docs/${area}`} className="text-sm text-accent-text hover:underline">{t("common.showAll")}</Link>} padded={false}>
+    <Card title={t(`docs.areas.${area}.title`)} actions={<TextLink href={`/docs/${area}`} className="text-sm">{t("common.showAll")}</TextLink>} padded={false}>
       {pages.length === 0 ? (
         <EmptyState title={t("docs.widgets.nonePinned")} hint={t("docs.widgets.pinHint")} />
       ) : (

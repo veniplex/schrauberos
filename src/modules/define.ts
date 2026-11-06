@@ -26,6 +26,7 @@ export type IconName =
   | "absences"
   | "fleet"
   | "docs"
+  | "handbook"
   | "modules"
   | "audit"
   | "updates"

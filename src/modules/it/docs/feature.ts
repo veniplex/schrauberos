@@ -8,8 +8,6 @@ export const itDocsFeature = defineFeature({
   order: 64,
   docsArea: "it",
   permissions: { group: "docsIt", keys: ["docsIt.view", "docsIt.edit"] },
-  nav: [
-    { id: "docs-it", href: "/docs/it", labelKey: "nav.docs", icon: "docs", permission: "docsIt.view", order: 64 },
-  ],
+  nav: [{ id: "docs-it", href: "/docs/it", labelKey: "nav.docsIt", icon: "docs", permission: "docsIt.view", order: 64 }],
   routes: [],
 });

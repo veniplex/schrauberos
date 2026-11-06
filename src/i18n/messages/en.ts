@@ -73,7 +73,8 @@ export const en: Messages = {
     employees: "Employees",
     absences: "Absences",
     fleet: "Fleet",
-    docs: "Documentation",
+    docsIt: "IT documentation",
+    handbook: "Handbook",
     it: "IT & network",
     network: "Network",
     devices: "Devices",
@@ -84,6 +85,7 @@ export const en: Messages = {
     workshop: "Workshop",
     office: "Office",
     it: "IT & network",
+    handbook: "Handbook",
     admin: "Administration",
   },
   help: {
@@ -152,11 +154,10 @@ export const en: Messages = {
     roles: "Roles",
     settings: "Settings",
     network: "IT & network",
-    docsWorkshop: "Workshop documentation",
     invoices: "Invoice archive",
     employees: "Employees",
     fleet: "Fleet",
-    docsOffice: "Office documentation",
+    handbook: "Handbook",
     docsIt: "IT documentation",
     backup: "Backups",
     updates: "Updates",
@@ -191,10 +192,6 @@ export const en: Messages = {
       edit: "Edit network documentation",
       delete: "Delete network entries",
     },
-    docsWorkshop: {
-      view: "Read workshop documentation",
-      edit: "Edit workshop documentation",
-    },
     invoices: {
       view: "View invoices",
       edit: "Record and edit invoices",
@@ -211,9 +208,9 @@ export const en: Messages = {
       edit: "Edit fleet",
       delete: "Delete fleet entries",
     },
-    docsOffice: {
-      view: "Read office documentation",
-      edit: "Edit office documentation",
+    handbook: {
+      view: "Read the handbook",
+      edit: "Edit the handbook",
     },
     docsIt: {
       view: "Read IT documentation",

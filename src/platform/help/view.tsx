@@ -1,13 +1,13 @@
-import clsx from "clsx";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Input } from "@/components/ui/form";
-import { EmptyState, PageHeader } from "@/components/ui/layout";
+import { Card, EmptyState, NavLink, PageHeader } from "@/components/ui/layout";
 import { Markdown } from "@/components/ui/markdown";
 import { getI18n } from "@/i18n/server";
 import type { HelpGroup } from "@/modules/help";
 import { platformTopics, readHelpPage, type HelpPage, type HelpTopicRef } from "./docs";
+import { Disclosure } from "@/components/ui/disclosure";
 
 type Section = { key: string; title: string; topics: Array<HelpTopicRef & { page: HelpPage }> };
 
@@ -35,16 +35,9 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
           <ul className="flex flex-col gap-0.5">
             {s.topics.map((topic) => (
               <li key={topic.id}>
-                <Link
-                  href={`/help/${topic.id}`}
-                  aria-current={topic.id === current?.id ? "page" : undefined}
-                  className={clsx(
-                    "block rounded-md px-3 py-1.5 text-sm font-medium",
-                    topic.id === current?.id ? "bg-accent-subtle text-accent-text" : "text-ink-muted hover:bg-surface-hover hover:text-ink",
-                  )}
-                >
+                <NavLink href={`/help/${topic.id}`} active={topic.id === current?.id} className="min-h-0 py-1.5">
                   {topic.page.title}
-                </Link>
+                </NavLink>
               </li>
             ))}
           </ul>
@@ -62,19 +55,18 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
       </form>
 
       <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_14rem]">
-        <details className="card card-pad lg:hidden">
-          <summary className="cursor-pointer text-sm font-medium">{t("help.contents")}</summary>
+        <Disclosure title={t("help.contents")} className="lg:hidden">
           <div className="mt-3">{nav}</div>
-        </details>
+        </Disclosure>
         <div className="hidden lg:block">{nav}</div>
 
         {current ? (
           <>
-            <article className="card card-pad min-w-0">
+            <Card as="article" className="min-w-0">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{current.section.title}</p>
               <h2 className="mb-4 text-xl font-semibold">{current.page.title}</h2>
               <Markdown source={current.page.body} />
-            </article>
+            </Card>
 
             {current.page.headings.length > 0 ? (
               <aside className="hidden xl:block">
@@ -92,7 +84,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
             ) : null}
           </>
         ) : (
-          <section className="card card-pad min-w-0 xl:col-span-2" aria-label={t("help.results")}>
+          <Card className="min-w-0 xl:col-span-2" aria-label={t("help.results")}>
             <h2 className="mb-4 text-xl font-semibold">{t("help.results")}</h2>
             {hits.length === 0 ? (
               <EmptyState title={t("help.noResults")} />
@@ -108,7 +100,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
                 ))}
               </ul>
             )}
-          </section>
+          </Card>
         )}
       </div>
     </>

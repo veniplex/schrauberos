@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useI18n } from "@/i18n/client";
 import { Plate } from "@/components/ui/layout";
+import { Button } from "@/components/ui/buttons";
+import { SearchInput } from "@/components/ui/form";
 
 export type VehicleOption = { id: string; plate: string; description: string; customer: string };
 
@@ -71,19 +73,16 @@ export function VehicleCombobox({
             {[selected.description, selected.customer].filter(Boolean).join(" · ")}
           </span>
         </div>
-        <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={t("common.remove")} onClick={() => setSelected(null)}>
+        <Button variant="ghost" size="icon-sm" aria-label={t("common.remove")} onClick={() => setSelected(null)}>
           <X className="size-4" aria-hidden />
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="relative">
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-      <input
-        type="text"
-        className="input pl-9"
+      <SearchInput
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}

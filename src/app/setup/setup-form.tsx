@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useSyncExternalStore } from "react";
-import { Field, FormMessage, Input, Select, type ActionState } from "@/components/ui/form";
+import { type ActionState, Checkbox, Field, FormMessage, Input, Select } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { useI18n } from "@/i18n/client";
 import { completeSetup } from "./actions";
@@ -56,13 +56,7 @@ export function SetupForm({ timezones }: { timezones: string[] }) {
         <Input id="confirm" name="confirm" type="password" invalid={!!err.confirm} autoComplete="new-password" required />
       </Field>
 
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" name="demo" className="mt-0.5 size-4 accent-[var(--accent)]" />
-        <span>
-          {t("setup.demo")}
-          <span className="block text-xs text-ink-muted">{t("setup.demoHint")}</span>
-        </span>
-      </label>
+      <Checkbox name="demo" label={t("setup.demo")} hint={t("setup.demoHint")} />
 
       <FormMessage state={state} />
       <SubmitButton className="w-full">{t("setup.submit")}</SubmitButton>

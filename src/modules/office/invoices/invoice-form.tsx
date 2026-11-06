@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
-import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Checkbox, Field, FieldError, FieldHint, FileInput, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { SearchCombobox, type SearchOption } from "@/components/ui/search-combobox";
 import { INVOICE_STATUSES } from "@/modules/office/invoices/domain";
@@ -124,26 +123,18 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
             {t("invoices.currentFile")}: <strong>{initial.file.name}</strong> <span className="text-ink-muted">({number(initial.file.size / 1024, { maximumFractionDigits: 0 })} KB)</span>
           </p>
         ) : null}
-        <input
-          type="file"
-          name="file"
-          accept="application/pdf,image/png,image/jpeg,image/webp"
-          aria-label={t("invoices.sections.file")}
-          className="block w-full text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm"
-        />
-        {err.file ? <p className="field-error">{err.file}</p> : <p className="field-hint">{initial.file ? t("invoices.fileReplaceHint") : t("invoices.fileHint")}</p>}
+        <FileInput name="file" accept="application/pdf,image/png,image/jpeg,image/webp" aria-label={t("invoices.sections.file")} />
+        {err.file ? <FieldError>{err.file}</FieldError> : <FieldHint>{initial.file ? t("invoices.fileReplaceHint") : t("invoices.fileHint")}</FieldHint>}
         {initial.file ? (
-          <label className="mt-3 flex items-center gap-2 text-sm">
-            <input type="checkbox" name="removeFile" className="size-4 accent-[var(--accent)]" /> {t("invoices.removeFile")}
-          </label>
+          <Checkbox name="removeFile" label={t("invoices.removeFile")} className="mt-3" />
         ) : null}
       </Card>
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>

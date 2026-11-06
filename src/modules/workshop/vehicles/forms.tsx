@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
-import { Field, FormMessage, Input, Textarea, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Field, FormCard, FormMessage, Input, Textarea } from "@/components/ui/form";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { SearchCombobox, type SearchOption } from "@/components/ui/search-combobox";
 import { useI18n } from "@/i18n/client";
 import { saveVehicle, transferVehicle } from "./actions";
@@ -27,7 +26,7 @@ export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValue
   const [state, action] = useActionState<ActionState, FormData>(saveVehicle, {});
   const err = state.fieldErrors ?? {};
   return (
-    <form action={action} className="card card-pad flex flex-col gap-4">
+    <FormCard action={action}>
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -61,12 +60,12 @@ export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValue
       </Field>
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
-    </form>
+    </FormCard>
   );
 }
 
@@ -91,9 +90,9 @@ export function TransferForm({ vehicleId, today, closeHref }: { vehicleId: strin
       </div>
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={closeHref} className="btn btn-secondary">
+        <LinkButton href={closeHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("vehicles.transfer")}</SubmitButton>
       </div>
     </form>

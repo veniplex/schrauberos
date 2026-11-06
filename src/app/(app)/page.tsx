@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import clsx from "clsx";
-import { PageHeader } from "@/components/ui/layout";
+import { Card, PageHeader } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { widgetsFor } from "@/modules/registry";
 import { MODULES } from "@/modules/catalog";
@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 function WidgetSkeleton() {
-  return <div className="card h-48 animate-pulse bg-surface-2" aria-hidden />;
+  return <Card as="div" padded={false} className="h-48 animate-pulse bg-surface-2" aria-hidden />;
 }
 
 export default async function DashboardPage() {

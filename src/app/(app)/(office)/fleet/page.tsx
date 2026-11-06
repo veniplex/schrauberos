@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
-import { Badge, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Plus } from "lucide-react";
+import { Badge, Card, ChipLink, EmptyState, FilterBar, PageHeader, Plate, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { employeeName } from "@/modules/office/employees/public";
@@ -11,6 +11,7 @@ import { requirePermission } from "@/server/auth/session";
 import { contains } from "@/server/search";
 import { listFleet } from "@/modules/office/fleet/queries";
 import { DueBadge } from "@/modules/office/fleet/ui";
+import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -63,21 +64,18 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
       </nav>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Link href="/fleet" className={clsx("badge px-3 py-1 text-sm", !sp.due ? "badge-accent" : "badge-neutral hover:bg-surface-hover")}>
+        <ChipLink href="/fleet" active={!sp.due}>
           {t("fleet.filters.all")}
-        </Link>
-        <Link href="/fleet?due=1" className={clsx("badge px-3 py-1 text-sm", sp.due ? "badge-accent" : "badge-neutral hover:bg-surface-hover")}>
+        </ChipLink>
+        <ChipLink href="/fleet?due=1" active={!!sp.due}>
           {t("fleet.filters.due")} ({dueCount})
-        </Link>
+        </ChipLink>
       </div>
 
-      <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_auto]">
+      <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_11rem_auto]" submitLabel={t("common.filter")}>
         {sp.due ? <input type="hidden" name="due" value="1" /> : null}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <input name="q" defaultValue={q} className="input pl-9" placeholder={t("fleet.searchPlaceholder")} aria-label={t("common.search")} />
-        </div>
-        <select name="status" defaultValue={status} className="input" aria-label={t("common.status")}>
+        <SearchInput name="q" defaultValue={q}  className="pl-9" placeholder={t("fleet.searchPlaceholder")} aria-label={t("common.search")} />
+        <Select name="status" defaultValue={status}  aria-label={t("common.status")}>
           <option value="current">{t("fleet.filters.current")}</option>
           <option value="all">{t("fleet.filters.anyStatus")}</option>
           {FLEET_STATUSES.map((x) => (
@@ -85,20 +83,16 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
               {td(`fleet.statuses.${x}`, x)}
             </option>
           ))}
-        </select>
-        <button type="submit" className="btn btn-secondary">
-          {t("common.filter")}
-        </button>
-      </form>
+        </Select>
+</FilterBar>
 
-      <section className="card overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         {vehicles.length === 0 ? (
           <EmptyState title={t("fleet.empty")} hint={t("fleet.emptyHint")} />
         ) : (
           <>
             <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("fleet.count", vehicles.length)}</p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[52rem]">
+            <Table className="min-w-[52rem]">
                 <thead>
                   <tr>
                     <th>{t("vehicles.fields.plate")}</th>
@@ -136,11 +130,10 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
-      </section>
+      </Card>
     </>
   );
 }

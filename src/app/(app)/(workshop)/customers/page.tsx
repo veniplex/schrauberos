@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
-import { Badge, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Badge, Card, EmptyState, PageHeader, Plate, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
@@ -9,6 +9,7 @@ import { normalizePlate } from "@/lib/plate";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
+import { Input } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -60,11 +61,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       <form method="get" className="mb-5 max-w-lg">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <input name="q" defaultValue={q} className="input pl-9" placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />
+          <Input name="q" defaultValue={q}  className="pl-9" placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />
         </div>
       </form>
 
-      <section className="card overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         {customers.length === 0 ? (
           <EmptyState title={t("customers.empty")} hint={q ? t("common.noResults") : t("customers.emptyHint")} />
         ) : (
@@ -73,8 +74,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               {tp("customers.count", total)}
               {total > LIMIT ? ` · ${t("common.limited", { limit: LIMIT })}` : ""}
             </p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[40rem]">
+            <Table className="min-w-[40rem]">
                 <thead>
                   <tr>
                     <th>{t("customers.cols.name")}</th>
@@ -106,11 +106,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
-      </section>
+      </Card>
     </>
   );
 }

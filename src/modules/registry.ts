@@ -8,13 +8,12 @@ import { widgets as appointmentsWidgets } from "./workshop/appointments/widgets"
 import { settingsTabs as appointmentsSettings } from "./workshop/appointments/settings-tab";
 import { widgets as tiresWidgets } from "./workshop/tires/widgets";
 import { settingsTabs as tiresSettings } from "./workshop/tires/settings-tab";
-import { widgets as workshopDocsWidgets } from "./workshop/docs/widgets";
 import { widgets as invoicesWidgets } from "./office/invoices/widgets";
 import { widgets as employeesWidgets } from "./office/employees/widgets";
 import { widgets as fleetWidgets } from "./office/fleet/widgets";
-import { widgets as officeDocsWidgets } from "./office/docs/widgets";
 import { widgets as networkWidgets } from "./it/network/widgets";
 import { widgets as itDocsWidgets } from "./it/docs/widgets";
+import { widgets as handbookWidgets } from "./handbook/manual/widgets";
 import { settingsTabs as workshopProfileSettings } from "./admin/settings/settings-tab";
 import { settingsTabs as backupSettings } from "./admin/backup/settings-tab";
 import { settingsTabs as updatesSettings } from "./admin/updates/settings-tab";
@@ -26,13 +25,12 @@ import { settingsTabs as updatesSettings } from "./admin/updates/settings-tab";
 const ALL_WIDGETS: WidgetDef[] = [
   ...appointmentsWidgets,
   ...tiresWidgets,
-  ...workshopDocsWidgets,
   ...invoicesWidgets,
   ...employeesWidgets,
   ...fleetWidgets,
-  ...officeDocsWidgets,
   ...networkWidgets,
   ...itDocsWidgets,
+  ...handbookWidgets,
 ];
 
 const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...backupSettings, ...updatesSettings];

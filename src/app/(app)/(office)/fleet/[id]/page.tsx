@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, PageHeader, Plate, Table } from "@/components/ui/layout";
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { todayInput } from "@/lib/dates";
@@ -91,8 +91,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
             {v.mileage.length === 0 ? (
               <EmptyState title={t("fleet.noMileage")} />
             ) : (
-              <div className="max-h-72 overflow-auto">
-                <table className="table">
+              <Table scrollClassName="max-h-72 overflow-auto">
                   <tbody>
                     {v.mileage.map((m) => (
                       <tr key={m.id}>
@@ -112,8 +111,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                </Table>
             )}
             {canEdit ? (
               <div className="border-t border-line px-5 py-4">
@@ -144,8 +142,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                     ))}
                   </span>
                 </div>
-                <div className="max-h-72 overflow-auto">
-                  <table className="table">
+                <Table scrollClassName="max-h-72 overflow-auto">
                     <tbody>
                       {v.costs.map((c) => (
                         <tr key={c.id}>
@@ -166,8 +163,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                  </Table>
               </>
             )}
             {canEdit ? (

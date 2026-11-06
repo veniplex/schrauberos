@@ -1,18 +1,18 @@
 import { workshopModule } from "./workshop/module";
 import { officeModule } from "./office/module";
 import { itModule } from "./it/module";
+import { handbookModule } from "./handbook/module";
 import { adminModule } from "./admin/module";
 import { appointmentsFeature } from "./workshop/appointments/feature";
 import { tiresFeature } from "./workshop/tires/feature";
 import { customersFeature } from "./workshop/customers/feature";
 import { vehiclesFeature } from "./workshop/vehicles/feature";
-import { workshopDocsFeature } from "./workshop/docs/feature";
 import { invoicesFeature } from "./office/invoices/feature";
 import { employeesFeature } from "./office/employees/feature";
 import { fleetFeature } from "./office/fleet/feature";
-import { officeDocsFeature } from "./office/docs/feature";
 import { networkFeature } from "./it/network/feature";
 import { itDocsFeature } from "./it/docs/feature";
+import { manualFeature } from "./handbook/manual/feature";
 import { usersFeature } from "./admin/users/feature";
 import { rolesFeature } from "./admin/roles/feature";
 import { settingsFeature } from "./admin/settings/feature";
@@ -27,20 +27,19 @@ import { featureKey } from "./catalog-logic";
  * Neue Funktion = feature.ts anlegen und hier eintragen. Alles andere (Rechte-Typen, Rechte-Gruppen,
  * Aktivierung, Admin-Seite) wird daraus abgeleitet.
  */
-export const MODULES = [workshopModule, officeModule, itModule, adminModule] as const;
+export const MODULES = [workshopModule, officeModule, itModule, handbookModule, adminModule] as const;
 
 export const FEATURES = [
   appointmentsFeature,
   tiresFeature,
   customersFeature,
   vehiclesFeature,
-  workshopDocsFeature,
   invoicesFeature,
   employeesFeature,
   fleetFeature,
-  officeDocsFeature,
   networkFeature,
   itDocsFeature,
+  manualFeature,
   usersFeature,
   rolesFeature,
   settingsFeature,

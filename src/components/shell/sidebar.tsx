@@ -9,6 +9,7 @@ import {
   Blocks,
   ScrollText,
   Download,
+  FileText,
   CircleHelp,
   HardDriveDownload,
   Cable,
@@ -19,7 +20,7 @@ import {
   Disc3,
   Globe,
   LayoutDashboard,
-  Menu,
+  Menu as MenuIcon,
   Network,
   Receipt,
   Server,
@@ -33,6 +34,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { IconName } from "@/modules/define";
+import { Button } from "@/components/ui/buttons";
+import { Disclosure } from "@/components/ui/disclosure";
+import { NavLink } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
 
 const ICONS: Record<IconName, LucideIcon> = {
@@ -52,7 +56,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   employees: Contact,
   absences: CalendarOff,
   fleet: Truck,
-  docs: BookOpen,
+  docs: FileText,
+  handbook: BookOpen,
   modules: Blocks,
   audit: ScrollText,
   updates: Download,
@@ -61,7 +66,7 @@ const ICONS: Record<IconName, LucideIcon> = {
 };
 
 export type SidebarItem = { href: string; label: string; icon: IconName };
-/** Eine Navigationsgruppe (Dashboard ohne Titel, sonst ein Modul). */
+/** Eine Navigationsgruppe: ohne Titel immer sichtbar (Übersicht, Hilfe), sonst ein Modul – aufklappbar, außer es hat nur einen Eintrag. */
 export type SidebarGroup = { id: string; label: string | null; items: SidebarItem[] };
 
 function isActive(pathname: string, href: string) {
@@ -72,53 +77,65 @@ export function Sidebar({
   workshopName,
   logoDataUrl,
   groups,
+  footer,
   children,
 }: {
   workshopName: string;
   logoDataUrl: string | null;
   groups: SidebarGroup[];
-  /** Topbar + Inhalt */
+  /** Benutzer-Menü am Fuß der Leiste */
+  footer: React.ReactNode;
+  /** Inhalt */
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(pathname);
+  // Aufgeklappte Gruppen: anfangs die der aktuellen Seite (auf Übersicht, Hilfe & Co. alle); wer weiter navigiert, bekommt die neue Gruppe aufgeklappt dazu
+  const groupOf = (path: string) => groups.find((g) => g.items.some((i) => isActive(path, i.href)))?.id;
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(groupOf(pathname) ? [groupOf(pathname)!] : groups.map((g) => g.id)));
 
-  // Drawer bei Navigation schließen (State-Anpassung während des Renderns statt im Effect)
+  // State-Anpassung während des Renderns statt im Effect: Drawer bei Navigation schließen, Gruppe der neuen Seite öffnen
   if (pathname !== lastPath) {
     setLastPath(pathname);
     setOpen(false);
+    const current = groupOf(pathname);
+    if (current && !expanded.has(current)) setExpanded(new Set([...expanded, current]));
   }
 
+  const setGroupOpen = (id: string, value: boolean) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  const link = (item: SidebarItem) => {
+    const Icon = ICONS[item.icon];
+    return (
+      <li key={item.href}>
+        <NavLink href={item.href} active={isActive(pathname, item.href)} icon={<Icon className="size-[18px] shrink-0" aria-hidden />}>
+          {item.label}
+        </NavLink>
+      </li>
+    );
+  };
+
   const nav = (
-    <nav aria-label={t("nav.main")} className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
-      {groups.map((g) => (
-        <div key={g.id}>
-          {g.label ? <p className="mb-1 px-3 text-xs font-medium uppercase tracking-wide text-ink-muted">{g.label}</p> : null}
-          <ul className="flex flex-col gap-0.5">
-            {g.items.map((item) => {
-              const Icon = ICONS[item.icon];
-              const active = isActive(pathname, item.href);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={clsx(
-                      "flex min-h-9 items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                      active ? "bg-accent-subtle text-accent-text" : "text-ink-muted hover:bg-surface-hover hover:text-ink",
-                    )}
-                  >
-                    <Icon className="size-[18px] shrink-0" aria-hidden />
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
+    <nav aria-label={t("nav.main")} className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-4">
+      {groups.map((g) =>
+        g.label && g.items.length > 1 ? (
+          <Disclosure key={g.id} variant="section" title={g.label} open={expanded.has(g.id)} onOpenChange={(v) => setGroupOpen(g.id, v)}>
+            <ul className="mt-1 flex flex-col gap-0.5">{g.items.map(link)}</ul>
+          </Disclosure>
+        ) : (
+          <ul key={g.id} className="flex flex-col gap-0.5">
+            {g.items.map(link)}
           </ul>
-        </div>
-      ))}
+        ),
+      )}
     </nav>
   );
 
@@ -136,16 +153,34 @@ export function Sidebar({
     </Link>
   );
 
+  const content = (
+    <>
+      {brand}
+      {nav}
+      <div className="border-t border-line p-3">{footer}</div>
+    </>
+  );
+
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
       {/* Desktop */}
-      <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface lg:flex">
-        {brand}
-        {nav}
-      </aside>
+      <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface lg:flex">{content}</aside>
 
-      {/* Mobil: Drawer */}
+      {/* Mobil: Kopfzeile mit Menü-Knopf und Drawer */}
       <div className="no-print lg:hidden">
+        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
+          <Button
+            variant="secondary"
+            size="icon"
+            aria-label={open ? t("common.close") : t("nav.menu")}
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? <X className="size-4" aria-hidden /> : <MenuIcon className="size-4" aria-hidden />}
+          </Button>
+          <span className="truncate text-sm font-semibold">{workshopName}</span>
+        </header>
         <div
           className={clsx("fixed inset-0 z-40 bg-[var(--overlay)] transition-opacity", open ? "opacity-100" : "pointer-events-none opacity-0")}
           onClick={() => setOpen(false)}
@@ -160,19 +195,8 @@ export function Sidebar({
           aria-hidden={!open}
           inert={!open}
         >
-          {brand}
-          {nav}
+          {content}
         </aside>
-        <button
-          type="button"
-          className="btn btn-secondary btn-icon fixed left-3 top-2.5 z-30"
-          aria-label={open ? t("common.close") : t("nav.menu")}
-          aria-expanded={open}
-          aria-controls="mobile-nav"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <X className="size-4" aria-hidden /> : <Menu className="size-4" aria-hidden />}
-        </button>
       </div>
 
       <div className="min-w-0">{children}</div>

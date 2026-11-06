@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useRef } from "react";
-import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Field, FieldError, FormCard, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { IP_KINDS } from "@/modules/it/network/constants";
 import { useI18n } from "@/i18n/client";
 import { saveConnection, saveIp, saveLocation, saveSubnet, saveVlan } from "./actions";
@@ -24,7 +23,7 @@ export function VlanForm({ initial }: { initial?: { id: string; vlanId: number; 
       {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
       <div>
         <Input name="vlanId" type="number" min={1} max={4094} defaultValue={initial?.vlanId} placeholder="VLAN-ID" aria-label={t("network.fields.vlanId")} className="w-28" invalid={!!err.vlanId} required />
-        {err.vlanId ? <p className="field-error">{err.vlanId}</p> : null}
+        {err.vlanId ? <FieldError>{err.vlanId}</FieldError> : null}
       </div>
       <Input name="name" defaultValue={initial?.name} placeholder={t("network.fields.vlanName")} aria-label={t("network.fields.vlanName")} className="min-w-36 flex-1" maxLength={60} required />
       <Input name="description" defaultValue={initial?.description} placeholder={t("network.fields.description")} aria-label={t("network.fields.description")} className="min-w-40 flex-[2]" maxLength={200} />
@@ -141,7 +140,7 @@ export function SubnetForm({
   const [state, action] = useActionState<ActionState, FormData>(saveSubnet, {});
   const err = state.fieldErrors ?? {};
   return (
-    <form action={action} className="card card-pad flex max-w-3xl flex-col gap-4">
+    <FormCard action={action} className="max-w-3xl">
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("network.fields.subnetName")} htmlFor="name" error={err.name} required>
@@ -178,12 +177,12 @@ export function SubnetForm({
       </Field>
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
-    </form>
+    </FormCard>
   );
 }
 
@@ -256,9 +255,9 @@ export function IpForm({
       </Field>
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={closeHref} className="btn btn-secondary">
+        <LinkButton href={closeHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>

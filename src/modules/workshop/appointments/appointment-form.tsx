@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Disc3 } from "lucide-react";
 import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton, LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { VehicleCombobox, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { useI18n } from "@/i18n/client";
@@ -165,9 +164,9 @@ export function AppointmentForm({
         <FormMessage state={state} />
 
         <div className="flex justify-end gap-2">
-          <Link href={closeHref} className="btn btn-secondary">
+          <LinkButton href={closeHref}>
             {t("common.cancel")}
-          </Link>
+          </LinkButton>
           <SubmitButton>{t("common.save")}</SubmitButton>
         </div>
       </form>

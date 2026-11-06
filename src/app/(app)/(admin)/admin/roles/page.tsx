@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Alert, Badge, PageHeader } from "@/components/ui/layout";
+import { Alert, Badge, CardLink, PageHeader } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -36,7 +35,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {roles.map((r) => (
           <li key={r.id}>
-            <Link href={`/admin/roles/${r.id}`} className="card card-pad block h-full transition-colors hover:bg-surface-hover">
+            <CardLink href={`/admin/roles/${r.id}`} className="h-full">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-semibold">{r.name}</h2>
                 {r.isAdmin ? <Badge tone="accent">{t("roles.adminBadge")}</Badge> : null}
@@ -46,7 +45,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
                 {tp("roles.userCount", r._count.users)} ·{" "}
                 {r.isAdmin ? t("roles.allPermissions") : t("roles.permissionCount", { count: r._count.permissions, total: ALL_PERMISSIONS.length })}
               </p>
-            </Link>
+            </CardLink>
           </li>
         ))}
       </ul>

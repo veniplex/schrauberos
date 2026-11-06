@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useRef } from "react";
-import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Checkbox, Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { ABSENCE_TYPES, DEPARTMENTS } from "@/modules/office/employees/domain";
 import { useI18n } from "@/i18n/client";
@@ -107,10 +106,7 @@ export function EmployeeForm({
             <Input id="leaveDate" name="leaveDate" type="date" defaultValue={initial.leaveDate} invalid={!!err.leaveDate} />
           </Field>
         </div>
-        <label className="mt-4 flex items-center gap-2 text-sm">
-          <input type="checkbox" name="active" defaultChecked={initial.active} className="size-4 accent-[var(--accent)]" />
-          {t("employees.fields.active")}
-        </label>
+        <Checkbox name="active" defaultChecked={initial.active} label={t("employees.fields.active")} className="mt-4" />
         <Field label={t("employees.fields.userAccount")} htmlFor="userId" error={err.userId} hint={t("employees.fields.userAccountHint")} className="mt-4">
           <Select id="userId" name="userId" defaultValue={initial.userId} invalid={!!err.userId}>
             <option value="">{t("employees.fields.noUser")}</option>
@@ -145,9 +141,9 @@ export function EmployeeForm({
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>
@@ -211,9 +207,9 @@ export function AbsenceForm({
       </Field>
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={closeHref} className="btn btn-secondary">
+        <LinkButton href={closeHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>
@@ -235,15 +231,12 @@ export function QualificationForm({ employeeId }: { employeeId: string }) {
     <form ref={formRef} action={action} className="flex flex-wrap items-start gap-3">
       <input type="hidden" name="employeeId" value={employeeId} />
       <Input name="name" placeholder={t("employees.fields.qualification")} aria-label={t("employees.fields.qualification")} className="min-w-48 flex-[2]" maxLength={100} required invalid={!!err.name} />
-      <label className="flex min-w-36 flex-1 flex-col text-xs text-ink-muted">
-        {t("employees.fields.issuedAt")}
-        <Input name="issuedAt" type="date" className="mt-1" />
-      </label>
-      <label className="flex min-w-36 flex-1 flex-col text-xs text-ink-muted">
-        {t("employees.fields.expiresAt")}
-        <Input name="expiresAt" type="date" className="mt-1" invalid={!!err.expiresAt} />
-        {err.expiresAt ? <span className="field-error">{err.expiresAt}</span> : null}
-      </label>
+      <Field label={t("employees.fields.issuedAt")} htmlFor="issuedAt" className="min-w-36 flex-1">
+        <Input id="issuedAt" name="issuedAt" type="date" />
+      </Field>
+      <Field label={t("employees.fields.expiresAt")} htmlFor="expiresAt" error={err.expiresAt} className="min-w-36 flex-1">
+        <Input id="expiresAt" name="expiresAt" type="date" invalid={!!err.expiresAt} />
+      </Field>
       <SubmitButton size="sm" className="mt-5">
         {t("common.add")}
       </SubmitButton>

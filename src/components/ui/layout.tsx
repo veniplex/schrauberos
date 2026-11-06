@@ -1,5 +1,7 @@
 import clsx from "clsx";
-import type { ReactNode } from "react";
+import Link from "next/link";
+import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
+import { Button } from "./buttons";
 
 export function PageHeader({
   title,
@@ -21,29 +23,41 @@ export function PageHeader({
   );
 }
 
+/**
+ * Die Karte. Mit `title`/`actions` bekommt sie einen Kopf; `padded={false}` für Inhalte, die bis an den Rand reichen (Tabellen, Listen).
+ * `className` geht an die Karte selbst – ohne Kopf gilt er also auch für den Inhalt (z. B. `grid gap-3`).
+ */
 export function Card({
   title,
   actions,
   children,
   className,
   padded = true,
+  as: Tag = "section",
+  ...rest
 }: {
   title?: ReactNode;
   actions?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   padded?: boolean;
-}) {
+  as?: "section" | "article" | "aside" | "div";
+} & Omit<HTMLAttributes<HTMLElement>, "title">) {
+  const hasHeader = Boolean(title || actions);
   return (
-    <section className={clsx("card min-w-0", className)}>
-      {title || actions ? (
-        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          {actions}
-        </div>
-      ) : null}
-      <div className={clsx(padded && "card-pad")}>{children}</div>
-    </section>
+    <Tag {...rest} className={clsx("card min-w-0", padded && !hasHeader && "card-pad", className)}>
+      {hasHeader ? (
+        <>
+          <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+            <h2 className="text-sm font-semibold">{title}</h2>
+            {actions}
+          </div>
+          <div className={clsx(padded && "card-pad")}>{children}</div>
+        </>
+      ) : (
+        children
+      )}
+    </Tag>
   );
 }
 
@@ -61,6 +75,11 @@ type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info" | "accent
 
 export function Badge({ tone = "neutral", children, className }: { tone?: BadgeTone; children: ReactNode; className?: string }) {
   return <span className={clsx("badge", `badge-${tone}`, className)}>{children}</span>;
+}
+
+/** Umschaltbarer Filter in Chip-Form (z. B. Status-Filter über einer Liste), als Link. */
+export function ChipLink({ active, className, ...props }: ComponentProps<typeof Link> & { active?: boolean }) {
+  return <Link {...props} aria-current={active ? "true" : undefined} className={clsx("badge px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)} />;
 }
 
 export function Plate({ children }: { children: ReactNode }) {
@@ -93,4 +112,75 @@ export function DefinitionList({ items }: { items: Array<{ label: ReactNode; val
       ))}
     </dl>
   );
+}
+
+/** Tabelle mit waagerechtem Scrollen auf schmalen Bildschirmen. `className` geht an die Tabelle (z. B. Mindestbreite), `scrollClassName` an den Rahmen. */
+export function Table({
+  className,
+  scrollClassName,
+  variant = "list",
+  children,
+}: {
+  className?: string;
+  scrollClassName?: string;
+  /** `list` = Datenliste mit Kopfzeile; `grid` = Raster ohne Standard-Zellenstil (Monatskalender) */
+  variant?: "list" | "grid";
+  children: ReactNode;
+}) {
+  return (
+    <div className={clsx("overflow-x-auto", scrollClassName)}>
+      <table className={clsx(variant === "list" ? "table" : "w-full border-collapse text-xs", className)}>{children}</table>
+    </div>
+  );
+}
+
+/** Link im Fließtext/Kartenkopf („Alle anzeigen“, Verweise auf andere Seiten). */
+export function TextLink({ className, ...props }: ComponentProps<typeof Link>) {
+  return <Link {...props} className={clsx("text-accent-text hover:underline", className)} />;
+}
+
+/**
+ * Filterleiste über einer Liste (GET-Formular): Suchfeld, Auswahlfelder … als Kinder, der Absenden-Knopf kommt von selbst dazu.
+ * `columns` ist die Spaltenaufteilung ab `sm` (Tailwind, z. B. "sm:grid-cols-[minmax(0,1fr)_10rem_auto]").
+ */
+export function FilterBar({ columns, submitLabel, children }: { columns: string; submitLabel: string; children: ReactNode }) {
+  return (
+    <form method="get" role="search" className={clsx("card card-pad mb-5 grid gap-3", columns)}>
+      {children}
+      <Button type="submit" variant="secondary">
+        {submitLabel}
+      </Button>
+    </form>
+  );
+}
+
+/** Eintrag einer senkrechten Navigation (Kapitelliste, Hilfe, Seitenleiste). `count` zeigt eine Zahl am Zeilenende. */
+export function NavLink({
+  active,
+  icon,
+  count,
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof Link> & { active?: boolean; icon?: ReactNode; count?: number | null }) {
+  return (
+    <Link
+      {...props}
+      aria-current={active ? "page" : undefined}
+      className={clsx(
+        "flex min-h-9 items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        active ? "bg-accent-subtle text-accent-text" : "text-ink-muted hover:bg-surface-hover hover:text-ink",
+        className,
+      )}
+    >
+      {icon}
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {count != null ? <span className="text-xs tabular">{count}</span> : null}
+    </Link>
+  );
+}
+
+/** Karte, die als Ganzes ein Link ist (Übersichtskacheln, Trefferlisten). */
+export function CardLink({ className, ...props }: ComponentProps<typeof Link>) {
+  return <Link {...props} className={clsx("card card-pad block transition-colors hover:bg-surface-hover", className)} />;
 }

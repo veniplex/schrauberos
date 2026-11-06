@@ -40,6 +40,7 @@ export type SessionUser = {
   mustChangePassword: boolean;
   isAdmin: boolean;
   roleNames: string[];
+  roleIds: string[];
 };
 
 export type AppSession = {
@@ -177,6 +178,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
       mustChangePassword: u.mustChangePassword,
       isAdmin,
       roleNames: roles.map((r) => r.name),
+      roleIds: roles.map((r) => r.id),
     },
     features,
     permissions,

@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
-import { SubmitButton } from "@/components/ui/buttons";
+import { Button, ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
 import { Alert } from "@/components/ui/layout";
 import type { ActionState } from "@/components/ui/form";
 import { createManualBackup, restoreBackup } from "./actions";
+import { FieldError, FileInput } from "@/components/ui/form";
 
 export function CreateBackupForm({ label }: { label: string }) {
   const [state, action] = useActionState<ActionState, FormData>(createManualBackup, {});
@@ -24,17 +25,12 @@ export function CreateBackupForm({ label }: { label: string }) {
 export function RestoreForm({ name, label, confirm }: { name: string; label: string; confirm: string }) {
   const [state, action] = useActionState<ActionState, FormData>(restoreBackup, {});
   return (
-    <form
-      action={action}
-      onSubmit={(e) => {
-        if (!window.confirm(confirm)) e.preventDefault();
-      }}
-    >
+    <form action={action}>
       <input type="hidden" name="name" value={name} />
-      <SubmitButton variant="secondary" size="sm">
+      <ConfirmSubmitButton message={confirm} variant="secondary" size="sm">
         {label}
-      </SubmitButton>
-      {state.error ? <p className="field-error mt-1">{state.error}</p> : null}
+      </ConfirmSubmitButton>
+      {state.error ? <FieldError className="mt-1">{state.error}</FieldError> : null}
     </form>
   );
 }
@@ -113,11 +109,11 @@ export function UploadForm({ labels }: { labels: { button: string; hint: string;
       <p className="text-sm text-ink-muted">{labels.hint}</p>
       {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
       <div>
-        <input ref={input} type="file" accept=".tar,.gz,.tgz,.db,.sqlite" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => input.current?.click()}>
+        <FileInput ref={input} accept=".tar,.gz,.tgz,.db,.sqlite" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+        <Button disabled={busy} onClick={() => input.current?.click()}>
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Upload className="size-4" aria-hidden />}
           {busy ? labels.uploading : labels.button}
-        </button>
+        </Button>
       </div>
     </div>
   );

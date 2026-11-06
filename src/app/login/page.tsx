@@ -5,6 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import { getWorkshop } from "@/server/workshop";
 import { LoginForm } from "./login-form";
+import { Card } from "@/components/ui/layout";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -32,10 +33,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             {workshop.tagline ? <p className="text-sm text-ink-muted">{workshop.tagline}</p> : null}
           </div>
         </div>
-        <div className="card card-pad">
+        <Card as="div">
           <h2 className="mb-4 text-base font-semibold">{t("auth.signIn")}</h2>
           <LoginForm next={next ?? "/"} />
-        </div>
+        </Card>
       </div>
     </main>
   );

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
-import { Paperclip, Plus, Search } from "lucide-react";
-import { EmptyState, PageHeader } from "@/components/ui/layout";
+import { Paperclip, Plus } from "lucide-react";
+import { Card, EmptyState, FilterBar, PageHeader, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
@@ -13,6 +13,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
 import { PaymentBadge } from "@/modules/office/invoices/ui";
+import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -69,11 +70,11 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     </Link>
   );
   const stat = (label: string, value: string, sub?: string, tone?: string) => (
-    <div className="card card-pad">
+    <Card as="div">
       <p className="text-sm text-ink-muted">{label}</p>
       <p className={clsx("mt-1 text-2xl font-semibold tabular", tone)}>{value}</p>
       {sub ? <p className="mt-0.5 text-xs text-ink-muted">{sub}</p> : null}
-    </div>
+    </Card>
   );
 
   return (
@@ -100,41 +101,34 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         {stat(dir === "incoming" ? t("invoices.stats.paid") : t("invoices.stats.received"), eur(totals.paidCents), year ? String(year) : t("invoices.allYears"))}
       </div>
 
-      <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto]">
+      <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto]" submitLabel={t("common.filter")}>
         <input type="hidden" name="dir" value={dir} />
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <input name="q" defaultValue={q} className="input pl-9" placeholder={t("invoices.searchPlaceholder")} aria-label={t("common.search")} />
-        </div>
-        <select name="status" defaultValue={state} className="input" aria-label={t("common.status")}>
+        <SearchInput name="q" defaultValue={q}  className="pl-9" placeholder={t("invoices.searchPlaceholder")} aria-label={t("common.search")} />
+        <Select name="status" defaultValue={state}  aria-label={t("common.status")}>
           <option value="">{t("invoices.filters.anyStatus")}</option>
           {STATES.map((s) => (
             <option key={s} value={s}>
               {t(`invoices.payment.${s}`)}
             </option>
           ))}
-        </select>
-        <select name="year" defaultValue={year ? String(year) : "all"} className="input" aria-label={t("invoices.fields.year")}>
+        </Select>
+        <Select name="year" defaultValue={year ? String(year) : "all"}  aria-label={t("invoices.fields.year")}>
           <option value="all">{t("invoices.allYears")}</option>
           {yearOptions.map((y) => (
             <option key={y} value={y}>
               {y}
             </option>
           ))}
-        </select>
-        <button type="submit" className="btn btn-secondary">
-          {t("common.filter")}
-        </button>
-      </form>
+        </Select>
+</FilterBar>
 
-      <section className="card overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         {invoices.length === 0 ? (
           <EmptyState title={t("invoices.empty")} hint={t("invoices.emptyHint")} />
         ) : (
           <>
             <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("invoices.count", invoices.length)}</p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[52rem]">
+            <Table className="min-w-[52rem]">
                 <thead>
                   <tr>
                     <th>{t("invoices.fields.issueDate")}</th>
@@ -167,11 +161,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
-      </section>
+      </Card>
     </>
   );
 }

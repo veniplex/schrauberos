@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import clsx from "clsx";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
-import { Badge, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Plus } from "lucide-react";
+import { Badge, Card, ChipLink, EmptyState, FilterBar, PageHeader, Plate, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
@@ -11,6 +10,7 @@ import { formatTireSize } from "@/modules/workshop/tires/domain";
 import { requirePermission } from "@/server/auth/session";
 import { bySeverity, listTireSets, type TireSetRow } from "@/modules/workshop/tires/queries";
 import { HealthBadge, SeasonBadge } from "@/modules/workshop/tires/ui";
+import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -51,13 +51,9 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
   const canCreate = session.can("tires.create");
   const canPlan = session.can("appointments.create");
   const quick = (href: string, active: boolean, label: string) => (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={clsx("badge px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover")}
-    >
+    <ChipLink href={href} active={active}>
       {label}
-    </Link>
+    </ChipLink>
   );
 
   return (
@@ -80,35 +76,29 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
         {quick("/tires?swap=1", !!sp.swap, `${t("tires.filters.swap")} (${swapCount})`)}
       </div>
 
-      <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]">
+      <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]" submitLabel={t("common.filter")}>
         {sp.attention ? <input type="hidden" name="attention" value="1" /> : null}
         {sp.swap ? <input type="hidden" name="swap" value="1" /> : null}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <input name="q" defaultValue={sp.q ?? ""} className="input pl-9" placeholder={t("tires.searchPlaceholder")} aria-label={t("common.search")} />
-        </div>
-        <select name="status" defaultValue={status} className="input" aria-label={t("common.status")}>
+        <SearchInput name="q" defaultValue={sp.q ?? ""}  className="pl-9" placeholder={t("tires.searchPlaceholder")} aria-label={t("common.search")} />
+        <Select name="status" defaultValue={status}  aria-label={t("common.status")}>
           <option value="all">{t("tires.filters.anyStatus")}</option>
           {TIRE_SET_STATUSES.map((s) => (
             <option key={s} value={s}>
               {td(`enums.tireSetStatus.${s}`, s)}
             </option>
           ))}
-        </select>
-        <select name="season" defaultValue={season} className="input" aria-label={t("tires.fields.season")}>
+        </Select>
+        <Select name="season" defaultValue={season}  aria-label={t("tires.fields.season")}>
           <option value="">{t("tires.filters.anySeason")}</option>
           {TIRE_SEASONS.map((s) => (
             <option key={s} value={s}>
               {td(`enums.season.${s}`, s)}
             </option>
           ))}
-        </select>
-        <button type="submit" className="btn btn-secondary">
-          {t("common.filter")}
-        </button>
-      </form>
+        </Select>
+</FilterBar>
 
-      <section className="card overflow-hidden" aria-label={t("tires.title")}>
+      <Card padded={false} className="overflow-hidden" aria-label={t("tires.title")}>
         {rows.length === 0 ? (
           <EmptyState
             title={t("tires.empty")}
@@ -118,8 +108,7 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
         ) : (
           <>
             <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("tires.count", rows.length)}</p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[56rem]">
+            <Table className="min-w-[56rem]">
                 <thead>
                   <tr>
                     <th>{t("tires.cols.vehicle")}</th>
@@ -162,9 +151,9 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
                             {date(s.nextAppointment.startsAt, { dateStyle: "medium", timeStyle: "short" })}
                           </Link>
                         ) : s.swapDue && canPlan ? (
-                          <Link href={`/appointments?new=1&tireSet=${s.id}`} className="btn btn-secondary btn-sm">
+                          <LinkButton size="sm" href={`/appointments?new=1&tireSet=${s.id}`}>
                             {t("tires.planChange")}
-                          </Link>
+                          </LinkButton>
                         ) : (
                           <span className="text-ink-muted">–</span>
                         )}
@@ -172,11 +161,10 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
-      </section>
+      </Card>
     </>
   );
 }

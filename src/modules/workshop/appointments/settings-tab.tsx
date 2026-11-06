@@ -1,6 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
-import { Field, Input, Select } from "@/components/ui/form";
+import { Checkbox, ColorInput, Field, Input, Select } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
@@ -35,9 +35,7 @@ async function BaysCards() {
                 <input type="hidden" name="id" value={b.id} />
                 <Input name="name" defaultValue={b.name} aria-label={t("appointments.settings.bays.name")} className="min-w-40 flex-1" required maxLength={60} />
                 <Input name="sortOrder" type="number" min={0} defaultValue={b.sortOrder} aria-label={t("appointments.settings.sortOrder")} className="w-20" />
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="active" defaultChecked={b.active} className="size-4 accent-[var(--accent)]" /> {t("appointments.settings.active")}
-                </label>
+                <Checkbox name="active" defaultChecked={b.active} label={t("appointments.settings.active")} />
                 <SubmitButton variant="secondary" size="sm">{t("common.save")}</SubmitButton>
               </form>
               <form action={deleteBay}>
@@ -70,7 +68,7 @@ async function TypesCards() {
     <>
       {v ? <input type="hidden" name="id" value={v.id} /> : null}
       <Input name="name" defaultValue={v?.name} aria-label={t("appointments.settings.types.name")} placeholder={t("appointments.settings.types.name")} className="min-w-40 flex-1" required maxLength={60} />
-      <input type="color" name="color" defaultValue={v?.color ?? "#2459c9"} aria-label={t("appointments.settings.types.color")} className="size-9 cursor-pointer rounded-md border border-line-strong bg-surface p-0.5" />
+      <ColorInput name="color" defaultValue={v?.color ?? "#2459c9"} aria-label={t("appointments.settings.types.color")} />
       <Input name="defaultMinutes" type="number" min={5} max={720} step={5} defaultValue={v?.defaultMinutes ?? 60} aria-label={t("appointments.settings.types.minutes")} className="w-24" required />
       <Select name="kind" defaultValue={v?.kind ?? "general"} aria-label={t("appointments.settings.types.kind")} className="w-44">
         {APPOINTMENT_KINDS.map((k) => (
@@ -90,9 +88,7 @@ async function TypesCards() {
             <li key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <form action={saveAppointmentType} className="flex flex-1 flex-wrap items-center gap-3">
                 {fields(v)}
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="active" defaultChecked={v.active} className="size-4 accent-[var(--accent)]" /> {t("appointments.settings.active")}
-                </label>
+                <Checkbox name="active" defaultChecked={v.active} label={t("appointments.settings.active")} />
                 <SubmitButton variant="secondary" size="sm">{t("common.save")}</SubmitButton>
               </form>
               <form action={deleteAppointmentType}>

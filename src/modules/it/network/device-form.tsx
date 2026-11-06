@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
-import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Checkbox, Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { DEVICE_STATUSES, DEVICE_TYPES } from "@/modules/it/network/constants";
 import { useI18n } from "@/i18n/client";
@@ -121,13 +120,7 @@ export function DeviceForm({
             <Input id="warrantyUntil" name="warrantyUntil" type="date" defaultValue={initial.warrantyUntil} />
           </Field>
         </div>
-        <label className="mt-4 flex items-start gap-3 text-sm">
-          <input type="checkbox" name="monitorEnabled" defaultChecked={initial.monitorEnabled} className="mt-0.5 size-4 accent-[var(--accent)]" />
-          <span>
-            {t("network.fields.monitorEnabled")}
-            <span className="block text-xs text-ink-muted">{t("network.fields.monitorHint")}</span>
-          </span>
-        </label>
+        <Checkbox name="monitorEnabled" defaultChecked={initial.monitorEnabled} label={t("network.fields.monitorEnabled")} hint={t("network.fields.monitorHint")} className="mt-4" />
         <Field label={t("common.notes")} htmlFor="notes" className="mt-4">
           <Textarea id="notes" name="notes" defaultValue={initial.notes} maxLength={2000} />
         </Field>
@@ -135,9 +128,9 @@ export function DeviceForm({
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>

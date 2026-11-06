@@ -54,8 +54,8 @@ describe("helpFor", () => {
 
   it("gliedert nach Modulen in der Reihenfolge der Navigation", () => {
     const groups = helpFor(sessionWith(everything));
-    assert.deepEqual(groups.map((g) => g.module), ["workshop", "office", "it", "admin"]);
-    assert.deepEqual(groups[0].topics.map((t) => t.id), ["workshop.appointments", "workshop.tires", "workshop.customers", "workshop.vehicles", "workshop.docs"]);
+    assert.deepEqual(groups.map((g) => g.module), ["workshop", "office", "it", "handbook", "admin"]);
+    assert.deepEqual(groups[0].topics.map((t) => t.id), ["workshop.appointments", "workshop.tires", "workshop.customers", "workshop.vehicles"]);
   });
 
   it("blendet Kapitel ausgeschalteter Funktionen aus – und Module, die dadurch leer werden", () => {

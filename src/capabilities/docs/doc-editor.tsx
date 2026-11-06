@@ -1,14 +1,13 @@
 "use client";
 
-import clsx from "clsx";
-import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
 import { Bold, CheckSquare, Code, Heading2, ImagePlus, Italic, Link2, List, Table } from "lucide-react";
-import { Field, FormMessage, Input, Select, type ActionState } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { type ActionState, Checkbox, Field, FieldError, FileInput, FormMessage, Input, Select } from "@/components/ui/form";
+import { Button, LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { useI18n } from "@/i18n/client";
 import { saveDocPage } from "./actions";
 import { Markdown } from "@/components/ui/markdown";
+import { SegmentedControl } from "@/components/ui/segmented";
 
 export type DocEditorInitial = {
   id?: string;
@@ -39,9 +38,9 @@ function prefixLines(value: string, s: number, e: number, prefix: string): Edit 
 
 function ToolButton({ label, Icon, onClick }: { label: string; Icon: typeof Bold; onClick: () => void }) {
   return (
-    <button type="button" className="btn btn-ghost btn-icon btn-sm" title={label} aria-label={label} onClick={onClick}>
+    <Button variant="ghost" size="icon-sm" title={label} aria-label={label} onClick={onClick}>
       <Icon className="size-4" aria-hidden />
-    </button>
+    </Button>
   );
 }
 
@@ -142,9 +141,8 @@ export function DocEditor({
             <ToolButton label={t("docs.tools.code")} Icon={Code} onClick={() => apply((v, s, e) => (v.slice(s, e).includes("\n") ? wrap(v, s, e, "\n```\n", "\n```\n", "") : wrap(v, s, e, "`", "`", "code")))} />
             <ToolButton label={t("docs.tools.table")} Icon={Table} onClick={() => apply((v, s, e) => ({ value: v.slice(0, s) + TABLE_TEMPLATE + v.slice(e), start: s + TABLE_TEMPLATE.length, end: s + TABLE_TEMPLATE.length }))} />
             <ToolButton label={uploading ? t("docs.tools.uploading") : t("docs.tools.image")} Icon={ImagePlus} onClick={() => fileRef.current?.click()} />
-            <input
+            <FileInput
               ref={fileRef}
-              type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
               className="hidden"
               aria-hidden
@@ -156,22 +154,15 @@ export function DocEditor({
               }}
             />
           </div>
-          <div role="tablist" aria-label={t("docs.view")} className="flex gap-0.5 rounded-md bg-surface p-0.5">
-            {(["edit", "preview"] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="tab"
-                aria-selected={tab === k}
-                className={clsx("min-h-7 rounded-sm px-3 text-xs font-medium", tab === k ? "bg-surface-2 text-ink shadow-sm" : "text-ink-muted hover:text-ink")}
-                onClick={() => setTab(k)}
-              >
-                {t(`docs.tabs.${k}`)}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            label={t("docs.view")}
+            value={tab}
+            onChange={setTab}
+            options={(["edit", "preview"] as const).map((k) => ({ value: k, label: t(`docs.tabs.${k}`) }))}
+          />
         </div>
 
+        {/* ui-kit-exception: Editorfläche ohne eigenen Rand – bildet mit Werkzeugleiste und Vorschau eine Einheit */}
         <textarea
           ref={ref}
           name="content"
@@ -196,19 +187,16 @@ export function DocEditor({
           </div>
         ) : null}
       </div>
-      {uploadError ? <p role="alert" className="text-sm text-danger-ink">{uploadError}</p> : null}
+      {uploadError ? <FieldError>{uploadError}</FieldError> : null}
       <p className="text-xs text-ink-muted">{t("docs.markdownHint")}</p>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="pinned" defaultChecked={initial.pinned} className="size-4 accent-[var(--accent)]" />
-        {t("docs.fields.pinned")}
-      </label>
+      <Checkbox name="pinned" defaultChecked={initial.pinned} label={t("docs.fields.pinned")} />
 
       <FormMessage state={state} />
       <div className="flex justify-end gap-2">
-        <Link href={cancelHref} className="btn btn-secondary">
+        <LinkButton href={cancelHref}>
           {t("common.cancel")}
-        </Link>
+        </LinkButton>
         <SubmitButton>{t("common.save")}</SubmitButton>
       </div>
     </form>

@@ -6,13 +6,12 @@ import { help as appointments } from "./workshop/appointments/help";
 import { help as tires } from "./workshop/tires/help";
 import { help as customers } from "./workshop/customers/help";
 import { help as vehicles } from "./workshop/vehicles/help";
-import { help as workshopDocs } from "./workshop/docs/help";
 import { help as invoices } from "./office/invoices/help";
 import { help as employees } from "./office/employees/help";
 import { help as fleet } from "./office/fleet/help";
-import { help as officeDocs } from "./office/docs/help";
 import { help as network } from "./it/network/help";
 import { help as itDocs } from "./it/docs/help";
+import { help as manual } from "./handbook/manual/help";
 import { help as users } from "./admin/users/help";
 import { help as roles } from "./admin/roles/help";
 import { help as settings } from "./admin/settings/help";
@@ -30,13 +29,12 @@ export const ALL_HELP_TOPICS: readonly HelpTopicDef[] = [
   ...tires,
   ...customers,
   ...vehicles,
-  ...workshopDocs,
   ...invoices,
   ...employees,
   ...fleet,
-  ...officeDocs,
   ...network,
   ...itDocs,
+  ...manual,
   ...users,
   ...roles,
   ...settings,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Field, FormMessage, Input, type ActionState } from "@/components/ui/form";
+import { type ActionState, Checkbox, Field, FormMessage, Input } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
@@ -15,10 +15,7 @@ export function BackupPlanForm({ initial }: { initial: { enabled: boolean; hour:
     <form action={action} className="flex max-w-3xl flex-col gap-5">
       <Card title={t("backup.settings.title")}>
         <div className="flex flex-col gap-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="enabled" defaultChecked={initial.enabled} className="size-4 accent-[var(--accent)]" />
-            {t("backup.settings.enabled")}
-          </label>
+          <Checkbox name="enabled" defaultChecked={initial.enabled} label={t("backup.settings.enabled")} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("backup.settings.hour")} htmlFor="hour" error={err.hour} hint={t("backup.settings.hourHint")}>
               <Input id="hour" name="hour" type="number" min={0} max={23} defaultValue={initial.hour} invalid={!!err.hour} />

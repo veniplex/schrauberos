@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
 import { ArrowRight, Trash2 } from "lucide-react";
-import { Card, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
 import { ConfirmSubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -62,8 +62,7 @@ async function ConnectionsTab({ canEdit, canDelete }: { canEdit: boolean; canDel
         ) : (
           <>
             <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("network.connectionsCount", connections.length)}</p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[44rem]">
+            <Table className="min-w-[44rem]">
                 <thead>
                   <tr>
                     <th>{t("network.fields.fromDevice")}</th>
@@ -108,8 +107,7 @@ async function ConnectionsTab({ canEdit, canDelete }: { canEdit: boolean; canDel
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
       </Card>

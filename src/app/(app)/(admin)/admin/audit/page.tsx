@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EmptyState, PageHeader } from "@/components/ui/layout";
+import { Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
 import { Input, Select } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
@@ -60,12 +60,11 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         <SubmitButton variant="secondary">{t("common.search")}</SubmitButton>
       </form>
 
-      <div className="card overflow-hidden">
+      <Card as="div" padded={false} className="overflow-hidden">
         {entries.length === 0 ? (
           <EmptyState title={t("audit.empty")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="table min-w-[44rem]">
+          <Table className="min-w-[44rem]">
               <thead>
                 <tr>
                   <th>{t("audit.cols.time")}</th>
@@ -84,10 +83,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
         )}
-      </div>
+      </Card>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">
         <span>{tp("audit.count", total)}</span>

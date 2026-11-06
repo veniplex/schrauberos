@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
-import { Badge, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Plus } from "lucide-react";
+import { Badge, Card, EmptyState, FilterBar, PageHeader, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { DEVICE_STATUSES, DEVICE_TYPES } from "@/modules/it/network/constants";
@@ -10,6 +10,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { checkDevices, listDevices } from "@/modules/it/network/queries";
 import { DemoNotice, DeviceStatusBadge, LinkStateBadge } from "@/modules/it/network/ui";
+import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -58,39 +59,33 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
         }
       />
 
-      <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_10rem_10rem_auto]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <input name="q" defaultValue={sp.q ?? ""} className="input pl-9" placeholder={t("network.searchPlaceholder")} aria-label={t("common.search")} />
-        </div>
-        <select name="type" defaultValue={type} className="input" aria-label={t("network.fields.type")}>
+      <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_10rem_10rem_10rem_auto]" submitLabel={t("common.filter")}>
+        <SearchInput name="q" defaultValue={sp.q ?? ""}  className="pl-9" placeholder={t("network.searchPlaceholder")} aria-label={t("common.search")} />
+        <Select name="type" defaultValue={type}  aria-label={t("network.fields.type")}>
           <option value="">{t("network.filters.anyType")}</option>
           {DEVICE_TYPES.map((x) => (
             <option key={x} value={x}>
               {td(`enums.deviceType.${x}`, x)}
             </option>
           ))}
-        </select>
-        <select name="status" defaultValue={status} className="input" aria-label={t("common.status")}>
+        </Select>
+        <Select name="status" defaultValue={status}  aria-label={t("common.status")}>
           <option value="">{t("network.filters.anyStatus")}</option>
           {DEVICE_STATUSES.map((x) => (
             <option key={x} value={x}>
               {td(`enums.deviceStatus.${x}`, x)}
             </option>
           ))}
-        </select>
-        <select name="location" defaultValue={sp.location ?? ""} className="input" aria-label={t("network.fields.location")}>
+        </Select>
+        <Select name="location" defaultValue={sp.location ?? ""}  aria-label={t("network.fields.location")}>
           <option value="">{t("network.filters.anyLocation")}</option>
           {locations.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
             </option>
           ))}
-        </select>
-        <button type="submit" className="btn btn-secondary">
-          {t("common.filter")}
-        </button>
-      </form>
+        </Select>
+</FilterBar>
 
       {devices.some((d) => d.monitorEnabled) ? (
         <div className="mb-4">
@@ -98,7 +93,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
         </div>
       ) : null}
 
-      <section className="card overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         {devices.length === 0 ? (
           <EmptyState
             title={t("network.devicesEmpty")}
@@ -108,8 +103,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
         ) : (
           <>
             <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("network.devicesCount", devices.length)}</p>
-            <div className="overflow-x-auto">
-              <table className="table min-w-[56rem]">
+            <Table className="min-w-[56rem]">
                 <thead>
                   <tr>
                     <th>{t("network.cols.device")}</th>
@@ -159,11 +153,10 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
                     );
                   })}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           </>
         )}
-      </section>
+      </Card>
     </>
   );
 }

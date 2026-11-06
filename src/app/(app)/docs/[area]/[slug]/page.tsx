@@ -2,27 +2,31 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { History, Pencil, Pin, PinOff } from "lucide-react";
-import { Badge, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, PageHeader } from "@/components/ui/layout";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { markdownHeadings } from "@/lib/slug";
 import { db } from "@/server/db";
-import { requireDocArea } from "@/capabilities/docs/access";
+import { requireDocArea, visiblePages } from "@/capabilities/docs/access";
+import { isDocArea } from "@/capabilities/docs/areas";
+import { getSession } from "@/server/auth/session";
 import { togglePin } from "@/capabilities/docs/actions";
 import { Markdown } from "@/components/ui/markdown";
 
 export async function generateMetadata({ params }: { params: Promise<{ area: string; slug: string }> }): Promise<Metadata> {
   const { area, slug } = await params;
-  const page = await db.docPage.findUnique({ where: { area_slug: { area, slug } } }).catch(() => null);
+  const session = await getSession();
+  if (!session || !isDocArea(area)) return {};
+  const page = await db.docPage.findFirst({ where: { area, slug, ...visiblePages(session, area) }, select: { title: true } });
   return { title: page?.title };
 }
 
 export default async function DocPage({ params }: { params: Promise<{ area: string; slug: string }> }) {
   const { area: areaParam, slug } = await params;
-  const { area, canEdit } = await requireDocArea(areaParam);
+  const { area, session, canEdit } = await requireDocArea(areaParam);
   const { t, date } = await getI18n();
 
-  const page = await db.docPage.findUnique({ where: { area_slug: { area, slug } }, include: { category: true } });
+  const page = await db.docPage.findFirst({ where: { area, slug, ...visiblePages(session, area) }, include: { category: true } });
   if (!page) notFound();
   const toc = markdownHeadings(page.content);
   const base = `/docs/${area}`;
@@ -70,9 +74,9 @@ export default async function DocPage({ params }: { params: Promise<{ area: stri
       />
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_14rem]">
-        <article className="card card-pad min-w-0">
+        <Card as="article" className="min-w-0">
           {page.content.trim() ? <Markdown source={page.content} /> : <p className="text-sm text-ink-muted">{t("docs.emptyPage")}</p>}
-        </article>
+        </Card>
         {toc.length > 1 ? (
           <nav aria-label={t("docs.toc")} className="hidden xl:block">
             <div className="sticky top-20">

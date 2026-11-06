@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Download, Trash2 } from "lucide-react";
-import { Alert, Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
-import { ConfirmSubmitButton } from "@/components/ui/buttons";
+import { Alert, Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { readPending, readRestoreResult } from "@/lib/updates/restore";
 import { requirePermission } from "@/server/auth/session";
@@ -54,8 +54,7 @@ export default async function BackupPage() {
           {backups.length === 0 ? (
             <EmptyState title={t("backup.list.empty")} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table min-w-[44rem]">
+            <Table className="min-w-[44rem]">
                 <thead>
                   <tr>
                     <th>{t("backup.list.time")}</th>
@@ -76,9 +75,9 @@ export default async function BackupPage() {
                       <td className="tabular text-ink-muted">{b.fileCount > 0 ? `${b.fileCount} · ${size(b.fileBytes)}` : "–"}</td>
                       <td>
                         <div className="flex items-start justify-end gap-2">
-                          <a href={`/api/backups/${b.name}`} className="btn btn-secondary btn-sm" download>
+                          <LinkButton size="sm" external href={`/api/backups/${b.name}`} download>
                             <Download className="size-3.5" aria-hidden /> {t("backup.list.download")}
-                          </a>
+                          </LinkButton>
                           <RestoreForm name={b.name} label={t("backup.list.restore")} confirm={t("backup.list.confirmRestore", { date: when(b.createdAt) })} />
                           <form action={removeBackup}>
                             <input type="hidden" name="name" value={b.name} />
@@ -91,8 +90,7 @@ export default async function BackupPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
           )}
         </Card>
 

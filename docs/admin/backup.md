@@ -2,7 +2,7 @@
 
 Unter **Backups** sichert und stellt die Anwendung ihre Daten wieder her – ohne Zutun am Server.
 
-* **Was gesichert wird:** alles – Kunden, Termine, Rechnungen **samt Belegen**, Dokumentation samt Bildern, Benutzer und
+* **Was gesichert wird:** alles – Kunden, Termine, Rechnungen **samt Belegen**, Handbuch und IT-Dokumentation samt Bildern, Benutzer und
   Einstellungen. Ein Backup entsteht, während die Anwendung läuft; niemand muss warten.
 * **Automatisch:** jede Nacht (Standard ab 02:00 Uhr). Wie viele automatische Backups erhalten bleiben (Standard 14) und wann sie
   entstehen, stellt man unter **Einstellungen → Backups** ein. Manuelle Backups werden nie automatisch gelöscht.
