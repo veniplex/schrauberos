@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { logError } from "@/lib/log-safe";
+import { checkUpload } from "@/lib/upload-sniff";
 import { dateText, moneyCents } from "@/lib/zod-fields";
 import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, invoiceFileLocation, outgoingKeyOf } from "@/modules/office/invoices/domain";
 import { defineOperation, fail, failField, mapPrismaError } from "@/server/operations";
@@ -46,9 +47,12 @@ export const saveInvoiceOperation = defineOperation({
   prepare: async ({ input: d }) => {
     const file = d.file;
     if (!file || file.size === 0) return { upload: null, stored: null as string | null };
-    if (!(INVOICE_FILE_TYPES as readonly string[]).includes(file.type)) failField("file", "invoices.errors.fileType");
     if (file.size > INVOICE_FILE_MAX_BYTES) failField("file", "invoices.errors.fileSize");
-    const upload = { name: file.name.slice(0, 120), mime: file.type, size: file.size, data: new Uint8Array(await file.arrayBuffer()) };
+    // Der Inhalt entscheidet, nicht der gemeldete Typ: HTML als „.pdf“ oder „.png“ wird abgelehnt; gespeichert wird der erkannte Typ
+    const data = new Uint8Array(await file.arrayBuffer());
+    const checked = checkUpload(data, file.type, INVOICE_FILE_TYPES);
+    if (!checked.ok) failField("file", "invoices.errors.fileType");
+    const upload = { name: file.name.slice(0, 120), mime: checked.mime, size: file.size, data };
     const location = invoiceFileLocation({ direction: d.direction, issueDate: noon(d.issueDate), number: d.number, partyName: d.partyName }, upload.mime);
     return { upload, stored: await storeFile(location.dir, location.name, upload.data) };
   },

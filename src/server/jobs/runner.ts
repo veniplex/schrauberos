@@ -174,6 +174,18 @@ export function createJobRunner(options: RunnerOptions) {
     return { jobId: job.id, status, message, durationMs, attempt };
   }
 
+  /**
+   * Berechnet die nächsten Termine der Cron-Jobs neu (nach einem Wechsel der Zeitzone der Werkstatt): Ein Job, der „um 03:00“ läuft, soll um 03:00 Ortszeit der neuen
+   * Zone laufen, nicht erst nach dem alten Termin. Jobs in einer Fehlerserie (Wiederholung mit Wartezeit), laufende und überfällige bleiben unberührt.
+   */
+  async function reschedule(): Promise<void> {
+    const at = now();
+    for (const job of definitions()) {
+      if ("every" in job.schedule) continue;
+      await db.jobState.updateMany({ where: { id: job.id, failures: 0, lockedUntil: null, nextRunAt: { gt: at } }, data: { nextRunAt: nextRun(job.schedule, at, timeZone()) } });
+    }
+  }
+
   /** Führt alle fälligen Jobs aus (gleichzeitig, jeder höchstens einmal). */
   async function tick(): Promise<RunResult[]> {
     const at = now();
@@ -217,7 +229,7 @@ export function createJobRunner(options: RunnerOptions) {
     timers = {};
   }
 
-  return { sync, recover, tick, runNow, start, stop, isRunning: (jobId: string) => inFlight.has(jobId) };
+  return { sync, recover, tick, runNow, reschedule, start, stop, isRunning: (jobId: string) => inFlight.has(jobId) };
 }
 
 export type JobRunner = ReturnType<typeof createJobRunner>;

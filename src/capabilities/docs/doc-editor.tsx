@@ -87,7 +87,7 @@ export function DocEditor({
       const fd = new FormData();
       fd.set("area", area);
       fd.set("file", file);
-      const res = await fetch("/api/docs/images", { method: "POST", body: fd });
+      const res = await fetch("/api/docs/images", { method: "POST", body: fd, headers: { "X-Requested-With": "schrauberos" } });
       if (!res.ok) {
         setUploadError(res.status === 413 ? t("docs.errors.imageSize") : res.status === 415 ? t("docs.errors.imageType") : t("docs.errors.upload"));
         return;

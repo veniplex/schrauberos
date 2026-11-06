@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import * as tar from "tar";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { gzipSync } from "node:zlib";
+import { DISK_RESERVE_BYTES, setFreeBytesForTest } from "@/lib/disk";
+import { rawTar, type RawEntry } from "@/test/tar";
 import { applyPendingRestore, readPending } from "@/lib/updates/restore";
 import { runMigrations } from "@/server/migrate";
 import { filesDir, resolveRel, storeFile } from "@/server/files";
@@ -235,6 +237,44 @@ describe("Backups", () => {
       (await import("node:fs")).readdirSync(backupsDir()).filter((n) => n.startsWith(".import-")),
       [],
     );
+  });
+
+  it("Archive mit Hardlink, ..-Pfad, zu vielen Einträgen oder zu großem Inhalt werden abgelehnt – ohne Reste (SEC-14)", async () => {
+    const dbGz = readFileSync(path.join(backupPath(manual)!, "database.db.gz"));
+    const archive = (name: string, entries: RawEntry[]) => {
+      const file = path.join(data, name);
+      writeFileSync(file, rawTar([{ name: "database.db.gz", data: dbGz }, ...entries]));
+      return file;
+    };
+    const outside = path.join(data, "draussen.txt");
+    const uploadsBefore = listBackups().filter((b) => b.kind === "upload").length;
+
+    assert.equal(await codeOf(() => importBackupFile(archive("hart.tar", [{ name: "files/hart", type: "1", linkname: "../database.db.gz" }]))), "notBackup", "Hardlink");
+    assert.equal(await codeOf(() => importBackupFile(archive("punkte.tar", [{ name: "files/../../draussen.txt", data: "böse" }]))), "notBackup", "..-Pfad");
+    assert.equal(await codeOf(() => importBackupFile(archive("geraet.tar", [{ name: "files/dev", type: "3" }]))), "notBackup", "Geräte-Datei");
+    assert.equal(existsSync(outside), false);
+
+    // Grenzen für Einträge und Größe (hier klein, damit die Archive klein bleiben)
+    const many = Array.from({ length: 10 }, (_, i) => ({ name: `files/f${i}.txt`, data: "x" }));
+    assert.equal(await codeOf(() => importBackupFile(archive("viele.tar", many), { maxEntries: 5, maxBytes: 1e9 })), "tooLarge", "zu viele Einträge");
+    assert.equal(await codeOf(() => importBackupFile(archive("gross.tar", [{ name: "files/gross.bin", data: Buffer.alloc(5000) }]), { maxEntries: 100, maxBytes: dbGz.length + 1000 })), "tooLarge", "zu große Gesamtgröße");
+    setFreeBytesForTest(async () => 4 * 1024 ** 4);
+    try {
+      assert.equal(await codeOf(() => importBackupFile(archive("riesig.tar", [{ name: "files/riesig.bin", declaredSize: 300 * 1024 ** 3, data: "kurz" }]))), "tooLarge", "riesig angekündigt (über der Standardgrenze)");
+    } finally {
+      setFreeBytesForTest(null);
+    }
+
+    // reicht der freie Platz nicht, heißt der Fehler „diskFull“
+    setFreeBytesForTest(async () => DISK_RESERVE_BYTES + 100);
+    try {
+      assert.equal(await codeOf(() => importBackupFile(archive("platz.tar", [{ name: "files/a.bin", data: Buffer.alloc(5000) }]))), "diskFull");
+    } finally {
+      setFreeBytesForTest(null);
+    }
+
+    assert.deepEqual(readdirSync(backupsDir()).filter((n) => n.startsWith(".import-") || n.startsWith(".upload-")), [], "keine Zwischenordner");
+    assert.equal(listBackups().filter((b) => b.kind === "upload").length, uploadsBefore, "nichts wurde als Sicherung übernommen");
   });
 
   it("filesDir liegt im Datenverzeichnis", () => {

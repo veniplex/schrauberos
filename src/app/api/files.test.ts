@@ -5,7 +5,9 @@ import path from "node:path";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { NextRequest } from "next/server";
 import * as tar from "tar";
+import { DISK_RESERVE_BYTES, setFreeBytesForTest } from "@/lib/disk";
 import { startupState } from "@/server/startup-state";
+import { rawTar, type RawEntry } from "@/test/tar";
 import { createTestEnv, type TestEnv } from "@/test/harness";
 
 /**
@@ -44,13 +46,14 @@ beforeEach(async () => {
 
 /* ───────────── Doku-Bilder hochladen ───────────── */
 
-describe("Doku-Bild hochladen (ZP2-A-F12: wird protokolliert)", () => {
+describe("Doku-Bild hochladen (ZP2-A-F12: wird protokolliert; SEC-12: Inhalt, Herkunft, Größe)", () => {
   const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
-  const upload = async (area: string, file: File | null) => {
+  const HEADERS = { "x-requested-with": "schrauberos", host: "localhost" };
+  const upload = async (area: string, file: File | null, headers: Record<string, string> = HEADERS) => {
     const body = new FormData();
     body.set("area", area);
     if (file) body.set("file", file);
-    return imageRoute.POST(new NextRequest("http://localhost/api/docs/images", { method: "POST", body }));
+    return imageRoute.POST(new NextRequest("http://localhost/api/docs/images", { method: "POST", body, headers }));
   };
 
   it("legt das Bild ab, antwortet mit Adresse und schreibt einen Audit-Eintrag (Bereich, Dateiname); Fehlschläge schreiben nichts", async () => {
@@ -71,6 +74,54 @@ describe("Doku-Bild hochladen (ZP2-A-F12: wird protokolliert)", () => {
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "docs.imageUpload" } });
     assert.equal(entry.entityId, id);
     assert.equal(entry.target, `${area}: Schaltplan.png`);
+  });
+
+  it("HTML als .png (mit Typ image/png), ein Bild unter falschem Typ und Text werden abgelehnt (415) – es wird nichts gespeichert", async () => {
+    const { DOC_PERMISSIONS, DOC_AREAS } = await import("@/capabilities/docs/areas");
+    const area = DOC_AREAS[0];
+    await signInWith([DOC_PERMISSIONS[area].edit]);
+    const before = await env.db.docImage.count();
+    const html = new TextEncoder().encode("<html><script>fetch('/api/backups/x')</script></html>");
+    for (const file of [
+      new File([html], "bild.png", { type: "image/png" }),
+      new File([html], "bild.jpg", { type: "image/jpeg" }),
+      new File([html], "bild.gif", { type: "" }),
+      new File([PNG], "bild.jpg", { type: "image/jpeg" }),
+      new File([new TextEncoder().encode("%PDF-1.4")], "bild.png", { type: "image/png" }),
+    ]) {
+      assert.equal((await upload(area, file)).status, 415, `${file.name} (${file.type})`);
+    }
+    assert.equal(await env.db.docImage.count(), before);
+    assert.equal(await env.db.auditLog.count({ where: { action: "docs.imageUpload" } }), 0);
+  });
+
+  it("speichert den erkannten Typ und passende Endung, nicht die Angaben des Absenders", async () => {
+    const { DOC_PERMISSIONS, DOC_AREAS } = await import("@/capabilities/docs/areas");
+    const area = DOC_AREAS[0];
+    await signInWith([DOC_PERMISSIONS[area].edit]);
+    const res = await upload(area, new File([PNG], "Foto.exe", { type: "" }));
+    assert.equal(res.status, 200);
+    const { id } = (await res.json()) as { id: string };
+    const row = await env.db.docImage.findUniqueOrThrow({ where: { id } });
+    assert.equal(row.mime, "image/png");
+    assert.ok(row.path.endsWith(".png"), row.path);
+  });
+
+  it("Fremdaufrufe: ohne eigenen Header, mit fremder Herkunft oder fremder Website (Sec-Fetch-Site) 403; zu große Anfragen werden gar nicht gelesen (413)", async () => {
+    const { DOC_PERMISSIONS, DOC_AREAS, DOC_IMAGE_MAX_BYTES } = await import("@/capabilities/docs/areas");
+    const area = DOC_AREAS[0];
+    await signInWith([DOC_PERMISSIONS[area].edit]);
+    const file = new File([PNG], "a.png", { type: "image/png" });
+    const before = await env.db.docImage.count();
+    assert.equal((await upload(area, file, { host: "localhost" })).status, 403, "ohne X-Requested-With");
+    assert.equal((await upload(area, file, { ...HEADERS, origin: "https://evil.example" })).status, 403, "fremde Herkunft");
+    assert.equal((await upload(area, file, { ...HEADERS, origin: "null" })).status, 403, "Origin: null");
+    assert.equal((await upload(area, file, { ...HEADERS, "sec-fetch-site": "cross-site" })).status, 403, "fremde Website");
+    assert.equal((await upload(area, file, { ...HEADERS, "sec-fetch-site": "same-site" })).status, 403, "andere Subdomain");
+    assert.equal((await upload(area, file, { ...HEADERS, origin: "http://localhost", "sec-fetch-site": "same-origin" })).status, 200, "gleiche Herkunft");
+    assert.equal((await upload(area, file, { ...HEADERS, "content-length": String(DOC_IMAGE_MAX_BYTES + 10 * 1024 * 1024) })).status, 413, "angekündigte Länge zu groß");
+    assert.equal((await upload(area, new File([new Uint8Array(DOC_IMAGE_MAX_BYTES + 1)], "gross.png", { type: "image/png" }))).status, 413, "Datei zu groß");
+    assert.equal(await env.db.docImage.count(), before + 1);
   });
 });
 
@@ -108,6 +159,41 @@ describe("Rechnungsbeleg ausliefern", () => {
     assert.equal(res.headers.get("cache-control"), "private, no-store");
     assert.match(res.headers.get("content-disposition") ?? "", /^inline;/);
     assert.equal(await res.text(), "%PDF-1.4 beleg");
+  });
+
+  it("Kopfzeilen je Dateityp (SEC-12): PDF nur nosniff, Bilder mit sandbox, XML und Unbekanntes immer als Download", async () => {
+    await signInWith(["invoices.view"]);
+    const file = await env.db.invoiceFile.findUniqueOrThrow({ where: { invoiceId } });
+    const SANDBOX = "sandbox; default-src 'none'";
+    const cases: Array<{ mime: string; type: string; disposition: RegExp; csp: string | null }> = [
+      { mime: "application/pdf", type: "application/pdf", disposition: /^inline;/, csp: null },
+      { mime: "image/png", type: "image/png", disposition: /^inline;/, csp: SANDBOX },
+      { mime: "application/xml", type: "application/xml", disposition: /^attachment;/, csp: SANDBOX },
+      // manipulierter Datenbankeintrag: nie als Seite ausliefern
+      { mime: "text/html", type: "application/octet-stream", disposition: /^attachment;/, csp: SANDBOX },
+      { mime: "image/svg+xml", type: "application/octet-stream", disposition: /^attachment;/, csp: SANDBOX },
+    ];
+    for (const c of cases) {
+      await env.db.invoiceFile.update({ where: { id: file.id }, data: { mime: c.mime } });
+      const res = await get();
+      assert.equal(res.headers.get("content-type"), c.type, c.mime);
+      assert.match(res.headers.get("content-disposition") ?? "", c.disposition, c.mime);
+      assert.equal(res.headers.get("content-security-policy"), c.csp, c.mime);
+      assert.equal(res.headers.get("x-content-type-options"), "nosniff", c.mime);
+      await res.arrayBuffer();
+    }
+  });
+
+  it("Dateiname mit Zeilenumbruch und Anführungszeichen schleust keine Kopfzeile ein", async () => {
+    await signInWith(["invoices.view"]);
+    const file = await env.db.invoiceFile.findUniqueOrThrow({ where: { invoiceId } });
+    await env.db.invoiceFile.update({ where: { id: file.id }, data: { name: 'x.pdf"\r\nSet-Cookie: boese=1\r\n\r\n<script>' } });
+    const res = await get();
+    assert.equal(res.headers.get("set-cookie"), null);
+    const disposition = res.headers.get("content-disposition") ?? "";
+    assert.equal(/[\r\n]/.test(disposition), false);
+    assert.equal(/filename="([^"]*)"/.exec(disposition)?.[1].includes('"'), false);
+    await res.arrayBuffer();
   });
 
   it("?download=1 erzwingt den Download; der Dateiname ist ASCII-sicher und in UTF-8 kodiert (kein Header-Einschleusen)", async () => {
@@ -273,6 +359,56 @@ describe("Sicherung hochladen", () => {
     assert.equal(res.status, 200, await res.clone().text());
     const { name } = (await res.json()) as { name: string };
     assert.equal(statSync(path.join(core.backupPath(name)!, "files", "gross", "beleg.bin")).size, 11 * 1024 * 1024, "die Datei ist nicht abgeschnitten");
+  });
+
+  it("Archive mit Symlink, Hardlink, „..“-Pfad oder absolutem Pfad werden abgelehnt (422), nichts wird angelegt oder außerhalb geschrieben (SEC-14)", async () => {
+    await signInWith(["backup.manage"]);
+    const before = core.listBackups().length;
+    const outside = path.join(env.dir, "draussen.txt");
+    const evil: Array<[string, RawEntry[]]> = [
+      ["Symlink", [{ name: "files/link", type: "2", linkname: "../../secret.key" }]],
+      ["Hardlink", [{ name: "files/hart", type: "1", linkname: "../secret.key" }]],
+      ["..-Pfad", [{ name: "../../draussen.txt", data: "böse" }]],
+      ["absoluter Pfad", [{ name: `/${outside.split(String.fromCharCode(92)).join("/").replace(/^[A-Za-z]:/, "").replace(/^\/+/, "")}`, data: "böse" }]],
+      ["Geräte-Datei", [{ name: "dev", type: "3" }]],
+    ];
+    for (const [name, entries] of evil) {
+      const res = await post(rawTar([{ name: "database.db.gz", data: "x" }, ...entries]));
+      assert.equal(res.status, 422, name);
+      assert.equal(((await res.json()) as { error: string }).error, "notBackup", name);
+    }
+    assert.equal(existsSync(outside), false);
+    assert.equal(core.listBackups().length, before);
+    assert.deepEqual(uploads(), []);
+    assert.deepEqual(readdirSync(core.backupsDir()).filter((f) => f.startsWith(".import-")), [], "keine halben Entpackordner");
+  });
+
+  it("Schutz der Platte: angekündigte Größe über der Obergrenze 413, passt sie nicht in den freien Platz 507, während des Empfangs wird der freie Platz laufend geprüft", async () => {
+    await signInWith(["backup.manage"]);
+    const before = core.listBackups().length;
+    const GiB = 1024 ** 3;
+    assert.equal((await post(archive, { "x-requested-with": "schrauberos", host: "localhost", "content-length": String(101 * GiB) })).status, 413);
+
+    setFreeBytesForTest(async () => 1 * GiB);
+    try {
+      const announced = await post(archive, { "x-requested-with": "schrauberos", host: "localhost", "content-length": String(600 * 1024 * 1024) });
+      assert.equal(announced.status, 507, "600 MB brauchen als Datei und entpackt mehr als 1 GiB frei");
+      assert.equal(((await announced.json()) as { error: string }).error, "diskFull");
+
+      // ohne Längenangabe: der Platz schwindet mitten im Empfang (nach 64 MiB wird geprüft)
+      let left = 10 * GiB;
+      setFreeBytesForTest(async () => left);
+      const big = Buffer.alloc(70 * 1024 * 1024, 1);
+      left = DISK_RESERVE_BYTES - 1;
+      const streamed = await post(big);
+      assert.equal(streamed.status, 507);
+    } finally {
+      setFreeBytesForTest(null);
+    }
+    assert.equal(core.listBackups().length, before);
+    assert.deepEqual(uploads(), [], "die halbe Datei ist gelöscht");
+    const failures = await env.db.auditLog.findMany({ where: { action: "backup.uploadFailed" } });
+    assert.ok(failures.some((f) => f.target === "diskFull"));
   });
 
   it("Müll, leerer Body und fremde Datenbanken: abgelehnt (422/400), Zwischendatei weg, Fehlschlag im Audit – nur mit Fehlercode", async () => {

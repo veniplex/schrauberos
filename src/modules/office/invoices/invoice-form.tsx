@@ -123,7 +123,7 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
             {t("invoices.currentFile")}: <strong>{initial.file.name}</strong> <span className="text-ink-muted">({number(initial.file.size / 1024, { maximumFractionDigits: 0 })} KB)</span>
           </p>
         ) : null}
-        <FileInput name="file" accept="application/pdf,image/png,image/jpeg,image/webp" aria-label={t("invoices.sections.file")} />
+        <FileInput name="file" accept="application/pdf,image/png,image/jpeg,image/webp,application/xml,text/xml,.xml" aria-label={t("invoices.sections.file")} />
         {err.file ? <FieldError>{err.file}</FieldError> : <FieldHint>{initial.file ? t("invoices.fileReplaceHint") : t("invoices.fileHint")}</FieldHint>}
         {initial.file ? (
           <Checkbox name="removeFile" label={t("invoices.removeFile")} className="mt-3" />

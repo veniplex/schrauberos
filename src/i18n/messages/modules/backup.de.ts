@@ -59,6 +59,8 @@ export const backupDe = {
     corrupt: "Die Datei ist beschädigt und kann nicht verwendet werden.",
     notBackup: "Das ist keine Backup-Datei dieser Anwendung.",
     newer: "Dieses Backup stammt von einer neueren Version der Anwendung. Bitte zuerst die Anwendung aktualisieren.",
+    tooLarge: "Die Datei ist zu groß oder enthält zu viele Einträge.",
+    diskFull: "Auf dem Server ist nicht genug freier Speicherplatz für diese Datei.",
     uploadFailed: "Der Upload ist fehlgeschlagen.",
   },
   note: "Ein Backup enthält alle Daten der Anwendung (auch Rechnungsbelege und Dokumentationsbilder) und ist nicht verschlüsselt: sicher aufbewahren. Dateien werden nicht doppelt gespeichert (nur Verweise), ein Backup kostet daher kaum Platz. Dafür schützt es nicht vor dem Ausfall des Datenträgers: gelegentlich eine Kopie außerhalb des Servers ablegen (Herunterladen).",

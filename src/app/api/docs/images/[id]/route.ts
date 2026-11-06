@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import { type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
+import { deliveryHeaders } from "@/lib/file-delivery";
 import { fileExists, fileSize, openFile } from "@/server/files";
 import { isDocArea } from "@/capabilities/docs/areas";
 import { canViewDocImage } from "@/capabilities/docs/images";
@@ -17,12 +18,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!(await canViewDocImage(session, { id: image.id, area: image.area }))) return new Response("Forbidden", { status: 403 });
 
   return new Response(Readable.toWeb(openFile(image.path)) as ReadableStream, {
-    headers: {
-      "Content-Type": image.mime,
-      "Content-Length": String(fileSize(image.path)),
-      "X-Content-Type-Options": "nosniff",
-      // Inhalt ist unveränderlich (neue ID bei neuem Bild) – nur privat im Browser cachen
-      "Cache-Control": "private, max-age=86400, immutable",
-    },
+    // Inhalt ist unveränderlich (neue ID bei neuem Bild) – nur privat im Browser cachen
+    headers: deliveryHeaders({ mime: image.mime, name: image.name, size: fileSize(image.path), cacheControl: "private, max-age=86400, immutable" }),
   });
 }

@@ -39,7 +39,7 @@ export function invoiceTotals(list: Array<{ status: string; dueDate: Date | null
 }
 
 /** Erlaubte Dateien am Rechnungsarchiv. */
-export const INVOICE_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"] as const;
+export const INVOICE_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "application/xml"] as const;
 export const INVOICE_FILE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** Passen Netto + MwSt zum Brutto (Toleranz 1 Cent wegen Rundung)? */
@@ -49,7 +49,7 @@ export function amountsConsistent(netCents: number | null, vatCents: number | nu
 }
 
 /** Dateiendung je erlaubtem Beleg-Typ. */
-const FILE_EXTENSIONS: Record<string, string> = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
+const FILE_EXTENSIONS: Record<string, string> = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "application/xml": "xml" };
 
 /**
  * Ort eines Belegs im Dateispeicher – lesbar und auffindbar:

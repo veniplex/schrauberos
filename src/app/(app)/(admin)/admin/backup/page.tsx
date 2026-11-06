@@ -117,6 +117,8 @@ export default async function BackupPage() {
                 notBackup: t("backup.errors.notBackup"),
                 corrupt: t("backup.errors.corrupt"),
                 newer: t("backup.errors.newer"),
+                tooLarge: t("backup.errors.tooLarge"),
+                diskFull: t("backup.errors.diskFull"),
                 uploadFailed: t("backup.errors.uploadFailed"),
               },
             }}

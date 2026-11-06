@@ -3,13 +3,14 @@ import { randomBytes } from "node:crypto";
 import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readSync, readFileSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
-import * as tar from "tar";
 import { constants as zlibConstants, createGunzip, gunzipSync } from "node:zlib";
+import { ArchiveError, extractArchive, type ArchiveLimits } from "@/lib/archive";
+import { DISK_RESERVE_BYTES, freeBytes } from "@/lib/disk";
 import { cancelPending, pendingDbFile, pendingFilesDir, restoreDir, writePending } from "@/lib/updates/restore";
 import { listMigrations } from "@/server/migrate";
 import { assertPlainTree, backupPath, backupsDir, checkDatabaseFile, countTree, createBackup, DB_ARCHIVE, gzipFile, linkTree, uniqueBackupName, writeInfo } from "./core";
 
-export type RestoreErrorCode = "notFound" | "corrupt" | "notBackup" | "newer";
+export type RestoreErrorCode = "notFound" | "corrupt" | "notBackup" | "newer" | "tooLarge" | "diskFull";
 
 /** Fehler mit festem Code; die Oberfläche übersetzt `backup.errors.<code>`. */
 export class RestoreError extends Error {
@@ -119,12 +120,16 @@ function sniff(file: string): Sniffed {
   return kindOf(head, false);
 }
 
+/** Obergrenzen für ein hochgeladenes Backup-Archiv: Zahl der Einträge und entpackte Gesamtgröße (zusätzlich begrenzt der freie Platz). */
+export const BACKUP_ARCHIVE_LIMITS: ArchiveLimits = { maxEntries: 500_000, maxBytes: 200 * 1024 ** 3 };
+
 /**
  * Übernimmt eine hochgeladene Datei als Sicherung `upload` in die Liste: ein Backup-Archiv (von „Herunterladen“) oder – für
  * ältere/fremde Sicherungen – eine reine SQLite-Datei (roh oder .gz; dann ohne Dateien). Die Datei muss auf der Platte liegen;
- * sie wird geprüft und danach gelöscht.
+ * sie wird geprüft und danach gelöscht. Archive werden nur mit Ordnern und normalen Dateien, ohne gefährliche Pfade und unter den Grenzen in
+ * `limits` (Einträge, Größe, freier Platz) entpackt (`lib/archive.ts`).
  */
-export async function importBackupFile(uploaded: string): Promise<string> {
+export async function importBackupFile(uploaded: string, limits: ArchiveLimits = BACKUP_ARCHIVE_LIMITS): Promise<string> {
   const kind = sniff(uploaded);
   if (!kind) {
     rmSync(uploaded, { force: true });
@@ -136,25 +141,16 @@ export async function importBackupFile(uploaded: string): Promise<string> {
   mkdirSync(work);
   try {
     if (kind === "tar" || kind === "tar.gz") {
-      // Nur Ordner und normale Dateien: Symlinks, Hardlinks und Sonderdateien werden abgelehnt
-      let unsupported = false;
+      const free = await freeBytes(root);
+      const diskLimit = free === null ? Number.POSITIVE_INFINITY : Math.max(0, free - DISK_RESERVE_BYTES);
       try {
-        await tar.x({
-          file: uploaded,
-          cwd: work,
-          strict: true,
-          noChmod: true,
-          filter: (_p, entry) => {
-            const type = (entry as tar.ReadEntry).type;
-            if (type === "File" || type === "OldFile" || type === "ContiguousFile" || type === "Directory") return true;
-            unsupported = true;
-            return false;
-          },
-        });
-      } catch {
+        await extractArchive(uploaded, work, { ...limits, maxBytes: Math.min(limits.maxBytes, diskLimit) }, { noChmod: true });
+      } catch (error) {
+        if (!(error instanceof ArchiveError)) throw error;
+        if (error.code === "unsupported" || error.code === "unsafePath") throw new RestoreError("notBackup");
+        if (error.code === "tooLarge" || error.code === "tooManyEntries") throw new RestoreError(diskLimit < limits.maxBytes && error.code === "tooLarge" ? "diskFull" : "tooLarge");
         throw new RestoreError("corrupt");
       }
-      if (unsupported) throw new RestoreError("notBackup");
       await assertPlainTree(work);
       if (!existsSync(path.join(work, DB_ARCHIVE))) throw new RestoreError("notBackup");
     } else {

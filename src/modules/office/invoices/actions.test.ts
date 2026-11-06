@@ -36,7 +36,7 @@ beforeEach(async () => {
 });
 
 const base = { direction: "incoming", number: "RE-1", partyName: "Lieferant GmbH", issueDate: "2026-03-14", gross: "119,00", net: "100,00", vat: "19,00" };
-const pdf = () => new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], "beleg.pdf", { type: "application/pdf" });
+const pdf = () => new File([new TextEncoder().encode("%PDF-1.4 beleg")], "beleg.pdf", { type: "application/pdf" });
 
 describe("saveInvoice", () => {
   it("legt eine Rechnung an (Beträge als Text), protokolliert und leitet zur Rechnung", async () => {
@@ -108,6 +108,35 @@ describe("saveInvoice", () => {
     const state = await actions.saveInvoice({}, form({ ...base, file: new File(["<html>"], "x.html", { type: "text/html" }) }));
     assert.ok(state.fieldErrors?.file);
     assert.equal(await env.db.invoice.count(), 0);
+  });
+
+  it("prüft den Inhalt der Datei, nicht nur die Angabe: HTML als .png/.pdf/.jpg, ein Bild mit falscher Typangabe und Text als XML werden abgelehnt (SEC-12)", async () => {
+    const html = new TextEncoder().encode("<html><script>alert(document.cookie)</script></html>");
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
+    const attempts: Array<[string, File]> = [
+      ["HTML als PNG", new File([html], "beleg.png", { type: "image/png" })],
+      ["HTML als PDF", new File([html], "beleg.pdf", { type: "application/pdf" })],
+      ["HTML ohne Typangabe", new File([html], "beleg.jpg")],
+      ["PNG als PDF ausgegeben", new File([png], "beleg.pdf", { type: "application/pdf" })],
+      ["Text als XML", new File(["das ist kein xml"], "beleg.xml", { type: "text/xml" })],
+      ["HTML als XML (XHTML)", new File(['<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"/>'], "beleg.xml", { type: "application/xml" })],
+    ];
+    for (const [name, file] of attempts) {
+      const state = await actions.saveInvoice({}, form({ ...base, number: `X-${name}`, file }));
+      assert.ok(state.fieldErrors?.file, name);
+    }
+    assert.equal(await env.db.invoice.count(), 0);
+    assert.equal(filesIn("rechnungen").length, 0, "nichts liegt im Dateispeicher");
+  });
+
+  it("speichert den erkannten Typ: echtes PNG mit leerer Typangabe, XML-Beleg (XRechnung) als application/xml mit Endung .xml", async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
+    await redirectOf(() => actions.saveInvoice({}, form({ ...base, number: "B-1", file: new File([png], "scan", { type: "" }) })));
+    await redirectOf(() => actions.saveInvoice({}, form({ ...base, number: "B-2", file: new File(['<?xml version="1.0"?><Invoice xmlns="urn:x"/>'], "re.xml", { type: "text/xml" }) })));
+    const files = await env.db.invoiceFile.findMany({ orderBy: { uploadedAt: "asc" } });
+    assert.deepEqual(files.map((f) => f.mime), ["image/png", "application/xml"]);
+    assert.ok(files[0].path.endsWith(".png"));
+    assert.ok(files[1].path.endsWith(".xml"));
   });
 
   it("ohne Recht invoices.edit wird nichts gespeichert", async () => {

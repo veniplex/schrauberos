@@ -4,9 +4,12 @@ import { z } from "zod";
 import { isHexColor } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/constants";
 import { formObject } from "@/lib/forms";
+import { logError } from "@/lib/log-safe";
 import { isValidTime } from "@/lib/opening-hours";
+import { checkUpload } from "@/lib/upload-sniff";
 import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
+import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
@@ -52,9 +55,12 @@ const saveWorkshopOperation = defineOperation({
     if (input.removeLogo) logoDataUrl = null;
     const file = input.logo;
     if (file && file.size > 0) {
-      if (!LOGO_TYPES.includes(file.type)) failField("logo", "settings.errors.logoType");
       if (file.size > MAX_LOGO_BYTES) failField("logo", "settings.errors.logoSize");
-      logoDataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString("base64")}`;
+      // Der Inhalt entscheidet (Magic Bytes), nicht der gemeldete Typ; in die Daten-URL kommt der erkannte Typ
+      const data = new Uint8Array(await file.arrayBuffer());
+      const checked = checkUpload(data, file.type, LOGO_TYPES);
+      if (!checked.ok) failField("logo", "settings.errors.logoType");
+      logoDataUrl = `data:${checked.mime};base64,${Buffer.from(data).toString("base64")}`;
     }
     return { logoDataUrl };
   },
@@ -79,7 +85,10 @@ const saveWorkshopOperation = defineOperation({
       ...(prepared.logoDataUrl !== undefined ? { logoDataUrl: prepared.logoDataUrl } : {}),
     };
     await tx.workshop.upsert({ where: { id: "default" }, update: data, create: { id: "default", ...data } });
-    afterCommit(() => applyTimezone(d.timezone)); // erst nach dem Speichern, nie bei einem abgebrochenen Vorgang
+    // erst nach dem Speichern, nie bei einem abgebrochenen Vorgang; die Termine der Cron-Jobs gelten danach in der neuen Zeitzone
+    afterCommit(() => {
+      if (applyTimezone(d.timezone)) void jobRunner().reschedule().catch((error) => logError("settings:reschedule", error));
+    });
     audit({ target: d.name });
     return { saved: true };
   },

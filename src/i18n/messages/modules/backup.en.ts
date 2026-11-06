@@ -61,6 +61,8 @@ export const backupEn: typeof backupDe = {
     corrupt: "The file is damaged and cannot be used.",
     notBackup: "This is not a backup file of this application.",
     newer: "This backup comes from a newer version of the application. Please update the application first.",
+    tooLarge: "The file is too large or contains too many entries.",
+    diskFull: "The server does not have enough free disk space for this file.",
     uploadFailed: "The upload failed.",
   },
   note: "A backup contains all data of the application (including invoice receipts and documentation images) and is not encrypted: keep it safe. Files are not stored twice (only links), so a backup costs hardly any space. It does not protect against failure of the disk, though: keep a copy away from the server now and then (download).",

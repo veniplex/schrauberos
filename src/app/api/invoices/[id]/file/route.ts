@@ -2,9 +2,13 @@ import { Readable } from "node:stream";
 import { type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
+import { deliveryHeaders } from "@/lib/file-delivery";
 import { fileExists, fileSize, openFile } from "@/server/files";
 
-/** Liefert die Datei einer Rechnung aus – nur mit Recht `invoices.view`. ?download=1 erzwingt den Download. */
+/**
+ * Liefert die Datei einer Rechnung aus – nur mit Recht `invoices.view`. ?download=1 erzwingt den Download. Kopfzeilen (nosniff, PDF inline,
+ * sonst `sandbox`, XML nur als Download, sicherer Dateiname): siehe `lib/file-delivery.ts`.
+ */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || session.user.mustChangePassword) return new Response("Unauthorized", { status: 401 });
@@ -15,15 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!file || !fileExists(file.path)) return new Response("Not found", { status: 404 });
 
   const download = request.nextUrl.searchParams.get("download") === "1";
-  // Dateiname nur ASCII im einfachen Parameter + UTF-8-Variante (RFC 5987)
-  const ascii = file.name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
   return new Response(Readable.toWeb(openFile(file.path)) as ReadableStream, {
-    headers: {
-      "Content-Type": file.mime,
-      "Content-Length": String(fileSize(file.path)),
-      "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-    },
+    headers: deliveryHeaders({ mime: file.mime, name: file.name, download, size: fileSize(file.path) }),
   });
 }
