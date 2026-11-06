@@ -420,8 +420,8 @@ getrennt: `UPDATE_ROOT_PUBLIC_KEY`).
 
 ### Schlüsselkette: Wurzelschlüssel → Release-Schlüssel
 
-Damit der Release-Schlüssel getauscht werden kann, ohne dass jede Installation ein neues Image braucht, gibt es zwei Ebenen
-(`src/lib/updates/keychain.ts`, getestet):
+Damit ein **verlorener** (oder planmäßig gewechselter) Release-Schlüssel ersetzt werden kann, ohne dass jede Installation ein neues Image
+braucht, gibt es zwei Ebenen (`src/lib/updates/keychain.ts`, getestet):
 
 | Schlüssel | Wo er liegt | Wofür |
 | --- | --- | --- |
@@ -430,16 +430,23 @@ Damit der Release-Schlüssel getauscht werden kann, ohne dass jede Installation 
 
 Die App vertraut dem eingebauten Release-Schlüssel **und** jedem Schlüssel mit einer gültigen Beglaubigung des Wurzelschlüssels
 (`release-keys.json`, wird dem Release beigelegt und unter `<DATA_DIR>/app/release-keys.json` gemerkt; bei jeder Verwendung erneut
-gegen die Wurzel geprüft, optional befristet mit `--valid-until`). Nicht beglaubigte Schlüssel werden abgelehnt.
+gegen die Wurzel geprüft). **Jede Beglaubigung trägt ein Ablaufdatum (`--valid-until`, Pflicht)**; eine unbefristete wird von der App abgelehnt und vom
+Skript gar nicht erst erzeugt. Nicht beglaubigte Schlüssel werden abgelehnt.
 
-* **Ausgangslage:** `ROOT_PUBLIC_KEY` ist noch `= RELEASE_PUBLIC_KEY` – die Kette funktioniert, schützt aber erst, wenn der Besitzer
-  einen eigenen Wurzelschlüssel erzeugt (Befehle oben, andere Dateinamen), den öffentlichen Teil als `ROOT_PUBLIC_KEY` einträgt (vor
-  der Veröffentlichung, Wurzel steht im Image) und den privaten Teil offline verwahrt.
+**Grenze der Kette (wichtig):** Der im Image eingebaute Release-Schlüssel bleibt für diese Installationen **immer vertraut**. Die Kette hilft bei
+*Verlust* des privaten Schlüssels – **nicht** bei *Diebstahl* oder Kompromittierung: Wer das Secret `RELEASE_SIGNING_KEY` gestohlen hat, kann weiter
+gültige Manifeste signieren, eine Beglaubigung für einen neuen Schlüssel entzieht dem alten nichts. Dagegen bräuchte es eine Widerrufsliste oder einen
+**neuen Wurzelschlüssel samt neuem Image**, das jede Installation einmal von Hand zieht.
+
+* **Ausgangslage:** `ROOT_PUBLIC_KEY` ist noch `= RELEASE_PUBLIC_KEY` – dann schützt die Kette nicht. **`scripts/make-release.mjs` bricht beim
+  Tag-Build deshalb ab** (kein stilles Zurückfallen auf den Release-Schlüssel; getestet in `src/lib/updates/make-release.test.ts`), bis der Besitzer
+  einen eigenen Wurzelschlüssel erzeugt (Befehle oben, andere Dateinamen), den öffentlichen Teil als `ROOT_PUBLIC_KEY` einträgt (vor der
+  Veröffentlichung, die Wurzel steht im Image) und den privaten Teil offline verwahrt.
 * **Release-Schlüssel tauschen:** neues Paar erzeugen, Secret `RELEASE_SIGNING_KEY` ersetzen, offline beglaubigen:
-  `ROOT_SIGNING_KEY_FILE=wurzel-privat.pem node scripts/endorse-release-key.mjs --public release-public-key.pem [--valid-until 2031-12-31]`,
+  `ROOT_SIGNING_KEY_FILE=wurzel-privat.pem node scripts/endorse-release-key.mjs --public release-public-key.pem --valid-until 2031-12-31`,
   `release-keys.json` committen, Release veröffentlichen – Installationen nehmen den neuen Schlüssel über die Beglaubigung an.
   `scripts/make-release.mjs` prüft die Signatur gegen die Kette und legt `release-keys.json` bei.
-* **Wurzelschlüssel tauschen** (Verlust/Kompromittierung) geht nur über ein neues Image.
+* **Wurzelschlüssel tauschen** (Verlust/Kompromittierung) und **Widerruf eines gestohlenen Release-Schlüssels** gehen nur über ein neues Image.
 * Private Schlüssel gehören **nie** ins Repository.
 
 ### Schlüsselpaar erzeugen
@@ -481,7 +488,8 @@ Die private Datei beginnt mit `-----BEGIN PRIVATE KEY-----`, die öffentliche mi
 Weil der öffentliche Schlüssel **im Image** steht, erkennen bereits laufende Installationen Releases, die mit einem neuen Schlüssel
 signiert sind, nicht mehr an (die Update-Seite meldet „Signatur ungültig“) – **es sei denn, der neue Release-Schlüssel ist vom
 Wurzelschlüssel beglaubigt** (siehe Schlüsselkette). Ohne Beglaubigung muss **jede Installation einmal ein neues Image ziehen**;
-danach laufen Web-Updates wieder. Den Schlüssel nur bei Verlust oder Kompromittierung
+danach laufen Web-Updates wieder. Bei *Diebstahl* des privaten Schlüssels reicht Rotieren nicht (der alte bleibt in bestehenden Images vertraut): neuen
+Wurzelschlüssel und neues Image veröffentlichen. Den Schlüssel nur bei Verlust oder Kompromittierung
 wechseln: neues Paar erzeugen, Secret ersetzen (`gh secret set …` überschreibt), öffentlichen Schlüssel eintragen, Release
 veröffentlichen, Installationen einmal per `docker compose pull && docker compose up -d` aktualisieren.
 

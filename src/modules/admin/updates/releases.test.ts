@@ -68,7 +68,7 @@ describe("Release-Prüfung mit Schlüsselkette", () => {
   });
 
   it("akzeptiert ein Release mit neuem Schlüssel, den der Wurzelschlüssel beglaubigt hat, und merkt sich die Beglaubigung", async () => {
-    const endorsement = createEndorsement(priv(root), pub(rotated));
+    const endorsement = createEndorsement(priv(root), pub(rotated), "2099-12-31");
     fakeGithub(rotated, { keys: [endorsement] });
     assert.ok("release" in (await releases.checkLatestRelease(true)));
     assert.deepEqual(store.readEndorsements(), [endorsement]);
@@ -82,7 +82,7 @@ describe("Release-Prüfung mit Schlüsselkette", () => {
   it("lehnt ein Release mit nicht beglaubigtem Schlüssel ab – auch mit selbst ausgestellter Beglaubigung", async () => {
     fakeGithub(rogue);
     assert.deepEqual(await releases.checkLatestRelease(true).then((c) => ("error" in c ? c.error : "ok")), "badSignature");
-    fakeGithub(rogue, { keys: [createEndorsement(priv(rogue), pub(rogue))] });
+    fakeGithub(rogue, { keys: [createEndorsement(priv(rogue), pub(rogue), "2099-12-31")] });
     assert.deepEqual(await releases.checkLatestRelease(true).then((c) => ("error" in c ? c.error : "ok")), "badSignature");
     assert.deepEqual(store.readEndorsements(), [], "ungültige Beglaubigungen werden nicht gemerkt");
   });

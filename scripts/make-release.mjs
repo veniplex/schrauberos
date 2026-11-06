@@ -8,7 +8,7 @@ import { createHash, createPublicKey, sign, verify } from "node:crypto";
 import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseEndorsements, trustedReleaseKeys } from "../src/lib/updates/keychain.ts";
+import { parseEndorsements, rootKeyProblem, trustedReleaseKeys } from "../src/lib/updates/keychain.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -39,12 +39,23 @@ const manifest = {
 const bytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
 const signature = sign(null, bytes, privateKey);
 
-const source = readFileSync(resolve(root, "src/modules/admin/updates/release-key.ts"), "utf8");
+// RELEASE_KEY_FILE: nur für Tests (Pfad zu einer Kopie von release-key.ts)
+const source = readFileSync(process.env.RELEASE_KEY_FILE ?? resolve(root, "src/modules/admin/updates/release-key.ts"), "utf8");
 const keyOf = (name) => new RegExp(`${name}\\s*=\\s*\`(-----BEGIN PUBLIC KEY-----[\\s\\S]*?-----END PUBLIC KEY-----\\n?)\``).exec(source)?.[1];
 const publicPem = keyOf("RELEASE_PUBLIC_KEY");
 if (!publicPem) throw new Error("Öffentlicher Schlüssel in release-key.ts nicht gefunden.");
-// Steht ROOT_PUBLIC_KEY noch als Zuweisung `= RELEASE_PUBLIC_KEY` da, gilt der Release-Schlüssel zugleich als Wurzel
-const rootPem = keyOf("ROOT_PUBLIC_KEY") ?? publicPem;
+// Kein stilles Zurückfallen: Ist ROOT_PUBLIC_KEY noch eine Zuweisung `= RELEASE_PUBLIC_KEY` (oder dasselbe PEM), schützt die Kette nicht –
+// wer das GitHub-Secret hat, könnte zugleich beglaubigen. Der Tag-Build bricht dann ab, bis ein eigener Offline-Wurzelschlüssel eingetragen ist.
+const rootPem = keyOf("ROOT_PUBLIC_KEY");
+const problem = rootKeyProblem(publicPem, rootPem);
+if (problem) {
+  throw new Error(
+    (problem === "root-missing"
+      ? "ROOT_PUBLIC_KEY in release-key.ts ist kein eigener Schlüssel (steht noch als Zuweisung an RELEASE_PUBLIC_KEY)."
+      : "ROOT_PUBLIC_KEY ist derselbe Schlüssel wie RELEASE_PUBLIC_KEY.") +
+      " Release abgebrochen: zuerst einen eigenen Wurzelschlüssel offline erzeugen und seinen öffentlichen Teil als ROOT_PUBLIC_KEY eintragen (README, „Schlüsselkette“).",
+  );
+}
 const keysFile = resolve(root, "release-keys.json");
 const endorsements = existsSync(keysFile) ? parseEndorsements(JSON.parse(readFileSync(keysFile, "utf8"))) : [];
 const trusted = trustedReleaseKeys({ root: rootPem, builtIn: [publicPem], endorsements });

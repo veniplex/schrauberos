@@ -4,12 +4,20 @@
  *   Wurzelschlüssel (im Code/Image, privater Teil offline)  ──beglaubigt──▶  Release-Schlüssel  ──signiert──▶  Manifest
  *
  * Der **Wurzelschlüssel** steht fest im Code (`release-key.ts`). Er signiert nur *Beglaubigungen* für Release-Schlüssel, nie
- * Pakete. Der **Release-Schlüssel** (privat als GitHub-Secret) signiert die Manifeste. So lässt sich der Release-Schlüssel
- * tauschen (Verlust, Verdacht), ohne dass jede Installation ein neues Image braucht: Die neue Beglaubigung wird mit dem Release
- * ausgeliefert, die App prüft die Kette und merkt sie sich im Datenverzeichnis (`<DATA_DIR>/app/release-keys.json`).
+ * Pakete. Der **Release-Schlüssel** (privat als GitHub-Secret) signiert die Manifeste. Die Kette löst **ein** Problem: den
+ * *Verlust* des Release-Schlüssels (oder seinen planmäßigen Wechsel). Dann beglaubigt der Wurzelschlüssel einen neuen, ohne dass
+ * jede Installation ein neues Image braucht: Die Beglaubigung wird mit dem Release ausgeliefert, die App prüft die Kette und merkt
+ * sie sich im Datenverzeichnis (`<DATA_DIR>/app/release-keys.json`).
+ *
+ * **Was die Kette nicht leistet:** Der im Image eingebaute Release-Schlüssel (`RELEASE_PUBLIC_KEY`) bleibt für diese Installationen
+ * **immer vertraut**. Wird sein privater Teil gestohlen (Kompromittierung), kann der Dieb weiterhin gültige Manifeste signieren; eine
+ * Beglaubigung für einen neuen Schlüssel entzieht dem alten das Vertrauen nicht. Dagegen bräuchte es eine Widerrufsliste oder einen
+ * neuen Wurzelschlüssel samt neuem Image (die Installationen ziehen es einmal von Hand). Wer das Secret `RELEASE_SIGNING_KEY` für
+ * gestohlen hält, muss also ein neues Image veröffentlichen, nicht nur rotieren.
  *
  * Eine Beglaubigung ist `{ statement, signature }` (beide base64): `statement` sind die exakten JSON-Bytes
- * `{"schema":1,"publicKey":"<PEM>","validUntil":"<Datum, optional>"}`; die Signatur des Wurzelschlüssels gilt für
+ * `{"schema":1,"publicKey":"<PEM>","validUntil":"<JJJJ-MM-TT>"}`; `validUntil` ist **Pflicht** (eine unbefristete Beglaubigung gilt
+ * nicht, sonst bliebe ein einmal beglaubigter Schlüssel für immer gültig); die Signatur des Wurzelschlüssels gilt für
  * `ENDORSEMENT_CONTEXT + statement` (so lässt sich eine Beglaubigung nie mit einer Manifest-Signatur verwechseln).
  */
 import { createPublicKey, sign, verify } from "node:crypto";
@@ -44,10 +52,10 @@ export function verifyEndorsement(endorsement: Endorsement, rootPem: string, now
     if (!verify(null, Buffer.concat([Buffer.from(ENDORSEMENT_CONTEXT), statement]), createPublicKey(rootPem), signature)) return null;
     const data = JSON.parse(statement.toString("utf8")) as { schema?: unknown; publicKey?: unknown; validUntil?: unknown };
     if (data.schema !== 1 || !ownKey(data.publicKey)) return null;
-    if (data.validUntil !== undefined) {
-      if (typeof data.validUntil !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(data.validUntil)) return null;
-      if (now.getTime() > Date.parse(`${data.validUntil}T23:59:59Z`)) return null;
-    }
+    // Pflicht: eine Beglaubigung ohne (oder mit unlesbarem) Ablaufdatum gilt nicht
+    if (typeof data.validUntil !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(data.validUntil)) return null;
+    const end = Date.parse(`${data.validUntil}T23:59:59Z`);
+    if (Number.isNaN(end) || now.getTime() > end) return null;
     createPublicKey(data.publicKey); // muss ein lesbarer Schlüssel sein
     return data.publicKey;
   } catch {
@@ -79,8 +87,18 @@ function samePublicKey(a: string, b: string): boolean {
 }
 
 /** Erzeugt eine Beglaubigung (für das Skript `scripts/endorse-release-key.mjs`; der Wurzel-Schlüssel kommt nie in die App). */
-export function createEndorsement(rootPrivatePem: string, releasePublicPem: string, validUntil?: string): Endorsement {
-  const statement = Buffer.from(JSON.stringify({ schema: 1, publicKey: releasePublicPem, ...(validUntil ? { validUntil } : {}) }));
+export function createEndorsement(rootPrivatePem: string, releasePublicPem: string, validUntil: string): Endorsement {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(validUntil) || Number.isNaN(Date.parse(`${validUntil}T23:59:59Z`))) throw new Error("validUntil (JJJJ-MM-TT) ist Pflicht.");
+  const statement = Buffer.from(JSON.stringify({ schema: 1, publicKey: releasePublicPem, validUntil }));
   const signature = sign(null, Buffer.concat([Buffer.from(ENDORSEMENT_CONTEXT), statement]), rootPrivatePem);
   return { statement: statement.toString("base64"), signature: signature.toString("base64") };
+}
+
+/**
+ * Ist die Schlüsselausstattung für einen Release brauchbar? Solange der Wurzelschlüssel fehlt oder derselbe wie der Release-Schlüssel
+ * ist, schützt die Kette nicht: Wer das GitHub-Secret hat, kann zugleich beglaubigen. Das Release-Skript bricht dann ab.
+ */
+export function rootKeyProblem(releasePem: string, rootPem: string | undefined): "root-missing" | "root-equals-release" | null {
+  if (!rootPem) return "root-missing";
+  return samePublicKey(releasePem, rootPem) ? "root-equals-release" : null;
 }
