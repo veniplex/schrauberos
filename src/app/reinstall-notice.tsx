@@ -1,4 +1,5 @@
 import { Alert, Card, PageHeader } from "@/components/ui/layout";
+import { REINSTALL_TEXT } from "@/lib/reinstall-text";
 
 /**
  * Statt der Anwendung, wenn die Datenbank im Volume aus einer nicht verträglichen Version stammt (fremde Migrationshistorie, siehe
@@ -7,16 +8,14 @@ import { Alert, Card, PageHeader } from "@/components/ui/layout";
  */
 export function ReinstallNotice() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-10">
+    <main className="mx-auto w-full max-w-2xl px-4 py-10" data-status="reinstall">
       <Card>
-        <PageHeader title="Neuinstallation nötig · Reinstallation required" />
+        <PageHeader title={REINSTALL_TEXT.title} />
         <div className="grid gap-4 text-sm">
-          <Alert tone="danger">
-            Die Datenbank in diesem Volume stammt aus einer nicht verträglichen Version von SchrauberOS (zum Beispiel 0.1.0). Die Anwendung startet deshalb nicht und hat nichts verändert.
-          </Alert>
-          <p>Bitte mit einem neuen, leeren Volume starten und neu einrichten. Daten der alten Version werden nicht übernommen.</p>
-          <Alert tone="danger">The database in this volume comes from an incompatible SchrauberOS version (for example 0.1.0). The application therefore does not start and has not changed anything.</Alert>
-          <p>Please start with a new, empty volume and set up again. Data from the old version is not carried over.</p>
+          <Alert tone="danger">{REINSTALL_TEXT.de[0]}</Alert>
+          <p>{REINSTALL_TEXT.de[1]}</p>
+          <Alert tone="danger">{REINSTALL_TEXT.en[0]}</Alert>
+          <p>{REINSTALL_TEXT.en[1]}</p>
         </div>
       </Card>
     </main>

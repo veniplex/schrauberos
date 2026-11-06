@@ -305,6 +305,18 @@ export async function requireSession(opts: { allowPasswordChange?: boolean } = {
 }
 
 /**
+ * Für `generateMetadata`: liefert die Sitzung nur, wenn die Person angemeldet ist, kein Passwortwechsel aussteht und sie das Recht hat – sonst
+ * `null`, **ohne** Weiterleitung oder 404 (Metadaten sind kein Ort dafür). Der Titel einer Detailseite (Kundenname, Rechnungsnummer …) darf nur
+ * mit dem Recht der Seite aus der Datenbank gelesen werden: Er steht sonst schon im ersten gestreamten HTML, noch bevor die Seite selbst prüft.
+ */
+export async function sessionIfAllowed(permission: Permission): Promise<AppSession | null> {
+  const session = await getSession();
+  if (!session || session.user.mustChangePassword) return null;
+  if (!session.features.has(featureOfPermission(permission) ?? "") || !session.can(permission)) return null;
+  return session;
+}
+
+/**
  * Login + Berechtigung erzwingen. Gehört das Recht zu einer ausgeschalteten Funktion, gibt es die Seite
  * schlicht nicht (404); sonst ohne Recht -> /forbidden.
  */

@@ -7,7 +7,7 @@ import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName, customerHasLinks } from "@/modules/workshop/customers/domain";
 import { toDateInput } from "@/lib/dates";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteCustomer } from "@/modules/workshop/customers/actions";
 import { HealthBadge, SeasonBadge, formatTireSize, getTireRules, setHealth } from "@/modules/workshop/tires/public";
@@ -15,6 +15,7 @@ import { STATUS_TONE } from "@/modules/workshop/appointments/public";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  if (!(await sessionIfAllowed("customers.view"))) return {};
   const c = await db.customer.findUnique({ where: { id } });
   return { title: c ? customerDisplayName(c) : undefined };
 }

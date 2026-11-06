@@ -8,7 +8,7 @@ import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { formatTireSize, setHealth, tireHealth } from "@/modules/workshop/tires/domain";
 import { getTireRules } from "@/modules/workshop/tires/settings";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteTireSet, setTireSetStatus } from "@/modules/workshop/tires/actions";
 import { HealthBadge, SeasonBadge } from "@/modules/workshop/tires/ui";
@@ -17,6 +17,7 @@ import { toDateInput } from "@/lib/dates";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const [{ id }, { t }] = await Promise.all([params, getI18n()]);
+  if (!(await sessionIfAllowed("tires.view"))) return {};
   const set = await db.tireSet.findUnique({ where: { id }, include: { vehicle: true } });
   return { title: set ? `${set.vehicle.plate} · ${t("tires.title")}` : t("tires.title") };
 }

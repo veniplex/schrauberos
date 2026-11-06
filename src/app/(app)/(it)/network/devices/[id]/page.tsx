@@ -7,7 +7,7 @@ import { Badge, Card, DefinitionList, EmptyState, PageHeader, Table } from "@/co
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { compareIPv4, nextFreeIp, warrantyState } from "@/modules/it/network/domain";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteDevice } from "@/modules/it/network/actions";
 import { checkDevices } from "@/modules/it/network/queries";
@@ -15,6 +15,7 @@ import { DemoNotice, DeviceStatusBadge, LinkStateBadge } from "@/modules/it/netw
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  if (!(await sessionIfAllowed("network.view"))) return {};
   const d = await db.netDevice.findUnique({ where: { id } });
   return { title: d?.name };
 }

@@ -11,7 +11,7 @@ import { employeeName } from "@/modules/office/employees/public";
 import { COST_CATEGORIES, costPerKm, currentMileage, fleetDues } from "@/modules/office/fleet/domain";
 import { formatCents } from "@/lib/money";
 import { INTL_LOCALE } from "@/i18n/config";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteCost, deleteFleetVehicle, deleteMileage } from "@/modules/office/fleet/actions";
 import { CostForm, MileageForm } from "@/modules/office/fleet/forms";
@@ -19,6 +19,7 @@ import { DueBadge } from "@/modules/office/fleet/ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  if (!(await sessionIfAllowed("fleet.view"))) return {};
   const v = await db.fleetVehicle.findUnique({ where: { id } });
   return { title: v?.plate };
 }

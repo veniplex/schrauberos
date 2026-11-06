@@ -8,7 +8,7 @@ import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { toDateInput, todayInput } from "@/lib/dates";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
 import { HealthBadge, SeasonBadge, formatTireSize, getTireRules, setHealth } from "@/modules/workshop/tires/public";
@@ -17,6 +17,7 @@ import { TransferForm } from "@/modules/workshop/vehicles/forms";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  if (!(await sessionIfAllowed("vehicles.view"))) return {};
   const v = await db.vehicle.findUnique({ where: { id } });
   return { title: v?.plate };
 }

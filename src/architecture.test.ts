@@ -232,3 +232,34 @@ describe("Aktions-Rahmen", () => {
     assert.deepEqual(violations, []);
   });
 });
+
+describe("Seitentitel (generateMetadata)", () => {
+  /** Rumpf jeder `generateMetadata`-Funktion einer Datei (Klammern gezählt). */
+  function metadataBodies(source: string): string[] {
+    const bodies: string[] = [];
+    for (const m of source.matchAll(/export async function generateMetadata\([^)]*\)[^{]*\{/g)) {
+      let depth = 1;
+      let i = (m.index ?? 0) + m[0].length;
+      const start = i;
+      while (depth > 0 && i < source.length) {
+        if (source[i] === "{") depth++;
+        else if (source[i] === "}") depth--;
+        i++;
+      }
+      bodies.push(source.slice(start, i));
+    }
+    return bodies;
+  }
+
+  it("Titel, die aus der Datenbank kommen, werden erst nach der Rechteprüfung gelesen (Verhalten: app/metadata.test.ts)", () => {
+    const unguarded: string[] = [];
+    for (const file of walk(path.join(SRC, "app"))) {
+      for (const body of metadataBodies(readFileSync(file, "utf8"))) {
+        const readsDatabase = /\bdb\./.test(body);
+        const guarded = /\b(sessionIfAllowed|getSession|requirePermission|requireSession)\(/.test(body);
+        if (readsDatabase && !guarded) unguarded.push(path.relative(SRC, file).split(path.sep).join("/"));
+      }
+    }
+    assert.deepEqual(unguarded, [], "generateMetadata liest die Datenbank ohne Rechteprüfung: sessionIfAllowed(\"<recht>\") vorschalten");
+  });
+});

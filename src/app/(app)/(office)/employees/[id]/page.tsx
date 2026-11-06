@@ -8,13 +8,14 @@ import { getI18n } from "@/i18n/server";
 import { currentYear } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { employeeName, visibleAbsenceType, workdaysBetween, workdaysWithin } from "@/modules/office/employees/domain";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteAbsence, deleteEmployee, deleteQualification } from "@/modules/office/employees/actions";
 import { QualificationForm } from "@/modules/office/employees/forms";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  if (!(await sessionIfAllowed("employees.view"))) return {};
   const e = await db.employee.findUnique({ where: { id } });
   return { title: e ? employeeName(e) : undefined };
 }

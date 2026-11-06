@@ -7,13 +7,14 @@ import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { compareIPv4, freeRanges, nextFreeIp, parseCidr } from "@/modules/it/network/domain";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteIp } from "@/modules/it/network/actions";
 import { IpForm } from "@/modules/it/network/forms";
 
 export async function generateMetadata({ params }: { params: Promise<{ subnetId: string }> }): Promise<Metadata> {
   const { subnetId } = await params;
+  if (!(await sessionIfAllowed("network.view"))) return {};
   const s = await db.netSubnet.findUnique({ where: { id: subnetId } });
   return { title: s ? `${s.name} (${s.cidr})` : undefined };
 }

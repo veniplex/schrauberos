@@ -10,7 +10,7 @@ import { todayInput } from "@/lib/dates";
 import { paymentState } from "@/modules/office/invoices/domain";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { formatCents } from "@/lib/money";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteInvoice, markInvoicePaid, reopenInvoice } from "@/modules/office/invoices/actions";
 import { PaymentBadge } from "@/modules/office/invoices/ui";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  if (!(await sessionIfAllowed("invoices.view"))) return {};
   const inv = await db.invoice.findUnique({ where: { id } });
   return { title: inv ? `${inv.number} · ${inv.partyName}` : undefined };
 }
