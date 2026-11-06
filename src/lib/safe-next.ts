@@ -18,5 +18,14 @@ export function safeNext(value: unknown, fallback = "/"): string {
   if (/%5c/i.test(value)) return fallback;
   // Die Anmeldeseite selbst ist kein Ziel (Schleife)
   if (url.pathname === "/login" || url.pathname.startsWith("/login/")) return fallback;
-  return url.pathname + url.search + url.hash;
+  const result = url.pathname + url.search + url.hash;
+  // Die Normalisierung entfernt Punktsegmente: "/.//evil.com" wird zu "//evil.com" (protokollrelativ!). Das Ergebnis muss deshalb
+  // selbst noch einmal bestehen – kein "//" am Anfang, kein Rückwärtsschrägstrich, gleicher Origin bei erneuter Auflösung.
+  if (result.startsWith("//") || result.includes("\\")) return fallback;
+  try {
+    if (new URL(result, BASE).origin !== BASE) return fallback;
+  } catch {
+    return fallback;
+  }
+  return result;
 }

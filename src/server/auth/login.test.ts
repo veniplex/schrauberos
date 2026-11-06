@@ -279,6 +279,9 @@ describe("Anmeldeseite", () => {
     await attempt("anna", "richtiges-passwort-1");
     assert.equal(await redirectOf(() => LoginPage({ searchParams: Promise.resolve({ next: "/appointments" }) })), "/appointments");
     assert.equal(await redirectOf(() => LoginPage({ searchParams: Promise.resolve({ next: "//evil.example" }) })), "/");
+    for (const evil of ["/.//evil.example", "/%2e//evil.example", "/a/..//evil.example"]) {
+      assert.equal(await redirectOf(() => LoginPage({ searchParams: Promise.resolve({ next: evil }) })), "/", evil);
+    }
   });
 
   it("ohne Benutzer geht es zur Ersteinrichtung", async () => {

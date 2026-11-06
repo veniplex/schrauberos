@@ -19,6 +19,17 @@ describe("safeNext", () => {
     for (const evil of ["/\\x", "/%5Cx", "/%5cx", "/\\t/x", "/\t/x", "//x", "javascript:alert(1)", "https://evil.example", "evil.example", "", "x"]) assert.equal(safeNext(evil), "/", JSON.stringify(evil));
   });
 
+  it("lässt sich nicht durch Punktsegmente in //host verwandeln (URL-Normalisierung)", () => {
+    for (const evil of ["/.//evil.com", "/%2e//evil.com", "/%2E//evil.com", "/a/..//evil.com", "/a/%2e%2e//evil.com", "/..//evil.com", "/a/./..//evil.com/x"]) {
+      const result = safeNext(evil);
+      assert.ok(result.startsWith("/") && !result.startsWith("//") && !result.includes("\\"), `${JSON.stringify(evil)} → ${result}`);
+      assert.equal(result, "/", JSON.stringify(evil));
+    }
+    // normale Pfade mit Punktsegmenten bleiben erlaubt
+    assert.equal(safeNext("/a/../b"), "/b");
+    assert.equal(safeNext("/a/./b?x=1"), "/a/b?x=1");
+  });
+
   it("nimmt keine Nicht-Texte und keine Anmeldeseite als Ziel", () => {
     assert.equal(safeNext(null), "/");
     assert.equal(safeNext(undefined), "/");
