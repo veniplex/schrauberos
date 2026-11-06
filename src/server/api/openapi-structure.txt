@@ -1,3 +1,5 @@
+GET /appointment-bays appointment-bays.list appointments.view sort=sortOrder,name
+GET /appointment-bays/{id} appointment-bays.get appointments.view
 GET /appointment-types appointment-types.list appointments.view sort=sortOrder,name
 GET /appointment-types/{id} appointment-types.get appointments.view
 GET /appointments appointments.list appointments.view query=from,to,status,bayId,vehicleId,customerId,assigneeId sort=startsAt,title,createdAt,updatedAt
@@ -5,8 +7,6 @@ POST /appointments appointments.create appointments.create body=title,typeId,veh
 GET /appointments/{id} appointments.get appointments.view
 PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId,vehicleId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
 DELETE /appointments/{id} appointments.delete appointments.delete
-GET /bays bays.list appointments.view sort=sortOrder,name
-GET /bays/{id} bays.get appointments.view
 GET /customers customers.list customers.view query=q,city sort=lastName,customerNumber,city,createdAt,updatedAt
 POST /customers customers.create customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
 GET /customers/{id} customers.get customers.view
@@ -49,35 +49,35 @@ PATCH /invoices/{id} invoices.update invoices.edit body=direction,number,partyNa
 DELETE /invoices/{id} invoices.delete invoices.delete
 POST /invoices/{id}/pay invoices.pay invoices.edit body=paidAt
 POST /invoices/{id}/reopen invoices.reopen invoices.edit
-GET /network/connections network-connections.list network.view query=deviceId sort=cableLabel
-POST /network/connections network-connections.create network.edit body=fromDeviceId,fromPort,toDeviceId,toPort,cableLabel,notes
-GET /network/connections/{id} network-connections.get network.view
-DELETE /network/connections/{id} network-connections.delete network.delete
-GET /network/devices network-devices.list network.view query=q,type,status,locationId sort=name,type,createdAt,updatedAt
-POST /network/devices network-devices.create network.edit body=name,type,status,manufacturer,model,serialNumber,locationId,rackInfo,portCount,assignedTo,purchaseDate,warrantyUntil,monitorEnabled,notes
-GET /network/devices/{id} network-devices.get network.view
-PATCH /network/devices/{id} network-devices.update network.edit body=name,type,status,manufacturer,model,serialNumber,locationId,rackInfo,portCount,assignedTo,purchaseDate,warrantyUntil,monitorEnabled,notes
-DELETE /network/devices/{id} network-devices.delete network.delete
-GET /network/ips network-ips.list network.view query=subnetId,deviceId,q sort=address,hostname,createdAt,updatedAt
-POST /network/ips network-ips.create network.edit body=subnetId,address,deviceId,hostname,kind,mac,notes
-GET /network/ips/{id} network-ips.get network.view
-PATCH /network/ips/{id} network-ips.update network.edit body=subnetId,address,deviceId,hostname,kind,mac,notes
-DELETE /network/ips/{id} network-ips.delete network.delete
-GET /network/locations network-locations.list network.view sort=name,sortOrder
-POST /network/locations network-locations.create network.edit body=name,description,sortOrder
-GET /network/locations/{id} network-locations.get network.view
-PATCH /network/locations/{id} network-locations.update network.edit body=name,description,sortOrder
-DELETE /network/locations/{id} network-locations.delete network.delete
-GET /network/subnets network-subnets.list network.view query=vlanId sort=name,cidr
-POST /network/subnets network-subnets.create network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
-GET /network/subnets/{id} network-subnets.get network.view
-PATCH /network/subnets/{id} network-subnets.update network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
-DELETE /network/subnets/{id} network-subnets.delete network.delete
-GET /network/vlans network-vlans.list network.view sort=number,name
-POST /network/vlans network-vlans.create network.edit body=number,name,description
-GET /network/vlans/{id} network-vlans.get network.view
-PATCH /network/vlans/{id} network-vlans.update network.edit body=number,name,description
-DELETE /network/vlans/{id} network-vlans.delete network.delete
+GET /network-connections network-connections.list network.view query=deviceId sort=cableLabel
+POST /network-connections network-connections.create network.edit body=fromDeviceId,fromPort,toDeviceId,toPort,cableLabel,notes
+GET /network-connections/{id} network-connections.get network.view
+DELETE /network-connections/{id} network-connections.delete network.delete
+GET /network-devices network-devices.list network.view query=q,type,status,locationId sort=name,type,createdAt,updatedAt
+POST /network-devices network-devices.create network.edit body=name,type,status,manufacturer,model,serialNumber,locationId,rackInfo,portCount,assignedTo,purchaseDate,warrantyUntil,monitorEnabled,notes
+GET /network-devices/{id} network-devices.get network.view
+PATCH /network-devices/{id} network-devices.update network.edit body=name,type,status,manufacturer,model,serialNumber,locationId,rackInfo,portCount,assignedTo,purchaseDate,warrantyUntil,monitorEnabled,notes
+DELETE /network-devices/{id} network-devices.delete network.delete
+GET /network-ips network-ips.list network.view query=subnetId,deviceId,q sort=address,hostname,createdAt,updatedAt
+POST /network-ips network-ips.create network.edit body=subnetId,address,deviceId,hostname,kind,mac,notes
+GET /network-ips/{id} network-ips.get network.view
+PATCH /network-ips/{id} network-ips.update network.edit body=subnetId,address,deviceId,hostname,kind,mac,notes
+DELETE /network-ips/{id} network-ips.delete network.delete
+GET /network-locations network-locations.list network.view sort=name,sortOrder
+POST /network-locations network-locations.create network.edit body=name,description,sortOrder
+GET /network-locations/{id} network-locations.get network.view
+PATCH /network-locations/{id} network-locations.update network.edit body=name,description,sortOrder
+DELETE /network-locations/{id} network-locations.delete network.delete
+GET /network-subnets network-subnets.list network.view query=vlanId sort=name,cidr
+POST /network-subnets network-subnets.create network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
+GET /network-subnets/{id} network-subnets.get network.view
+PATCH /network-subnets/{id} network-subnets.update network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
+DELETE /network-subnets/{id} network-subnets.delete network.delete
+GET /network-vlans network-vlans.list network.view sort=number,name
+POST /network-vlans network-vlans.create network.edit body=number,name,description
+GET /network-vlans/{id} network-vlans.get network.view
+PATCH /network-vlans/{id} network-vlans.update network.edit body=number,name,description
+DELETE /network-vlans/{id} network-vlans.delete network.delete
 GET /tire-sets tire-sets.list tires.view query=vehicleId,status,season sort=storedAt,season,createdAt,updatedAt
 POST /tire-sets tire-sets.create tires.create body=vehicleId,season,status,brand,model,width,aspect,rim,loadIndex,speedIndex,rimType,storageLocation,storedAt,notes,spare,tires
 GET /tire-sets/{id} tire-sets.get tires.view

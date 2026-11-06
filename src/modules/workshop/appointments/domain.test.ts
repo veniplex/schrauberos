@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { appointmentWindow, BAY_FREE_STATUSES, findBayClash, intervalsOverlap, occupiesBay, type BayBooking } from "./domain";
 
 /** Terminkonflikt-Logik (reine Funktionen): Zeitfenster aus Formularwerten und Doppelbelegung eines Arbeitsplatzes. */
@@ -89,5 +89,38 @@ describe("findBayClash", () => {
   it("erhält zusätzliche Felder des Treffers (z. B. Fahrzeug für die Meldung)", () => {
     const hit = findBayClash(candidate("09:00", "10:00"), [{ ...booking("a", "09:00", "10:00"), title: "HU", vehicle: { plate: "B AB 1" } }]);
     assert.equal(hit?.vehicle.plate, "B AB 1");
+  });
+});
+
+describe("Zeitumstellung (Europe/Berlin)", () => {
+  const before0 = process.env.TZ;
+  before(() => {
+    process.env.TZ = "Europe/Berlin";
+  });
+  after(() => {
+    if (before0 === undefined) delete process.env.TZ;
+    else process.env.TZ = before0;
+  });
+
+  it("lehnt eine Ortszeit ab, die es nicht gibt (Lücke der Sommerzeit am 31.03.2030 von 02:00 bis 03:00) – statt still auf 03:30 zu verschieben", () => {
+    for (const time of ["02:00", "02:30", "02:59"]) assert.equal(appointmentWindow("2030-03-31", time, 60), null, time);
+    assert.ok(appointmentWindow("2030-03-31", "01:59", 60));
+    assert.ok(appointmentWindow("2030-03-31", "03:00", 60));
+    // ein anderer Tag mit derselben Uhrzeit ist unauffällig
+    assert.ok(appointmentWindow("2030-03-30", "02:30", 60));
+    assert.ok(appointmentWindow("2030-04-01", "02:30", 60));
+  });
+
+  it("nimmt doppelt vorkommende Zeiten beim Zurückstellen (27.10.2030, 02:00–03:00 gibt es zweimal) an", () => {
+    const w = appointmentWindow("2030-10-27", "02:30", 30);
+    assert.ok(w);
+    assert.equal(w.startsAt.getHours(), 2);
+    assert.equal(w.startsAt.getMinutes(), 30);
+  });
+
+  it("rechnet die Dauer in echten Minuten über die Umstellung: 01:30 + 60 min endet um 03:30 Ortszeit", () => {
+    const w = appointmentWindow("2030-03-31", "01:30", 120)!;
+    assert.equal(w.endsAt.getHours(), 4, "120 echte Minuten ab 01:30 (MEZ) sind 04:30 MESZ");
+    assert.equal(w.endsAt.getMinutes(), 30);
   });
 });

@@ -5,10 +5,29 @@ import { format, isValid, parse, startOfDay } from "date-fns";
 export const toDateInput = (d: Date) => format(d, "yyyy-MM-dd");
 export const toTimeInput = (d: Date) => format(d, "HH:mm");
 
-/** "2026-11-05" + "09:30" -> Date (lokal). null bei ungültiger Eingabe. */
+/**
+ * `JJJJ-MM-TT` ist ein **echter Kalendertag**: kein Monat 13, kein 30. Februar, kein 29. Februar im Nichtschaltjahr, Jahr ab 1000.
+ * (Die bloße Form „vier Ziffern, Bindestrich, zwei, zwei“ lässt `2026-02-30` durch; JavaScript rollt das still auf den 2. März – oder liefert „Invalid Date“.)
+ */
+export function isCalendarDay(value: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (year < 1000) return false;
+  const d = new Date(Date.UTC(2000, 0, 1));
+  d.setUTCFullYear(year, month - 1, day);
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+
+/**
+ * "2026-11-05" + "09:30" -> Date (lokal). null bei ungültiger Eingabe **und bei einer Ortszeit, die es nicht gibt**: In der Lücke der Sommerzeitumstellung
+ * (z. B. 31.03.2030 02:30 in Europe/Berlin) verschiebt `Date` still auf 03:30 – ein Termin läge dann zu einer Zeit, die niemand eingegeben hat.
+ * (Doppelt vorkommende Zeiten beim Zurückstellen sind eindeutig genug: die erste gilt.)
+ */
 export function parseLocalDateTime(date: string, time: string): Date | null {
   const d = parse(`${date} ${time}`, "yyyy-MM-dd HH:mm", new Date());
-  return isValid(d) ? d : null;
+  if (!isValid(d)) return null;
+  return format(d, "yyyy-MM-dd HH:mm") === `${date} ${time}` ? d : null;
 }
 
 /** URL-Parameter -> Tagesbeginn; fällt bei Fehlern auf heute zurück. */

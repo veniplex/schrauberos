@@ -7,7 +7,7 @@ import { Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layo
 import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
-import { nowDate, parseMonthParam, todayInput } from "@/lib/dates";
+import { isCalendarDay, nowDate, parseMonthParam, todayInput } from "@/lib/dates";
 import { employeeName, visibleAbsenceType, workdaysBetween } from "@/modules/office/employees/domain";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -197,7 +197,7 @@ export default async function AbsencesPage({
           <AbsenceForm
             employees={employees.map((e) => ({ id: e.id, name: employeeName(e) }))}
             initialEmployeeId={sp.employee ?? ""}
-            initialDate={/^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? sp.date! : todayInput()}
+            initialDate={isCalendarDay(sp.date ?? "") ? sp.date! : todayInput()}
             canSensitive={sensitive}
             returnTo={base}
             closeHref={base}

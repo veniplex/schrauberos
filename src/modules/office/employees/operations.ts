@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { ABSENCE_TYPES, DEPARTMENTS, employeeName } from "@/modules/office/employees/domain";
 import { writeAudit } from "@/server/audit";
 import { defineOperation, fail, failField } from "@/server/operations";
 
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+const date = dateText().optional();
 const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 /* ───────────── Mitarbeiter ───────────── */
@@ -111,8 +112,8 @@ const absenceInput = z
   .object({
     employeeId: z.string().min(1),
     type: z.enum(ABSENCE_TYPES),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    startDate: dateText(),
+    endDate: dateText(),
     note: z.string().max(200).optional(),
     returnTo: z.string().optional(),
   })

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { pathToRegexp } from "next/dist/compiled/path-to-regexp";
 import { Readable } from "node:stream";
-import bytes from "next/dist/compiled/bytes";
 import { getCloneableBody } from "next/dist/server/body-streams";
 import nextConfig, { PROXY_BODY_LIMIT, SECURITY_HEADERS, SERVER_ACTION_BODY_LIMIT } from "../next.config";
 
@@ -46,7 +45,7 @@ describe("next.config: Basis-Header", () => {
 });
 
 describe("next.config: Größe der Anfrage-Bodies (ZP2-A-F1)", () => {
-  const limit = (value: string | number | undefined) => (typeof value === "string" ? (bytes.parse(value) as number) : (value ?? 0));
+  const limit = (value: string | number | undefined) => (typeof value === "string" ? Number(/^(\d+)mb$/i.exec(value)?.[1] ?? NaN) * 1024 * 1024 : (value ?? 0));
   const configured = () => limit(nextConfig.experimental?.proxyClientMaxBodySize);
 
   it("der Proxy-Puffer ist größer als das Limit der Server Actions (sonst kommt ein Beleg nahe 10 MB abgeschnitten an) und kleiner als ein Vielfaches", () => {
@@ -61,7 +60,7 @@ describe("next.config: Größe der Anfrage-Bodies (ZP2-A-F1)", () => {
     const total = 12 * 1024 * 1024 + 512 * 1024;
     const body = () => Readable.from((function* () { for (let sent = 0; sent < total; sent += 1024 * 1024) yield Buffer.alloc(Math.min(1024 * 1024, total - sent), 1); })());
     const read = async (sizeLimit: number | undefined) => {
-      const cloneable = getCloneableBody(body(), sizeLimit);
+      const cloneable = getCloneableBody(body() as never, sizeLimit);
       const warn = console.warn;
       console.warn = () => undefined;
       try {

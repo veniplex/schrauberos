@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { RIM_TYPES, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
 import { parseTireRows, type RawTireRow } from "@/modules/workshop/tires/domain";
@@ -24,7 +25,7 @@ const tireSetInput = z
     speedIndex: z.string().max(3).optional(),
     rimType: z.enum(RIM_TYPES).default("none"),
     storageLocation: z.string().max(120).optional(),
-    storedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    storedAt: dateText().optional(),
     notes: z.string().max(2000).optional(),
     spare: z.boolean(),
     /** Einzelreifen je Position (aus den Formularfeldern `tire.<POS>.dot|tread|condition`) */

@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
-import { moneyCents } from "@/lib/zod-fields";
+import { dateText, moneyCents } from "@/lib/zod-fields";
 import { formatPlate } from "@/lib/plate";
 import { COST_CATEGORIES, FLEET_STATUSES, FUEL_TYPES, nextLicenseCheck } from "@/modules/office/fleet/domain";
 import { defineOperation, fail, failField } from "@/server/operations";
 import type { Tx } from "@/server/operations";
 
-const dateOpt = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
-const dateReq = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const dateOpt = dateText().optional();
+const dateReq = dateText();
 const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 /** Das Dienstfahrzeug laden (Verweise aus dem Formular nie ungeprüft verwenden); sonst Feldfehler. */

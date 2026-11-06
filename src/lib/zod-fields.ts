@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCalendarDay } from "./dates";
 import { parseMoneyToCents } from "./money";
 
 /**
@@ -20,5 +21,5 @@ export const moneyCents = (invalidKey: string, max = 20) =>
       return cents;
     });
 
-/** Kalendertag als Text `JJJJ-MM-TT` (Formularfeld `type="date"`). */
-export const dateText = () => z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** Kalendertag als Text `JJJJ-MM-TT` (Formularfeld `type="date"`) – ein echter Tag (`isCalendarDay`), nicht nur die Form. Gilt für Formulare **und** API. */
+export const dateText = () => z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isCalendarDay);

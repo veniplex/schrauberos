@@ -22,7 +22,7 @@ import {
 } from "./operations";
 
 /**
- * API-Ressourcen „Netzwerk-Dokumentation“ unter `/api/v1/network/…`: Geräte, Standorte, VLANs, Subnetze, IP-Adressen und Kabelverbindungen. Dieselben Prüfungen
+ * API-Ressourcen „Netzwerk-Dokumentation“ unter `/api/v1/network-…`: Geräte, Standorte, VLANs, Subnetze, IP-Adressen und Kabelverbindungen. Dieselben Prüfungen
  * wie in der Oberfläche (IP im Subnetz, Adresse eindeutig, MAC normalisiert, Port nicht doppelt belegt). Standorte, VLANs, Subnetze und Verbindungen haben keine
  * Version (kein `If-Match`).
  */
@@ -75,7 +75,7 @@ export const deviceEndpoints = defineResource({
   tag: "Network",
   name: "network-devices",
   singular: "network device",
-  path: "/network/devices",
+  path: "/network-devices",
   read: "network.view",
   model: db.netDevice as unknown as Delegate<NetDevice>,
   item: deviceItem,
@@ -146,7 +146,7 @@ export const locationEndpoints = defineResource({
   tag: "Network",
   name: "network-locations",
   singular: "location",
-  path: "/network/locations",
+  path: "/network-locations",
   read: "network.view",
   model: db.netLocation as unknown as Delegate<NetLocation>,
   item: locationItem,
@@ -182,7 +182,7 @@ export const vlanEndpoints = defineResource({
   tag: "Network",
   name: "network-vlans",
   singular: "VLAN",
-  path: "/network/vlans",
+  path: "/network-vlans",
   read: "network.view",
   model: db.netVlan as unknown as Delegate<NetVlan>,
   item: vlanItem,
@@ -209,7 +209,7 @@ const subnetBody = z.strictObject({
   name: z.string().trim().min(1).max(80),
   /** IPv4 in CIDR-Schreibweise, z. B. 192.168.10.0/24 */
   cidr: z.string().max(18),
-  /** Verweis auf ein VLAN (id aus `/network/vlans`) */
+  /** Verweis auf ein VLAN (id aus `/network-vlans`) */
   vlanId: ref,
   gateway: text(15),
   dnsServers: text(100),
@@ -234,7 +234,7 @@ export const subnetEndpoints = defineResource({
   tag: "Network",
   name: "network-subnets",
   singular: "subnet",
-  path: "/network/subnets",
+  path: "/network-subnets",
   read: "network.view",
   model: db.netSubnet as unknown as Delegate<NetSubnet>,
   item: subnetItem,
@@ -285,7 +285,7 @@ export const ipEndpoints = defineResource({
   tag: "Network",
   name: "network-ips",
   singular: "IP address",
-  path: "/network/ips",
+  path: "/network-ips",
   read: "network.view",
   model: db.netIp as unknown as Delegate<NetIp>,
   item: ipItem,
@@ -348,7 +348,7 @@ export const connectionEndpoints = defineResource({
   tag: "Network",
   name: "network-connections",
   singular: "connection",
-  path: "/network/connections",
+  path: "/network-connections",
   read: "network.view",
   model: db.netConnection as unknown as Delegate<NetConnection>,
   item: connectionItem,

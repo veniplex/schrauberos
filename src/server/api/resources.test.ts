@@ -107,9 +107,9 @@ describe("Termine", () => {
     assert.equal(patched.json.data.durationMinutes, 60);
 
     // Arbeitsplätze und Terminarten: nur lesbar
-    assert.deepEqual((await api("GET", "/bays")).json.data.map((b: Json) => b.name), ["Bühne 1"]);
+    assert.deepEqual((await api("GET", "/appointment-bays")).json.data.map((b: Json) => b.name), ["Bühne 1"]);
     assert.equal((await api("GET", "/appointment-types")).json.data[0].name, "Inspektion");
-    assert.equal((await api("POST", "/bays", { body: { name: "X" } })).status, 405);
+    assert.equal((await api("POST", "/appointment-bays", { body: { name: "X" } })).status, 405);
     assert.equal((await api("DELETE", `/appointment-types/${type.id}`)).status, 405);
   });
 });
@@ -278,41 +278,41 @@ describe("Fuhrpark", () => {
 
 describe("Netzwerk-Dokumentation", () => {
   it("Subnetz, IP im Subnetz und eindeutig, MAC normalisiert, VLAN-Nummer, Standort, Kabel mit belegtem Port", async () => {
-    const vlan = await api("POST", "/network/vlans", { body: { number: 10, name: "Büro" } });
+    const vlan = await api("POST", "/network-vlans", { body: { number: 10, name: "Büro" } });
     assert.equal(vlan.status, 201);
     assert.equal(vlan.json.data.number, 10);
-    const dupVlan = await api("POST", "/network/vlans", { body: { number: 10, name: "Doppelt" } });
+    const dupVlan = await api("POST", "/network-vlans", { body: { number: 10, name: "Doppelt" } });
     assert.equal(dupVlan.json.fields.number.code, "network.errors.vlanExists");
-    assert.equal((await api("POST", "/network/vlans", { body: { number: 5000, name: "Zu hoch" } })).status, 422);
+    assert.equal((await api("POST", "/network-vlans", { body: { number: 5000, name: "Zu hoch" } })).status, 422);
 
-    const subnet = await api("POST", "/network/subnets", { body: { name: "Büro", cidr: "192.168.10.0/24", vlanId: vlan.json.data.id, gateway: "192.168.10.1" } });
+    const subnet = await api("POST", "/network-subnets", { body: { name: "Büro", cidr: "192.168.10.0/24", vlanId: vlan.json.data.id, gateway: "192.168.10.1" } });
     assert.equal(subnet.status, 201);
     assert.equal(subnet.json.data.cidr, "192.168.10.0/24");
-    assert.equal((await api("POST", "/network/subnets", { body: { name: "Falsch", cidr: "10.1.0.0/16", gateway: "192.168.10.1" } })).json.fields.gateway.code, "network.errors.notInSubnet");
+    assert.equal((await api("POST", "/network-subnets", { body: { name: "Falsch", cidr: "10.1.0.0/16", gateway: "192.168.10.1" } })).json.fields.gateway.code, "network.errors.notInSubnet");
 
-    const location = (await api("POST", "/network/locations", { body: { name: "Serverraum" } })).json.data as Json;
-    const device = (await api("POST", "/network/devices", { body: { name: "sw1", type: "switch", locationId: location.id, portCount: 24 } })).json.data as Json;
-    const device2 = (await api("POST", "/network/devices", { body: { name: "srv1", type: "server" } })).json.data as Json;
+    const location = (await api("POST", "/network-locations", { body: { name: "Serverraum" } })).json.data as Json;
+    const device = (await api("POST", "/network-devices", { body: { name: "sw1", type: "switch", locationId: location.id, portCount: 24 } })).json.data as Json;
+    const device2 = (await api("POST", "/network-devices", { body: { name: "srv1", type: "server" } })).json.data as Json;
     assert.equal(device.monitorEnabled, false);
 
-    const ip = await api("POST", "/network/ips", { body: { subnetId: subnet.json.data.id, address: "192.168.10.20", deviceId: device.id, mac: "aa-bb-cc-00-11-22" } });
+    const ip = await api("POST", "/network-ips", { body: { subnetId: subnet.json.data.id, address: "192.168.10.20", deviceId: device.id, mac: "aa-bb-cc-00-11-22" } });
     assert.equal(ip.status, 201);
     assert.equal(ip.json.data.mac, "AA:BB:CC:00:11:22");
-    assert.equal((await api("POST", "/network/ips", { body: { subnetId: subnet.json.data.id, address: "192.168.99.5" } })).json.fields.address.code, "network.errors.notInSubnet");
-    assert.equal((await api("POST", "/network/ips", { body: { subnetId: subnet.json.data.id, address: "192.168.10.20" } })).json.fields.address.code, "network.errors.ipTaken");
-    const moved = await api("PATCH", `/network/ips/${ip.json.data.id}`, { body: { hostname: "sw1.lan" }, headers: ifMatch(ip.json.data) });
+    assert.equal((await api("POST", "/network-ips", { body: { subnetId: subnet.json.data.id, address: "192.168.99.5" } })).json.fields.address.code, "network.errors.notInSubnet");
+    assert.equal((await api("POST", "/network-ips", { body: { subnetId: subnet.json.data.id, address: "192.168.10.20" } })).json.fields.address.code, "network.errors.ipTaken");
+    const moved = await api("PATCH", `/network-ips/${ip.json.data.id}`, { body: { hostname: "sw1.lan" }, headers: ifMatch(ip.json.data) });
     assert.deepEqual([moved.json.data.hostname, moved.json.data.address], ["sw1.lan", "192.168.10.20"]);
-    assert.equal((await api("PATCH", `/network/vlans/${vlan.json.data.id}`, { body: { name: "Büro neu" } })).json.data.name, "Büro neu");
+    assert.equal((await api("PATCH", `/network-vlans/${vlan.json.data.id}`, { body: { name: "Büro neu" } })).json.data.name, "Büro neu");
 
-    const cable = await api("POST", "/network/connections", { body: { fromDeviceId: device.id, fromPort: "1", toDeviceId: device2.id, toPort: "eth0" } });
+    const cable = await api("POST", "/network-connections", { body: { fromDeviceId: device.id, fromPort: "1", toDeviceId: device2.id, toPort: "eth0" } });
     assert.equal(cable.status, 201);
-    assert.equal((await api("POST", "/network/connections", { body: { fromDeviceId: device.id, fromPort: "1", toDeviceId: device2.id, toPort: "eth1" } })).json.fields.fromPort.code, "network.errors.portBusy");
-    assert.equal((await api("POST", "/network/connections", { body: { fromDeviceId: device.id, toDeviceId: device.id } })).json.fields.toDeviceId.code, "network.errors.sameDevice");
-    assert.equal((await api("GET", `/network/connections?deviceId=${device2.id}`)).json.page.total, 1);
-    assert.equal((await api("GET", "/network/ips?q=sw1")).json.page.total, 1);
+    assert.equal((await api("POST", "/network-connections", { body: { fromDeviceId: device.id, fromPort: "1", toDeviceId: device2.id, toPort: "eth1" } })).json.fields.fromPort.code, "network.errors.portBusy");
+    assert.equal((await api("POST", "/network-connections", { body: { fromDeviceId: device.id, toDeviceId: device.id } })).json.fields.toDeviceId.code, "network.errors.sameDevice");
+    assert.equal((await api("GET", `/network-connections?deviceId=${device2.id}`)).json.page.total, 1);
+    assert.equal((await api("GET", "/network-ips?q=sw1")).json.page.total, 1);
 
-    assert.equal((await api("DELETE", `/network/locations/${location.id}`)).status, 204);
-    assert.equal((await api("DELETE", `/network/devices/${device.id}`)).status, 204);
+    assert.equal((await api("DELETE", `/network-locations/${location.id}`)).status, 204);
+    assert.equal((await api("DELETE", `/network-devices/${device.id}`)).status, 204);
     assert.equal(await env.db.netConnection.count(), 0);
   });
 });
@@ -321,7 +321,7 @@ describe("Kunden: Audit der API-Schreibzugriffe", () => {
   it("alle Schreibzugriffe tragen die Token-Kennung im Audit-Log und keine Klartext-Tokens", async () => {
     await api("POST", "/customers", { body: { lastName: "Audit" } });
     await api("POST", "/vehicles", { body: { plate: "B-AU 1" } });
-    await api("POST", "/network/vlans", { body: { number: 20, name: "Audit" } });
+    await api("POST", "/network-vlans", { body: { number: 20, name: "Audit" } });
     const entries = await env.db.auditLog.findMany();
     assert.equal(entries.length, 3);
     for (const entry of entries) assert.match(entry.actorName, /\[API: Token \d+\]$/);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
@@ -71,7 +72,7 @@ export const saveVehicleOperation = defineOperation({
 const transferInput = z.object({
   vehicleId: z.string(),
   newCustomerId: z.string().optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: dateText(),
   note: z.string().max(300).optional(),
 });
 

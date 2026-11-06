@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { DEVICE_STATUSES, DEVICE_TYPES, IP_KINDS } from "@/modules/it/network/constants";
 import { formatIPv4, ipInCidr, normalizeMac, parseCidr, parseIPv4 } from "@/modules/it/network/domain";
 import { defineOperation, fail, failField, failFields, type FieldMessage, type Tx } from "@/server/operations";
 
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+const date = dateText().optional();
 const idInput = z.object({ id: z.string().min(1) });
 
 /* ───────────── Geräte ───────────── */

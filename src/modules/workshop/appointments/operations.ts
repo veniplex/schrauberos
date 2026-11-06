@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { isHexColor } from "@/lib/color";
 import { toTimeInput } from "@/lib/dates";
@@ -15,7 +16,7 @@ const appointmentInput = z.object({
   bayId: z.string().optional(),
   assigneeId: z.string().optional(),
   tireSetId: z.string().optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: dateText(),
   time: z.string().regex(/^\d{2}:\d{2}$/),
   duration: z.coerce.number().int().min(5).max(720),
   status: z.enum(APPOINTMENT_STATUSES).default("scheduled"),

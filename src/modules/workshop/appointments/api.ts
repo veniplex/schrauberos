@@ -6,6 +6,7 @@ import { parseLocalDateTime, toDateInput, toTimeInput } from "@/lib/dates";
 import { dateOnly, iso } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
+import { apiProblem } from "@/server/operations";
 import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES } from "./constants";
 import { createAppointmentOperation, deleteAppointmentOperation, updateAppointmentOperation } from "./operations";
 
@@ -59,7 +60,12 @@ const durationOf = (a: Appointment) => Math.round((a.endsAt.getTime() - a.starts
 /** API-Körper → Eingabe der Operation (`duration`, `status` hat dort einen Standard). */
 const toInput = ({ durationMinutes, ...rest }: Record<string, unknown>): Record<string, unknown> => ({ ...rest, duration: durationMinutes });
 
-const dayStart = (value: string): Date | null => parseLocalDateTime(value, "00:00");
+/** Beginn des Tages in Ortszeit. Gibt es ihn nicht (Zeitumstellung um Mitternacht), ist der Filter ungültig: 422 statt stillem Weglassen des Filters. */
+const dayStart = (value: string, field: string): Date => {
+  const start = parseLocalDateTime(value, "00:00");
+  if (!start) throw apiProblem("validation_failed", { fields: { [field]: { code: "validation.invalid" } } });
+  return start;
+};
 
 export const appointmentEndpoints = defineResource({
   feature: "workshop.appointments",
@@ -104,8 +110,8 @@ export const appointmentEndpoints = defineResource({
       assigneeId: z.string().max(64).optional(),
     }),
     where: ({ from, to, status, bayId, vehicleId, customerId, assigneeId }) => {
-      const start = from ? dayStart(from) : null;
-      const end = to ? dayStart(to) : null;
+      const start = from ? dayStart(from, "from") : null;
+      const end = to ? dayStart(to, "to") : null;
       return {
         ...(start || end ? { startsAt: { ...(start ? { gte: start } : {}), ...(end ? { lt: addDays(end, 1) } : {}) } } : {}),
         ...(status ? { status } : {}),
@@ -146,9 +152,9 @@ const bayItem = z.object({ id: z.string(), name: z.string(), active: z.boolean()
 export const bayEndpoints = defineResource({
   feature: "workshop.appointments",
   tag: "Appointments",
-  name: "bays",
+  name: "appointment-bays",
   singular: "bay",
-  path: "/bays",
+  path: "/appointment-bays",
   read: "appointments.view",
   model: db.bay as unknown as Delegate<Bay>,
   item: bayItem,
