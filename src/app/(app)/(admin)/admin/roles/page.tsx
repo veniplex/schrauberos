@@ -6,18 +6,20 @@ import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { ALL_PERMISSIONS } from "@/modules/catalog";
+import { hasAdminOnlyRights, isDenial } from "@/lib/rbac";
+import { toRights } from "@/server/rbac/hierarchy";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return { title: t("nav.roles") };
 }
 
-export default async function RolesPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function RolesPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   await requirePermission("roles.manage");
   const [{ t, tp }, sp] = await Promise.all([getI18n(), searchParams]);
   const roles = await db.role.findMany({
     orderBy: [{ isAdmin: "desc" }, { name: "asc" }],
-    include: { _count: { select: { users: true, permissions: true } } },
+    include: { permissions: true, _count: { select: { users: true, permissions: true } } },
   });
 
   return (
@@ -32,6 +34,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
         }
       />
       {sp.saved ? <div className="mb-4"><Alert tone="success">{t("common.saved")}</Alert></div> : null}
+      {isDenial(sp.error) ? <div className="mb-4"><Alert tone="danger">{t(`rbac.denied.${sp.error}`)}</Alert></div> : null}
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {roles.map((r) => (
           <li key={r.id}>
@@ -39,6 +42,11 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-semibold">{r.name}</h2>
                 {r.isAdmin ? <Badge tone="accent">{t("roles.adminBadge")}</Badge> : null}
+                {hasAdminOnlyRights([toRights(r)]) ? (
+                  <span title={t("roles.adminRightsHint")}>
+                    <Badge tone="warning">{t("roles.adminRightsBadge")}</Badge>
+                  </span>
+                ) : null}
               </div>
               {r.description ? <p className="mt-1 text-sm text-ink-muted">{r.description}</p> : null}
               <p className="mt-4 text-sm text-ink-muted">

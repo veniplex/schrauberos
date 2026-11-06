@@ -8,7 +8,7 @@ export const appointmentsFeature = defineFeature({
   order: 10,
   requires: ["workshop.vehicles"],
   uses: ["workshop.tires", "workshop.customers"],
-  permissions: { group: "appointments", keys: ["appointments.view", "appointments.create", "appointments.edit", "appointments.delete"] },
+  permissions: { group: "appointments", keys: ["appointments.view", "appointments.create", "appointments.edit", "appointments.delete", "appointments.configure"] },
   nav: [
     { id: "appointments", href: "/appointments", labelKey: "nav.appointments", icon: "calendar", permission: "appointments.view", order: 10 },
   ],

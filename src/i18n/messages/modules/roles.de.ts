@@ -17,6 +17,12 @@ export const rolesDe = {
   userCount_one: "{count} Benutzer",
   userCount_other: "{count} Benutzer",
   fields: { name: "Name", description: "Beschreibung" },
+  adminRightsBadge: "Verwaltungsrechte",
+  adminRightsHint: "Diese Rolle enthält Rechte der Verwaltung (Benutzer, Rollen, Einstellungen, Module, Backups oder Updates), ist aber keine Administrator-Rolle.",
+  readOnlyNotice: "Diese Rolle kannst du nicht ändern: Sie ist deine eigene, eine Administrator-Rolle oder enthält Rechte der Verwaltung.",
+  lockedRight: "Nur Administratoren können dieses Recht vergeben, oder du hast es selbst nicht.",
+  duplicate: "Rolle duplizieren",
+  copyOf: "Kopie von {name}",
   selectAll: "Alle",
   selectNone: "Keine",
 };

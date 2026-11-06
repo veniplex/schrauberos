@@ -6,6 +6,8 @@ import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
+import { hasAdminOnlyRights, isDenial } from "@/lib/rbac";
+import { toRights } from "@/server/rbac/hierarchy";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -17,7 +19,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const [{ t, date }, sp] = await Promise.all([getI18n(), searchParams]);
   const users = await db.user.findMany({
     orderBy: { name: "asc" },
-    include: { roles: { include: { role: true } } },
+    include: { roles: { include: { role: { include: { permissions: true } } } } },
   });
   const canManage = session.can("users.manage");
 
@@ -36,6 +38,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       />
       {sp.saved ? <div className="mb-4"><Alert tone="success">{t("common.saved")}</Alert></div> : null}
       {sp.error === "lastAdmin" ? <div className="mb-4"><Alert tone="danger">{t("users.errors.lastAdmin")}</Alert></div> : null}
+      {isDenial(sp.error) ? <div className="mb-4"><Alert tone="danger">{t(`rbac.denied.${sp.error}`)}</Alert></div> : null}
 
       <Card as="div" padded={false} className="overflow-hidden">
         <Table className="min-w-[44rem]">
@@ -63,6 +66,11 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-1.5">
+                      {hasAdminOnlyRights(u.roles.map((r) => toRights(r.role))) ? (
+                        <span title={t("users.adminRightsHint")}>
+                          <Badge tone="warning">{t("users.adminRightsBadge")}</Badge>
+                        </span>
+                      ) : null}
                       {u.roles.length ? u.roles.map((r) => <Badge key={r.roleId} tone={r.role.isAdmin ? "accent" : "neutral"}>{r.role.name}</Badge>) : <span className="text-ink-muted">–</span>}
                     </div>
                   </td>

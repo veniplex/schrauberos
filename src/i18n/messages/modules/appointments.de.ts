@@ -5,6 +5,7 @@ export const appointmentsDe = {
   },
   settings: {
     tab: "Termine & Arbeitsplätze",
+    open: "Arbeitsplätze & Terminarten",
     active: "Aktiv",
     sortOrder: "Reihenfolge",
     calendar: "Kalender",

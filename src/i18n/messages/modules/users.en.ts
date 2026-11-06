@@ -12,6 +12,10 @@ export const usersEn: typeof usersDe = {
   delete: "Delete user",
   confirmDelete: "Really delete user “{name}”?",
   cols: { user: "User", roles: "Roles", source: "Sign-in", lastLogin: "Last sign-in" },
+  adminRightsBadge: "Administration rights",
+  adminRightsHint: "This account is not an administrator but has administration rights (users, roles, settings, modules, backups or updates). Please check that this is intended.",
+  readOnlyNotice: "This account has permissions you do not have yourself. You can view it but not change it.",
+  roleLocked: "Only administrators can grant or revoke this role.",
   linkedEmployee: "Employee: {name}",
   sourceLocal: "Local",
   active: "Active",
@@ -30,7 +34,6 @@ export const usersEn: typeof usersDe = {
     mustChangePassword: "Require a password change at next sign-in",
   },
   errors: {
-    adminRoleRestricted: "Administrator roles can only be granted or revoked by administrators.",
     lastAdmin: "At least one active administrator must remain.",
     selfDeactivate: "You cannot disable your own account.",
     usernameTaken: "This username is already taken.",

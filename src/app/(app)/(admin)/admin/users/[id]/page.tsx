@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PageHeader } from "@/components/ui/layout";
+import { Alert, PageHeader } from "@/components/ui/layout";
 import { ConfirmSubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -9,6 +9,8 @@ import { db } from "@/server/db";
 import { UserForm } from "@/modules/admin/users/forms";
 import { deleteUser } from "@/modules/admin/users/actions";
 import { versionOf } from "@/lib/concurrency";
+import { checkGrantRole, checkManageUser } from "@/lib/rbac";
+import { loadActor, toRights } from "@/server/rbac/hierarchy";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -18,12 +20,16 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission("users.manage");
   const [{ t }, { id }] = await Promise.all([getI18n(), params]);
-  const [user, roles] = await Promise.all([
-    db.user.findUnique({ where: { id }, include: { roles: true, employee: true } }),
-    db.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }] }),
+  const [user, roles, actor] = await Promise.all([
+    db.user.findUnique({ where: { id }, include: { roles: { include: { role: { include: { permissions: true } } } }, employee: true } }),
+    db.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }], include: { permissions: true } }),
+    loadActor(db, session.user.id),
   ]);
   if (!user) notFound();
   const isSelf = user.id === session.user.id;
+  // Rechte-Hierarchie: nur Konten ändern, deren Rechte man selbst vollständig hat; Rollen, die man nicht vergeben darf, sind gesperrt
+  const readOnly = checkManageUser(actor, user.roles.map((r) => toRights(r.role))) !== null;
+  const lockedRoleIds = roles.filter((r) => checkGrantRole(actor, toRights(r)) !== null).map((r) => r.id);
 
   return (
     <>
@@ -45,7 +51,8 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
         }
       />
       <div className="flex flex-col gap-4">
-        <UserForm
+        {readOnly ? <Alert tone="warning">{t("users.readOnlyNotice")}</Alert> : null}
+        {!readOnly ? <UserForm
           initial={{
             id: user.id,
             version: versionOf(user),
@@ -57,11 +64,11 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
             roleIds: user.roles.map((r) => r.roleId),
             authSource: user.authSource,
           }}
-          roles={roles}
-          canAssignAdmin={session.user.isAdmin}
+          roles={roles.map((r) => ({ id: r.id, name: r.name, description: r.description, isAdmin: r.isAdmin }))}
+          lockedRoleIds={lockedRoleIds}
           isSelf={isSelf}
-        />
-        {!isSelf ? (
+        /> : null}
+        {!isSelf && !readOnly ? (
           <form action={deleteUser} className="max-w-3xl">
             <input type="hidden" name="id" value={user.id} />
             <ConfirmSubmitButton message={t("users.confirmDelete", { name: user.name })}>{t("users.delete")}</ConfirmSubmitButton>

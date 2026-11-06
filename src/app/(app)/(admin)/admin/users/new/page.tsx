@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
+import { checkGrantRole } from "@/lib/rbac";
+import { loadActor, toRights } from "@/server/rbac/hierarchy";
 import { UserForm } from "@/modules/admin/users/forms";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -12,14 +14,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function NewUserPage() {
   const session = await requirePermission("users.manage");
-  const [{ t }, roles] = await Promise.all([getI18n(), db.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }] })]);
+  const [{ t }, roles, actor] = await Promise.all([
+    getI18n(),
+    db.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }], include: { permissions: true } }),
+    loadActor(db, session.user.id),
+  ]);
   return (
     <>
       <PageHeader title={t("users.new")} />
       <UserForm
         initial={{ username: "", name: "", email: "", active: true, mustChangePassword: true, roleIds: [], authSource: "local" }}
-        roles={roles}
-        canAssignAdmin={session.user.isAdmin}
+        roles={roles.map((r) => ({ id: r.id, name: r.name, description: r.description, isAdmin: r.isAdmin }))}
+        lockedRoleIds={roles.filter((r) => checkGrantRole(actor, toRights(r)) !== null).map((r) => r.id)}
         isSelf={false}
       />
     </>

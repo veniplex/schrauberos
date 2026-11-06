@@ -7,7 +7,7 @@ export const modulesFeature = defineFeature({
   descriptionKey: "modules.feature.description",
   order: 130,
   required: true,
-  permissions: { group: "modules", keys: ["modules.manage"] },
+  permissions: { group: "modules", keys: ["modules.manage"], adminOnly: ["modules.manage"] },
   nav: [
     { id: "modules", href: "/admin/modules", labelKey: "nav.modules", icon: "modules", permission: "modules.manage", order: 130 },
   ],

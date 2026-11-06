@@ -9,4 +9,6 @@ Der Werkstattkalender zeigt die Termine als **Woche**, **Tag** (mit einer Spalte
 * **Status:** Geplant, Bestätigt, In Arbeit, Erledigt, Storniert oder Nicht erschienen. Stornierte Termine blockieren keinen Platz.
 * **Reifenwechsel:** Termine der Art „Reifenwechsel“ lassen sich mit einem eingelagerten Reifensatz verknüpfen.
 
-Arbeitsplätze, Terminarten und das Kalender-Raster pflegt ein Administrator unter **Verwaltung → Einstellungen → Termine**.
+Arbeitsplätze, Terminarten und das Kalender-Raster pflegt, wer das Recht „Arbeitsplätze, Terminarten und Kalender einrichten“ hat
+(Administratoren immer), unter **Verwaltung → Einstellungen → Termine** – oder über die Schaltfläche „Arbeitsplätze & Terminarten“
+oben im Kalender.

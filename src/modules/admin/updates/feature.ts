@@ -7,7 +7,7 @@ export const updatesFeature = defineFeature({
   descriptionKey: "updates.feature.description",
   required: true,
   order: 136,
-  permissions: { group: "updates", keys: ["updates.manage"] },
+  permissions: { group: "updates", keys: ["updates.manage"], adminOnly: ["updates.manage"] },
   nav: [
     { id: "updates", href: "/admin/updates", labelKey: "nav.updates", icon: "updates", permission: "updates.manage", order: 136 },
   ],

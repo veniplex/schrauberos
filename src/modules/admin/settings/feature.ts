@@ -7,7 +7,7 @@ export const settingsFeature = defineFeature({
   descriptionKey: "settings.feature.description",
   order: 120,
   required: true,
-  permissions: { group: "settings", keys: ["settings.manage"] },
+  permissions: { group: "settings", keys: ["settings.manage"], adminOnly: ["settings.manage"] },
   nav: [
     { id: "settings", href: "/settings", labelKey: "nav.settings", icon: "settings", permission: "settings.manage", order: 120 },
   ],

@@ -52,6 +52,8 @@ model Role {
   isAdmin     Boolean @default(false)
   // Systemrollen können nicht gelöscht werden
   isSystem    Boolean @default(false)
+  // Version für das gleichzeitige Bearbeiten (siehe src/lib/concurrency.ts)
+  updatedAt   DateTime @default(now()) @updatedAt
 
   permissions RolePermission[]
   users       UserRole[]

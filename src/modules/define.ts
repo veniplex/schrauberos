@@ -67,8 +67,12 @@ export type FeatureDef = {
   requires?: readonly string[];
   /** Weiche Abhängigkeiten (vollständige IDs): optionale Verknüpfung, läuft auch ohne. */
   uses?: readonly string[];
-  /** Eigene Rechte-Gruppe. Schlüssel: "<gruppe>.<aktion>" */
-  permissions: { group: string; keys: readonly string[] };
+  /**
+   * Eigene Rechte-Gruppe. Schlüssel: "<gruppe>.<aktion>".
+   * `adminOnly`: Rechte der Verwaltung (Benutzer, Rollen, Einstellungen, Backups …), die nur Administratoren vergeben dürfen –
+   * ein Nicht-Admin kann sie weder Rollen hinzufügen noch Konten zuweisen (siehe `src/lib/rbac.ts`).
+   */
+  permissions: { group: string; keys: readonly string[]; adminOnly?: readonly string[] };
   nav: readonly NavDef[];
   /** URL-Präfixe (ohne führenden Slash), die zu dieser Funktion gehören, z. B. "appointments", "admin/users" */
   routes: readonly string[];

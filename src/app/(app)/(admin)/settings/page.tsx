@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { settingsTabsFor } from "@/modules/registry";
-import { requirePermission } from "@/server/auth/session";
+import { requireSession } from "@/server/auth/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -13,9 +14,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Die Reiter liefern die Funktionen selbst (siehe SettingsTabDef) – ausgeschaltete Funktionen haben hier keinen Reiter. */
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const session = await requirePermission("settings.manage");
+  // Jede Funktion bringt ihre Reiter mit ihrem eigenen Recht mit (Verwaltung: settings.manage, Termine: appointments.configure …)
+  const session = await requireSession();
   const [{ t }, sp] = await Promise.all([getI18n(), searchParams]);
   const tabs = settingsTabsFor(session);
+  if (tabs.length === 0) redirect("/forbidden");
   const active = tabs.find((tab) => tab.id === sp.tab) ?? tabs[0];
 
   return (

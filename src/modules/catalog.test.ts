@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import { de } from "@/i18n/messages/de";
 import { en } from "@/i18n/messages/en";
-import { ALL_PERMISSIONS, FEATURES, MODULES, fullFeatureId } from "./catalog";
+import { ADMIN_ONLY_PERMISSIONS, ALL_PERMISSIONS, FEATURES, MODULES, fullFeatureId } from "./catalog";
 import { DEFAULT_ROLES } from "./default-roles";
 import { featureKey } from "./catalog-logic";
 
@@ -94,6 +94,14 @@ describe("Katalog", () => {
   it("Standardrollen enthalten nur gültige Rechte", () => {
     const valid = new Set<string>(ALL_PERMISSIONS);
     for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(valid.has(p), `${role.key}: ${p}`);
+  });
+
+  it("adminOnly-Rechte gibt es, gehören zur eigenen Funktion und stecken in keiner Standardrolle (Regel 9)", () => {
+    for (const f of FEATURES) {
+      for (const p of (f.permissions as { adminOnly?: readonly string[] }).adminOnly ?? []) assert.ok((f.permissions.keys as readonly string[]).includes(p), `${p} nicht in der Gruppe`);
+    }
+    for (const p of ["users.manage", "roles.manage", "backup.manage", "updates.manage", "modules.manage", "settings.manage"]) assert.ok(ADMIN_ONLY_PERMISSIONS.has(p), `${p} muss adminOnly sein`);
+    for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(!ADMIN_ONLY_PERMISSIONS.has(p), `${role.key}: ${p} ist adminOnly`);
   });
 
   it("jede Audit-Aktion hat eine Beschriftung", () => {

@@ -21,12 +21,13 @@ export type UserFormInitial = {
 export function UserForm({
   initial,
   roles,
-  canAssignAdmin,
+  lockedRoleIds,
   isSelf,
 }: {
   initial: UserFormInitial;
   roles: Array<{ id: string; name: string; description: string | null; isAdmin: boolean }>;
-  canAssignAdmin: boolean;
+  /** Rollen, die der angemeldete Benutzer nicht vergeben oder entziehen darf (Administrator-Rollen, Verwaltungsrechte, fremde Rechte) */
+  lockedRoleIds: string[];
   isSelf: boolean;
 }) {
   const { t } = useI18n();
@@ -74,7 +75,7 @@ export function UserForm({
         <FieldLabel as="legend">{t("users.fields.roles")}</FieldLabel>
         <ul className="mt-1 grid gap-2 sm:grid-cols-2">
           {roles.map((r) => {
-            const locked = r.isAdmin && !canAssignAdmin;
+            const locked = lockedRoleIds.includes(r.id);
             return (
               <li key={r.id}>
                 <Checkbox
@@ -83,7 +84,7 @@ export function UserForm({
                   defaultChecked={initial.roleIds.includes(r.id)}
                   disabled={locked}
                   label={<span className="font-medium">{r.name}</span>}
-                  hint={r.description}
+                  hint={locked ? t("users.roleLocked") : r.description}
                   className={locked ? "rounded-md border border-line p-3 opacity-60" : "cursor-pointer rounded-md border border-line p-3 hover:bg-surface-hover"}
                 />
                 {locked && initial.roleIds.includes(r.id) ? <input type="hidden" name="roleId" value={r.id} /> : null}

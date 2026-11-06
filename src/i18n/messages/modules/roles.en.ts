@@ -19,6 +19,12 @@ export const rolesEn: typeof rolesDe = {
   userCount_one: "{count} user",
   userCount_other: "{count} users",
   fields: { name: "Name", description: "Description" },
+  adminRightsBadge: "Administration rights",
+  adminRightsHint: "This role contains administration rights (users, roles, settings, modules, backups or updates) but is not an administrator role.",
+  readOnlyNotice: "You cannot change this role: it is your own, an administrator role, or contains administration rights.",
+  lockedRight: "Only administrators can grant this permission, or you do not have it yourself.",
+  duplicate: "Duplicate role",
+  copyOf: "Copy of {name}",
   selectAll: "All",
   selectNone: "None",
 };

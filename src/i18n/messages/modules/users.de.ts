@@ -10,6 +10,10 @@ export const usersDe = {
   delete: "Benutzer löschen",
   confirmDelete: "Benutzer „{name}“ wirklich löschen?",
   cols: { user: "Benutzer", roles: "Rollen", source: "Anmeldung", lastLogin: "Letzte Anmeldung" },
+  adminRightsBadge: "Verwaltungsrechte",
+  adminRightsHint: "Dieses Konto ist kein Administrator, hat aber Rechte der Verwaltung (Benutzer, Rollen, Einstellungen, Module, Backups oder Updates). Bitte prüfen, ob das gewollt ist.",
+  readOnlyNotice: "Dieses Konto hat Rechte, die du selbst nicht hast. Du kannst es ansehen, aber nicht ändern.",
+  roleLocked: "Nur Administratoren können diese Rolle vergeben oder entziehen.",
   linkedEmployee: "Mitarbeiter: {name}",
   sourceLocal: "Lokal",
   active: "Aktiv",
@@ -28,7 +32,6 @@ export const usersDe = {
     mustChangePassword: "Passwort beim nächsten Login ändern lassen",
   },
   errors: {
-    adminRoleRestricted: "Administrator-Rollen dürfen nur von Administratoren vergeben oder entzogen werden.",
     lastAdmin: "Es muss mindestens ein aktiver Administrator bestehen bleiben.",
     selfDeactivate: "Das eigene Konto kann nicht deaktiviert werden.",
     usernameTaken: "Dieser Benutzername ist bereits vergeben.",

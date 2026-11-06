@@ -7,7 +7,7 @@ export const rolesFeature = defineFeature({
   descriptionKey: "roles.feature.description",
   order: 110,
   required: true,
-  permissions: { group: "roles", keys: ["roles.manage"] },
+  permissions: { group: "roles", keys: ["roles.manage"], adminOnly: ["roles.manage"] },
   nav: [
     { id: "roles", href: "/admin/roles", labelKey: "nav.roles", icon: "roles", permission: "roles.manage", order: 110 },
   ],

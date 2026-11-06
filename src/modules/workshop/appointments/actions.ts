@@ -131,7 +131,7 @@ const settingsSchema = z.object({
 });
 
 export async function saveAppointmentSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("settings.manage");
+  await requirePermission("appointments.configure");
   const { t } = await getI18n();
   const parsed = settingsSchema.safeParse(formObject(formData));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
@@ -149,7 +149,7 @@ export async function saveAppointmentSettings(_prev: ActionState, formData: Form
 const baySchema = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(60), sortOrder: z.coerce.number().int().min(0).max(999).default(0) });
 
 export async function saveBay(formData: FormData) {
-  await requirePermission("settings.manage");
+  await requirePermission("appointments.configure");
   const parsed = baySchema.safeParse(formObject(formData));
   if (!parsed.success) return;
   const { id, ...data } = parsed.data;
@@ -160,7 +160,7 @@ export async function saveBay(formData: FormData) {
 }
 
 export async function deleteBay(formData: FormData) {
-  await requirePermission("settings.manage");
+  await requirePermission("appointments.configure");
   const id = String(formData.get("id") ?? "");
   if (id) await db.bay.deleteMany({ where: { id } });
   revalidatePath("/appointments");
@@ -178,7 +178,7 @@ const typeSchema = z.object({
 });
 
 export async function saveAppointmentType(formData: FormData) {
-  await requirePermission("settings.manage");
+  await requirePermission("appointments.configure");
   const parsed = typeSchema.safeParse(formObject(formData));
   if (!parsed.success) return;
   const { id, ...data } = parsed.data;
@@ -189,7 +189,7 @@ export async function saveAppointmentType(formData: FormData) {
 }
 
 export async function deleteAppointmentType(formData: FormData) {
-  await requirePermission("settings.manage");
+  await requirePermission("appointments.configure");
   const id = String(formData.get("id") ?? "");
   if (id) await db.appointmentType.deleteMany({ where: { id } });
   revalidatePath("/appointments");

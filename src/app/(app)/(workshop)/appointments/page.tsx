@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { addDays, startOfWeek } from "date-fns";
+import { Settings } from "lucide-react";
+import { LinkButton } from "@/components/ui/buttons";
 import { PageHeader } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { parseDateParam, toDateInput } from "@/lib/dates";
@@ -70,7 +72,17 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader title={i18n.t("appointments.title")} description={i18n.t("appointments.description")} />
+      <PageHeader
+        title={i18n.t("appointments.title")}
+        description={i18n.t("appointments.description")}
+        actions={
+          session.can("appointments.configure") ? (
+            <LinkButton href="/settings?tab=appointments" variant="ghost">
+              <Settings className="size-4" aria-hidden /> {i18n.t("appointments.settings.open")}
+            </LinkButton>
+          ) : null
+        }
+      />
       <CalendarToolbar i18n={i18n} view={view} date={date} canCreate={canCreate} />
       {view === "week" ? <WeekView ctx={ctx} events={events} /> : null}
       {view === "day" ? <DayView ctx={ctx} events={events} bays={bays} /> : null}

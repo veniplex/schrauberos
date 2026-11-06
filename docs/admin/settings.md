@@ -7,4 +7,6 @@ ihre eigenen Einstellungen mit.
 * **Backups:** Zeitplan der automatischen Backups (siehe Hilfe „Backups“).
 * **Updates:** Zugang für die Update-Prüfung (siehe Hilfe „Updates“).
 * **Termine** und **Reifenlager:** Kalender-Raster, Arbeitsplätze, Terminarten bzw. Ampel-Grenzwerte – beschrieben in der Hilfe
-  der jeweiligen Funktion im Bereich Werkstatt.
+  der jeweiligen Funktion im Bereich Werkstatt. Den Reiter **Termine** sieht, wer das Recht „Arbeitsplätze, Terminarten und Kalender
+  einrichten“ hat (auch ohne „Einstellungen verwalten“); er ist außerdem über die Schaltfläche im Terminkalender erreichbar.
+* Das Recht „Werkstatt-Einstellungen verwalten“ gehört zu den Rechten der Verwaltung und wird nur von Administratoren vergeben.

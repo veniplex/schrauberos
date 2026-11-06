@@ -112,5 +112,5 @@ async function TypesCards() {
 }
 
 export const settingsTabs: SettingsTabDef[] = [
-  { id: "appointments", feature: "workshop.appointments", labelKey: "appointments.settings.tab", permission: "settings.manage", order: 20, Component: AppointmentsSettingsTab },
+  { id: "appointments", feature: "workshop.appointments", labelKey: "appointments.settings.tab", permission: "appointments.configure", order: 20, Component: AppointmentsSettingsTab },
 ];

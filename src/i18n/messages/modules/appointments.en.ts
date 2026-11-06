@@ -7,6 +7,7 @@ export const appointmentsEn: typeof appointmentsDe = {
   },
   settings: {
     tab: "Appointments & bays",
+    open: "Bays & appointment types",
     active: "Active",
     sortOrder: "Order",
     calendar: "Calendar",

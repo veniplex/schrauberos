@@ -130,6 +130,14 @@ export const en: Messages = {
     themes: { system: "System", light: "Light", dark: "Dark" },
     themeHint: "“System” follows your device setting.",
   },
+  rbac: {
+    denied: {
+      adminRole: "Administrator accounts and roles can only be changed or assigned by administrators.",
+      adminOnly: "Administration permissions (users, roles, settings, modules, backups, updates) can only be granted or removed by administrators.",
+      notSubset: "Not possible: this would affect permissions you do not have yourself. You can only change accounts and roles whose permissions you fully hold.",
+      ownRole: "Only an administrator can change or delete your own role.",
+    },
+  },
   validation: {
     required: "Required.",
     invalid: "Invalid value.",
@@ -170,6 +178,7 @@ export const en: Messages = {
       create: "Create appointments",
       edit: "Edit appointments",
       delete: "Delete appointments",
+      configure: "Set up bays, appointment types and calendar",
     },
     tires: {
       view: "View tyre storage",

@@ -17,32 +17,49 @@ export type RolePermissionSection = {
 export function RoleForm({
   initial,
   sections,
+  lockedPermissions,
 }: {
-  initial: { id?: string; name: string; description: string; isAdmin: boolean; permissions: string[] };
+  initial: { id?: string; version?: string; name: string; description: string; isAdmin: boolean; permissions: string[] };
   sections: RolePermissionSection[];
+  /** Rechte, die der angemeldete Benutzer nicht vergeben oder entziehen darf (nicht Teil seiner eigenen Rechte oder nur für Administratoren) */
+  lockedPermissions: string[];
 }) {
   const { t } = useI18n();
   const [state, action] = useActionState<ActionState, FormData>(saveRole, {});
   const [selected, setSelected] = useState(() => new Set(initial.permissions));
   const err = state.fieldErrors ?? {};
 
-  const toggle = (key: string, on: boolean) =>
+  const locked = new Set(lockedPermissions);
+  // „Bearbeiten“ setzt „Ansehen“ (Rechte ohne Ansehen-Recht sind sinnlos); wer „Ansehen“ abwählt, verliert die übrigen Rechte der Gruppe
+  const toggle = (key: string, on: boolean, groupKeys: readonly string[]) =>
     setSelected((s) => {
       const next = new Set(s);
-      if (on) next.add(key);
-      else next.delete(key);
+      const [group, action] = key.split(".");
+      const view = `${group}.view`;
+      if (on) {
+        next.add(key);
+        if (action !== "view" && groupKeys.includes(view) && !locked.has(view)) next.add(view);
+      } else {
+        next.delete(key);
+        if (action === "view") groupKeys.filter((k) => !locked.has(k)).forEach((k) => next.delete(k));
+      }
       return next;
     });
   const toggleGroup = (keys: readonly string[], on: boolean) =>
     setSelected((s) => {
       const next = new Set(s);
-      keys.forEach((k) => (on ? next.add(k) : next.delete(k)));
+      keys.filter((k) => !locked.has(k)).forEach((k) => (on ? next.add(k) : next.delete(k)));
       return next;
     });
 
   return (
     <form action={action} className="flex max-w-4xl flex-col gap-5">
-      {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? (
+        <>
+          <input type="hidden" name="id" value={initial.id} />
+          <input type="hidden" name="version" value={initial.version ?? ""} />
+        </>
+      ) : null}
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("roles.fields.name")} htmlFor="name" error={err.name} required>
@@ -66,22 +83,35 @@ export function RoleForm({
               <div className="grid gap-4 md:grid-cols-2">
                 {section.groups.map((group) => {
                   const keys = group.keys.map((k) => k.key);
-                  const allOn = keys.every((k) => selected.has(k));
+                  const free = keys.filter((k) => !locked.has(k));
+                  const allOn = free.every((k) => selected.has(k));
                   return (
                     <Card
                       key={group.group}
                       title={group.label}
                       actions={
-                        <Button variant="ghost" size="sm" onClick={() => toggleGroup(keys, !allOn)}>
-                          {allOn ? t("roles.selectNone") : t("roles.selectAll")}
-                        </Button>
+                        free.length > 0 ? (
+                          <Button variant="ghost" size="sm" onClick={() => toggleGroup(keys, !allOn)}>
+                            {allOn ? t("roles.selectNone") : t("roles.selectAll")}
+                          </Button>
+                        ) : null
                       }
                     >
                       {group.inactive ? <p className="mb-2 text-xs text-warning-ink">{t("roles.featureInactive")}</p> : null}
                       <ul className="flex flex-col gap-2">
                         {group.keys.map(({ key, label }) => (
                           <li key={key}>
-                            <Checkbox name="permission" value={key} checked={selected.has(key)} onChange={(e) => toggle(key, e.target.checked)} label={label} />
+                            <Checkbox
+                              name={locked.has(key) ? undefined : "permission"}
+                              value={key}
+                              checked={selected.has(key)}
+                              disabled={locked.has(key)}
+                              onChange={(e) => toggle(key, e.target.checked, keys)}
+                              label={label}
+                              hint={locked.has(key) ? t("roles.lockedRight") : undefined}
+                            />
+                            {/* gesperrte, aber vorhandene Rechte bleiben erhalten (der Server prüft nur die Differenz) */}
+                            {locked.has(key) && selected.has(key) ? <input type="hidden" name="permission" value={key} /> : null}
                           </li>
                         ))}
                       </ul>

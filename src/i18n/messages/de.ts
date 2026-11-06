@@ -130,6 +130,14 @@ export const de = {
     themes: { system: "System", light: "Hell", dark: "Dunkel" },
     themeHint: "„System“ folgt der Einstellung des Geräts.",
   },
+  rbac: {
+    denied: {
+      adminRole: "Administrator-Konten und -Rollen dürfen nur von Administratoren geändert oder vergeben werden.",
+      adminOnly: "Rechte der Verwaltung (Benutzer, Rollen, Einstellungen, Module, Backups, Updates) dürfen nur Administratoren vergeben oder entziehen.",
+      notSubset: "Das geht nicht: Es würden Rechte betroffen, die du selbst nicht hast. Man kann nur Konten und Rollen ändern, deren Rechte man vollständig selbst besitzt.",
+      ownRole: "Die eigene Rolle darf nur ein Administrator ändern oder löschen.",
+    },
+  },
   validation: {
     required: "Pflichtfeld.",
     invalid: "Ungültiger Wert.",
@@ -170,6 +178,7 @@ export const de = {
       create: "Termine anlegen",
       edit: "Termine bearbeiten",
       delete: "Termine löschen",
+      configure: "Arbeitsplätze, Terminarten und Kalender einrichten",
     },
     tires: {
       view: "Reifenlager ansehen",

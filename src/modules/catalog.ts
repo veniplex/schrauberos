@@ -73,6 +73,10 @@ export const featureOfPermission = (permission: string): FeatureId | undefined =
 
 export const isPermission = (value: string): value is Permission => FEATURE_OF_PERMISSION.has(value);
 
+/** Rechte der Verwaltung, die nur Administratoren vergeben dürfen (Markierung `adminOnly` in der `feature.ts`). */
+export const ADMIN_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(FEATURES.flatMap((f) => (f.permissions as { adminOnly?: readonly string[] }).adminOnly ?? []));
+export const isAdminOnly = (permission: string): boolean => ADMIN_ONLY_PERMISSIONS.has(permission);
+
 export const fullFeatureId = (f: { module: string; id: string }) => featureKey(f) as FeatureId;
 
 export const featuresOfModule = (moduleId: string) => FEATURES.filter((f) => f.module === moduleId);
