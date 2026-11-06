@@ -7,7 +7,10 @@ import { normalizePlate } from "@/lib/plate";
 
 const ALLOWED = ["appointments.create", "appointments.edit", "tires.create", "tires.edit", "vehicles.view"] as const;
 
-/** Fahrzeugsuche für die Auswahlfelder (Kennzeichen, Kundenname, Hersteller/Modell). */
+/**
+ * Fahrzeugsuche für die Auswahlfelder (Kennzeichen, Kundenname, Hersteller/Modell). Kunden erscheinen nur als Anzeigename
+ * (Richtlinie D7): Kontaktdaten, Adresse und Notizen gibt es hier nicht – dafür braucht es `customers.view`.
+ */
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -28,7 +31,7 @@ export async function GET(request: NextRequest) {
         { customer: { company: contains(q) } },
       ],
     },
-    include: { customer: true },
+    select: { id: true, plate: true, make: true, model: true, customer: { select: { firstName: true, lastName: true, company: true } } },
     orderBy: { plateNorm: "asc" },
     take: 8,
   });

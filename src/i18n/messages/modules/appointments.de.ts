@@ -57,7 +57,10 @@ export const appointmentsDe = {
     bay: "Arbeitsplatz",
     assignee: "Mitarbeiter",
   },
-  errors: { bayBusy: "Arbeitsplatz ist von {from} bis {to} belegt ({title})." },
+  errors: {
+    bayBusy: "Arbeitsplatz ist von {from} bis {to} belegt ({title}).",
+    tireSetMismatch: "Der verknüpfte Reifensatz gehört nicht zu diesem Fahrzeug.",
+  },
   widgets: {
     todayTitle: "Heutige Termine",
     toCalendar: "Zum Kalender",

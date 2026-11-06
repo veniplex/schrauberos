@@ -51,6 +51,20 @@ export async function saveAppointment(_prev: ActionState, formData: FormData): P
     : null;
   if (d.vehicleId && !vehicle) return { fieldErrors: { vehicleId: t("validation.invalid") } };
 
+  // Alle Verweise müssen existieren (statt eines Datenbankfehlers); Terminart, Arbeitsplatz und Mitarbeiter müssen aktiv sein –
+  // es sei denn, der bestehende Termin hat sie schon (dann bleibt der Wert unverändert möglich).
+  const current = d.id ? await db.appointment.findUnique({ where: { id: d.id }, select: { typeId: true, bayId: true, assigneeId: true } }) : null;
+  const invalid = (field: string) => ({ fieldErrors: { [field]: t("validation.invalid") } });
+  if (d.typeId && d.typeId !== current?.typeId && !(await db.appointmentType.findFirst({ where: { id: d.typeId, active: true }, select: { id: true } }))) return invalid("typeId");
+  if (d.bayId && d.bayId !== current?.bayId && !(await db.bay.findFirst({ where: { id: d.bayId, active: true }, select: { id: true } }))) return invalid("bayId");
+  if (d.assigneeId && d.assigneeId !== current?.assigneeId && !(await db.user.findFirst({ where: { id: d.assigneeId, active: true }, select: { id: true } }))) return invalid("assigneeId");
+  if (d.tireSetId) {
+    // Der Reifensatz muss existieren und zum gewählten Fahrzeug gehören
+    const set = await db.tireSet.findUnique({ where: { id: d.tireSetId }, select: { vehicleId: true } });
+    if (!set) return invalid("tireSetId");
+    if (!vehicle || set.vehicleId !== vehicle.id) return { fieldErrors: { vehicleId: t("appointments.errors.tireSetMismatch") } };
+  }
+
   const data = {
     title: d.title.trim(),
     startsAt,

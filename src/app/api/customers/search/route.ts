@@ -6,7 +6,10 @@ import { customerDisplayName } from "@/modules/workshop/customers/public";
 
 const ALLOWED = ["customers.view", "customers.edit", "invoices.edit"] as const;
 
-/** Kundensuche für Auswahlfelder (Name, Firma, Kundennummer, Ort). */
+/**
+ * Kundensuche für Auswahlfelder (Name, Firma, Kundennummer). Der Anzeigename ist in jedem Auswahl-Kontext sichtbar (Richtlinie D7);
+ * der Wohnort ist Adressdaten und wird nur mit `customers.view` durchsucht und angezeigt.
+ */
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -15,8 +18,10 @@ export async function GET(request: NextRequest) {
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 60);
   if (!q) return NextResponse.json({ results: [] });
 
+  const withAddress = session.can("customers.view");
   const customers = await db.customer.findMany({
-    where: { OR: [{ lastName: contains(q) }, { firstName: contains(q) }, { company: contains(q) }, { customerNumber: contains(q) }, { city: contains(q) }] },
+    where: { OR: [{ lastName: contains(q) }, { firstName: contains(q) }, { company: contains(q) }, { customerNumber: contains(q) }, ...(withAddress ? [{ city: contains(q) }] : [])] },
+    select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true, ...(withAddress ? { city: true } : {}) },
     orderBy: { lastName: "asc" },
     take: 8,
   });
@@ -24,7 +29,7 @@ export async function GET(request: NextRequest) {
     results: customers.map((c) => ({
       id: c.id,
       label: customerDisplayName(c),
-      sublabel: [c.customerNumber ? `#${c.customerNumber}` : "", c.city ?? ""].filter(Boolean).join(" · "),
+      sublabel: [c.customerNumber ? `#${c.customerNumber}` : "", "city" in c ? (c.city ?? "") : ""].filter(Boolean).join(" · "),
     })),
   });
 }

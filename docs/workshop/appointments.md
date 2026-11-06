@@ -7,7 +7,7 @@ Der Werkstattkalender zeigt die Termine als **Woche**, **Tag** (mit einer Spalte
 * **Doppelbelegung:** Ein Arbeitsplatz lässt sich nicht zur selben Zeit zweimal belegen; die Anwendung sagt, wer den Platz
   schon hat.
 * **Status:** Geplant, Bestätigt, In Arbeit, Erledigt, Storniert oder Nicht erschienen. Stornierte Termine blockieren keinen Platz.
-* **Reifenwechsel:** Termine der Art „Reifenwechsel“ lassen sich mit einem eingelagerten Reifensatz verknüpfen.
+* **Reifenwechsel:** Termine der Art „Reifenwechsel“ lassen sich mit einem eingelagerten Reifensatz verknüpfen. Der Satz muss zum gewählten Fahrzeug gehören.
 
 Arbeitsplätze, Terminarten und das Kalender-Raster pflegt, wer das Recht „Arbeitsplätze, Terminarten und Kalender einrichten“ hat
 (Administratoren immer), unter **Verwaltung → Einstellungen → Termine** – oder über die Schaltfläche „Arbeitsplätze & Terminarten“

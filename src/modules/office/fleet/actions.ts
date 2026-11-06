@@ -23,6 +23,11 @@ const dateOpt = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
 const dateReq = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const noon = (d: string) => new Date(`${d}T12:00:00`);
 
+/** Gibt es dieses Dienstfahrzeug? (Verweise aus dem Formular nie ungeprüft verwenden.) */
+async function fleetVehicleExists(id: string): Promise<boolean> {
+  return (await db.fleetVehicle.findUnique({ where: { id }, select: { id: true } })) !== null;
+}
+
 /* ───────────── Fahrzeug ───────────── */
 
 const vehicleSchema = z.object({
@@ -125,6 +130,7 @@ export async function addMileage(_prev: ActionState, formData: FormData): Promis
   const parsed = mileageSchema.safeParse(formObject(formData));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
   const d = parsed.data;
+  if (!(await fleetVehicleExists(d.fleetVehicleId))) return { error: t("validation.invalid") };
 
   // Ein Kilometerstand darf nicht unter dem zuletzt erfassten Wert liegen (Tippfehler-Schutz)
   const last = await db.fleetMileage.findFirst({ where: { fleetVehicleId: d.fleetVehicleId }, orderBy: { km: "desc" } });
@@ -163,6 +169,7 @@ export async function addCost(_prev: ActionState, formData: FormData): Promise<A
 
   const amountCents = parseMoneyToCents(d.amount);
   if (amountCents === null || amountCents === 0) return { fieldErrors: { amount: t("fleet.errors.amount") } };
+  if (!(await fleetVehicleExists(d.fleetVehicleId))) return { error: t("validation.invalid") };
 
   await db.fleetCost.create({
     data: { fleetVehicleId: d.fleetVehicleId, date: noon(d.date), category: d.category, amountCents, km: d.km ?? null, note: d.note ?? null },
