@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, type ReactNode } from "react";
+import { Component, startTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/buttons";
 import { Alert } from "@/components/ui/layout";
@@ -38,10 +38,14 @@ function WidgetFallback({ retry }: { retry: () => void }) {
       </Alert>
       <Button
         size="sm"
-        onClick={() => {
-          router.refresh();
-          retry();
-        }}
+        onClick={() =>
+          // Beides in einer Transition (wie die Fehlerseite von Next): Die Grenze setzt sich erst zurück, wenn die neu geladenen Daten da sind.
+          // Sonst rendern die alten, werfenden Kinder sofort wieder, und erst der zweite Klick hilft.
+          startTransition(() => {
+            router.refresh();
+            retry();
+          })
+        }
       >
         {t("errors.retry")}
       </Button>

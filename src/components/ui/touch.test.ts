@@ -53,17 +53,13 @@ describe("Touch-Fundament", () => {
     }
     assert.ok(found >= 4, `Kennzeichen-/FIN-Felder gefunden: ${found}`);
     assert.deepEqual(missing, []);
-    const form = readFileSync(path.join(SRC, "components", "ui", "form.tsx"), "utf8");
-    assert.match(form, /props\.type === "number"/);
-    assert.match(form, /"decimal" : "numeric"/);
+    // Zahlentastatur und Fokus-Verhalten der Bausteine: Wiedergabetests in form.test.ts
   });
 
-  it("autoFocus gilt nur am Desktop, nie auf Touch-Geräten", () => {
-    const form = readFileSync(path.join(SRC, "components", "ui", "form.tsx"), "utf8");
-    assert.match(form, /isTouchLayout/);
-    assert.match(form, /autoFocus \? \(el\) => void \(el && !isTouchLayout\(\) && el\.focus\(\)\)/);
-    // kein anderes Element der App setzt autoFocus an React vorbei
-    const direct = walk(SRC).filter((f) => !f.includes(`${path.sep}ui${path.sep}`)).filter((f) => /<(textarea|select|button)[^>]*autoFocus/.test(readFileSync(f, "utf8")));
+  it("kein Element der App setzt autoFocus an den Bausteinen vorbei (Verhalten selbst: form.test.ts)", () => {
+    const direct = walk(SRC)
+      .filter((f) => !f.includes(`${path.sep}ui${path.sep}`))
+      .filter((f) => /<(textarea|select|button|input)[^>]*autoFocus/.test(readFileSync(f, "utf8")));
     assert.deepEqual(direct, []);
   });
 });
