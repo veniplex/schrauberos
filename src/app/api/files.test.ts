@@ -16,6 +16,7 @@ let env: TestEnv;
 let invoiceRoute: typeof import("./invoices/[id]/file/route");
 let uploadRoute: typeof import("./backups/upload/route");
 let downloadRoute: typeof import("./backups/[name]/route");
+let imageRoute: typeof import("./docs/images/route");
 let storeFile: typeof import("@/server/files").storeFile;
 let core: typeof import("@/server/backup/core");
 
@@ -24,6 +25,7 @@ before(async () => {
   invoiceRoute = await import("./invoices/[id]/file/route");
   uploadRoute = await import("./backups/upload/route");
   downloadRoute = await import("./backups/[name]/route");
+  imageRoute = await import("./docs/images/route");
   ({ storeFile } = await import("@/server/files"));
   core = await import("@/server/backup/core");
 });
@@ -38,6 +40,38 @@ async function signInWith(permissions: string[], extra: { mustChangePassword?: b
 beforeEach(async () => {
   await env.db.auditLog.deleteMany();
   env.signOut();
+});
+
+/* ───────────── Doku-Bilder hochladen ───────────── */
+
+describe("Doku-Bild hochladen (ZP2-A-F12: wird protokolliert)", () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+  const upload = async (area: string, file: File | null) => {
+    const body = new FormData();
+    body.set("area", area);
+    if (file) body.set("file", file);
+    return imageRoute.POST(new NextRequest("http://localhost/api/docs/images", { method: "POST", body }));
+  };
+
+  it("legt das Bild ab, antwortet mit Adresse und schreibt einen Audit-Eintrag (Bereich, Dateiname); Fehlschläge schreiben nichts", async () => {
+    const { DOC_PERMISSIONS, DOC_AREAS } = await import("@/capabilities/docs/areas");
+    const area = DOC_AREAS[0];
+    assert.equal((await upload(area, new File([PNG], "a.png", { type: "image/png" }))).status, 401);
+    await signInWith([]);
+    assert.equal((await upload(area, new File([PNG], "a.png", { type: "image/png" }))).status, 403);
+    await signInWith([DOC_PERMISSIONS[area].edit]);
+    assert.equal((await upload(area, new File([PNG], "a.txt", { type: "text/plain" }))).status, 415);
+    assert.equal((await upload(area, new File([new Uint8Array(0)], "leer.png", { type: "image/png" }))).status, 413);
+    assert.equal(await env.db.auditLog.count({ where: { action: "docs.imageUpload" } }), 0);
+
+    const res = await upload(area, new File([PNG], "Schaltplan.png", { type: "image/png" }));
+    assert.equal(res.status, 200);
+    const { id, url } = (await res.json()) as { id: string; url: string };
+    assert.equal(url, `/api/docs/images/${id}`);
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "docs.imageUpload" } });
+    assert.equal(entry.entityId, id);
+    assert.equal(entry.target, `${area}: Schaltplan.png`);
+  });
 });
 
 /* ───────────── Rechnungsbeleg ───────────── */

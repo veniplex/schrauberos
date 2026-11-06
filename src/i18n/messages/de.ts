@@ -58,6 +58,7 @@ export const de = {
       notFound: "Dieser Eintrag existiert nicht mehr.",
       duplicate: "Dieser Eintrag existiert bereits.",
       inUse: "Dieser Eintrag wird noch verwendet und kann nicht geändert werden.",
+      busy: "Die Datenbank ist gerade ausgelastet. Bitte versuche es gleich noch einmal.",
       failed: "Das hat nicht geklappt. Bitte versuche es noch einmal.",
       badRequest: "Die Anfrage ist ungültig.",
     },

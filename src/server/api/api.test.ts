@@ -476,6 +476,27 @@ describe("Idempotenz", () => {
   });
 });
 
+describe("Datenbank überlastet (P2028)", () => {
+  it("antwortet 503 mit Retry-After statt 500, und der Idempotenz-Schlüssel bleibt frei", async () => {
+    const { token } = await makeToken(env, owner());
+    const client = env.db as unknown as { $transaction: (...args: unknown[]) => Promise<unknown> };
+    const original = client.$transaction.bind(client);
+    client.$transaction = async () => {
+      throw Object.assign(new Error("Transaction API error"), { code: "P2028" });
+    };
+    try {
+      const response = await call(apiRequest("POST", "/customers", { token, body: { lastName: "Busy" }, headers: { "idempotency-key": "busy-1" } }));
+      assert.equal(response.status, 503);
+      assert.equal(response.headers.get("retry-after"), "2");
+      assert.equal((await json(response)).code, "service_unavailable");
+    } finally {
+      client.$transaction = original;
+    }
+    assert.equal(await env.db.apiIdempotencyKey.count({ where: { key: "busy-1" } }), 0);
+    assert.equal((await call(apiRequest("POST", "/customers", { token, body: { lastName: "Busy" }, headers: { "idempotency-key": "busy-1" } }))).status, 201);
+  });
+});
+
 describe("OpenAPI", () => {
   it("verlangt ein gültiges Token, ist deterministisch und nennt nur aktive Funktionen", async () => {
     assert.equal((await call(apiRequest("GET", "/openapi.json"))).status, 401);

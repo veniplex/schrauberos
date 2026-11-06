@@ -1,7 +1,7 @@
 import "server-only";
 import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
-import { startBackupScheduler } from "@/server/backup/scheduler";
+import { startScheduler } from "@/server/backup/scheduler";
 import { writeAudit } from "@/server/audit";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
@@ -75,7 +75,7 @@ export async function startApp(): Promise<void> {
     // Frische Installation: Einrichtungs-Token erzeugen und ins Container-Log schreiben (nach der Einrichtung entfernt)
     ensureSetupToken((await db.user.count()) === 0, { logExisting: true });
 
-    startBackupScheduler();
+    startScheduler();
     state.status = "ready";
   } catch (error) {
     if (error instanceof MigrationError && error.code === "foreignHistory") {

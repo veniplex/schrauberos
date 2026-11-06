@@ -71,6 +71,7 @@ export const AUDIT_ACTIONS = [
   "docs.delete",
   "docs.categorySave",
   "docs.categoryDelete",
+  "docs.imageUpload",
   "backup.create",
   "backup.delete",
   "backup.download",

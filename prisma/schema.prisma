@@ -223,7 +223,7 @@ model Customer {
 
 model Vehicle {
   id             String    @id @default(cuid())
-  // aktueller Halter; null = ohne Kunde (Bestand, Gebrauchtwagen, ehemaliger Kunde gelöscht)
+  // aktueller Halter; null = ohne Kunde (Bestand, Gebrauchtwagen). Ein Kunde mit Fahrzeugen ist nicht löschbar (Restrict), das Fahrzeug verliert den Halter also nie durch Löschen.
   customerId     String?
   // normalisiert: Großbuchstaben, ohne Leerzeichen/Bindestriche (z. B. "BAB1234")
   plateNorm      String

@@ -154,6 +154,7 @@ export const auditDe = {
       delete: "Dokumentation gelöscht",
       categorySave: "Dokumentations-Kapitel gespeichert",
       categoryDelete: "Dokumentations-Kapitel gelöscht",
+      imageUpload: "Dokumentations-Bild hochgeladen",
     },
   },
 };

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { removeFile, storeFile } from "@/server/files";
 import { getSession } from "@/server/auth/session";
+import { audit } from "@/server/audit";
 import { DOC_IMAGE_MAX_BYTES, DOC_IMAGE_TYPES, DOC_PERMISSIONS, isDocArea } from "@/capabilities/docs/areas";
 
 /** Bild für eine Dokumentationsseite hochladen (Recht: Bearbeiten im jeweiligen Bereich). Antwort: { url, id }. */
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
   const path = await storeFile(`doku/${area}`, `${file.name.replace(/\.[^.]*$/, "") || "bild"}.${ext}`, new Uint8Array(await file.arrayBuffer()));
   try {
     const image = await db.docImage.create({ data: { area, name: file.name.slice(0, 120), mime: file.type, size: file.size, path } });
+    await audit("docs.imageUpload", { target: `${area}: ${file.name.slice(0, 80)}`, entityId: image.id });
     return NextResponse.json({ id: image.id, url: `/api/docs/images/${image.id}` });
   } catch (error) {
     await removeFile(path).catch(() => undefined);

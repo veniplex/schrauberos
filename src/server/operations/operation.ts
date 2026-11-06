@@ -131,7 +131,7 @@ export function listOperations(): ReadonlyMap<string, Operation> {
 
 const TX_OPTIONS = { maxWait: 5_000, timeout: 20_000 };
 
-const failureOf = (error: unknown): OperationFailure | null => (error instanceof OperationError ? error.failure : mapPrismaError(error));
+const failureOf = (error: unknown, operation: string): OperationFailure | null => (error instanceof OperationError ? error.failure : mapPrismaError(error, operation));
 
 export function defineOperation<S extends z.ZodType, R, P = undefined>(def: OperationDef<S, R, P>): Operation<z.output<S>, R> {
   if (!def.permission) throw new Error(`Operation ${def.name}: permission ist Pflicht`);
@@ -163,7 +163,7 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
         try {
           if (def.prepare) prepared = await def.prepare({ input, principal });
         } catch (error) {
-          const failure = failureOf(error);
+          const failure = failureOf(error, def.name);
           if (!failure) throw error;
           outcome = { ok: false, failure };
           await settle(def, input, principal, outcome);
@@ -190,7 +190,18 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
           if (def.transaction !== false) await runOperationHooks({ operation: def.name, input, result: data, principal, tx });
           if (def.audit !== false) {
             const action = typeof def.audit === "function" ? def.audit(input, data) : def.audit;
-            await writeAudit(tx, action, { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } });
+            const entry = { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } };
+            if (def.transaction === false) {
+              // Außerhalb einer Transaktion ist die Wirkung (Wiederherstellung, Update …) schon eingetreten: ein Fehler beim Protokollieren darf die Operation nicht abbrechen
+              // (sonst bliebe z. B. der vorgemerkte Neustart aus) – er wird protokolliert, nicht verschluckt.
+              try {
+                await writeAudit(tx, action, entry);
+              } catch (error) {
+                logError(`${def.name}:audit`, error);
+              }
+            } else {
+              await writeAudit(tx, action, entry);
+            }
           }
           return data;
         };
@@ -200,7 +211,7 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
           committed = true;
           outcome = { ok: true, data, input };
         } catch (error) {
-          const failure = failureOf(error);
+          const failure = failureOf(error, def.name);
           if (!failure) throw error;
           outcome = { ok: false, failure };
         }

@@ -22,6 +22,7 @@ export const PROBLEMS = {
   idempotency_key_reuse: { status: 422, title: "Idempotency key reused", detail: "This Idempotency-Key was already used for a different request." },
   idempotency_in_progress: { status: 409, title: "Request in progress", detail: "A request with this Idempotency-Key is still being processed." },
   rate_limited: { status: 429, title: "Too many requests", detail: "Rate limit exceeded; retry later." },
+  service_unavailable: { status: 503, title: "Service unavailable", detail: "The service is busy; retry shortly." },
   internal_error: { status: 500, title: "Internal error", detail: "The request could not be processed." },
 } as const;
 

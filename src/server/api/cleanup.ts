@@ -12,8 +12,8 @@ const globalForCleanup = globalThis as unknown as { __lastApiTokenPrune?: number
 export async function runApiCleanup(now = Date.now()): Promise<number> {
   let removed = await pruneIdempotency(now);
   if (globalForCleanup.__lastApiTokenPrune === undefined || now - globalForCleanup.__lastApiTokenPrune >= DAY_MS) {
-    globalForCleanup.__lastApiTokenPrune = now;
     removed += await pruneApiTokens(now);
+    globalForCleanup.__lastApiTokenPrune = now; // erst nach erfolgreichem Lauf: ein Fehler verschiebt das Aufräumen nicht um einen Tag
   }
   return removed;
 }

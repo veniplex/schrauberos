@@ -5,7 +5,7 @@ import { db } from "@/server/db";
 import { FEATURES, MODULES, featureById } from "./catalog";
 import { effectiveFeatureIds, type Overrides } from "./catalog-logic";
 
-/** Gespeicherte Schalter (nur Abweichungen vom Standard "an"), pro Request gecacht. */
+/** Gespeicherte Schalter (nur Abweichungen vom Standard der Funktion, `defaultEnabled`), pro Request gecacht. */
 export const getOverrides = cache(async (): Promise<Overrides> => {
   const rows = await db.featureSetting.findMany();
   return Object.fromEntries(rows.map((r) => [r.key, r.enabled]));

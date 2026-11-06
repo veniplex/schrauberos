@@ -19,6 +19,8 @@ export type ErrorCode =
   | "duplicate"
   /** wird noch verwendet (Fremdschlüssel) */
   | "inUse"
+  /** Datenbank vorübergehend nicht erreichbar/überlastet (Transaktion kam nicht zustande): später wiederholen */
+  | "busy"
   /** unerwarteter Fehler */
   | "failed";
 
@@ -41,6 +43,7 @@ export const DEFAULT_KEYS: Record<ErrorCode, MessageKey> = {
   conflict: "common.conflict",
   duplicate: "common.errors.duplicate",
   inUse: "common.errors.inUse",
+  busy: "common.errors.busy",
   failed: "common.errors.failed",
 };
 
@@ -94,12 +97,19 @@ export function fieldErrors(error: ZodError): Record<string, FieldMessage> {
   return out;
 }
 
-/** Fehler der Datenbank, die einen Zustand der Daten (nicht einen Programmfehler) melden: P2002 (doppelt), P2025 (fehlt), P2003 (noch verwendet). */
-export function mapPrismaError(error: unknown): OperationFailure | null {
+/**
+ * Fehler der Datenbank, die einen Zustand der Daten (nicht einen Programmfehler) melden: P2002 (doppelt), P2025 (fehlt), P2003 (Fremdschlüssel), P2028 (Transaktion
+ * kam nicht zustande: Wartezeit/Zeitlimit – vorübergehend, später wiederholen).
+ *
+ * P2003 heißt je nach Vorgang etwas anderes: Beim **Löschen** hängt noch etwas daran (`inUse`); beim **Anlegen/Ändern** ist ein Verweis ungültig geworden (der Verweisziel wurde
+ * zwischenzeitlich gelöscht) – das ist ein Eingabefehler (`invalid`), nicht „wird noch verwendet“. `operation` ist der Name der Operation (`customers.delete` …).
+ */
+export function mapPrismaError(error: unknown, operation?: string): OperationFailure | null {
   const code = error instanceof Error ? (error as { code?: unknown }).code : undefined;
   if (typeof code !== "string") return null;
   if (code === "P2002") return { code: "duplicate" };
   if (code === "P2025") return { code: "notFound" };
-  if (code === "P2003") return { code: "inUse" };
+  if (code === "P2003") return operation === undefined || /(?:^|[._-])(?:delete|remove)/i.test(operation) ? { code: "inUse" } : { code: "invalid" };
+  if (code === "P2028") return { code: "busy" };
   return null;
 }

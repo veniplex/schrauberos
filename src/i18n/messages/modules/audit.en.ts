@@ -156,6 +156,7 @@ export const auditEn: typeof auditDe = {
       delete: "Documentation deleted",
       categorySave: "Documentation chapter saved",
       categoryDelete: "Documentation chapter deleted",
+      imageUpload: "Documentation image uploaded",
     },
   },
 };

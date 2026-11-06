@@ -24,15 +24,27 @@ export async function runBackupCheck(now = new Date()): Promise<string | null> {
 
 const globalForScheduler = globalThis as unknown as { __backupTimer?: NodeJS.Timeout; __lastAuditPrune?: number };
 
-/** Löscht Audit-Einträge außerhalb der Aufbewahrungsfrist – höchstens einmal am Tag. */
+/**
+ * Löscht Audit-Einträge außerhalb der Aufbewahrungsfrist – höchstens einmal am Tag. Der Zeitpunkt wird **erst nach erfolgreichem Lauf** gemerkt: Ein Fehler
+ * (gesperrte Datenbank …) verschiebt die Bereinigung nicht um einen Tag, der nächste Takt versucht es erneut.
+ */
 export async function runAuditRetention(now = Date.now()): Promise<number> {
   if (globalForScheduler.__lastAuditPrune !== undefined && now - globalForScheduler.__lastAuditPrune < PRUNE_EVERY_MS) return 0;
+  const removed = await pruneAuditLog(new Date(now));
   globalForScheduler.__lastAuditPrune = now;
-  return pruneAuditLog(new Date(now));
+  return removed;
 }
 
-/** Prüft regelmäßig (und kurz nach dem Start, falls die Uhrzeit verpasst wurde, z. B. nach einem Neustart). */
-export function startBackupScheduler(): void {
+/** Nur für Tests: vergisst, wann zuletzt bereinigt wurde. */
+export function resetSchedulerForTest(): void {
+  delete globalForScheduler.__lastAuditPrune;
+}
+
+/**
+ * Zeitgeber der App (Backup-Zeitplan, Bereinigung des Audit-Logs, Aufräumen der API-Daten): prüft regelmäßig und kurz nach dem Start, falls die Uhrzeit verpasst wurde
+ * (z. B. nach einem Neustart).
+ */
+export function startScheduler(): void {
   if (globalForScheduler.__backupTimer) return;
   cleanupBackupTemp();
   const tick = () => {

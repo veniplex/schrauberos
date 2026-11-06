@@ -176,7 +176,7 @@ describe("defineOperation – Rahmen", () => {
     const d = await dup.execute(admin, { name: "R" });
     const m = await missing.execute(admin, { name: "x" });
     const usedOp = ops.defineOperation({
-      name: "t.used2",
+      name: "t.deleteUsed",
       permission: "customers.edit",
       input: z.object({ id: z.string() }),
       audit: false,
@@ -187,6 +187,58 @@ describe("defineOperation – Rahmen", () => {
     assert.equal(!d.ok && d.failure.code, "duplicate");
     assert.equal(!m.ok && m.failure.code, "notFound");
     assert.equal(!u.ok && u.failure.code, "inUse");
+  });
+
+  it("P2003 heißt beim Löschen „wird noch verwendet“, beim Anlegen „ungültiger Verweis“ (nicht inUse); P2028 (Transaktion kam nicht zustande) ist „später wiederholen“ (ZP2-A-F12)", async () => {
+    const make = (name: string, run: () => Promise<unknown>) => ops.defineOperation({ name, permission: "customers.edit", input: nameSchema, audit: false, auditReason: "Test", run: async () => void (await run()) });
+    // echter Fremdschlüsselfehler beim Anlegen: Fahrzeug mit nicht vorhandenem Halter, ohne vorherige Prüfung
+    const create = make("t.createWithBadReference", () => env.db.vehicle.create({ data: { plate: "X-Y 9", plateNorm: "XY9", customerId: "gibtsnicht" } }));
+    const created = await create.execute(admin, { name: "x" });
+    assert.equal(!created.ok && created.failure.code, "invalid");
+    const removed = make("t.removeSomething", () => env.db.vehicle.create({ data: { plate: "X-Y 9", plateNorm: "XY9", customerId: "gibtsnicht" } }));
+    assert.equal(!(await removed.execute(admin, { name: "x" })).ok && true, true);
+    assert.equal(ops.mapPrismaError(Object.assign(new Error("x"), { code: "P2003" }), "customers.delete")?.code, "inUse");
+    assert.equal(ops.mapPrismaError(Object.assign(new Error("x"), { code: "P2003" }), "network.deleteDevice")?.code, "inUse");
+    assert.equal(ops.mapPrismaError(Object.assign(new Error("x"), { code: "P2003" }), "vehicles.save")?.code, "invalid");
+    const busy = make("t.busy", async () => {
+      throw Object.assign(new Error("Transaction API error"), { code: "P2028" });
+    });
+    const outcome = await busy.execute(admin, { name: "x" });
+    assert.equal(!outcome.ok && outcome.failure.code, "busy");
+  });
+
+  it("transaction: false – schlägt das Audit nach der Wirkung fehl, bleibt die Operation erfolgreich und afterCommit läuft (kein ausbleibender Neustart)", async () => {
+    const log: string[] = [];
+    const op = ops.defineOperation({
+      name: "t.longRunning",
+      permission: "customers.edit",
+      input: nameSchema,
+      audit: "system.update",
+      transaction: false,
+      run: async (ctx) => {
+        log.push("wirkung");
+        ctx.afterCommit(() => void log.push("neustart"));
+        return "fertig";
+      },
+    });
+    await env.db.$executeRawUnsafe(`CREATE TRIGGER "test_block_audit_insert" BEFORE INSERT ON "AuditLog" BEGIN SELECT RAISE(ABORT, 'blockiert'); END`);
+    try {
+      const outcome = await op.execute(admin, { name: "x" });
+      assert.equal(outcome.ok && outcome.data, "fertig");
+      assert.deepEqual(log, ["wirkung", "neustart"]);
+    } finally {
+      await env.db.$executeRawUnsafe('DROP TRIGGER "test_block_audit_insert"');
+    }
+    // innerhalb einer Transaktion gilt weiter: ohne Audit keine Änderung
+    const tx = ops.defineOperation({ name: "t.inTx", permission: "customers.edit", input: nameSchema, audit: "system.update", run: async (ctx) => void (await ctx.tx.customer.create({ data: { lastName: "Nicht da" } })) });
+    await env.db.$executeRawUnsafe(`CREATE TRIGGER "test_block_audit_insert" BEFORE INSERT ON "AuditLog" BEGIN SELECT RAISE(ABORT, 'blockiert'); END`);
+    try {
+      const outcome = await tx.execute(admin, { name: "x" }).catch(() => null);
+      assert.ok(!outcome || !outcome.ok, "die Operation scheitert (als Fehler oder gemeldeter Fehlschlag)");
+    } finally {
+      await env.db.$executeRawUnsafe('DROP TRIGGER "test_block_audit_insert"');
+    }
+    assert.equal(await env.db.customer.count({ where: { lastName: "Nicht da" } }), 0);
   });
 
   it("lässt unerwartete Fehler durch (der Adapter protokolliert sie)", async () => {

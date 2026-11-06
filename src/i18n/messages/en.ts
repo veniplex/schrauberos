@@ -58,6 +58,7 @@ export const en: Messages = {
       notFound: "This entry no longer exists.",
       duplicate: "This entry already exists.",
       inUse: "This entry is still in use and cannot be changed.",
+      busy: "The database is busy right now. Please try again in a moment.",
       failed: "That did not work. Please try again.",
       badRequest: "The request is invalid.",
     },

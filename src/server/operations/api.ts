@@ -78,6 +78,8 @@ export function failureToProblem(failure: OperationFailure, rename: Rename = {})
       return problemOf("conflict", extra);
     case "inUse":
       return problemOf("in_use", extra);
+    case "busy":
+      return problemOf("service_unavailable");
     case "failed":
       return problemOf("internal_error");
   }
@@ -86,6 +88,6 @@ export function failureToProblem(failure: OperationFailure, rename: Rename = {})
 /** Führt eine Operation für den API-Principal aus: Daten bei Erfolg, sonst `ApiProblemError`. */
 export async function runApiOperation<I, R>(operation: Operation<I, R>, principal: Principal, raw: unknown, rename: Rename = {}): Promise<R> {
   const outcome = await operation.execute(principal, raw);
-  if (!outcome.ok) throw new ApiProblemError(failureToProblem(outcome.failure, rename));
+  if (!outcome.ok) throw new ApiProblemError(failureToProblem(outcome.failure, rename), outcome.failure.code === "busy" ? { "retry-after": "2" } : undefined);
   return outcome.data;
 }
