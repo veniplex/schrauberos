@@ -1,53 +1,79 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { db } from "@/server/db";
-import { requireSession } from "@/server/auth/session";
+import { z } from "zod";
 import { verifyPassword } from "@/server/auth/password";
 import { acknowledgeRecoveryNotice, replaceRecoveryCode } from "@/server/auth/recovery";
 import { loginThrottle } from "@/server/auth/throttle";
-import { getI18n } from "@/i18n/server";
-import { audit } from "@/server/audit";
-import type { RecoveryActionState } from "@/lib/recovery-code";
+import { db } from "@/server/db";
+import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 
 /**
  * Wiederherstellungs-Code erzeugen oder neu erzeugen – nur für Administrator-Konten und nur mit erneuter Passwortabfrage. Der
- * bisherige Code wird dabei ungültig (derselbe Schritt in einer Transaktion). Der Klartext steht nur in dieser Antwort.
+ * bisherige Code wird dabei ungültig (derselbe Schritt in einer Transaktion). Der Klartext steht nur in der Antwort der Aktion
+ * (`state`), nie in URL, Log oder Audit.
  */
-export async function createRecoveryCode(_prev: RecoveryActionState, formData: FormData): Promise<RecoveryActionState> {
-  const session = await requireSession();
-  const { t, date } = await getI18n();
-  if (!session.user.isAdmin) return { error: t("recovery.account.errors.adminOnly") };
-  const user = await db.user.findUniqueOrThrow({ where: { id: session.user.id } });
-  if (user.authSource !== "local") return { error: t("recovery.account.errors.external") };
+const createRecoveryCodeOperation = defineOperation({
+  name: "account.createRecoveryCode",
+  permission: "authenticated",
+  input: z.object({ password: z.string().max(1024) }),
+  audit: "auth.recoveryCreated",
+  // Passwortprüfung außerhalb der Transaktion (aufwendig)
+  prepare: async ({ input, principal }) => {
+    if (!principal.user.isAdmin) fail("forbidden", "recovery.account.errors.adminOnly");
+    const user = await db.user.findUniqueOrThrow({ where: { id: principal.user.id } });
+    if (user.authSource !== "local") fail("forbidden", "recovery.account.errors.external");
+    // Die Passwortprüfung hat dasselbe eigene Limit wie der Passwortwechsel (gestohlene Sitzung darf nicht raten)
+    const gate = loginThrottle.passwordChange;
+    const wait = gate.check(user.id);
+    if (wait > 0) fail("forbidden", "account.errors.tooManyAttempts", { seconds: Math.ceil(wait / 1000) });
+    gate.take(user.id);
+    if (!(await verifyPassword(input.password, user.passwordHash))) failField("password", "account.errors.currentWrong");
+    gate.succeed(user.id);
+    return { username: user.username };
+  },
+  run: async ({ principal, prepared, tx, audit }) => {
+    const code = await replaceRecoveryCode(tx, principal.user.id);
+    audit({ target: prepared.username, entityId: principal.user.id }); // nie der Code selbst
+    return { code };
+  },
+});
 
-  // Die Passwortprüfung hat dasselbe eigene Limit wie der Passwortwechsel (gestohlene Sitzung darf nicht raten)
-  const gate = loginThrottle.passwordChange;
-  const wait = gate.check(user.id);
-  if (wait > 0) return { error: t("account.errors.tooManyAttempts", { seconds: Math.ceil(wait / 1000) }) };
-  gate.take(user.id);
-  if (!(await verifyPassword(String(formData.get("password") ?? ""), user.passwordHash))) return { fieldErrors: { password: t("account.errors.currentWrong") } };
-  gate.succeed(user.id);
-
-  const code = await db.$transaction((tx) => replaceRecoveryCode(tx, user.id));
-  await audit("auth.recoveryCreated", { target: user.username });
-  revalidatePath("/account");
-  return { ok: true, recoveryCode: code, issuedOn: date(new Date(), { dateStyle: "medium" }) };
-}
+export const createRecoveryCode = defineAction(createRecoveryCodeOperation, {
+  form: (fd) => ({ password: String(fd.get("password") ?? "") }),
+  revalidate: ["/account"],
+  state: ({ code }, _input, { date }) => ({ recoveryCode: code, issuedOn: date(new Date(), { dateStyle: "medium" }) }),
+});
 
 /** „Ich habe den Code gesichert“ – merkt sich die Bestätigung des eigenen Codes. */
-export async function confirmRecoveryCode(): Promise<{ ok: boolean }> {
-  const session = await requireSession({ allowPasswordChange: true });
-  await db.recoveryCode.updateMany({ where: { userId: session.user.id, confirmedAt: null }, data: { confirmedAt: new Date() } });
-  revalidatePath("/", "layout");
-  // „ok“ heißt: Das Konto hat einen Code (bestätigt jetzt oder schon früher) – nicht, dass diesmal etwas geschrieben wurde
-  return { ok: (await db.recoveryCode.count({ where: { userId: session.user.id, confirmedAt: { not: null } } })) > 0 };
-}
+const confirmRecoveryCodeOperation = defineOperation({
+  name: "account.confirmRecoveryCode",
+  permission: "authenticated",
+  allowPasswordChange: true,
+  input: z.object({}),
+  audit: false,
+  auditReason: "Die Bestätigung merkt nur, dass der Code gesichert wurde; Erzeugung und Verwendung des Codes sind protokolliert",
+  run: async ({ principal, tx }) => {
+    await tx.recoveryCode.updateMany({ where: { userId: principal.user.id, confirmedAt: null }, data: { confirmedAt: new Date() } });
+    // Es gibt nur dann etwas zu bestätigen, wenn das Konto einen Code hat (jetzt oder schon früher bestätigt)
+    if ((await tx.recoveryCode.count({ where: { userId: principal.user.id, confirmedAt: { not: null } } })) === 0) fail("notFound");
+    return {};
+  },
+});
+
+export const confirmRecoveryCode = defineAction(confirmRecoveryCodeOperation, { revalidate: [["/", "layout"]] });
 
 /** Banner „Notzugang wurde verwendet“ als gesehen markieren (für den angemeldeten Benutzer). */
-export async function acknowledgeNotice(formData: FormData): Promise<void> {
-  const session = await requireSession({ allowPasswordChange: true });
-  const id = String(formData.get("id") ?? "");
-  if (id) await acknowledgeRecoveryNotice(id, { id: session.user.id, isAdmin: session.user.isAdmin });
-  revalidatePath("/", "layout");
-}
+const acknowledgeNoticeOperation = defineOperation({
+  name: "account.acknowledgeNotice",
+  permission: "authenticated",
+  allowPasswordChange: true,
+  input: z.object({ id: z.string().min(1) }),
+  audit: false,
+  auditReason: "Das Ausblenden des Hinweises ändert keine Daten; die Verwendung des Notzugangs selbst ist protokolliert",
+  run: async ({ input, principal, tx }) => {
+    await acknowledgeRecoveryNotice(input.id, { id: principal.user.id, isAdmin: principal.user.isAdmin }, tx);
+    return {};
+  },
+});
+
+export const acknowledgeNotice = defineAction(acknowledgeNoticeOperation, { revalidate: [["/", "layout"]] });

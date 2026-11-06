@@ -7,7 +7,7 @@ import { ConfirmSubmitButton, LinkButton, SubmitButton } from "@/components/ui/b
 import { VehicleCombobox, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { useI18n } from "@/i18n/client";
-import { deleteAppointment, saveAppointment } from "./actions";
+import { createAppointment, deleteAppointment, updateAppointment } from "./actions";
 
 export type AppointmentFormInitial = {
   id?: string;
@@ -46,7 +46,7 @@ export function AppointmentForm({
   canDelete: boolean;
 }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveAppointment, {});
+  const [state, action] = useActionState<ActionState, FormData>(initial.id ? updateAppointment : createAppointment, {});
   const [typeId, setTypeId] = useState(initial.typeId);
   const [title, setTitle] = useState(initial.title);
   const [duration, setDuration] = useState(initial.duration);

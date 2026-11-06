@@ -39,7 +39,7 @@ export function SetupForm({ timezones, done = false }: { timezones: string[]; do
       <RecoveryCodeView
         code={state.recoveryCode}
         issuedOn={state.issuedOn}
-        onConfirm={confirmRecoveryCode}
+        onConfirm={() => confirmRecoveryCode(new FormData())}
         onContinue={() => router.push("/")}
       />
     );

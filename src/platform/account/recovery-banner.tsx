@@ -29,7 +29,7 @@ export async function RecoveryBanner({ user }: { user: { id: string; isAdmin: bo
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span>{t("recovery.banner.unconfirmed")}</span>
             <span className="flex flex-wrap gap-2">
-              <form action={async () => { "use server"; await confirmRecoveryCode(); }}>
+              <form action={confirmRecoveryCode}>
                 <SubmitButton size="sm" variant="secondary">
                   {t("recovery.banner.confirm")}
                 </SubmitButton>

@@ -1,61 +1,88 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { requireSession, revokeSessions } from "@/server/auth/session";
+import { formObject } from "@/lib/forms";
 import { revokeDevices } from "@/server/auth/devices";
-import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem, verifyPassword } from "@/server/auth/password";
+import { hashPassword, MAX_PASSWORD_CHARS, MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from "@/server/auth/password";
+import { revokeSessions } from "@/server/auth/session";
 import { loginThrottle } from "@/server/auth/throttle";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import { fieldErrors, formObject } from "@/lib/forms";
-import { audit } from "@/server/audit";
+import { db } from "@/server/db";
+import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 
-const profileSchema = z.object({
+const profileInput = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().email().max(200).optional(),
 });
 
-export async function saveProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const session = await requireSession({ allowPasswordChange: true });
-  const { t } = await getI18n();
-  const parsed = profileSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  await db.user.update({ where: { id: session.user.id }, data: { name: parsed.data.name, email: parsed.data.email ?? null } });
-  await audit("account.profile");
-  revalidatePath("/", "layout");
-  return { ok: true, message: t("common.saved") };
-}
+const saveProfileOperation = defineOperation({
+  name: "account.saveProfile",
+  permission: "authenticated",
+  allowPasswordChange: true,
+  input: profileInput,
+  audit: "account.profile",
+  run: async ({ input, principal, tx, audit }) => {
+    await tx.user.update({ where: { id: principal.user.id }, data: { name: input.name, email: input.email ?? null } });
+    audit({ target: principal.user.username, entityId: principal.user.id });
+    return {};
+  },
+});
 
-export async function changePassword(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const session = await requireSession({ allowPasswordChange: true });
-  const { t } = await getI18n();
-  const current = String(formData.get("current") ?? "");
-  const next = String(formData.get("next") ?? "");
-  const confirm = String(formData.get("confirm") ?? "");
+export const saveProfile = defineAction(saveProfileOperation, { form: formObject, revalidate: [["/", "layout"]], message: "common.saved" });
 
-  const user = await db.user.findUniqueOrThrow({ where: { id: session.user.id } });
-  if (user.authSource !== "local") return { error: t("account.errors.externalPassword") };
-  // Eigenes Limit: Die Prüfung des aktuellen Passworts darf mit einer gestohlenen Sitzung kein unbegrenztes Rätselraten erlauben
-  const gate = loginThrottle.passwordChange;
-  const wait = gate.check(user.id);
-  if (wait > 0) return { error: t("account.errors.tooManyAttempts", { seconds: Math.ceil(wait / 1000) }) };
-  gate.take(user.id);
-  if (!(await verifyPassword(current, user.passwordHash))) return { fieldErrors: { current: t("account.errors.currentWrong") } };
-  gate.succeed(user.id);
-  const problem = passwordProblem(next);
-  if (problem === "short") return { fieldErrors: { next: t("account.errors.passwordShort", { min: MIN_PASSWORD_LENGTH }) } };
-  if (problem === "long") return { fieldErrors: { next: t("account.errors.passwordLong", { max: MAX_PASSWORD_CHARS }) } };
-  if (next !== confirm) return { fieldErrors: { confirm: t("account.errors.mismatch") } };
-  if (next === current) return { fieldErrors: { next: t("account.errors.sameAsOld") } };
+/** Passwörter werden nie getrimmt oder sonst verändert (führende/abschließende Leerzeichen gehören dazu). */
+const passwordForm = (fd: FormData) => ({
+  current: String(fd.get("current") ?? ""),
+  next: String(fd.get("next") ?? ""),
+  confirm: String(fd.get("confirm") ?? ""),
+});
 
-  await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), mustChangePassword: false } });
-  // Alle anderen Geräte abmelden
-  await revokeSessions(user.id, true);
-  await revokeDevices(user.id, true);
-  await audit("account.password");
-  if (user.mustChangePassword) redirect("/");
-  return { ok: true, message: t("account.passwordChanged") };
-}
+const changePasswordInput = z
+  .object({
+    current: z.string().max(1024),
+    next: z.string().max(1024),
+    confirm: z.string().max(1024),
+  })
+  .superRefine((d, ctx) => {
+    const problem = passwordProblem(d.next);
+    if (problem === "short") ctx.addIssue({ code: "custom", message: "account.errors.passwordShort", params: { min: MIN_PASSWORD_LENGTH }, path: ["next"] });
+    else if (problem === "long") ctx.addIssue({ code: "custom", message: "account.errors.passwordLong", params: { max: MAX_PASSWORD_CHARS }, path: ["next"] });
+    else if (d.next !== d.confirm) ctx.addIssue({ code: "custom", message: "account.errors.mismatch", path: ["confirm"] });
+  });
+
+const changePasswordOperation = defineOperation({
+  name: "account.changePassword",
+  permission: "authenticated",
+  allowPasswordChange: true,
+  input: changePasswordInput,
+  audit: "account.password",
+  // Die Passwortprüfung und das Hashen sind aufwendig und gehören nicht in die Transaktion (SQLite hat nur einen Schreiber)
+  prepare: async ({ input, principal }) => {
+    const user = await db.user.findUniqueOrThrow({ where: { id: principal.user.id } });
+    if (user.authSource !== "local") fail("forbidden", "account.errors.externalPassword");
+    // Eigenes Limit: Die Prüfung des aktuellen Passworts darf mit einer gestohlenen Sitzung kein unbegrenztes Rätselraten erlauben
+    const gate = loginThrottle.passwordChange;
+    const wait = gate.check(user.id);
+    if (wait > 0) fail("forbidden", "account.errors.tooManyAttempts", { seconds: Math.ceil(wait / 1000) });
+    gate.take(user.id);
+    if (!(await verifyPassword(input.current, user.passwordHash))) failField("current", "account.errors.currentWrong");
+    gate.succeed(user.id);
+    if (input.next === input.current) failField("next", "account.errors.sameAsOld");
+    return { passwordHash: await hashPassword(input.next), wasForced: user.mustChangePassword };
+  },
+  run: async ({ principal, prepared, tx, audit, afterCommit }) => {
+    await tx.user.update({ where: { id: principal.user.id }, data: { passwordHash: prepared.passwordHash, mustChangePassword: false } });
+    audit({ target: principal.user.username, entityId: principal.user.id });
+    // Alle anderen Geräte abmelden
+    afterCommit(async () => {
+      await revokeSessions(principal.user.id, true);
+      await revokeDevices(principal.user.id, true);
+    });
+    return { wasForced: prepared.wasForced };
+  },
+});
+
+export const changePassword = defineAction(changePasswordOperation, {
+  form: passwordForm,
+  redirect: ({ wasForced }) => (wasForced ? "/" : undefined),
+  message: "account.passwordChanged",
+});

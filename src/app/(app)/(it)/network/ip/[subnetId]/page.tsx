@@ -10,6 +10,7 @@ import { compareIPv4, freeRanges, nextFreeIp, parseCidr } from "@/modules/it/net
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteIp } from "@/modules/it/network/actions";
+import { versionOf } from "@/lib/concurrency";
 import { IpForm } from "@/modules/it/network/forms";
 
 export async function generateMetadata({ params }: { params: Promise<{ subnetId: string }> }): Promise<Metadata> {
@@ -175,6 +176,7 @@ export default async function SubnetPage({
               closeHref={base}
               initial={{
                 id: editing?.id,
+                version: editing ? versionOf(editing) : undefined,
                 subnetId: subnet.id,
                 address: editing?.address ?? sp.address ?? "",
                 deviceId: editing?.deviceId ?? sp.device ?? "",

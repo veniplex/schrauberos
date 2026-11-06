@@ -1,4 +1,4 @@
-import type { TireCondition } from "./constants";
+import { TIRE_CONDITIONS, TIRE_POSITIONS, type TireCondition, type TirePosition } from "./constants";
 
 export type TireRules = {
   treadWarnMm: number;
@@ -141,4 +141,53 @@ export function formatTireSize(s: {
 }): string {
   if (!s.width || !s.aspect || !s.rim) return "–";
   return `${s.width}/${s.aspect} R${s.rim}${s.loadIndex || s.speedIndex ? ` ${s.loadIndex ?? ""}${s.speedIndex ?? ""}` : ""}`;
+}
+
+/* ───────────── Einzelreifen aus dem Formular ───────────── */
+
+
+/** Rohwerte eines Reifens im Formular (Felder `tire.<POS>.dot|tread|condition`). */
+export type RawTireRow = { dot?: string; tread?: string; condition?: string };
+
+export type TireRowData = {
+  position: TirePosition;
+  dot: string | null;
+  producedWeek: number | null;
+  producedYear: number | null;
+  treadDepthMm: number | null;
+  condition: string;
+  measuredAt: Date | null;
+};
+
+/**
+ * Prüft und übersetzt die Reifenzeilen eines Satzes (reine Funktion). Ersatzrad (`SPARE`) zählt nur mit `withSpare`.
+ * `errors` nennt je Feld (`tire.<POS>.dot` / `tire.<POS>.tread`) den Fehler: ungültiges oder zukünftiges DOT (vermutlich vertippt,
+ * z. B. 1234 = Woche 12/2034), Profiltiefe außerhalb 0–15 mm (Komma als Dezimalzeichen erlaubt).
+ */
+export function parseTireRows(rows: Partial<Record<TirePosition, RawTireRow>>, withSpare: boolean, now = new Date()): { tires: TireRowData[]; errors: Record<string, "dot" | "tread"> } {
+  const errors: Record<string, "dot" | "tread"> = {};
+  const positions: readonly TirePosition[] = withSpare ? TIRE_POSITIONS : TIRE_POSITIONS.filter((p) => p !== "SPARE");
+  const tires = positions.map((position) => {
+    const row = rows[position] ?? {};
+    const dotRaw = row.dot?.trim() || undefined;
+    const treadRaw = row.tread?.trim().replace(",", ".") || undefined;
+    const conditionRaw = row.condition ?? "good";
+
+    const dot = dotRaw ? parseDot(dotRaw) : null;
+    if (dotRaw && (!dot || dot.year > now.getFullYear())) errors[`tire.${position}.dot`] = "dot";
+    const tread = treadRaw !== undefined ? Number(treadRaw) : null;
+    if (tread !== null && (!Number.isFinite(tread) || tread < 0 || tread > 15)) errors[`tire.${position}.tread`] = "tread";
+    const condition = (TIRE_CONDITIONS as readonly string[]).includes(conditionRaw) ? conditionRaw : "good";
+
+    return {
+      position,
+      dot: dotRaw && dot ? dotRaw : null,
+      producedWeek: dot?.week ?? null,
+      producedYear: dot?.year ?? null,
+      treadDepthMm: tread,
+      condition,
+      measuredAt: tread !== null ? now : null,
+    };
+  });
+  return { tires, errors };
 }

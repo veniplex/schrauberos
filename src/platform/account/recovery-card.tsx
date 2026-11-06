@@ -25,7 +25,7 @@ export function RecoveryCard({ status, account }: { status: { createdOn: string 
         code={state.recoveryCode}
         issuedOn={state.issuedOn}
         account={account}
-        onConfirm={confirmRecoveryCode}
+        onConfirm={() => confirmRecoveryCode(new FormData())}
         onContinue={() => {
           setDismissed(state.recoveryCode ?? null);
           router.refresh();

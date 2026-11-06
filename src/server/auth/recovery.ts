@@ -175,8 +175,9 @@ export async function recoveryBannerData(viewer: { id: string; isAdmin: boolean 
   };
 }
 
-export async function acknowledgeRecoveryNotice(noticeId: string, viewer: { id: string; isAdmin: boolean }): Promise<void> {
-  const notice = await db.recoveryNotice.findUnique({ where: { id: noticeId }, select: { userId: true } });
+/** Hinweis als gesehen markieren. `client`: die Transaktion des Aufrufers (Aktions-Rahmen); Standard der normale Client. */
+export async function acknowledgeRecoveryNotice(noticeId: string, viewer: { id: string; isAdmin: boolean }, client: Pick<Tx, "recoveryNotice" | "recoveryNoticeAck"> = db): Promise<void> {
+  const notice = await client.recoveryNotice.findUnique({ where: { id: noticeId }, select: { userId: true } });
   if (!notice || (!viewer.isAdmin && notice.userId !== viewer.id)) return; // Hinweise gelöschter Konten (userId null) bestätigen nur Administratoren
-  await db.recoveryNoticeAck.upsert({ where: { noticeId_userId: { noticeId, userId: viewer.id } }, update: {}, create: { noticeId, userId: viewer.id } });
+  await client.recoveryNoticeAck.upsert({ where: { noticeId_userId: { noticeId, userId: viewer.id } }, update: {}, create: { noticeId, userId: viewer.id } });
 }

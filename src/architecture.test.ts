@@ -153,16 +153,6 @@ const LEGACY_ACTION_FILES: Record<string, string> = {
   "app/login/actions.ts": "Anmeldung/Abmeldung vor der Sitzung: eigener Drosselungspfad (Anmeldung), kein Recht prüfbar",
   "app/login/recover/actions.ts": "Notzugang vor der Sitzung: eigener Pfad ohne Konto-Drosselung",
   "app/setup/actions.ts": "Ersteinrichtung vor dem ersten Benutzer: Einrichtungs-Token statt Recht",
-  "platform/account/actions.ts": "Plattform (Konto): folgt mit der Umstellung der übrigen Bereiche",
-  "platform/account/recovery-actions.ts": "Plattform (Notzugang im Konto): folgt mit der Umstellung der übrigen Bereiche",
-  "platform/account/recovery-banner.tsx": "Plattform (Hinweisleiste mit Inline-Aktion): folgt mit der Umstellung der übrigen Bereiche",
-  "server/actions/preferences.ts": "Persönliche Einstellungen (Sprache, Design): folgt mit der Umstellung der übrigen Bereiche",
-  "capabilities/docs/actions.ts": "Dokumentation (docs): folgt mit der Umstellung der übrigen Funktionen",
-  "modules/it/network/actions.ts": "Netzwerk: folgt mit der Umstellung der übrigen Funktionen",
-  "modules/office/employees/actions.ts": "Mitarbeiter: folgt mit der Umstellung der übrigen Funktionen",
-  "modules/office/fleet/actions.ts": "Fuhrpark: folgt mit der Umstellung der übrigen Funktionen",
-  "modules/workshop/appointments/actions.ts": "Termine: folgt mit der Umstellung der übrigen Funktionen",
-  "modules/workshop/tires/actions.ts": "Reifenlager: folgt mit der Umstellung der übrigen Funktionen",
 };
 
 /** Verstöße einer Datei mit `"use server"`: alles, was exportiert wird, aber nicht mit `defineAction(` erzeugt ist, sowie Inline-Aktionen. */
@@ -223,7 +213,8 @@ describe("Aktions-Rahmen", () => {
       for (const m of source.matchAll(/defineOperation\(\{([\s\S]*?)\n\}\);/g)) {
         const body = m[1];
         const name = /name:\s*"([^"]+)"/.exec(body)?.[1] ?? "?";
-        if (!/\bpermission:\s*"/.test(body)) violations.push(`${rel(file)}: ${name} ohne permission`);
+        // Recht als Zeichenkette oder als benannte Konstante (GROSSBUCHSTABEN, z. B. bei eingabeabhängigem Recht mit `permissionFor`)
+        if (!/\bpermission:\s*(?:"|[A-Z][A-Z_]*\b)/.test(body)) violations.push(`${rel(file)}: ${name} ohne permission`);
         if (!/\binput:/.test(body)) violations.push(`${rel(file)}: ${name} ohne input`);
         if (!/\baudit:/.test(body)) violations.push(`${rel(file)}: ${name} ohne audit`);
         if (/\baudit:\s*false/.test(body) && !/\bauditReason:\s*"[^"]{10,}/.test(body)) violations.push(`${rel(file)}: ${name} verzichtet auf Audit ohne Begründung`);

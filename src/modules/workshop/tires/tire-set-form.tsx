@@ -8,7 +8,7 @@ import { Card, Plate, Table } from "@/components/ui/layout";
 import { VehicleCombobox, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
 import { useI18n } from "@/i18n/client";
-import { saveTireSet } from "./actions";
+import { createTireSet, updateTireSet } from "./actions";
 
 export type TireRowInitial = { dot: string; tread: string; condition: string };
 
@@ -45,7 +45,7 @@ export function TireSetForm({
   cancelHref: string;
 }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveTireSet, {});
+  const [state, action] = useActionState<ActionState, FormData>(initial.id ? updateTireSet : createTireSet, {});
   const [spare, setSpare] = useState(initial.spare);
   const [rows, setRows] = useState(initial.tires);
   const err = state.fieldErrors ?? {};

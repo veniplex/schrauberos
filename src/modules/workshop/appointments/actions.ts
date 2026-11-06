@@ -1,23 +1,20 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { requirePermission } from "@/server/auth/session";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
+import { claimRow } from "@/lib/concurrency";
 import { isHexColor } from "@/lib/color";
-import { parseLocalDateTime } from "@/lib/dates";
-import { fieldErrors, formObject, safeReturn } from "@/lib/forms";
-import { audit } from "@/server/audit";
-import { claimed } from "@/lib/concurrency";
+import { toTimeInput } from "@/lib/dates";
+import { formObject, safeReturn } from "@/lib/forms";
+import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
+import { defineAction, defineOperation, fail, failField, type RunContext } from "@/server/operations";
+import { appointmentWindow, findBayClash } from "./domain";
 
-const schema = z.object({
+const refresh = ["/appointments", "/", "/tires"] as const;
+
+const appointmentInput = z.object({
   id: z.string().optional(),
   version: z.string().optional(),
-  title: z.string().max(120),
+  title: z.string().trim().min(1).max(120),
   typeId: z.string().optional(),
   vehicleId: z.string().optional(),
   bayId: z.string().optional(),
@@ -31,42 +28,45 @@ const schema = z.object({
   returnTo: z.string().optional(),
 });
 
-export async function saveAppointment(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const raw = formObject(formData);
-  const session = await requirePermission(raw.id ? "appointments.edit" : "appointments.create");
-  const i18n = await getI18n();
-  const { t } = i18n;
+type AppointmentInput = z.output<typeof appointmentInput>;
 
-  const parsed = schema.safeParse(raw);
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const d = parsed.data;
-  if (!d.title.trim()) return { fieldErrors: { title: t("validation.required") } };
+/** Gemeinsamer Ablauf von Anlegen und Ändern (je ein eigenes Recht, daher zwei Operationen). */
+async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext<AppointmentInput, undefined>): Promise<{ id: string }> {
+  const window = appointmentWindow(d.date, d.time, d.duration);
+  if (!window) failField("date", "validation.invalid");
+  const { startsAt, endsAt } = window;
 
-  const startsAt = parseLocalDateTime(d.date, d.time);
-  if (!startsAt) return { fieldErrors: { date: t("validation.invalid") } };
-  const endsAt = new Date(startsAt.getTime() + d.duration * 60_000);
-
-  const vehicle = d.vehicleId
-    ? await db.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true } })
-    : null;
-  if (d.vehicleId && !vehicle) return { fieldErrors: { vehicleId: t("validation.invalid") } };
+  const vehicle = d.vehicleId ? await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true } }) : null;
+  if (d.vehicleId && !vehicle) failField("vehicleId", "validation.invalid");
 
   // Alle Verweise müssen existieren (statt eines Datenbankfehlers); Terminart, Arbeitsplatz und Mitarbeiter müssen aktiv sein –
   // es sei denn, der bestehende Termin hat sie schon (dann bleibt der Wert unverändert möglich).
-  const current = d.id ? await db.appointment.findUnique({ where: { id: d.id }, select: { typeId: true, bayId: true, assigneeId: true } }) : null;
-  const invalid = (field: string) => ({ fieldErrors: { [field]: t("validation.invalid") } });
-  if (d.typeId && d.typeId !== current?.typeId && !(await db.appointmentType.findFirst({ where: { id: d.typeId, active: true }, select: { id: true } }))) return invalid("typeId");
-  if (d.bayId && d.bayId !== current?.bayId && !(await db.bay.findFirst({ where: { id: d.bayId, active: true }, select: { id: true } }))) return invalid("bayId");
-  if (d.assigneeId && d.assigneeId !== current?.assigneeId && !(await db.user.findFirst({ where: { id: d.assigneeId, active: true }, select: { id: true } }))) return invalid("assigneeId");
+  const current = d.id ? await tx.appointment.findUnique({ where: { id: d.id }, select: { typeId: true, bayId: true, assigneeId: true } }) : null;
+  if (d.id && !current) fail("notFound");
+  if (d.typeId && d.typeId !== current?.typeId && !(await tx.appointmentType.findFirst({ where: { id: d.typeId, active: true }, select: { id: true } }))) failField("typeId", "validation.invalid");
+  if (d.bayId && d.bayId !== current?.bayId && !(await tx.bay.findFirst({ where: { id: d.bayId, active: true }, select: { id: true } }))) failField("bayId", "validation.invalid");
+  if (d.assigneeId && d.assigneeId !== current?.assigneeId && !(await tx.user.findFirst({ where: { id: d.assigneeId, active: true }, select: { id: true } }))) failField("assigneeId", "validation.invalid");
   if (d.tireSetId) {
     // Der Reifensatz muss existieren und zum gewählten Fahrzeug gehören
-    const set = await db.tireSet.findUnique({ where: { id: d.tireSetId }, select: { vehicleId: true } });
-    if (!set) return invalid("tireSetId");
-    if (!vehicle || set.vehicleId !== vehicle.id) return { fieldErrors: { vehicleId: t("appointments.errors.tireSetMismatch") } };
+    const set = await tx.tireSet.findUnique({ where: { id: d.tireSetId }, select: { vehicleId: true } });
+    if (!set) failField("tireSetId", "validation.invalid");
+    if (!vehicle || set.vehicleId !== vehicle.id) failField("vehicleId", "appointments.errors.tireSetMismatch");
+  }
+
+  // Doppelbelegung des Arbeitsplatzes: Prüfen und Speichern laufen in derselben Transaktion (SQLite hat einen Schreiber), zwei
+  // gleichzeitige Buchungen desselben Arbeitsplatzes schieben sich also nicht beide an der Prüfung vorbei. Die Entscheidung trifft die
+  // reine Funktion `findBayClash`; die Abfrage grenzt nur grob auf Arbeitsplatz und Zeitfenster ein.
+  if (d.bayId) {
+    const candidates = await tx.appointment.findMany({
+      where: { bayId: d.bayId, id: d.id ? { not: d.id } : undefined, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+      include: { vehicle: { select: { plate: true } } },
+    });
+    const clash = findBayClash({ id: d.id, bayId: d.bayId, status: d.status, startsAt, endsAt }, candidates);
+    if (clash) failField("bayId", "appointments.errors.bayBusy", { from: toTimeInput(clash.startsAt), to: toTimeInput(clash.endsAt), title: clash.vehicle?.plate ?? clash.title });
   }
 
   const data = {
-    title: d.title.trim(),
+    title: d.title,
     startsAt,
     endsAt,
     status: d.status,
@@ -78,133 +78,173 @@ export async function saveAppointment(_prev: ActionState, formData: FormData): P
     customerId: vehicle?.customerId ?? null,
     tireSetId: d.tireSetId ?? null,
   };
-
-  // Doppelbelegungs-Prüfung und Speichern gehören in eine Transaktion: Zwei gleichzeitige Buchungen desselben Arbeitsplatzes
-  // dürfen sich nicht beide an der Prüfung vorbeischieben.
-  const outcome = await db.$transaction(async (tx) => {
-    if (d.bayId && d.status !== "cancelled" && d.status !== "no_show") {
-      const clash = await tx.appointment.findFirst({
-        where: {
-          bayId: d.bayId,
-          id: d.id ? { not: d.id } : undefined,
-          status: { notIn: ["cancelled", "no_show"] },
-          startsAt: { lt: endsAt },
-          endsAt: { gt: startsAt },
-        },
-        include: { vehicle: true },
-      });
-      if (clash) return { clash };
-    }
-    if (d.id) {
-      if (!(await claimed(d.version, (stamp, next) => tx.appointment.updateMany({ where: { id: d.id!, updatedAt: stamp }, data: { updatedAt: next } })))) return { conflict: true as const };
-      await tx.appointment.update({ where: { id: d.id }, data });
-    } else {
-      await tx.appointment.create({ data: { ...data, createdById: session.user.id } });
-    }
-    return {};
-  });
-  if ("conflict" in outcome) return { error: t("common.conflict") };
-  if ("clash" in outcome && outcome.clash) {
-    const clash = outcome.clash;
-    return {
-      fieldErrors: {
-        bayId: t("appointments.errors.bayBusy", {
-          from: i18n.date(clash.startsAt, { timeStyle: "short" }),
-          to: i18n.date(clash.endsAt, { timeStyle: "short" }),
-          title: clash.vehicle?.plate ?? clash.title,
-        }),
-      },
-    };
+  let id: string;
+  if (d.id) {
+    if (!(await claimRow(tx.appointment, d.id, d.version))) fail("conflict");
+    await tx.appointment.update({ where: { id: d.id }, data });
+    id = d.id;
+  } else {
+    id = (await tx.appointment.create({ data: { ...data, createdById: principal.user.id } })).id;
   }
-
-  revalidatePath("/appointments");
-  revalidatePath("/");
-  revalidatePath("/tires");
-  redirect(safeReturn(d.returnTo, "/appointments", `/appointments?date=${d.date}`));
+  audit({ target: d.title, entityId: id });
+  return { id };
 }
 
-export async function deleteAppointment(formData: FormData) {
-  await requirePermission("appointments.delete");
-  const id = String(formData.get("id") ?? "");
-  const returnTo = safeReturn(String(formData.get("returnTo") ?? ""), "/appointments", "/appointments");
-  const appointment = id ? await db.appointment.findUnique({ where: { id }, select: { title: true } }) : null;
-  if (id) await db.appointment.deleteMany({ where: { id } });
-  if (appointment) await audit("appointment.delete", { target: appointment.title, entityId: id });
-  revalidatePath("/appointments");
-  revalidatePath("/");
-  revalidatePath("/tires");
-  redirect(returnTo);
-}
+const afterSave = {
+  form: formObject,
+  revalidate: [...refresh],
+  redirect: (_data: unknown, input: AppointmentInput) => safeReturn(input.returnTo, "/appointments", `/appointments?date=${input.date}`),
+};
+
+const createAppointmentOperation = defineOperation({
+  name: "appointments.create",
+  permission: "appointments.create",
+  input: appointmentInput.refine((d) => !d.id, { message: "validation.invalid", path: ["id"] }),
+  audit: "appointment.create",
+  run: saveAppointmentRun,
+});
+
+const updateAppointmentOperation = defineOperation({
+  name: "appointments.update",
+  permission: "appointments.edit",
+  input: appointmentInput.refine((d) => !!d.id, { message: "validation.invalid", path: ["id"] }),
+  audit: "appointment.update",
+  run: saveAppointmentRun,
+});
+
+/** Neuen Termin anlegen (Formular ohne `id`). */
+export const createAppointment = defineAction(createAppointmentOperation, afterSave);
+/** Bestehenden Termin ändern (Formular mit `id` und `version`). */
+export const updateAppointment = defineAction(updateAppointmentOperation, afterSave);
+
+const deleteAppointmentOperation = defineOperation({
+  name: "appointments.delete",
+  permission: "appointments.delete",
+  input: z.object({ id: z.string().min(1), returnTo: z.string().optional() }),
+  audit: "appointment.delete",
+  run: async ({ input, tx, audit }) => {
+    const appointment = await tx.appointment.findUnique({ where: { id: input.id }, select: { title: true } });
+    if (!appointment) fail("notFound");
+    await tx.appointment.delete({ where: { id: input.id } });
+    audit({ target: appointment.title, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteAppointment = defineAction(deleteAppointmentOperation, {
+  revalidate: [...refresh],
+  redirect: (_data, input) => safeReturn(input.returnTo, "/appointments", "/appointments"),
+  message: "common.deleted",
+  redirectOnError: (formData) => safeReturn(String(formData.get("returnTo") ?? ""), "/appointments", "/appointments"),
+});
 
 /* ───────────── Einstellungen (Kalender) ───────────── */
 
-const settingsSchema = z.object({
-  dayStartHour: z.coerce.number().int().min(0).max(23),
-  dayEndHour: z.coerce.number().int().min(1).max(24),
-  slotMinutes: z.coerce.number().int().refine((v) => [10, 15, 20, 30, 60].includes(v)),
+const settingsInput = z
+  .object({
+    dayStartHour: z.coerce.number().int().min(0).max(23),
+    dayEndHour: z.coerce.number().int().min(1).max(24),
+    slotMinutes: z.coerce.number().int().refine((v) => [10, 15, 20, 30, 60].includes(v)),
+  })
+  .superRefine((d, ctx) => {
+    if (d.dayEndHour <= d.dayStartHour) ctx.addIssue({ code: "custom", message: "appointments.settings.errors.hoursOrder", path: ["dayEndHour"] });
+  });
+
+const saveSettingsOperation = defineOperation({
+  name: "appointments.saveSettings",
+  permission: "appointments.configure",
+  input: settingsInput,
+  audit: "settings.appointments",
+  run: async ({ input: d, tx, audit }) => {
+    await tx.appointmentSettings.upsert({ where: { id: "default" }, update: d, create: { id: "default", ...d } });
+    audit({ target: `${d.dayStartHour}–${d.dayEndHour}, ${d.slotMinutes} min`, entityId: "default" });
+    return {};
+  },
 });
 
-export async function saveAppointmentSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("appointments.configure");
-  const { t } = await getI18n();
-  const parsed = settingsSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const d = parsed.data;
-  if (d.dayEndHour <= d.dayStartHour) return { fieldErrors: { dayEndHour: t("appointments.settings.errors.hoursOrder") } };
-
-  await db.appointmentSettings.upsert({ where: { id: "default" }, update: d, create: { id: "default", ...d } });
-  await audit("settings.appointments");
-  revalidatePath("/appointments");
-  return { ok: true, message: t("common.saved") };
-}
+export const saveAppointmentSettings = defineAction(saveSettingsOperation, { form: formObject, revalidate: ["/appointments"], message: "common.saved" });
 
 /* ───────────── Arbeitsplätze ───────────── */
 
-const baySchema = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(60), sortOrder: z.coerce.number().int().min(0).max(999).default(0) });
+const bayInput = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(60), sortOrder: z.coerce.number().int().min(0).max(999).default(0), active: z.boolean() });
 
-export async function saveBay(formData: FormData) {
-  await requirePermission("appointments.configure");
-  const parsed = baySchema.safeParse(formObject(formData));
-  if (!parsed.success) return;
-  const { id, ...data } = parsed.data;
-  const active = formData.get("active") === "on" || !id;
-  if (id) await db.bay.update({ where: { id }, data: { ...data, active } });
-  else await db.bay.create({ data: { ...data, active: true } });
-  revalidatePath("/appointments");
-}
+const saveBayOperation = defineOperation({
+  name: "appointments.saveBay",
+  permission: "appointments.configure",
+  input: bayInput,
+  audit: "settings.appointments",
+  run: async ({ input: { id, ...data }, tx, audit }) => {
+    // Neue Arbeitsplätze sind immer aktiv; das Häkchen gilt nur beim Bearbeiten
+    const saved = id ? await tx.bay.update({ where: { id }, data }) : await tx.bay.create({ data: { ...data, active: true } });
+    audit({ target: `Bay: ${saved.name}`, entityId: saved.id });
+    return { id: saved.id };
+  },
+});
 
-export async function deleteBay(formData: FormData) {
-  await requirePermission("appointments.configure");
-  const id = String(formData.get("id") ?? "");
-  if (id) await db.bay.deleteMany({ where: { id } });
-  revalidatePath("/appointments");
-}
+export const saveBay = defineAction(saveBayOperation, {
+  form: (fd) => ({ ...formObject(fd), active: fd.get("active") === "on" }),
+  revalidate: ["/appointments"],
+  message: "common.saved",
+});
+
+const deleteBayOperation = defineOperation({
+  name: "appointments.deleteBay",
+  permission: "appointments.configure",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "settings.appointments",
+  run: async ({ input, tx, audit }) => {
+    const bay = await tx.bay.findUnique({ where: { id: input.id }, select: { name: true } });
+    if (!bay) fail("notFound");
+    await tx.bay.delete({ where: { id: input.id } });
+    audit({ target: `Bay deleted: ${bay.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteBay = defineAction(deleteBayOperation, { revalidate: ["/appointments"], message: "common.deleted" });
 
 /* ───────────── Terminarten ───────────── */
 
-const typeSchema = z.object({
+const typeInput = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(1).max(60),
   color: z.string().refine(isHexColor),
   defaultMinutes: z.coerce.number().int().min(5).max(720),
   kind: z.enum(APPOINTMENT_KINDS).default("general"),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
+  active: z.boolean(),
 });
 
-export async function saveAppointmentType(formData: FormData) {
-  await requirePermission("appointments.configure");
-  const parsed = typeSchema.safeParse(formObject(formData));
-  if (!parsed.success) return;
-  const { id, ...data } = parsed.data;
-  const active = formData.get("active") === "on" || !id;
-  if (id) await db.appointmentType.update({ where: { id }, data: { ...data, active } });
-  else await db.appointmentType.create({ data: { ...data, active: true } });
-  revalidatePath("/appointments");
-}
+const saveTypeOperation = defineOperation({
+  name: "appointments.saveType",
+  permission: "appointments.configure",
+  input: typeInput,
+  audit: "settings.appointments",
+  run: async ({ input: { id, ...data }, tx, audit }) => {
+    const saved = id ? await tx.appointmentType.update({ where: { id }, data }) : await tx.appointmentType.create({ data: { ...data, active: true } });
+    audit({ target: `Type: ${saved.name}`, entityId: saved.id });
+    return { id: saved.id };
+  },
+});
 
-export async function deleteAppointmentType(formData: FormData) {
-  await requirePermission("appointments.configure");
-  const id = String(formData.get("id") ?? "");
-  if (id) await db.appointmentType.deleteMany({ where: { id } });
-  revalidatePath("/appointments");
-}
+export const saveAppointmentType = defineAction(saveTypeOperation, {
+  form: (fd) => ({ ...formObject(fd), active: fd.get("active") === "on" }),
+  revalidate: ["/appointments"],
+  message: "common.saved",
+});
+
+const deleteTypeOperation = defineOperation({
+  name: "appointments.deleteType",
+  permission: "appointments.configure",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "settings.appointments",
+  run: async ({ input, tx, audit }) => {
+    const type = await tx.appointmentType.findUnique({ where: { id: input.id }, select: { name: true } });
+    if (!type) fail("notFound");
+    await tx.appointmentType.delete({ where: { id: input.id } });
+    audit({ target: `Type deleted: ${type.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteAppointmentType = defineAction(deleteTypeOperation, { revalidate: ["/appointments"], message: "common.deleted" });

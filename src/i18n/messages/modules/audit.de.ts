@@ -88,6 +88,8 @@ export const auditDe = {
       updateToken: "Update-Token geändert",
     },
     appointment: {
+      create: "Termin angelegt",
+      update: "Termin geändert",
       delete: "Termin gelöscht",
     },
     customer: {
@@ -102,6 +104,8 @@ export const auditDe = {
       transfer: "Fahrzeug umgeschrieben",
     },
     tires: {
+      create: "Reifensatz angelegt",
+      update: "Reifensatz geändert",
       delete: "Reifensatz gelöscht",
     },
     invoice: {
@@ -112,16 +116,37 @@ export const auditDe = {
       delete: "Rechnung gelöscht",
     },
     employee: {
+      create: "Mitarbeiter angelegt",
+      update: "Mitarbeiter geändert",
+      sensitiveUpdate: "Notfallkontakt eines Mitarbeiters geändert",
       delete: "Mitarbeiter gelöscht",
+      absenceCreate: "Abwesenheit eingetragen",
+      absenceDelete: "Abwesenheit gelöscht",
+      qualificationCreate: "Qualifikation eingetragen",
+      qualificationDelete: "Qualifikation gelöscht",
     },
     fleet: {
+      create: "Dienstfahrzeug angelegt",
+      update: "Dienstfahrzeug geändert",
       delete: "Fuhrpark-Eintrag gelöscht",
+      mileageAdd: "Kilometerstand erfasst",
+      mileageDelete: "Kilometerstand gelöscht",
+      costAdd: "Fuhrpark-Kosten erfasst",
+      costDelete: "Fuhrpark-Kosten gelöscht",
+      licenseCheck: "Führerscheinkontrolle erfasst",
+      licenseCheckDelete: "Führerscheinkontrolle gelöscht",
     },
     network: {
+      create: "Netzwerk-Eintrag angelegt",
+      update: "Netzwerk-Eintrag geändert",
       delete: "Netzwerk-Eintrag gelöscht",
     },
     docs: {
+      create: "Dokumentationsseite angelegt",
+      update: "Dokumentationsseite geändert",
+      restore: "Dokumentationsseite wiederhergestellt",
       delete: "Dokumentation gelöscht",
+      categorySave: "Dokumentations-Kapitel gespeichert",
       categoryDelete: "Dokumentations-Kapitel gelöscht",
     },
   },

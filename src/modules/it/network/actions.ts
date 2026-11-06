@@ -1,27 +1,21 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { requirePermission } from "@/server/auth/session";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import { fieldErrors, formObject, safeReturn } from "@/lib/forms";
+import { claimRow } from "@/lib/concurrency";
+import { formObject, safeReturn } from "@/lib/forms";
 import { DEVICE_STATUSES, DEVICE_TYPES, IP_KINDS } from "@/modules/it/network/constants";
 import { formatIPv4, ipInCidr, normalizeMac, parseCidr, parseIPv4 } from "@/modules/it/network/domain";
-import { audit } from "@/server/audit";
-import { claimed } from "@/lib/concurrency";
+import { defineAction, defineOperation, fail, failField, failFields, type FieldMessage, type Tx } from "@/server/operations";
 
-function refresh(...extra: string[]) {
-  for (const p of ["/network", "/network/devices", "/network/ip", "/network/cabling", "/", ...extra]) revalidatePath(p);
-}
+const NETWORK_PATHS = ["/network", "/network/devices", "/network/ip", "/network/cabling", "/"];
+const refresh = (...extra: string[]) => [...NETWORK_PATHS, ...extra];
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+const idInput = z.object({ id: z.string().min(1) });
 
 /* ───────────── Geräte ───────────── */
 
-const deviceSchema = z.object({
+const deviceInput = z.object({
   id: z.string().optional(),
   version: z.string().optional(),
   name: z.string().trim().min(1).max(80),
@@ -36,85 +30,107 @@ const deviceSchema = z.object({
   assignedTo: z.string().max(80).optional(),
   purchaseDate: date,
   warrantyUntil: date,
+  monitorEnabled: z.boolean(),
   notes: z.string().max(2000).optional(),
 });
 
-export async function saveDevice(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("network.edit");
-  const { t } = await getI18n();
-  const parsed = deviceSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, purchaseDate, warrantyUntil, ...d } = parsed.data;
+const saveDeviceOperation = defineOperation({
+  name: "network.saveDevice",
+  permission: "network.edit",
+  input: deviceInput,
+  audit: (input) => (input.id ? "network.update" : "network.create"),
+  run: async ({ input: { id, version, purchaseDate, warrantyUntil, ...d }, tx, audit }) => {
+    if (d.locationId && !(await tx.netLocation.findUnique({ where: { id: d.locationId }, select: { id: true } }))) failField("locationId", "validation.invalid");
+    const data = {
+      name: d.name,
+      type: d.type,
+      status: d.status,
+      manufacturer: d.manufacturer ?? null,
+      model: d.model ?? null,
+      serialNumber: d.serialNumber ?? null,
+      locationId: d.locationId ?? null,
+      rackInfo: d.rackInfo ?? null,
+      portCount: d.portCount ?? null,
+      assignedTo: d.assignedTo ?? null,
+      purchaseDate: purchaseDate ? new Date(`${purchaseDate}T12:00:00`) : null,
+      warrantyUntil: warrantyUntil ? new Date(`${warrantyUntil}T12:00:00`) : null,
+      monitorEnabled: d.monitorEnabled,
+      notes: d.notes ?? null,
+    };
+    if (id && !(await claimRow(tx.netDevice, id, version))) fail("conflict");
+    const saved = id ? await tx.netDevice.update({ where: { id }, data }) : await tx.netDevice.create({ data });
+    audit({ target: `device: ${saved.name}`, entityId: saved.id });
+    return { id: saved.id };
+  },
+});
 
-  const data = {
-    name: d.name,
-    type: d.type,
-    status: d.status,
-    manufacturer: d.manufacturer ?? null,
-    model: d.model ?? null,
-    serialNumber: d.serialNumber ?? null,
-    locationId: d.locationId ?? null,
-    rackInfo: d.rackInfo ?? null,
-    portCount: d.portCount ?? null,
-    assignedTo: d.assignedTo ?? null,
-    purchaseDate: purchaseDate ? new Date(`${purchaseDate}T12:00:00`) : null,
-    warrantyUntil: warrantyUntil ? new Date(`${warrantyUntil}T12:00:00`) : null,
-    monitorEnabled: formData.get("monitorEnabled") === "on",
-    notes: d.notes ?? null,
-  };
-  if (id && !(await claimed(d.version, (stamp, next) => db.netDevice.updateMany({ where: { id: id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
-  const saved = id ? await db.netDevice.update({ where: { id }, data }) : await db.netDevice.create({ data });
+export const saveDevice = defineAction(saveDeviceOperation, {
+  form: (fd) => ({ ...formObject(fd), monitorEnabled: fd.get("monitorEnabled") === "on" }),
+  revalidate: refresh(),
+  redirect: ({ id }) => `/network/devices/${id}`,
+});
 
-  refresh();
-  redirect(`/network/devices/${saved.id}`);
-}
+const deleteDeviceOperation = defineOperation({
+  name: "network.deleteDevice",
+  permission: "network.delete",
+  input: idInput,
+  audit: "network.delete",
+  run: async ({ input, tx, audit }) => {
+    const device = await tx.netDevice.findUnique({ where: { id: input.id }, select: { name: true } });
+    if (!device) fail("notFound");
+    await tx.netDevice.delete({ where: { id: input.id } });
+    audit({ target: `device: ${device.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
 
-export async function deleteDevice(formData: FormData) {
-  await requirePermission("network.delete");
-  const id = String(formData.get("id") ?? "");
-  const device = id ? await db.netDevice.findUnique({ where: { id }, select: { name: true } }) : null;
-  if (id) await db.netDevice.deleteMany({ where: { id } });
-  if (device) await audit("network.delete", { target: device.name, entityId: id });
-  refresh();
-  redirect("/network/devices");
-}
+export const deleteDevice = defineAction(deleteDeviceOperation, { revalidate: refresh(), redirect: "/network/devices", message: "common.deleted" });
 
 /* ───────────── VLANs ───────────── */
 
-const vlanSchema = z.object({
+const vlanInput = z.object({
   id: z.string().optional(),
   vlanId: z.coerce.number().int().min(1).max(4094),
   name: z.string().trim().min(1).max(60),
   description: z.string().max(200).optional(),
 });
 
-export async function saveVlan(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("network.edit");
-  const { t } = await getI18n();
-  const parsed = vlanSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, ...d } = parsed.data;
+const saveVlanOperation = defineOperation({
+  name: "network.saveVlan",
+  permission: "network.edit",
+  input: vlanInput,
+  audit: (input) => (input.id ? "network.update" : "network.create"),
+  run: async ({ input: { id, ...d }, tx, audit }) => {
+    const dup = await tx.netVlan.findFirst({ where: { vlanId: d.vlanId, ...(id ? { id: { not: id } } : {}) } });
+    if (dup) failField("vlanId", "network.errors.vlanExists");
+    const data = { vlanId: d.vlanId, name: d.name, description: d.description ?? null };
+    const saved = id ? await tx.netVlan.update({ where: { id }, data }) : await tx.netVlan.create({ data });
+    audit({ target: `VLAN: ${saved.vlanId} ${saved.name}`, entityId: saved.id });
+    return { id: saved.id };
+  },
+});
 
-  const dup = await db.netVlan.findFirst({ where: { vlanId: d.vlanId, ...(id ? { id: { not: id } } : {}) } });
-  if (dup) return { fieldErrors: { vlanId: t("network.errors.vlanExists") } };
+export const saveVlan = defineAction(saveVlanOperation, { form: formObject, revalidate: refresh(), message: "common.saved" });
 
-  const data = { vlanId: d.vlanId, name: d.name, description: d.description ?? null };
-  if (id) await db.netVlan.update({ where: { id }, data });
-  else await db.netVlan.create({ data });
-  refresh();
-  return { ok: true, message: t("common.saved") };
-}
+const deleteVlanOperation = defineOperation({
+  name: "network.deleteVlan",
+  permission: "network.delete",
+  input: idInput,
+  audit: "network.delete",
+  run: async ({ input, tx, audit }) => {
+    const vlan = await tx.netVlan.findUnique({ where: { id: input.id }, select: { vlanId: true, name: true } });
+    if (!vlan) fail("notFound");
+    await tx.netVlan.delete({ where: { id: input.id } });
+    audit({ target: `VLAN: ${vlan.vlanId} ${vlan.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
 
-export async function deleteVlan(formData: FormData) {
-  await requirePermission("network.delete");
-  const id = String(formData.get("id") ?? "");
-  if (id) await db.netVlan.deleteMany({ where: { id } });
-  refresh();
-}
+export const deleteVlan = defineAction(deleteVlanOperation, { revalidate: refresh(), message: "common.deleted" });
 
 /* ───────────── Subnetze ───────────── */
 
-const subnetSchema = z.object({
+const subnetInput = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(1).max(80),
   cidr: z.string().max(18),
@@ -126,61 +142,71 @@ const subnetSchema = z.object({
   description: z.string().max(300).optional(),
 });
 
-export async function saveSubnet(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("network.edit");
-  const { t } = await getI18n();
-  const parsed = subnetSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, ...d } = parsed.data;
+const saveSubnetOperation = defineOperation({
+  name: "network.saveSubnet",
+  permission: "network.edit",
+  input: subnetInput,
+  audit: (input) => (input.id ? "network.update" : "network.create"),
+  run: async ({ input: { id, ...d }, tx, audit }) => {
+    const net = parseCidr(d.cidr);
+    if (!net) failField("cidr", "network.errors.cidr");
+    const cidr = `${formatIPv4(net.network)}/${net.prefix}`;
 
-  const net = parseCidr(d.cidr);
-  if (!net) return { fieldErrors: { cidr: t("network.errors.cidr") } };
-  const cidr = `${formatIPv4(net.network)}/${net.prefix}`;
+    const errors: Record<string, FieldMessage> = {};
+    const inside = (value: string | undefined, key: string) => {
+      if (value && !ipInCidr(value, cidr)) errors[key] = { key: "network.errors.notInSubnet" };
+    };
+    inside(d.gateway, "gateway");
+    inside(d.dhcpStart, "dhcpStart");
+    inside(d.dhcpEnd, "dhcpEnd");
+    if (d.dhcpStart && d.dhcpEnd && !errors.dhcpStart && !errors.dhcpEnd && parseIPv4(d.dhcpStart)! > parseIPv4(d.dhcpEnd)!) errors.dhcpEnd = { key: "network.errors.dhcpOrder" };
+    const dns = (d.dnsServers ?? "").split(/[,;\s]+/).filter(Boolean);
+    if (dns.some((x) => parseIPv4(x) === null)) errors.dnsServers = { key: "network.errors.dns" };
+    if (Object.keys(errors).length) failFields(errors);
 
-  const errors: Record<string, string> = {};
-  const inside = (value: string | undefined, key: string) => {
-    if (value && !ipInCidr(value, cidr)) errors[key] = t("network.errors.notInSubnet");
-  };
-  inside(d.gateway, "gateway");
-  inside(d.dhcpStart, "dhcpStart");
-  inside(d.dhcpEnd, "dhcpEnd");
-  if (d.dhcpStart && d.dhcpEnd && !errors.dhcpStart && !errors.dhcpEnd && parseIPv4(d.dhcpStart)! > parseIPv4(d.dhcpEnd)!) {
-    errors.dhcpEnd = t("network.errors.dhcpOrder");
-  }
-  const dns = (d.dnsServers ?? "").split(/[,;\s]+/).filter(Boolean);
-  if (dns.some((x) => parseIPv4(x) === null)) errors.dnsServers = t("network.errors.dns");
-  if (Object.keys(errors).length) return { fieldErrors: errors };
+    if (d.vlanId && !(await tx.netVlan.findUnique({ where: { id: d.vlanId }, select: { id: true } }))) failField("vlanId", "validation.invalid");
+    const dup = await tx.netSubnet.findFirst({ where: { cidr, ...(id ? { id: { not: id } } : {}) } });
+    if (dup) failField("cidr", "network.errors.subnetExists");
 
-  const dup = await db.netSubnet.findFirst({ where: { cidr, ...(id ? { id: { not: id } } : {}) } });
-  if (dup) return { fieldErrors: { cidr: t("network.errors.subnetExists") } };
+    const data = {
+      name: d.name,
+      cidr,
+      vlanId: d.vlanId ?? null,
+      gateway: d.gateway ?? null,
+      dnsServers: dns.length ? dns.join(", ") : null,
+      dhcpStart: d.dhcpStart ?? null,
+      dhcpEnd: d.dhcpEnd ?? null,
+      description: d.description ?? null,
+    };
+    const saved = id ? await tx.netSubnet.update({ where: { id }, data }) : await tx.netSubnet.create({ data });
+    audit({ target: `subnet: ${saved.name} (${saved.cidr})`, entityId: saved.id });
+    return { id: saved.id };
+  },
+});
 
-  const data = {
-    name: d.name,
-    cidr,
-    vlanId: d.vlanId ?? null,
-    gateway: d.gateway ?? null,
-    dnsServers: dns.length ? dns.join(", ") : null,
-    dhcpStart: d.dhcpStart ?? null,
-    dhcpEnd: d.dhcpEnd ?? null,
-    description: d.description ?? null,
-  };
-  const saved = id ? await db.netSubnet.update({ where: { id }, data }) : await db.netSubnet.create({ data });
-  refresh();
-  redirect(`/network/ip/${saved.id}`);
-}
+export const saveSubnet = defineAction(saveSubnetOperation, { form: formObject, revalidate: refresh(), redirect: ({ id }) => `/network/ip/${id}` });
 
-export async function deleteSubnet(formData: FormData) {
-  await requirePermission("network.delete");
-  const id = String(formData.get("id") ?? "");
-  if (id) await db.netSubnet.deleteMany({ where: { id } });
-  refresh();
-  redirect("/network/ip");
-}
+const deleteSubnetOperation = defineOperation({
+  name: "network.deleteSubnet",
+  permission: "network.delete",
+  input: idInput,
+  audit: "network.delete",
+  run: async ({ input, tx, audit }) => {
+    const subnet = await tx.netSubnet.findUnique({ where: { id: input.id }, select: { name: true, cidr: true } });
+    if (!subnet) fail("notFound");
+    await tx.netSubnet.delete({ where: { id: input.id } });
+    audit({ target: `subnet: ${subnet.name} (${subnet.cidr})`, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteSubnet = defineAction(deleteSubnetOperation, { revalidate: refresh(), redirect: "/network/ip", message: "common.deleted" });
 
 /* ───────────── IP-Adressen ───────────── */
 
-const ipSchema = z.object({
+const ipInput = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   subnetId: z.string(),
   address: z.string().max(15),
   deviceId: z.string().optional(),
@@ -191,84 +217,107 @@ const ipSchema = z.object({
   returnTo: z.string().optional(),
 });
 
-export async function saveIp(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("network.edit");
-  const { t } = await getI18n();
-  const parsed = ipSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, returnTo, ...d } = parsed.data;
+const saveIpOperation = defineOperation({
+  name: "network.saveIp",
+  permission: "network.edit",
+  input: ipInput,
+  audit: (input) => (input.id ? "network.update" : "network.create"),
+  run: async ({ input: { id, version, ...d }, tx, audit }) => {
+    const subnet = await tx.netSubnet.findUnique({ where: { id: d.subnetId } });
+    if (!subnet) fail("invalid", "validation.invalid");
+    const parsed = parseIPv4(d.address);
+    if (parsed === null) failField("address", "network.errors.ip");
+    if (!ipInCidr(d.address, subnet.cidr)) failField("address", "network.errors.notInSubnet");
 
-  const subnet = await db.netSubnet.findUnique({ where: { id: d.subnetId } });
-  if (!subnet) return { error: t("validation.invalid") };
-  if (parseIPv4(d.address) === null) return { fieldErrors: { address: t("network.errors.ip") } };
-  if (!ipInCidr(d.address, subnet.cidr)) return { fieldErrors: { address: t("network.errors.notInSubnet") } };
+    const address = formatIPv4(parsed);
+    const dup = await tx.netIp.findFirst({ where: { address, ...(id ? { id: { not: id } } : {}) }, include: { device: true } });
+    if (dup) failField("address", "network.errors.ipTaken", { who: dup.device?.name ?? dup.hostname ?? "–" });
 
-  const address = formatIPv4(parseIPv4(d.address)!);
-  const dup = await db.netIp.findFirst({ where: { address, ...(id ? { id: { not: id } } : {}) }, include: { device: true } });
-  if (dup) return { fieldErrors: { address: t("network.errors.ipTaken", { who: dup.device?.name ?? dup.hostname ?? "–" }) } };
+    let mac: string | null = null;
+    if (d.mac) {
+      mac = normalizeMac(d.mac);
+      if (!mac) failField("mac", "network.errors.mac");
+    }
+    if (d.deviceId && !(await tx.netDevice.findUnique({ where: { id: d.deviceId }, select: { id: true } }))) failField("deviceId", "validation.invalid");
 
-  let mac: string | null = null;
-  if (d.mac) {
-    mac = normalizeMac(d.mac);
-    if (!mac) return { fieldErrors: { mac: t("network.errors.mac") } };
-  }
+    const data = { address, subnetId: subnet.id, deviceId: d.deviceId ?? null, hostname: d.hostname ?? null, kind: d.kind, mac, notes: d.notes ?? null };
+    if (id && !(await claimRow(tx.netIp, id, version))) fail("conflict");
+    const saved = id ? await tx.netIp.update({ where: { id }, data }) : await tx.netIp.create({ data });
+    audit({ target: `IP: ${saved.address}`, entityId: saved.id });
+    return { id: saved.id, subnetId: subnet.id };
+  },
+});
 
-  const data = {
-    address,
-    subnetId: subnet.id,
-    deviceId: d.deviceId ?? null,
-    hostname: d.hostname ?? null,
-    kind: d.kind,
-    mac,
-    notes: d.notes ?? null,
-  };
-  if (id) await db.netIp.update({ where: { id }, data });
-  else await db.netIp.create({ data });
-  refresh();
-  redirect(safeReturn(returnTo, "/network/ip", `/network/ip/${subnet.id}`));
-}
+export const saveIp = defineAction(saveIpOperation, {
+  form: formObject,
+  revalidate: refresh(),
+  redirect: ({ subnetId }, input) => safeReturn(input.returnTo, "/network/ip", `/network/ip/${subnetId}`),
+});
 
-export async function deleteIp(formData: FormData) {
-  await requirePermission("network.delete");
-  const id = String(formData.get("id") ?? "");
-  const returnTo = safeReturn(String(formData.get("returnTo") ?? ""), "/network/ip", "/network/ip");
-  if (id) await db.netIp.deleteMany({ where: { id } });
-  refresh();
-  redirect(returnTo);
-}
+const deleteIpOperation = defineOperation({
+  name: "network.deleteIp",
+  permission: "network.delete",
+  input: z.object({ id: z.string().min(1), returnTo: z.string().optional() }),
+  audit: "network.delete",
+  run: async ({ input, tx, audit }) => {
+    const ip = await tx.netIp.findUnique({ where: { id: input.id }, select: { address: true } });
+    if (!ip) fail("notFound");
+    await tx.netIp.delete({ where: { id: input.id } });
+    audit({ target: `IP: ${ip.address}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteIp = defineAction(deleteIpOperation, {
+  revalidate: refresh(),
+  redirect: (_data, input) => safeReturn(input.returnTo, "/network/ip", "/network/ip"),
+  message: "common.deleted",
+  redirectOnError: (formData) => safeReturn(String(formData.get("returnTo") ?? ""), "/network/ip", "/network/ip"),
+});
 
 /* ───────────── Standorte/Räume ───────────── */
 
-const locationSchema = z.object({
+const locationInput = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(1).max(80),
   description: z.string().max(200).optional(),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
 });
 
-export async function saveLocation(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("network.edit");
-  const { t } = await getI18n();
-  const parsed = locationSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, ...d } = parsed.data;
-  const data = { name: d.name, description: d.description ?? null, sortOrder: d.sortOrder };
-  if (id) await db.netLocation.update({ where: { id }, data });
-  else await db.netLocation.create({ data });
-  refresh();
-  return { ok: true, message: t("common.saved") };
-}
+const saveLocationOperation = defineOperation({
+  name: "network.saveLocation",
+  permission: "network.edit",
+  input: locationInput,
+  audit: (input) => (input.id ? "network.update" : "network.create"),
+  run: async ({ input: { id, ...d }, tx, audit }) => {
+    const data = { name: d.name, description: d.description ?? null, sortOrder: d.sortOrder };
+    const saved = id ? await tx.netLocation.update({ where: { id }, data }) : await tx.netLocation.create({ data });
+    audit({ target: `location: ${saved.name}`, entityId: saved.id });
+    return { id: saved.id };
+  },
+});
 
-export async function deleteLocation(formData: FormData) {
-  await requirePermission("network.delete");
-  const id = String(formData.get("id") ?? "");
-  if (id) await db.netLocation.deleteMany({ where: { id } });
-  refresh();
-}
+export const saveLocation = defineAction(saveLocationOperation, { form: formObject, revalidate: refresh(), message: "common.saved" });
+
+const deleteLocationOperation = defineOperation({
+  name: "network.deleteLocation",
+  permission: "network.delete",
+  input: idInput,
+  audit: "network.delete",
+  run: async ({ input, tx, audit }) => {
+    const location = await tx.netLocation.findUnique({ where: { id: input.id }, select: { name: true } });
+    if (!location) fail("notFound");
+    await tx.netLocation.delete({ where: { id: input.id } });
+    audit({ target: `location: ${location.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteLocation = defineAction(deleteLocationOperation, { revalidate: refresh(), message: "common.deleted" });
 
 /* ───────────── Verbindungen (Kabel) ───────────── */
 
-const connectionSchema = z.object({
+const connectionInput = z.object({
   fromDeviceId: z.string().min(1),
   fromPort: z.string().max(30).optional(),
   toDeviceId: z.string().min(1),
@@ -278,42 +327,50 @@ const connectionSchema = z.object({
 });
 
 /** Ist der Port am Gerät schon durch ein anderes Kabel belegt? */
-async function portBusy(deviceId: string, port: string | undefined) {
+async function portBusy(tx: Tx, deviceId: string, port: string | undefined): Promise<boolean> {
   if (!port) return false;
-  const n = await db.netConnection.count({
-    where: { OR: [{ fromDeviceId: deviceId, fromPort: port }, { toDeviceId: deviceId, toPort: port }] },
-  });
+  const n = await tx.netConnection.count({ where: { OR: [{ fromDeviceId: deviceId, fromPort: port }, { toDeviceId: deviceId, toPort: port }] } });
   return n > 0;
 }
 
-export async function saveConnection(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("network.edit");
-  const { t } = await getI18n();
-  const parsed = connectionSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const d = parsed.data;
+const saveConnectionOperation = defineOperation({
+  name: "network.saveConnection",
+  permission: "network.edit",
+  input: connectionInput,
+  audit: "network.create",
+  run: async ({ input: d, tx, audit }) => {
+    if (d.fromDeviceId === d.toDeviceId) failField("toDeviceId", "network.errors.sameDevice");
+    const [from, to] = await Promise.all([
+      tx.netDevice.findUnique({ where: { id: d.fromDeviceId }, select: { name: true } }),
+      tx.netDevice.findUnique({ where: { id: d.toDeviceId }, select: { name: true } }),
+    ]);
+    if (!from) failField("fromDeviceId", "validation.invalid");
+    if (!to) failField("toDeviceId", "validation.invalid");
+    if (await portBusy(tx, d.fromDeviceId, d.fromPort)) failField("fromPort", "network.errors.portBusy");
+    if (await portBusy(tx, d.toDeviceId, d.toPort)) failField("toPort", "network.errors.portBusy");
 
-  if (d.fromDeviceId === d.toDeviceId) return { fieldErrors: { toDeviceId: t("network.errors.sameDevice") } };
-  if (await portBusy(d.fromDeviceId, d.fromPort)) return { fieldErrors: { fromPort: t("network.errors.portBusy") } };
-  if (await portBusy(d.toDeviceId, d.toPort)) return { fieldErrors: { toPort: t("network.errors.portBusy") } };
+    const row = await tx.netConnection.create({
+      data: { fromDeviceId: d.fromDeviceId, fromPort: d.fromPort ?? null, toDeviceId: d.toDeviceId, toPort: d.toPort ?? null, cableLabel: d.cableLabel ?? null, notes: d.notes ?? null },
+    });
+    audit({ target: `connection: ${from.name} – ${to.name}`, entityId: row.id });
+    return { id: row.id };
+  },
+});
 
-  await db.netConnection.create({
-    data: {
-      fromDeviceId: d.fromDeviceId,
-      fromPort: d.fromPort ?? null,
-      toDeviceId: d.toDeviceId,
-      toPort: d.toPort ?? null,
-      cableLabel: d.cableLabel ?? null,
-      notes: d.notes ?? null,
-    },
-  });
-  refresh();
-  return { ok: true, message: t("common.saved") };
-}
+export const saveConnection = defineAction(saveConnectionOperation, { form: formObject, revalidate: refresh(), message: "common.saved" });
 
-export async function deleteConnection(formData: FormData) {
-  await requirePermission("network.delete");
-  const id = String(formData.get("id") ?? "");
-  if (id) await db.netConnection.deleteMany({ where: { id } });
-  refresh();
-}
+const deleteConnectionOperation = defineOperation({
+  name: "network.deleteConnection",
+  permission: "network.delete",
+  input: idInput,
+  audit: "network.delete",
+  run: async ({ input, tx, audit }) => {
+    const row = await tx.netConnection.findUnique({ where: { id: input.id }, include: { from: { select: { name: true } }, to: { select: { name: true } } } });
+    if (!row) fail("notFound");
+    await tx.netConnection.delete({ where: { id: input.id } });
+    audit({ target: `connection: ${row.from.name} – ${row.to.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteConnection = defineAction(deleteConnectionOperation, { revalidate: refresh(), message: "common.deleted" });

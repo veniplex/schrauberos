@@ -72,6 +72,17 @@ export type OperationDef<S extends z.ZodType, R, P> = {
   name: string;
   /** Pflicht, kein Standard */
   permission: PermissionRequirement;
+  /**
+   * Nur wenn das Recht von der Eingabe abhängt (z. B. der Dokumentationsbereich): wählt das Recht aus der rohen Eingabe. `permission` bleibt der
+   * Standard (und die Vertretung für Berechtigungs-Matrix und Funktions-Zuordnung), wenn die Eingabe keinen gültigen Wert nennt.
+   */
+  permissionFor?: (raw: unknown) => PermissionRequirement;
+  /**
+   * Nur für das Konto: Auch Personen mit ausstehendem Passwortwechsel (`mustChangePassword`) dürfen diese Operation ausführen
+   * (Profil, Passwort ändern, Notzugangs-Code bestätigen, Anzeigeeinstellungen). Alle anderen werden zum Konto umgeleitet. Gilt nur mit
+   * `permission: "authenticated"`.
+   */
+  allowPasswordChange?: boolean;
   /** Eingabeschema der Sache (nicht des Formulars: Formular- und API-Eingaben werden vom Adapter in diese Form gebracht) */
   input: S;
   /** Vorarbeit außerhalb der Transaktion (Hash berechnen, Datei speichern). Darf `OperationError` werfen. */
@@ -91,6 +102,12 @@ export type Outcome<R, I = unknown> = { ok: true; data: R; input: I } | { ok: fa
 export type Operation<I = unknown, R = unknown> = {
   readonly name: string;
   readonly permission: PermissionRequirement;
+  /** Das für diese rohe Eingabe erforderliche Recht (meist `permission`; bei eingabeabhängigem Recht der gewählte Wert). */
+  permissionFor(raw: unknown): PermissionRequirement;
+  /** Hängt das Recht von der Eingabe ab (`permissionFor` in der Definition)? */
+  readonly dynamicPermission: boolean;
+  /** Auch mit ausstehendem Passwortwechsel erlaubt (nur Konto)? */
+  readonly allowPasswordChange: boolean;
   readonly audited: boolean;
   /** Führt die Operation für `principal` mit roher Eingabe aus. Kennt keinen Transport. */
   execute(principal: Principal, raw: unknown): Promise<Outcome<R, I>>;
@@ -111,15 +128,20 @@ const failureOf = (error: unknown): OperationFailure | null => (error instanceof
 
 export function defineOperation<S extends z.ZodType, R, P = undefined>(def: OperationDef<S, R, P>): Operation<z.output<S>, R> {
   if (!def.permission) throw new Error(`Operation ${def.name}: permission ist Pflicht`);
+  if (def.allowPasswordChange && def.permission !== "authenticated") throw new Error(`Operation ${def.name}: allowPasswordChange gilt nur mit permission "authenticated"`);
   if (def.audit === false && !def.auditReason?.trim()) throw new Error(`Operation ${def.name}: audit: false braucht eine Begründung (auditReason)`);
 
   const operation: Operation<z.output<S>, R> = {
     name: def.name,
     permission: def.permission,
+    permissionFor: (raw) => def.permissionFor?.(raw) ?? def.permission,
+    dynamicPermission: !!def.permissionFor,
+    allowPasswordChange: !!def.allowPasswordChange,
     audited: def.audit !== false,
 
     async execute(principal, raw) {
-      if (def.permission !== "authenticated" && !principal.can(def.permission)) return { ok: false, failure: { code: "forbidden" } };
+      const needed = operation.permissionFor(raw);
+      if (needed !== "authenticated" && !principal.can(needed)) return { ok: false, failure: { code: "forbidden" } };
 
       const parsed = def.input.safeParse(raw);
       if (!parsed.success) return { ok: false, failure: { code: "invalid", fields: fieldErrors(parsed.error) } };

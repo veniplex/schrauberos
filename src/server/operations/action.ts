@@ -34,10 +34,17 @@ export type ActionOptions<I, R> = {
   form?: (formData: FormData) => unknown | Promise<unknown>;
   /** Seiten, die nach Erfolg neu geladen werden (Pfad, oder `[Pfad, "layout"]`) */
   revalidate?: Of<ReadonlyArray<string | readonly [string, "layout" | "page"]>, I, R>;
-  /** Nach Erfolg weiterleiten */
-  redirect?: Of<string, I, R>;
+  /** Nach Erfolg weiterleiten (eine Funktion darf `undefined` liefern: dann bleibt es bei der Seite) */
+  redirect?: Of<string | undefined, I, R>;
   /** Erfolgsmeldung (Schlüssel): im Formularzustand `message`, sonst Flash. Weglassen, wenn die Zielseite selbst meldet (z. B. `?saved=`). */
   message?: Of<MessageKey, I, R>;
+  /**
+   * Zusätzliche Felder im Formularzustand nach Erfolg (nur bei `(prev, formData)`), z. B. der einmalig angezeigte Klartext eines neuen
+   * Wiederherstellungs-Codes. Steht nur in der Antwort der Aktion, nie in URL, Log oder Audit.
+   */
+  state?: (data: R, input: I, i18n: Awaited<ReturnType<typeof getI18n>>) => Record<string, unknown>;
+  /** Transport-spezifische Nachbereitung nach Erfolg (z. B. Cookie setzen); `run` bleibt davon frei. */
+  onSuccess?: (data: R, input: I) => unknown;
   /** Wohin nach einem Fehler weitergeleitet wird (nur bei `<form action>`; Standard: auf der Seite bleiben, Fehler als Flash) */
   redirectOnError?: string | ((formData: FormData) => string);
 };
@@ -58,13 +65,18 @@ export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOp
     const formMode = first instanceof FormData;
     const formData = formMode ? first : second instanceof FormData ? second : new FormData();
 
-    // Anmeldung und Recht prüft jede Aktion selbst (Navigation und Proxy sind nur Komfort)
-    const principal: Principal = operation.permission === "authenticated" ? await requireSession() : await requirePermission(operation.permission);
-    const { t } = await getI18n();
+    // Anmeldung und Recht prüft jede Aktion selbst (Navigation und Proxy sind nur Komfort). Hängt das Recht von der Eingabe ab
+    // (Dokumentationsbereich), wird zuerst nur das Formular umgeformt – nichts geprüft oder gespeichert.
+    const dynamic = operation.dynamicPermission;
+    const rawInput = dynamic ? await (options.form ?? formObject)(formData) : undefined;
+    const needed = dynamic ? operation.permissionFor(rawInput) : operation.permission;
+    const principal: Principal = needed === "authenticated" ? await requireSession({ allowPasswordChange: operation.allowPasswordChange }) : await requirePermission(needed);
+    const i18n = await getI18n();
+    const { t } = i18n;
 
     let outcome;
     try {
-      outcome = await operation.execute(principal, await (options.form ?? formObject)(formData));
+      outcome = await operation.execute(principal, dynamic ? rawInput : await (options.form ?? formObject)(formData));
     } catch (error) {
       unstable_rethrow(error); // redirect()/notFound() aus tieferem Code nie verschlucken
       logError(`action:${operation.name}`, error);
@@ -86,11 +98,14 @@ export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOp
       if (typeof entry === "string") revalidatePath(entry);
       else revalidatePath(entry[0], entry[1]);
     }
+    if (options.onSuccess) await options.onSuccess(data, input);
     const message = resolve(options.message, data, input);
     const target = resolve(options.redirect, data, input);
     if (message && (formMode || target)) await setFlash({ tone: "success", key: message });
     if (target) redirect(target);
-    return formMode ? undefined : message ? { ok: true, message: t(message) } : { ok: true };
+    if (formMode) return undefined;
+    const extra = options.state ? options.state(data, input, i18n) : {};
+    return { ok: true, ...(message ? { message: t(message) } : {}), ...extra };
   };
   return Object.assign(action as ActionFunction, { operation });
 }

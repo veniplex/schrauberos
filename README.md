@@ -325,8 +325,15 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
 * **Berechtigungs-Matrix** (`src/server/operations/matrix.test.ts`, generiert aus dem Quelltext): jede Action und jeder Route Handler wird ohne Sitzung, mit `mustChangePassword`, mit falschem Recht
   (alle Rechte außer dem erforderlichen) und mit ausgeschalteter Funktion aufgerufen und muss ablehnen, ohne etwas zu verändern. Neue Aktionen/Routen sind automatisch dabei; öffentliche Routen
   (`/api/health`) stehen in einer Ausnahmeliste im Test.
-* **Noch nicht umgestellt** (Liste `LEGACY_ACTION_FILES` in `architecture.test.ts`, darf nur schrumpfen): Anmeldung/Notzugang/Einrichtung (vor der Sitzung, eigene Pfade), Konto, Einstellungen der Person,
-  Dokumentation, Netzwerk, Mitarbeiter, Fuhrpark, Termine, Reifenlager.
+* **Eingabeabhängiges Recht** (`permissionFor`): Hängt das Recht von der Eingabe ab (Dokumentationsbereich: `<gruppe>.edit`), wählt `permissionFor(raw)` es aus dem rohen Formular;
+  `permission` bleibt der Standard und die Vertretung für Matrix und Funktions-Zuordnung. Die Aktion prüft das gewählte Recht, bevor etwas gelesen oder geschrieben wird.
+* **Konto-Operationen** (`permission: "authenticated"`, `allowPasswordChange: true`): Nur Profil, Passwort ändern, Notzugangs-Hinweise/-Code bestätigen und die Anzeigeeinstellungen (Sprache, Design)
+  sind auch mit ausstehendem Passwortwechsel (`mustChangePassword`) erreichbar; für alle anderen Aktionen führt dieser Zustand zum Konto. Aufwendiges (scrypt) liegt in `prepare`, nie in `run`.
+* **Transport-Nacharbeit der Aktion** (`ActionOptions`): `state(data, input, i18n)` ergänzt den Formularzustand nach Erfolg (der einmalig angezeigte Wiederherstellungs-Code; nie in URL, Log oder Audit),
+  `onSuccess(data, input)` erledigt Transportsachen wie Cookies (`src/server/preference-cookies.ts`). `run` bleibt davon frei (Architekturtest: kein `next/headers` in Operationsdateien).
+* **Dynamische Werte aus Client-Code:** Aktionen nehmen `FormData`; wer einen einzelnen Wert schickt (Sprach-/Design-Umschalter), baut ein `FormData` mit einem Feld.
+* **Nicht umgestellt** (Liste `LEGACY_ACTION_FILES` in `architecture.test.ts`, darf nur schrumpfen): Anmeldung/Abmeldung, Notzugang einlösen und Ersteinrichtung – sie laufen vor der Sitzung auf eigenen
+  Pfaden (Anmeldedrosselung, Einrichtungs-Token) und haben kein Recht, das der Rahmen prüfen könnte.
 
 ### Anmeldung, Sitzung und Rechte-Hierarchie
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import type { Role, User } from "@/generated/prisma/client";
 import { bytesToDataChars, formatRecoveryCode } from "@/lib/recovery-code";
+import type { RecoveryActionState } from "@/lib/recovery-code";
 import { browser, createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
 
 /**
@@ -296,10 +297,7 @@ describe("Aktionen", () => {
     try {
       const state = await recoverActions.recoverAccess({}, recoverForm(code));
       assert.ok(state.ok && state.recoveryCode, "der neue Code wird trotzdem angezeigt");
-      // dasselbe beim Erzeugen im Konto
-      await env.signIn(admin);
-      const created = await accountActions.createRecoveryCode({}, form({ password: NEW_PASSWORD }));
-      assert.ok(created.ok && created.recoveryCode);
+      // (Erzeugen im Konto läuft im Aktions-Rahmen: Änderung und Audit-Eintrag sind eine Transaktion, siehe „Erzeugen im Konto“)
     } finally {
       console.error = logged;
       (env.db.auditLog as { create: unknown }).create = original;
@@ -349,17 +347,17 @@ describe("Hinweis „Notzugang wurde verwendet“", () => {
 
   it("confirmRecoveryCode meldet ok, wenn der Code bestätigt ist (auch beim zweiten Mal), und nicht ok ohne Code", async () => {
     await env.signIn(admin);
-    assert.deepEqual(await accountActions.confirmRecoveryCode(), { ok: false }, "ohne Code gibt es nichts zu bestätigen");
+    assert.equal((await accountActions.confirmRecoveryCode({}, form({}))).ok, undefined, "ohne Code gibt es nichts zu bestätigen");
     await issue();
-    assert.deepEqual(await accountActions.confirmRecoveryCode(), { ok: true });
-    assert.deepEqual(await accountActions.confirmRecoveryCode(), { ok: true }, "schon bestätigt bleibt ok");
+    assert.equal((await accountActions.confirmRecoveryCode({}, form({}))).ok, true);
+    assert.equal((await accountActions.confirmRecoveryCode({}, form({}))).ok, true, "schon bestätigt bleibt ok");
   });
 
   it("zeigt Administratoren, dass der eigene Code noch nicht bestätigt ist", async () => {
     await issue();
     assert.equal((await recovery.recoveryBannerData({ id: admin.id, isAdmin: true })).unconfirmed, true);
     await env.signIn(admin);
-    await accountActions.confirmRecoveryCode();
+    await accountActions.confirmRecoveryCode(form({}));
     assert.equal((await recovery.recoveryBannerData({ id: admin.id, isAdmin: true })).unconfirmed, false);
   });
 });
@@ -368,12 +366,12 @@ describe("Erzeugen im Konto", () => {
   it("nur Administratoren, nur mit richtigem Passwort; der bisherige Code wird ungültig", async () => {
     const old = await issue();
     await env.signIn(admin);
-    const wrong = await accountActions.createRecoveryCode({}, form({ password: "falsch-falsch-1" }));
+    const wrong = (await accountActions.createRecoveryCode({}, form({ password: "falsch-falsch-1" }))) as RecoveryActionState;
     assert.ok(wrong.fieldErrors?.password);
     assert.equal(wrong.recoveryCode, undefined);
     assert.equal(await env.db.recoveryCode.count(), 1);
 
-    const created = await accountActions.createRecoveryCode({}, form({ password: PASSWORD }));
+    const created = (await accountActions.createRecoveryCode({}, form({ password: PASSWORD }))) as RecoveryActionState;
     assert.ok(created.recoveryCode && created.recoveryCode !== old);
     assert.deepEqual(await redeem(old, "irgendwas-12345"), { ok: false, reason: "invalid" });
     assert.equal((await redeem(created.recoveryCode!, "irgendwas-12345")).ok, true);

@@ -90,6 +90,8 @@ export const auditEn: typeof auditDe = {
       updateToken: "Update token changed",
     },
     appointment: {
+      create: "Appointment created",
+      update: "Appointment changed",
       delete: "Appointment deleted",
     },
     customer: {
@@ -104,6 +106,8 @@ export const auditEn: typeof auditDe = {
       transfer: "Vehicle transferred",
     },
     tires: {
+      create: "Tyre set created",
+      update: "Tyre set changed",
       delete: "Tyre set deleted",
     },
     invoice: {
@@ -114,16 +118,37 @@ export const auditEn: typeof auditDe = {
       delete: "Invoice deleted",
     },
     employee: {
+      create: "Employee created",
+      update: "Employee changed",
+      sensitiveUpdate: "Employee emergency contact changed",
       delete: "Employee deleted",
+      absenceCreate: "Absence recorded",
+      absenceDelete: "Absence deleted",
+      qualificationCreate: "Qualification recorded",
+      qualificationDelete: "Qualification deleted",
     },
     fleet: {
+      create: "Fleet vehicle created",
+      update: "Fleet vehicle changed",
       delete: "Fleet entry deleted",
+      mileageAdd: "Mileage recorded",
+      mileageDelete: "Mileage deleted",
+      costAdd: "Fleet cost recorded",
+      costDelete: "Fleet cost deleted",
+      licenseCheck: "Licence check recorded",
+      licenseCheckDelete: "Licence check deleted",
     },
     network: {
+      create: "Network entry created",
+      update: "Network entry changed",
       delete: "Network entry deleted",
     },
     docs: {
+      create: "Documentation page created",
+      update: "Documentation page changed",
+      restore: "Documentation page restored",
       delete: "Documentation deleted",
+      categorySave: "Documentation chapter saved",
       categoryDelete: "Documentation chapter deleted",
     },
   },

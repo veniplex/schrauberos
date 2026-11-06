@@ -45,7 +45,7 @@ describe("Termin: Referenzprüfung", () => {
     const bay = await env.db.bay.create({ data: { name: `Platz ${Math.random()}` } });
     return { user, customer, car, other, set, type, bay };
   };
-  const save = (fields: Record<string, string | undefined>) => actions.saveAppointment({}, form({ ...base, ...fields }));
+  const save = (fields: Record<string, string | undefined>) => (fields.id ? actions.updateAppointment : actions.createAppointment)({}, form({ ...base, ...fields }));
 
   it("unbekannte Terminart, Arbeitsplatz, Mitarbeiter, Satz → Feldfehler, nichts gespeichert", async () => {
     const { car } = await setup();

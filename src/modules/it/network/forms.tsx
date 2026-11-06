@@ -190,6 +190,8 @@ export function SubnetForm({
 
 export type IpFormInitial = {
   id?: string;
+  /** Version der Zeile beim Öffnen (optimistische Sperre) */
+  version?: string;
   subnetId: string;
   address: string;
   deviceId: string;
@@ -218,6 +220,7 @@ export function IpForm({
   return (
     <form action={action} className="flex flex-col gap-4">
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial.id ? <input type="hidden" name="version" value={initial.version ?? ""} /> : null}
       <input type="hidden" name="subnetId" value={initial.subnetId} />
       <input type="hidden" name="returnTo" value={returnTo} />
       <div className="grid gap-4 sm:grid-cols-2">

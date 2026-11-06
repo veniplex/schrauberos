@@ -1,84 +1,59 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { requirePermission } from "@/server/auth/session";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
-import { parseDot } from "@/modules/workshop/tires/domain";
-import { fieldErrors, formObject } from "@/lib/forms";
-import { audit } from "@/server/audit";
-import { claimed } from "@/lib/concurrency";
+import { claimRow } from "@/lib/concurrency";
+import { formObject } from "@/lib/forms";
+import { RIM_TYPES, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
+import { parseTireRows, type RawTireRow } from "@/modules/workshop/tires/domain";
+import { defineAction, defineOperation, fail, failFields, type RunContext } from "@/server/operations";
 
 const optInt = (min: number, max: number) => z.coerce.number().int().min(min).max(max).optional();
 
-const schema = z.object({
-  id: z.string().optional(),
-  version: z.string().optional(),
-  vehicleId: z.string(),
-  season: z.enum(TIRE_SEASONS),
-  status: z.enum(TIRE_SET_STATUSES).default("stored"),
-  brand: z.string().max(60).optional(),
-  model: z.string().max(60).optional(),
-  width: optInt(100, 400),
-  aspect: optInt(20, 100),
-  rim: optInt(10, 30),
-  loadIndex: z.string().max(5).optional(),
-  speedIndex: z.string().max(3).optional(),
-  rimType: z.enum(RIM_TYPES).default("none"),
-  storageLocation: z.string().max(120).optional(),
-  storedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  notes: z.string().max(2000).optional(),
-  spare: z.string().optional(),
-});
+const tireRows = z.record(z.string(), z.object({ dot: z.string().optional(), tread: z.string().optional(), condition: z.string().optional() }));
 
-function revalidateAll(id?: string) {
-  revalidatePath("/tires");
-  revalidatePath("/");
-  if (id) revalidatePath(`/tires/${id}`);
+const tireSetInput = z
+  .object({
+    id: z.string().optional(),
+    version: z.string().optional(),
+    vehicleId: z.string(),
+    season: z.enum(TIRE_SEASONS),
+    status: z.enum(TIRE_SET_STATUSES).default("stored"),
+    brand: z.string().max(60).optional(),
+    model: z.string().max(60).optional(),
+    width: optInt(100, 400),
+    aspect: optInt(20, 100),
+    rim: optInt(10, 30),
+    loadIndex: z.string().max(5).optional(),
+    speedIndex: z.string().max(3).optional(),
+    rimType: z.enum(RIM_TYPES).default("none"),
+    storageLocation: z.string().max(120).optional(),
+    storedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    notes: z.string().max(2000).optional(),
+    spare: z.boolean(),
+    /** Einzelreifen je Position (aus den Formularfeldern `tire.<POS>.dot|tread|condition`) */
+    tires: tireRows,
+  })
+  .superRefine((d, ctx) => {
+    // Fehler je Reifenfeld (`tire.<POS>.dot` / `.tread`)
+    const { errors } = parseTireRows(d.tires as Partial<Record<TirePosition, RawTireRow>>, d.spare);
+    for (const [field, kind] of Object.entries(errors)) ctx.addIssue({ code: "custom", message: kind === "dot" ? "tires.errors.dot" : "tires.errors.tread", path: [field] });
+  });
+
+type TireSetInput = z.output<typeof tireSetInput>;
+
+/** Formular → Eingabe: die Einzelreifen werden aus den flachen Feldnamen gesammelt. */
+function tireSetForm(fd: FormData): unknown {
+  const raw = formObject(fd);
+  const tires: Record<string, RawTireRow> = {};
+  for (const position of TIRE_POSITIONS) tires[position] = { dot: raw[`tire.${position}.dot`], tread: raw[`tire.${position}.tread`], condition: raw[`tire.${position}.condition`] };
+  return { ...raw, spare: fd.get("spare") !== null, tires };
 }
 
-export async function saveTireSet(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const raw = formObject(formData);
-  await requirePermission(raw.id ? "tires.edit" : "tires.create");
-  const { t } = await getI18n();
-
-  const parsed = schema.safeParse(raw);
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const d = parsed.data;
-
-  // Einzelne Reifen: Felder heißen tire.<POS>.dot | tread | condition
-  const errors: Record<string, string> = {};
-  const positions: TirePosition[] = d.spare ? [...TIRE_POSITIONS] : TIRE_POSITIONS.filter((p) => p !== "SPARE");
-  const tires = positions.map((position) => {
-    const dotRaw = raw[`tire.${position}.dot`];
-    const treadRaw = raw[`tire.${position}.tread`]?.replace(",", ".");
-    const conditionRaw = raw[`tire.${position}.condition`] ?? "good";
-
-    const dot = dotRaw ? parseDot(dotRaw) : null;
-    // Ungültig oder in der Zukunft (z. B. 1234 = Woche 12/2034) -> vermutlich vertippt
-    if (dotRaw && (!dot || dot.year > new Date().getFullYear())) errors[`tire.${position}.dot`] = t("tires.errors.dot");
-    const tread = treadRaw !== undefined ? Number(treadRaw) : null;
-    if (tread !== null && (!Number.isFinite(tread) || tread < 0 || tread > 15)) errors[`tire.${position}.tread`] = t("tires.errors.tread");
-    const condition = (TIRE_CONDITIONS as readonly string[]).includes(conditionRaw) ? conditionRaw : "good";
-
-    return {
-      position,
-      dot: dotRaw && dot ? dotRaw : null,
-      producedWeek: dot?.week ?? null,
-      producedYear: dot?.year ?? null,
-      treadDepthMm: tread,
-      condition,
-      measuredAt: tread !== null ? new Date() : null,
-    };
-  });
-  if (Object.keys(errors).length) return { fieldErrors: errors };
-
-  const vehicle = await db.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true } });
-  if (!vehicle) return { fieldErrors: { vehicleId: t("validation.required") } };
+/** Gemeinsamer Ablauf von Anlegen und Ändern (je ein eigenes Recht, daher zwei Operationen). */
+async function saveTireSetRun({ input: d, tx, audit }: RunContext<TireSetInput, undefined>): Promise<{ id: string }> {
+  const { tires } = parseTireRows(d.tires as Partial<Record<TirePosition, RawTireRow>>, d.spare);
+  const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true } });
+  if (!vehicle) failFields({ vehicleId: { key: "validation.required" } });
 
   const data = {
     vehicleId: vehicle.id,
@@ -97,67 +72,108 @@ export async function saveTireSet(_prev: ActionState, formData: FormData): Promi
     notes: d.notes ?? null,
   };
 
-  const id = await db.$transaction(async (tx) => {
-    if (d.id) {
-      if (!(await claimed(d.version, (stamp, next) => tx.tireSet.updateMany({ where: { id: d.id!, updatedAt: stamp }, data: { updatedAt: next } })))) return null;
-      await tx.tireSet.update({ where: { id: d.id }, data });
-      await tx.tire.deleteMany({ where: { tireSetId: d.id } });
-      await tx.tire.createMany({ data: tires.map((x) => ({ ...x, tireSetId: d.id! })) });
-      return d.id;
-    }
-    const created = await tx.tireSet.create({ data });
-    await tx.tire.createMany({ data: tires.map((x) => ({ ...x, tireSetId: created.id })) });
-    return created.id;
-  });
-
-  if (!id) return { error: t("common.conflict") };
-  revalidateAll(id);
-  redirect(`/tires/${id}`);
+  let id: string;
+  if (d.id) {
+    if (!(await claimRow(tx.tireSet, d.id, d.version))) fail("conflict");
+    await tx.tireSet.update({ where: { id: d.id }, data });
+    await tx.tire.deleteMany({ where: { tireSetId: d.id } });
+    await tx.tire.createMany({ data: tires.map((x) => ({ ...x, tireSetId: d.id! })) });
+    id = d.id;
+  } else {
+    id = (await tx.tireSet.create({ data })).id;
+    await tx.tire.createMany({ data: tires.map((x) => ({ ...x, tireSetId: id })) });
+  }
+  audit({ target: vehicle.plate, entityId: id });
+  return { id };
 }
 
-export async function setTireSetStatus(formData: FormData) {
-  await requirePermission("tires.edit");
-  const id = String(formData.get("id") ?? "");
-  const status = String(formData.get("status") ?? "");
-  if (!id || !(TIRE_SET_STATUSES as readonly string[]).includes(status)) return;
-  await db.tireSet.update({
-    where: { id },
-    // Beim erneuten Einlagern beginnt die Lagerzeit neu
-    data: { status, ...(status === "stored" ? { storedAt: new Date() } : {}) },
-  });
-  revalidateAll(id);
-}
+const afterSave = {
+  form: tireSetForm,
+  revalidate: (data: { id: string }) => ["/tires", "/", `/tires/${data.id}`],
+  redirect: (data: { id: string }) => `/tires/${data.id}`,
+};
 
-export async function deleteTireSet(formData: FormData) {
-  await requirePermission("tires.delete");
-  const id = String(formData.get("id") ?? "");
-  const set = id ? await db.tireSet.findUnique({ where: { id }, select: { vehicle: { select: { plate: true } } } }) : null;
-  if (id) await db.tireSet.deleteMany({ where: { id } });
-  if (set) await audit("tires.delete", { target: set.vehicle.plate, entityId: id });
-  revalidateAll();
-  redirect("/tires");
-}
+const createTireSetOperation = defineOperation({
+  name: "tires.create",
+  permission: "tires.create",
+  input: tireSetInput.refine((d) => !d.id, { message: "validation.invalid", path: ["id"] }),
+  audit: "tires.create",
+  run: saveTireSetRun,
+});
+
+const updateTireSetOperation = defineOperation({
+  name: "tires.update",
+  permission: "tires.edit",
+  input: tireSetInput.refine((d) => !!d.id, { message: "validation.invalid", path: ["id"] }),
+  audit: "tires.update",
+  run: saveTireSetRun,
+});
+
+/** Neuen Reifensatz anlegen (Formular ohne `id`). */
+export const createTireSet = defineAction(createTireSetOperation, afterSave);
+/** Reifensatz ändern (Formular mit `id` und `version`). */
+export const updateTireSet = defineAction(updateTireSetOperation, afterSave);
+
+const setStatusOperation = defineOperation({
+  name: "tires.setStatus",
+  permission: "tires.edit",
+  input: z.object({ id: z.string().min(1), status: z.enum(TIRE_SET_STATUSES) }),
+  audit: "tires.update",
+  run: async ({ input, tx, audit }) => {
+    const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { vehicle: { select: { plate: true } } } });
+    if (!set) fail("notFound");
+    await tx.tireSet.update({
+      where: { id: input.id },
+      // Beim erneuten Einlagern beginnt die Lagerzeit neu
+      data: { status: input.status, ...(input.status === "stored" ? { storedAt: new Date() } : {}) },
+    });
+    audit({ target: set.vehicle.plate, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const setTireSetStatus = defineAction(setStatusOperation, { revalidate: ({ id }) => ["/tires", "/", `/tires/${id}`], message: "common.saved" });
+
+const deleteTireSetOperation = defineOperation({
+  name: "tires.delete",
+  permission: "tires.delete",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "tires.delete",
+  run: async ({ input, tx, audit }) => {
+    const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { vehicle: { select: { plate: true } } } });
+    if (!set) fail("notFound");
+    await tx.tireSet.delete({ where: { id: input.id } });
+    audit({ target: set.vehicle.plate, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const deleteTireSet = defineAction(deleteTireSetOperation, { revalidate: ["/tires", "/"], redirect: "/tires", message: "common.deleted" });
 
 /* ───────────── Einstellungen (Reifen-Ampel) ───────────── */
 
-const settingsSchema = z.object({
-  treadWarnMm: z.coerce.number().min(1).max(10),
-  treadReplaceMm: z.coerce.number().min(1).max(10),
-  tireAgeWarnYears: z.coerce.number().int().min(1).max(20),
-  tireAgeReplaceYears: z.coerce.number().int().min(1).max(25),
+const settingsInput = z
+  .object({
+    treadWarnMm: z.coerce.number().min(1).max(10),
+    treadReplaceMm: z.coerce.number().min(1).max(10),
+    tireAgeWarnYears: z.coerce.number().int().min(1).max(20),
+    tireAgeReplaceYears: z.coerce.number().int().min(1).max(25),
+  })
+  .superRefine((d, ctx) => {
+    if (d.treadReplaceMm > d.treadWarnMm) ctx.addIssue({ code: "custom", message: "tires.settings.errors.treadOrder", path: ["treadReplaceMm"] });
+    if (d.tireAgeWarnYears > d.tireAgeReplaceYears) ctx.addIssue({ code: "custom", message: "tires.settings.errors.ageOrder", path: ["tireAgeWarnYears"] });
+  });
+
+const saveSettingsOperation = defineOperation({
+  name: "tires.saveSettings",
+  permission: "settings.manage",
+  input: settingsInput,
+  audit: "settings.tires",
+  run: async ({ input: d, tx, audit }) => {
+    await tx.tireSettings.upsert({ where: { id: "default" }, update: d, create: { id: "default", ...d } });
+    audit({ target: `${d.treadWarnMm}/${d.treadReplaceMm} mm, ${d.tireAgeWarnYears}/${d.tireAgeReplaceYears} a`, entityId: "default" });
+    return {};
+  },
 });
 
-export async function saveTireSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("settings.manage");
-  const { t } = await getI18n();
-  const parsed = settingsSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const d = parsed.data;
-  if (d.treadReplaceMm > d.treadWarnMm) return { fieldErrors: { treadReplaceMm: t("tires.settings.errors.treadOrder") } };
-  if (d.tireAgeWarnYears > d.tireAgeReplaceYears) return { fieldErrors: { tireAgeWarnYears: t("tires.settings.errors.ageOrder") } };
-
-  await db.tireSettings.upsert({ where: { id: "default" }, update: d, create: { id: "default", ...d } });
-  await audit("settings.tires");
-  revalidatePath("/", "layout");
-  return { ok: true, message: t("common.saved") };
-}
+export const saveTireSettings = defineAction(saveSettingsOperation, { form: formObject, revalidate: [["/", "layout"]], message: "common.saved" });

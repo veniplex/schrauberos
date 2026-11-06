@@ -68,7 +68,11 @@ describe("Kapitel löschen", () => {
     const p = await page("geheim", "x", restrictedId);
     await env.signIn(editor);
     const to = await redirectOf(() => actions.deleteDocCategory(form({ area: "handbook", id: restrictedId })));
-    assert.match(to ?? "", /notice=categoryNotEmpty/);
+    assert.equal(to, "/docs/handbook");
+    // Rückmeldung als Flash-Meldung (Fehler, Schlüssel des Hinweises)
+    const { decodeFlash } = await import("@/server/operations/flash");
+    const flash = decodeFlash(env.browser.writes.filter((w) => w.name === "so_flash").at(-1)?.value ?? null);
+    assert.deepEqual({ tone: flash?.tone, key: flash?.key }, { tone: "error", key: "docs.categoryNotEmpty" });
     assert.equal(await env.db.docCategory.count({ where: { id: restrictedId } }), 1);
     assert.equal((await env.db.docPage.findUniqueOrThrow({ where: { id: p.id } })).categoryId, restrictedId);
     assert.equal(await env.db.auditLog.count({ where: { action: "docs.categoryDelete" } }), 0);

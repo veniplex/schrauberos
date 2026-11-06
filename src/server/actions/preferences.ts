@@ -1,28 +1,44 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
-import { db } from "@/server/db";
-import { getSession } from "@/server/auth/session";
-import { isLocale, LOCALE_COOKIE, THEME_COOKIE } from "@/i18n/config";
+import { z } from "zod";
+import { isLocale } from "@/i18n/config";
 import { THEMES, type Theme } from "@/lib/constants";
+import { writeLocaleCookie, writeThemeCookie } from "@/server/preference-cookies";
+import { defineAction, defineOperation } from "@/server/operations";
 
-const cookieOpts = { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" as const };
+/**
+ * Persönliche Anzeigeeinstellungen: Sprache und Design. Gespeichert im Benutzerprofil (Operation) und als Cookie (Adapter, `onSuccess`):
+ * Das Cookie gilt auch vor der nächsten Anmeldung. Jede angemeldete Person darf – auch mit ausstehendem Passwortwechsel (die Kontoseite
+ * bietet beides an).
+ */
+const setLocaleOperation = defineOperation({
+  name: "preferences.setLocale",
+  permission: "authenticated",
+  allowPasswordChange: true,
+  input: z.object({ locale: z.string().refine(isLocale, { error: "validation.invalid" }) }),
+  audit: false,
+  auditReason: "Persönliche Anzeigeeinstellung ohne Auswirkung auf Daten oder Rechte anderer",
+  run: async ({ input, principal, tx }) => {
+    await tx.user.update({ where: { id: principal.user.id }, data: { locale: input.locale } });
+    return { locale: input.locale };
+  },
+});
 
-/** Persönliche Sprache setzen (Cookie + Benutzerprofil, falls eingeloggt). */
-export async function setLocale(locale: string) {
-  if (!isLocale(locale)) return;
-  (await cookies()).set(LOCALE_COOKIE, locale, cookieOpts);
-  const session = await getSession();
-  if (session) await db.user.update({ where: { id: session.user.id }, data: { locale } });
-  revalidatePath("/", "layout");
-}
+/** Persönliche Sprache setzen (Aufruf mit Formularfeld `locale`). */
+export const setLocale = defineAction(setLocaleOperation, { revalidate: [["/", "layout"]], onSuccess: ({ locale }) => writeLocaleCookie(locale) });
 
-/** Persönliches Design setzen: system | light | dark. */
-export async function setTheme(theme: string) {
-  if (!(THEMES as readonly string[]).includes(theme)) return;
-  (await cookies()).set(THEME_COOKIE, theme, cookieOpts);
-  const session = await getSession();
-  if (session) await db.user.update({ where: { id: session.user.id }, data: { theme: theme as Theme } });
-  revalidatePath("/", "layout");
-}
+const setThemeOperation = defineOperation({
+  name: "preferences.setTheme",
+  permission: "authenticated",
+  allowPasswordChange: true,
+  input: z.object({ theme: z.string().refine((value): value is Theme => (THEMES as readonly string[]).includes(value), { error: "validation.invalid" }) }),
+  audit: false,
+  auditReason: "Persönliche Anzeigeeinstellung ohne Auswirkung auf Daten oder Rechte anderer",
+  run: async ({ input, principal, tx }) => {
+    await tx.user.update({ where: { id: principal.user.id }, data: { theme: input.theme } });
+    return { theme: input.theme };
+  },
+});
+
+/** Persönliches Design setzen: system | light | dark (Aufruf mit Formularfeld `theme`). */
+export const setTheme = defineAction(setThemeOperation, { revalidate: [["/", "layout"]], onSuccess: ({ theme }) => writeThemeCookie(theme) });

@@ -1,166 +1,210 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { requirePermission } from "@/server/auth/session";
-import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
-import type { AppSession } from "@/server/auth/session";
-import { fieldErrors, formObject } from "@/lib/forms";
+import { claimRow } from "@/lib/concurrency";
+import { formObject } from "@/lib/forms";
 import { slugify, uniqueSlug } from "@/lib/slug";
-import { DOC_MAX_VERSIONS, DOC_PERMISSIONS, isDocArea, type DocArea } from "./areas";
-import { audit } from "@/server/audit";
-import { claimed } from "@/lib/concurrency";
+import { defineAction, defineOperation, fail, failField, type Tx } from "@/server/operations";
+import { DOC_AREAS, DOC_MAX_VERSIONS, DOC_PERMISSIONS, isDocArea, type DocArea } from "./areas";
 
-/** Prüft den Bereich aus dem Formular und das Bearbeitungsrecht dafür (jede Action prüft selbst). */
-async function requireEdit(areaRaw: string): Promise<{ area: DocArea; session: AppSession }> {
-  if (!isDocArea(areaRaw)) throw new Error("Unbekannter Dokumentationsbereich");
-  return { area: areaRaw, session: await requirePermission(DOC_PERMISSIONS[areaRaw].edit) };
-}
+/**
+ * Dokumentation (Handbuch, IT-Dokumentation): Das Bearbeitungsrecht hängt vom Bereich ab (`<gruppe>.edit`). Der Bereich steht im Formular;
+ * `permissionFor` wählt daraus das Recht, ohne gültigen Bereich gilt das des ersten Bereichs (die Eingabeprüfung lehnt ihn danach ab).
+ */
+const FALLBACK = DOC_PERMISSIONS[DOC_AREAS[0]].edit;
+const editPermissionFor = (raw: unknown) => {
+  const area = typeof raw === "object" && raw !== null ? String((raw as Record<string, unknown>).area ?? "") : "";
+  return isDocArea(area) ? DOC_PERMISSIONS[area].edit : FALLBACK;
+};
 
-function refresh(area: DocArea, slug?: string) {
-  revalidatePath(`/docs/${area}`);
-  if (slug) revalidatePath(`/docs/${area}/${slug}`);
-}
+const area = z.string().refine((value): value is DocArea => isDocArea(value), { error: "validation.invalid" });
+const idInput = z.object({ area, id: z.string().min(1) });
+
+/** Zielseite nach einem Fehler: der Bereich aus dem Formular, wenn er gültig ist. */
+const areaHome = (formData: FormData) => {
+  const name = String(formData.get("area") ?? "");
+  return isDocArea(name) ? `/docs/${name}` : "/";
+};
+
+const refresh = (areaName: string, slug?: string) => [`/docs/${areaName}`, ...(slug ? [`/docs/${areaName}/${slug}`] : [])];
 
 /** Speichert den Zustand als Version und kürzt den Verlauf. */
-async function snapshot(pageId: string, title: string, content: string, savedByName: string) {
-  await db.docVersion.create({ data: { pageId, title, content, savedByName } });
-  const old = await db.docVersion.findMany({ where: { pageId }, orderBy: { savedAt: "desc" }, skip: DOC_MAX_VERSIONS, select: { id: true } });
-  if (old.length) await db.docVersion.deleteMany({ where: { id: { in: old.map((v) => v.id) } } });
+async function snapshot(tx: Tx, pageId: string, title: string, content: string, savedByName: string) {
+  await tx.docVersion.create({ data: { pageId, title, content, savedByName } });
+  const old = await tx.docVersion.findMany({ where: { pageId }, orderBy: { savedAt: "desc" }, skip: DOC_MAX_VERSIONS, select: { id: true } });
+  if (old.length) await tx.docVersion.deleteMany({ where: { id: { in: old.map((v) => v.id) } } });
 }
 
 /* ───────────── Seiten ───────────── */
 
-const pageSchema = z.object({
+const pageInput = z.object({
   id: z.string().optional(),
   version: z.string().optional(),
-  area: z.string(),
+  area,
   title: z.string().trim().min(1).max(120),
   categoryId: z.string().optional(),
   content: z.string().max(200_000),
+  pinned: z.boolean(),
 });
 
-export async function saveDocPage(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const raw = formObject(formData);
-  const { area, session } = await requireEdit(raw.area ?? "");
-  const { t } = await getI18n();
+const saveDocPageOperation = defineOperation({
+  name: "docs.savePage",
+  permission: FALLBACK,
+  permissionFor: editPermissionFor,
+  input: pageInput,
+  audit: (input) => (input.id ? "docs.update" : "docs.create"),
+  run: async ({ input: d, principal, tx, audit }) => {
+    if (d.categoryId && !(await tx.docCategory.findFirst({ where: { id: d.categoryId, area: d.area }, select: { id: true } }))) failField("categoryId", "validation.invalid");
+
+    const by = principal.user.name;
+    let slug: string;
+    let id: string;
+    if (d.id) {
+      const page = await tx.docPage.findFirst({ where: { id: d.id, area: d.area } });
+      if (!page) fail("invalid", "validation.invalid");
+      if (!(await claimRow(tx.docPage, page.id, d.version))) fail("conflict");
+      slug = page.slug; // Adresse bleibt stabil, auch wenn der Titel geändert wird (Links in anderen Seiten)
+      id = page.id;
+      await tx.docPage.update({ where: { id }, data: { title: d.title, content: d.content, categoryId: d.categoryId ?? null, pinned: d.pinned, updatedByName: by } });
+    } else {
+      const taken = (await tx.docPage.findMany({ where: { area: d.area }, select: { slug: true } })).map((p) => p.slug);
+      slug = uniqueSlug(slugify(d.title), taken);
+      id = (await tx.docPage.create({ data: { area: d.area, slug, title: d.title, content: d.content, categoryId: d.categoryId ?? null, pinned: d.pinned, createdByName: by, updatedByName: by } })).id;
+    }
+    await snapshot(tx, id, d.title, d.content, by);
+    audit({ target: d.title, entityId: id });
+    return { id, slug, area: d.area };
+  },
+});
+
+export const saveDocPage = defineAction(saveDocPageOperation, {
   // content darf leer sein (formObject entfernt leere Felder)
-  const parsed = pageSchema.safeParse({ ...raw, content: String(formData.get("content") ?? "") });
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const d = parsed.data;
+  form: (fd) => ({ ...formObject(fd), content: String(fd.get("content") ?? ""), pinned: fd.get("pinned") === "on" }),
+  revalidate: ({ area: a, slug }) => refresh(a, slug),
+  redirect: ({ area: a, slug }) => `/docs/${a}/${slug}`,
+});
 
-  if (d.categoryId) {
-    const cat = await db.docCategory.findFirst({ where: { id: d.categoryId, area } });
-    if (!cat) return { fieldErrors: { categoryId: t("validation.invalid") } };
-  }
-  const pinned = formData.get("pinned") === "on";
+const deleteDocPageOperation = defineOperation({
+  name: "docs.deletePage",
+  permission: FALLBACK,
+  permissionFor: editPermissionFor,
+  input: idInput,
+  audit: "docs.delete",
+  run: async ({ input, tx, audit }) => {
+    const page = await tx.docPage.findFirst({ where: { id: input.id, area: input.area }, select: { title: true } });
+    if (!page) fail("notFound");
+    await tx.docPage.delete({ where: { id: input.id } });
+    audit({ target: page.title, entityId: input.id });
+    return { area: input.area };
+  },
+});
 
-  let slug: string;
-  if (d.id) {
-    const page = await db.docPage.findFirst({ where: { id: d.id, area } });
-    if (!page) return { error: t("validation.invalid") };
-    if (!(await claimed(d.version, (stamp, next) => db.docPage.updateMany({ where: { id: page.id, updatedAt: stamp }, data: { updatedAt: next } })))) return { error: t("common.conflict") };
-    slug = page.slug; // Adresse bleibt stabil, auch wenn der Titel geändert wird (Links in anderen Seiten)
-    await db.docPage.update({
-      where: { id: page.id },
-      data: { title: d.title, content: d.content, categoryId: d.categoryId ?? null, pinned, updatedByName: session.user.name },
-    });
-    await snapshot(page.id, d.title, d.content, session.user.name);
-  } else {
-    const taken = (await db.docPage.findMany({ where: { area }, select: { slug: true } })).map((p) => p.slug);
-    slug = uniqueSlug(slugify(d.title), taken);
-    const created = await db.docPage.create({
-      data: { area, slug, title: d.title, content: d.content, categoryId: d.categoryId ?? null, pinned, createdByName: session.user.name, updatedByName: session.user.name },
-    });
-    await snapshot(created.id, d.title, d.content, session.user.name);
-  }
-  refresh(area, slug);
-  redirect(`/docs/${area}/${slug}`);
-}
+export const deleteDocPage = defineAction(deleteDocPageOperation, {
+  revalidate: ({ area: a }) => refresh(a),
+  redirect: ({ area: a }) => `/docs/${a}`,
+  message: "common.deleted",
+  redirectOnError: areaHome,
+});
 
-export async function deleteDocPage(formData: FormData) {
-  const { area } = await requireEdit(String(formData.get("area") ?? ""));
-  const id = String(formData.get("id") ?? "");
-  const page = id ? await db.docPage.findFirst({ where: { id, area }, select: { title: true } }) : null;
-  if (id) await db.docPage.deleteMany({ where: { id, area } });
-  if (page) await audit("docs.delete", { target: page.title, entityId: id });
-  refresh(area);
-  redirect(`/docs/${area}`);
-}
+const togglePinOperation = defineOperation({
+  name: "docs.togglePin",
+  permission: FALLBACK,
+  permissionFor: editPermissionFor,
+  input: idInput,
+  audit: false,
+  auditReason: "Anheften ist eine reine Darstellungsänderung; Inhalt und Sichtbarkeit der Seite bleiben unverändert",
+  run: async ({ input, tx }) => {
+    const page = await tx.docPage.findFirst({ where: { id: input.id, area: input.area } });
+    if (!page) fail("notFound");
+    // Die Änderung der Anheften-Markierung soll weder die Versionsprüfung noch „zuletzt geändert“ auslösen
+    await tx.docPage.update({ where: { id: page.id }, data: { pinned: !page.pinned } });
+    return { area: input.area, slug: page.slug };
+  },
+});
 
-export async function togglePin(formData: FormData) {
-  const { area } = await requireEdit(String(formData.get("area") ?? ""));
-  const id = String(formData.get("id") ?? "");
-  const page = id ? await db.docPage.findFirst({ where: { id, area } }) : null;
-  if (page) await db.docPage.update({ where: { id: page.id }, data: { pinned: !page.pinned } });
-  refresh(area, page?.slug);
-}
+export const togglePin = defineAction(togglePinOperation, { revalidate: ({ area: a, slug }) => refresh(a, slug) });
 
 /** Alte Fassung wiederherstellen: wird als neue Version gespeichert (der Verlauf bleibt lückenlos). */
-export async function restoreDocVersion(formData: FormData) {
-  const { area, session } = await requireEdit(String(formData.get("area") ?? ""));
-  const versionId = String(formData.get("versionId") ?? "");
-  const version = versionId ? await db.docVersion.findUnique({ where: { id: versionId }, include: { page: true } }) : null;
-  if (!version || version.page.area !== area) redirect(`/docs/${area}`);
-  await db.docPage.update({
-    where: { id: version.pageId },
-    data: { title: version.title, content: version.content, updatedByName: session.user.name },
-  });
-  await snapshot(version.pageId, version.title, version.content, session.user.name);
-  refresh(area, version.page.slug);
-  redirect(`/docs/${area}/${version.page.slug}`);
-}
+const restoreDocVersionOperation = defineOperation({
+  name: "docs.restoreVersion",
+  permission: FALLBACK,
+  permissionFor: editPermissionFor,
+  input: z.object({ area, versionId: z.string().min(1) }),
+  audit: "docs.restore",
+  run: async ({ input, principal, tx, audit }) => {
+    const version = await tx.docVersion.findUnique({ where: { id: input.versionId }, include: { page: true } });
+    if (!version || version.page.area !== input.area) fail("notFound");
+    await tx.docPage.update({ where: { id: version.pageId }, data: { title: version.title, content: version.content, updatedByName: principal.user.name } });
+    await snapshot(tx, version.pageId, version.title, version.content, principal.user.name);
+    audit({ target: version.title, entityId: version.pageId });
+    return { area: input.area, slug: version.page.slug };
+  },
+});
+
+export const restoreDocVersion = defineAction(restoreDocVersionOperation, {
+  revalidate: ({ area: a, slug }) => refresh(a, slug),
+  redirect: ({ area: a, slug }) => `/docs/${a}/${slug}`,
+  message: "common.saved",
+  redirectOnError: areaHome,
+});
 
 /* ───────────── Kategorien ───────────── */
 
-const categorySchema = z.object({
+const categoryInput = z.object({
   id: z.string().optional(),
-  area: z.string(),
+  area,
   name: z.string().trim().min(1).max(60),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
+  roleIds: z.array(z.string()),
 });
 
-export async function saveDocCategory(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const raw = formObject(formData);
-  const { area } = await requireEdit(raw.area ?? "");
-  const { t } = await getI18n();
-  const parsed = categorySchema.safeParse(raw);
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
-  const { id, name, sortOrder } = parsed.data;
-
-  // Nur existierende Rollen übernehmen; leer = das Kapitel sehen alle mit Leserecht
-  const roleIds = (await db.role.findMany({ where: { id: { in: formData.getAll("roleIds").map(String) } }, select: { id: true } })).map((r) => r.id);
-  const roles = { deleteMany: {}, create: roleIds.map((roleId) => ({ roleId })) };
-
-  if (id) {
-    const cat = await db.docCategory.findFirst({ where: { id, area } });
-    if (cat) await db.docCategory.update({ where: { id }, data: { name, sortOrder, roles } });
-  } else {
-    await db.docCategory.create({ data: { area, name, sortOrder, roles: { create: roles.create } } });
-  }
-  refresh(area);
-  return { ok: true, message: t("common.saved") };
-}
-
-export async function deleteDocCategory(formData: FormData) {
-  const { area } = await requireEdit(String(formData.get("area") ?? ""));
-  const id = String(formData.get("id") ?? "");
-  const category = id ? await db.docCategory.findFirst({ where: { id, area }, select: { name: true } }) : null;
-  if (category) {
-    // Löschen darf keine Beschränkung aufheben: Seiten würden sonst ohne Kapitel für alle sichtbar. Prüfen und Löschen zusammen.
-    const deleted = await db.$transaction(async (tx) => {
-      if ((await tx.docPage.count({ where: { categoryId: id } })) > 0) return false;
-      await tx.docCategory.delete({ where: { id } });
-      return true;
-    });
-    if (!deleted) {
-      refresh(area);
-      redirect(`/docs/${area}?notice=categoryNotEmpty`);
+const saveDocCategoryOperation = defineOperation({
+  name: "docs.saveCategory",
+  permission: FALLBACK,
+  permissionFor: editPermissionFor,
+  input: categoryInput,
+  audit: "docs.categorySave",
+  run: async ({ input: { id, area: a, name, sortOrder, roleIds: wanted }, tx, audit }) => {
+    // Nur existierende Rollen übernehmen; leer = das Kapitel sehen alle mit Leserecht
+    const roleIds = (await tx.role.findMany({ where: { id: { in: wanted } }, select: { id: true } })).map((r) => r.id);
+    let saved;
+    if (id) {
+      const cat = await tx.docCategory.findFirst({ where: { id, area: a } });
+      if (!cat) fail("notFound");
+      saved = await tx.docCategory.update({ where: { id }, data: { name, sortOrder, roles: { deleteMany: {}, create: roleIds.map((roleId) => ({ roleId })) } } });
+    } else {
+      saved = await tx.docCategory.create({ data: { area: a, name, sortOrder, roles: { create: roleIds.map((roleId) => ({ roleId })) } } });
     }
-    await audit("docs.categoryDelete", { target: category.name, entityId: id });
-  }
-  refresh(area);
-}
+    audit({ target: name, entityId: saved.id });
+    return { area: a };
+  },
+});
+
+export const saveDocCategory = defineAction(saveDocCategoryOperation, {
+  form: (fd) => ({ ...formObject(fd), roleIds: fd.getAll("roleIds").map(String) }),
+  revalidate: ({ area: a }) => refresh(a),
+  message: "common.saved",
+});
+
+const deleteDocCategoryOperation = defineOperation({
+  name: "docs.deleteCategory",
+  permission: FALLBACK,
+  permissionFor: editPermissionFor,
+  input: idInput,
+  audit: "docs.categoryDelete",
+  run: async ({ input, tx, audit }) => {
+    const category = await tx.docCategory.findFirst({ where: { id: input.id, area: input.area }, select: { name: true } });
+    if (!category) fail("notFound");
+    // Löschen darf keine Beschränkung aufheben: Seiten würden sonst ohne Kapitel für alle sichtbar. Prüfen und Löschen laufen zusammen.
+    if ((await tx.docPage.count({ where: { categoryId: input.id } })) > 0) fail("inUse", "docs.categoryNotEmpty");
+    await tx.docCategory.delete({ where: { id: input.id } });
+    audit({ target: category.name, entityId: input.id });
+    return { area: input.area };
+  },
+});
+
+export const deleteDocCategory = defineAction(deleteDocCategoryOperation, {
+  revalidate: ({ area: a }) => refresh(a),
+  message: "common.deleted",
+  redirectOnError: areaHome,
+});

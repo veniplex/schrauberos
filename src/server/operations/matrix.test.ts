@@ -22,7 +22,7 @@ function walk(dir: string, match: (name: string) => boolean): string[] {
 }
 const specOf = (file: string) => `@/${path.relative(SRC, file).split(path.sep).join("/").replace(/\.tsx?$/, "")}`;
 
-type Action = ((...args: unknown[]) => Promise<unknown>) & { operation: { name: string; permission: string } };
+type Action = ((...args: unknown[]) => Promise<unknown>) & { operation: { name: string; permission: string; allowPasswordChange: boolean } };
 type Outcome = { redirect?: string; notFound?: boolean };
 
 /** Ruft `fn` auf und liefert, wohin die Aktion ablenkt (Weiterleitung oder „nicht gefunden“) – oder nichts, wenn sie lief. */
@@ -39,6 +39,7 @@ async function outcomeOf(fn: () => Promise<unknown>): Promise<Outcome> {
 
 let env: TestEnv;
 const actions: Action[] = [];
+let declared = 0;
 let routes: Array<{ file: string; url: string; methods: Array<[string, (request: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>]> }> = [];
 let seq = 0;
 
@@ -47,6 +48,7 @@ before(async () => {
   process.env.UPDATE_API_URL = "http://127.0.0.1:9"; // Update-Prüfung scheitert sofort, kein Netzwerk
   const actionFiles = walk(SRC, (n) => /\.tsx?$/.test(n) && !/\.test\./.test(n)).filter((f) => /\bdefineAction\(/.test(readFileSync(f, "utf8")) && !f.includes(`${path.sep}operations${path.sep}`));
   for (const file of actionFiles) {
+    declared += [...readFileSync(file, "utf8").matchAll(/^export const \w+ = defineAction\(/gm)].length;
     const mod = (await import(specOf(file))) as Record<string, unknown>;
     for (const value of Object.values(mod)) if (typeof value === "function" && "operation" in value) actions.push(value as Action);
   }
@@ -77,11 +79,22 @@ const snapshot = async () => ({
   vehicles: await env.db.vehicle.count(),
   features: await env.db.featureSetting.count(),
   settings: await env.db.appSetting.count(),
+  appointments: await env.db.appointment.count(),
+  bays: await env.db.bay.count(),
+  tireSets: await env.db.tireSet.count(),
+  employees: await env.db.employee.count(),
+  absences: await env.db.absence.count(),
+  fleetVehicles: await env.db.fleetVehicle.count(),
+  netDevices: await env.db.netDevice.count(),
+  docPages: await env.db.docPage.count(),
+  recoveryCodes: await env.db.recoveryCode.count(),
 });
 
 describe("Berechtigungs-Matrix: Server Actions", () => {
   it("findet die umgestellten Aktionen (kein leerer Lauf)", () => {
-    assert.ok(actions.length >= 20, `nur ${actions.length} Aktionen gefunden`);
+    // Generiert: Jede im Quelltext mit `export const x = defineAction(` angelegte Aktion muss auch geladen und damit geprüft werden
+    assert.ok(declared >= 70, `nur ${declared} Aktionen im Quelltext gefunden`);
+    assert.equal(actions.length, declared, "alle angelegten Aktionen sind in der Matrix");
     const names = actions.map((a) => a.operation.name);
     assert.equal(new Set(names).size, names.length, "Operationsnamen sind eindeutig");
     for (const a of actions) assert.ok(a.operation.permission, `${a.operation.name}: permission fehlt`);
@@ -101,10 +114,21 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
     await signInAs({ admin: true, mustChangePassword: true });
     const before = await snapshot();
     for (const action of actions) {
-      assert.deepEqual(await outcomeOf(() => action({}, form({}))), { redirect: "/account" }, action.operation.name);
-      assert.deepEqual(await outcomeOf(() => action(form({}))), { redirect: "/account" }, action.operation.name);
+      // Nur das Konto selbst (Profil, Passwort, Notzugangs-Hinweise, Anzeigeeinstellungen) bleibt erreichbar – sonst ließe sich der Wechsel nicht ausführen
+      const expected = action.operation.allowPasswordChange ? {} : { redirect: "/account" };
+      assert.deepEqual(await outcomeOf(() => action({}, form({}))), expected, action.operation.name);
+      assert.deepEqual(await outcomeOf(() => action(form({}))), expected, action.operation.name);
     }
     assert.deepEqual(await snapshot(), before);
+  });
+
+  it("nur Konto-Operationen erlauben den ausstehenden Passwortwechsel – und nur mit „authenticated“", () => {
+    for (const action of actions) {
+      if (action.operation.allowPasswordChange) {
+        assert.equal(action.operation.permission, "authenticated", action.operation.name);
+        assert.match(action.operation.name, /^(account|preferences)\./, `${action.operation.name}: allowPasswordChange nur für Konto/Anzeigeeinstellungen`);
+      }
+    }
   });
 
   it("mit falschem Recht (alle Rechte außer dem erforderlichen): /forbidden, nichts verändert", async () => {
