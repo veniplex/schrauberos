@@ -1,6 +1,8 @@
 import "server-only";
+import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
 import { startBackupScheduler } from "@/server/backup/scheduler";
+import { writeAudit } from "@/server/audit";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
 import { appliedMigrations, MigrationError, runMigrations } from "@/server/migrate";
@@ -31,6 +33,21 @@ export function applyTimezone(timezone: string): boolean {
 }
 
 /**
+ * Nach einer Wiederherstellung (der Launcher hat die Datenbank getauscht und noch nicht bestätigt: `restore/applied.json`) gelten **keine API-Tokens** mehr: Die
+ * Sicherung kennt keine Widerrufe, die seitdem geschehen sind – ein inzwischen widerrufenes (etwa gestohlenes) Token wäre sonst wieder gültig. Alle Tokens werden beim ersten
+ * Start widerrufen (und im Audit-Log festgehalten); neue Tokens sind schnell erzeugt. Läuft bei jedem Start bis zur Bestätigung (idempotent). Liefert die Anzahl.
+ */
+export async function revokeApiTokensAfterRestore(dataRoot?: string): Promise<number> {
+  const applied = readApplied(dataRoot);
+  if (!applied) return 0;
+  return db.$transaction(async (tx) => {
+    const { count } = await tx.apiToken.updateMany({ where: { revokedAt: null }, data: { revokedAt: new Date() } });
+    if (count > 0) await writeAudit(tx, "apiToken.restoreRevoked", { target: `${count} (Sicherung ${applied.from})`, actor: { id: null, name: "System" } });
+    return count;
+  });
+}
+
+/**
  * Bereitet die Datenbank vor: Sicherungskopie vor Migrationen, Migrationen, Basisdaten, Zeitzone, Zeitplan der Backups.
  * Scheitert etwas, beendet sich der Prozess – der Launcher erkennt das und fällt bei einem frischen Update zurück.
  */
@@ -50,6 +67,8 @@ export async function startApp(): Promise<void> {
     await db.$executeRawUnsafe("PRAGMA synchronous = FULL");
 
     await ensureBaseData(db);
+    const revoked = await revokeApiTokensAfterRestore();
+    if (revoked > 0) console.log(`[start] Nach der Wiederherstellung: ${revoked} API-Token(s) widerrufen.`);
     const workshop = await db.workshop.findUnique({ where: { id: "default" }, select: { timezone: true } });
     if (workshop && !applyTimezone(workshop.timezone)) console.error(`[start] Unbekannte Zeitzone ${workshop.timezone}`);
 

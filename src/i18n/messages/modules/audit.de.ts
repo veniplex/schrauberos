@@ -37,6 +37,7 @@ export const auditDe = {
     apiToken: {
       create: "API-Token erzeugt",
       revoke: "API-Token widerrufen",
+      restoreRevoked: "API-Tokens nach Wiederherstellung widerrufen",
     },
     backup: {
       create: "Backup erstellt",

@@ -135,6 +135,38 @@ describe("Update-Token", () => {
   });
 });
 
+describe("Aufbewahrung des Audit-Logs: Mindestfrist und Protokoll der Änderung (ZP2-S-F05)", () => {
+  it("weniger als 30 Tage (außer 0) wird abgelehnt – nichts gespeichert, nichts protokolliert; 30 und 0 gehen", async () => {
+    for (const days of [1, 7, 29]) {
+      const state = await settings.saveSecurity({}, form({ auditRetentionDays: days }));
+      assert.ok(state.fieldErrors?.auditRetentionDays, String(days));
+    }
+    assert.equal(await retention.getAuditRetentionDays(), 730);
+    assert.equal(await env.db.auditLog.count({ where: { action: "settings.security" } }), 0);
+    assert.equal((await settings.saveSecurity({}, form({ auditRetentionDays: 30 }))).ok, true);
+    assert.equal((await settings.saveSecurity({}, form({ auditRetentionDays: 0 }))).ok, true);
+  });
+
+  it("ein zu kurzer Altwert (vor der Mindestfrist gespeichert) gilt als Mindestfrist: 1 Tag löscht nichts, was jünger als 30 Tage ist", async () => {
+    await env.db.appSetting.upsert({ where: { key: retention.AUDIT_RETENTION_KEY }, update: { value: "1" }, create: { key: retention.AUDIT_RETENTION_KEY, value: "1" } });
+    assert.equal(await retention.getAuditRetentionDays(), 30);
+    assert.equal(retention.parseRetentionDays("5"), 30);
+    assert.equal(retention.parseRetentionDays("0"), 0);
+    assert.equal(retention.parseRetentionDays("31"), 31);
+    await env.db.auditLog.create({ data: { action: "user.create", actorName: "x", createdAt: new Date(Date.now() - 2 * 86_400_000) } });
+    assert.equal(await retention.pruneAuditLog(), 0);
+  });
+
+  it("die Änderung steht mit altem und neuem Wert im Audit-Log", async () => {
+    await settings.saveSecurity({}, form({ auditRetentionDays: 90 }));
+    await settings.saveSecurity({}, form({ auditRetentionDays: 0, behindProxy: true }));
+    const entries = await env.db.auditLog.findMany({ where: { action: "settings.security" }, orderBy: { createdAt: "asc" } });
+    assert.equal(entries.length, 2);
+    assert.match(entries[0].target ?? "", /Audit-Aufbewahrung 730 d → 90 d/);
+    assert.match(entries[1].target ?? "", /Audit-Aufbewahrung 90 d → unbegrenzt; Reverse-Proxy aus → an/);
+  });
+});
+
 describe("Aufbewahrung des Audit-Logs", () => {
   const entry = (daysAgo: number) => env.db.auditLog.create({ data: { action: "user.create", actorName: "x", createdAt: new Date(Date.now() - daysAgo * 86_400_000) } });
 
@@ -165,6 +197,7 @@ describe("Aufbewahrung des Audit-Logs", () => {
   it("lehnt unsinnige Fristen ab und lässt die Einstellung ohne Angabe unverändert", async () => {
     assert.ok((await settings.saveSecurity({}, form({ auditRetentionDays: 99999 }))).fieldErrors?.auditRetentionDays);
     assert.equal(await retention.getAuditRetentionDays(), 730);
+    assert.ok((await settings.saveSecurity({}, form({ auditRetentionDays: -1 }))).fieldErrors?.auditRetentionDays);
     await settings.saveSecurity({}, form({ auditRetentionDays: 90 }));
     await settings.saveSecurity({}, form({ behindProxy: true }));
     assert.equal(await retention.getAuditRetentionDays(), 90);

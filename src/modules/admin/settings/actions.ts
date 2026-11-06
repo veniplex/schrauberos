@@ -5,7 +5,7 @@ import { isHexColor } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/constants";
 import { formObject } from "@/lib/forms";
 import { isValidTime } from "@/lib/opening-hours";
-import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS } from "@/server/audit-retention";
+import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
 import { defineAction, defineOperation, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
@@ -100,8 +100,14 @@ export const saveWorkshop = defineAction(saveWorkshopOperation, {
 
 const securityInput = z.object({
   behindProxy: z.boolean(),
-  /** Tage, 0 = unbegrenzt aufbewahren; ohne Angabe bleibt die Einstellung unverändert */
-  auditRetentionDays: z.coerce.number().int().min(0).max(AUDIT_RETENTION_MAX_DAYS).optional(),
+  /** Tage, 0 = unbegrenzt aufbewahren, sonst mindestens 30; ohne Angabe bleibt die Einstellung unverändert */
+  auditRetentionDays: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(AUDIT_RETENTION_MAX_DAYS)
+    .refine((days) => days === 0 || days >= AUDIT_RETENTION_MIN_DAYS, { message: "settings.errors.auditRetentionMin", params: { min: AUDIT_RETENTION_MIN_DAYS } } as never)
+    .optional(),
 });
 
 /** Sicherheit: Läuft die Anwendung hinter einem Reverse-Proxy? Nur dann wird die Client-Adresse aus X-Forwarded-For ausgewertet. Dazu die Aufbewahrung des Audit-Logs. */
@@ -110,9 +116,15 @@ const saveSecurityOperation = defineOperation({
   permission: "settings.manage",
   input: securityInput,
   audit: "settings.security",
-  run: async ({ input, tx }) => {
+  run: async ({ input, tx, audit }) => {
+    // Alter und neuer Wert stehen im Audit-Log (die Frist des Audit-Logs selbst zu verkürzen ist eine Änderung, die man später nachvollziehen können muss)
+    const [oldProxy, oldRetention] = await Promise.all([tx.appSetting.findUnique({ where: { key: BEHIND_PROXY_KEY } }), tx.appSetting.findUnique({ where: { key: AUDIT_RETENTION_KEY } })]);
+    const retentionBefore = parseRetentionDays(oldRetention?.value ?? null);
+    const retentionAfter = input.auditRetentionDays ?? retentionBefore;
     await setSetting(BEHIND_PROXY_KEY, input.behindProxy ? "true" : "false", tx);
     if (input.auditRetentionDays !== undefined) await setSetting(AUDIT_RETENTION_KEY, String(input.auditRetentionDays), tx);
+    const days = (n: number) => (n === 0 ? "unbegrenzt" : `${n} d`);
+    audit({ target: `Audit-Aufbewahrung ${days(retentionBefore)} → ${days(retentionAfter)}; Reverse-Proxy ${oldProxy?.value === "true" ? "an" : "aus"} → ${input.behindProxy ? "an" : "aus"}` });
     return { saved: true };
   },
 });

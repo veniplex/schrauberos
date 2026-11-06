@@ -375,8 +375,9 @@ Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen 
   schreibende UI-Aktion hat ein API-Pendant (`ApiEndpoint.operations`) oder steht mit Begründung in `src/modules/api-exceptions.ts` (Konfiguration, Dokumentationsseiten …); Aktionen der Plattform
   und des Kontos (`authenticated`) sind automatisch ausgenommen. Die Ausnahmeliste darf nur schrumpfen. Vergisst man bei einer neuen Funktion (Blöcke 5–11) die `api.ts`, schlägt der Test fehl.
 * **Besonderheiten:** Mitarbeiter ohne sensible Daten – kein Notfallkontakt, keine Benutzerverknüpfung, Krankheit gibt es in der API nicht (nicht lesbar, anlegbar, löschbar); der Kundenlöschstopp,
-  Ausgangsnummern, Doppelbelegung des Arbeitsplatzes (`findBayClash`) und die DOT-Prüfung gelten unverändert. Nach der Wiederherstellung einer Sicherung gelten die Tokens des Sicherungsstands
-  (Widerrufe seitdem sind weg) – Tokens danach prüfen.
+  Ausgangsnummern, Doppelbelegung des Arbeitsplatzes (`findBayClash`) und die DOT-Prüfung gelten unverändert. Nach einer Wiederherstellung sind **alle Tokens widerrufen**: Beim ersten Start danach (solange der Launcher die Wiederherstellung noch nicht bestätigt hat, `restore/applied.json`)
+  widerruft `revokeApiTokensAfterRestore` (`src/server/startup.ts`) jedes gültige Token und vermerkt das im Audit-Log (`apiToken.restoreRevoked`) – die Sicherung kennt keine Widerrufe, die seitdem geschehen sind,
+  und ein gestohlenes Token würde sonst wieder gültig. Ebenso widerrufen Passwortwechsel, Deaktivierung und Notzugang die Tokens des Kontos (`revokeAccess`, in derselben Transaktion).
 * **Tests:** `src/server/api/api.test.ts` (Authentifizierung, Drosselung, Rate-Limit, Idempotenz, Lesen/Schreiben, Fehler), `matrix.test.ts` (generierte Berechtigungs-Matrix über alle Endpunkte: ohne/ungültiges/abgelaufenes/
   widerrufenes Token, Besitzer gesperrt, Cookie allein, Scope fehlt, Besitzer ohne Recht, Funktion aus), `tokens.test.ts`, `resources.test.ts` (Eigenheiten je Ressource), `openapi.test.ts`, `src/lib/api/api-lib.test.ts`.
 

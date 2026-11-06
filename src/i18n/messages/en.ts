@@ -297,13 +297,14 @@ export const en: Messages = {
       title: "Sign-in & network",
       behindProxy: "The application runs behind a reverse proxy",
       auditRetention: "Keep audit log (days)",
-      auditRetentionHint: "Older audit log entries are deleted daily (data minimisation). Default: 730 days (2 years); 0 = keep forever.",
+      auditRetentionHint: "Older audit log entries are deleted daily (data minimisation). Default: 730 days (2 years); at least 30 days; 0 = keep forever.",
       behindProxyHint: "Turn this on only if a reverse proxy really sits in front that appends the client address as the last X-Forwarded-For entry (nginx: proxy_add_x_forwarded_for). Sign-in then additionally limits failed attempts per address. Without a real proxy anyone can forge the address in the header and get other people's addresses blocked. Even with a proxy: if many devices share one address (office network behind NAT), the limit hits all of them together – administrators included, except on devices they have signed in from before. When in doubt, leave it off.",
     },
     errors: {
       hoursInvalid: "Please enter valid times (end after start).",
       logoType: "Allowed: PNG, JPEG, WebP or SVG.",
       logoSize: "The logo may be at most 200 KB.",
+      auditRetentionMin: "At least {min} days (or 0 for unlimited).",
     },
     workshop: {
       identity: "Details",

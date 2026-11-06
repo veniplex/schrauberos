@@ -8,7 +8,7 @@ Rechnungen, Mitarbeitern, Fuhrpark-Einträgen, Netzwerk-Geräten und Seiten in H
 gemeinsam mit der Änderung selbst – gibt es den Eintrag nicht, gab es auch die Änderung nicht.
 
 **Aufbewahrung:** Einträge, die älter sind als die eingestellte Frist, werden täglich gelöscht (Datensparsamkeit). Standard sind 730 Tage (2 Jahre);
-einstellen lässt sich das unter Einstellungen → Sicherheit, `0` bewahrt alles auf. Die Löschung steht selbst als Eintrag „Alte Audit-Einträge gelöscht“ im Log.
+einstellen lässt sich das unter Einstellungen → Sicherheit (**mindestens 30 Tage**, `0` bewahrt alles auf). Jede Änderung der Frist steht mit altem und neuem Wert im Log. Die Löschung steht selbst als Eintrag „Alte Audit-Einträge gelöscht“ im Log.
 
 Die Liste lässt sich nach Benutzer oder Objekt durchsuchen und nach Aktionsgruppe filtern. Der Name der handelnden Person bleibt
 auch erhalten, wenn das Konto später gelöscht wird.

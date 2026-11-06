@@ -39,6 +39,7 @@ export const auditEn: typeof auditDe = {
     apiToken: {
       create: "API token created",
       revoke: "API token revoked",
+      restoreRevoked: "API tokens revoked after restore",
     },
     backup: {
       create: "Backup created",
