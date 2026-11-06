@@ -85,13 +85,21 @@ export function findSmallInputFont(page: Page, min = 16): Promise<string[]> {
     const skip = new Set(["hidden", "checkbox", "radio", "range", "color", "file", "button", "submit", "image", "reset"]);
     const out = new Set<string>();
     for (const el of document.querySelectorAll("input, textarea, select")) {
-      if (el instanceof HTMLInputElement && skip.has(el.type)) continue;
+      // Attribut statt Eigenschaft: WebKit ohne Farbwähler meldet type="color" als "text"
+      if (el instanceof HTMLInputElement && skip.has((el.getAttribute("type") ?? "text").toLowerCase())) continue;
       const style = getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden" || el.closest("[inert],[hidden],[aria-hidden='true']")) continue;
       if (parseFloat(style.fontSize) < min - 0.01) out.add(describe(el));
     }
     return [...out].sort();
   }, min);
+}
+
+/** Wartet, bis Layout und Farben (nach einem Wechsel von Hell/Dunkel, Schriften, Animationen) zur Ruhe gekommen sind – sonst messen axe und Co. Zwischenzustände. */
+export async function settle(page: Page) {
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.waitForTimeout(250);
 }
 
 /** axe-core (WCAG 2 A/AA): Kennungen der verletzten Regeln. */

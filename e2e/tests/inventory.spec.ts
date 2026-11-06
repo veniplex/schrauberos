@@ -1,6 +1,6 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { checkAgainstBaseline } from "../support/baseline";
-import { axeRules, cspViolations, findOverflow, findSmallInputFont, findSmallTargets, watchCsp } from "../support/checks";
+import { axeRules, cspViolations, findOverflow, findSmallInputFont, findSmallTargets, settle, watchCsp } from "../support/checks";
 import { loadInventory, type InventoryEntry } from "../support/inventory";
 
 /**
@@ -22,7 +22,7 @@ async function openAndCheck(page: Page, entry: InventoryEntry, info: TestInfo) {
   const response = await page.goto(entry.url, { waitUntil: "load" });
   expect(response?.status(), `${entry.url}: Statuscode`).toBe(200);
   await expect(page.locator("[data-status='not-found']"), `${entry.url}: Seite nicht gefunden`).toHaveCount(0);
-  await page.evaluate(() => document.fonts.ready);
+  await settle(page);
   if (entry.kind === "modal") await expect(page.locator("dialog[open]")).toBeVisible();
 
   checkAgainstBaseline(info, "overflow", entry.key, await findOverflow(page));
@@ -32,6 +32,7 @@ async function openAndCheck(page: Page, entry: InventoryEntry, info: TestInfo) {
   }
   checkAgainstBaseline(info, "axe-light", entry.key, await axeRules(page));
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await settle(page);
   checkAgainstBaseline(info, "axe-dark", entry.key, await axeRules(page));
   expect.soft(await cspViolations(page), `${entry.key}: Verstöße gegen die Content-Security-Policy`).toEqual([]);
 }

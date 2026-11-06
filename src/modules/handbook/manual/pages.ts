@@ -6,5 +6,5 @@ export const pages = definePages("handbook.manual", [
   { path: "/docs/[area]/new", kind: "new", permission: "handbook.edit", params: { area: { value: "handbook" } } },
   { path: "/docs/[area]/[slug]", kind: "detail", permission: "handbook.view", params: { area: { value: "handbook" }, slug: { table: "DocPage", column: "slug", where: "area = 'handbook'" } }, key: true },
   { path: "/docs/[area]/[slug]/edit", kind: "edit", permission: "handbook.edit", params: { area: { value: "handbook" }, slug: { table: "DocPage", column: "slug", where: "area = 'handbook'" } } },
-  { path: "/docs/[area]/[slug]/history", kind: "other", permission: "handbook.edit", params: { area: { value: "handbook" }, slug: { table: "DocPage", column: "slug", where: "area = 'handbook'" } } },
+  { path: "/docs/[area]/[slug]/history", kind: "other", permission: "handbook.view", params: { area: { value: "handbook" }, slug: { table: "DocPage", column: "slug", where: "area = 'handbook'" } } },
 ]);
