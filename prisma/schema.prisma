@@ -44,6 +44,7 @@ model User {
   recoveryNotices RecoveryNotice[]
   recoveryAcks    RecoveryNoticeAck[]
   knownDevices    KnownDevice[]
+  apiTokens       ApiToken[]
 
   @@unique([authSource, externalId])
 }
@@ -814,4 +815,58 @@ model OutboxEvent {
 
   @@index([processedAt, availableAt])
   @@index([type])
+}
+
+// ───────────── Programmierschnittstelle (API-Kern, /api/v1) ─────────────
+
+// API-Token: gespeichert wird nur der SHA-256-Hash (das Token ist hochentropisch, ein langsamer Hash wäre sinnlos), das Klartext-Token
+// steht ausschließlich in der Antwort der Erzeugung. Wirksame Rechte bei jeder Anfrage: Scope ∩ aktuelle Rechte des Besitzers (nie adminOnly).
+// Bewusst ohne updatedAt: "zuletzt benutzt" wird gedrosselt geschrieben und soll keine Änderung der Zeile sein. Besitzer gelöscht = Token weg.
+model ApiToken {
+  id                 String    @id @default(cuid())
+  name               String
+  tokenHash          String    @unique
+  // erste Zeichen des Tokens (nicht geheim, nur zum Wiedererkennen in Listen und im Audit-Log)
+  hint               String
+  userId             String
+  expiresAt          DateTime
+  createdAt          DateTime  @default(now())
+  createdByName      String?
+  lastUsedAt         DateTime?
+  revokedAt          DateTime?
+  // Anfragen pro Minute für dieses Token
+  rateLimitPerMinute Int       @default(120)
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope ApiTokenScope[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Rechte, die das Token höchstens tragen darf (Schlüssel wie in der Rechte-Maske, z. B. "customers.view")
+model ApiTokenScope {
+  tokenId    String
+  permission String
+
+  token ApiToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@id([tokenId, permission])
+}
+
+// Idempotenz-Schlüssel (Header Idempotency-Key): je Token, Methode+Pfad und Schlüssel höchstens eine Zeile. status = null: Anfrage läuft noch.
+model ApiIdempotencyKey {
+  id        String   @id @default(cuid())
+  tokenId   String
+  scope     String
+  key       String
+  bodyHash  String
+  status    Int?
+  response  String?
+  headers   String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@unique([tokenId, scope, key])
+  @@index([expiresAt])
 }

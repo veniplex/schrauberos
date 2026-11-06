@@ -595,6 +595,45 @@ CREATE TABLE "OutboxEvent" (
     "processedAt" DATETIME
 );
 
+-- CreateTable
+CREATE TABLE "ApiToken" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "hint" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "expiresAt" DATETIME NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdByName" TEXT,
+    "lastUsedAt" DATETIME,
+    "revokedAt" DATETIME,
+    "rateLimitPerMinute" INTEGER NOT NULL DEFAULT 120,
+    CONSTRAINT "ApiToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ApiTokenScope" (
+    "tokenId" TEXT NOT NULL,
+    "permission" TEXT NOT NULL,
+
+    PRIMARY KEY ("tokenId", "permission"),
+    CONSTRAINT "ApiTokenScope_tokenId_fkey" FOREIGN KEY ("tokenId") REFERENCES "ApiToken" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ApiIdempotencyKey" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tokenId" TEXT NOT NULL,
+    "scope" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "bodyHash" TEXT NOT NULL,
+    "status" INTEGER,
+    "response" TEXT,
+    "headers" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" DATETIME NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
@@ -792,3 +831,18 @@ CREATE INDEX "OutboxEvent_processedAt_availableAt_idx" ON "OutboxEvent"("process
 
 -- CreateIndex
 CREATE INDEX "OutboxEvent_type_idx" ON "OutboxEvent"("type");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ApiToken_tokenHash_key" ON "ApiToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "ApiToken_userId_idx" ON "ApiToken"("userId");
+
+-- CreateIndex
+CREATE INDEX "ApiToken_expiresAt_idx" ON "ApiToken"("expiresAt");
+
+-- CreateIndex
+CREATE INDEX "ApiIdempotencyKey_expiresAt_idx" ON "ApiIdempotencyKey"("expiresAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ApiIdempotencyKey_tokenId_scope_key_key" ON "ApiIdempotencyKey"("tokenId", "scope", "key");

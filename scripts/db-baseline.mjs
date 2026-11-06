@@ -22,7 +22,7 @@ if (existsSync(file)) {
     console.error(`Die vorhandene Baseline trägt keinen Marker "${MARKER} unreleased" in der ersten Zeile – sie wird nicht überschrieben. Bitte prüfen (Git-Verlauf), nicht von Hand ändern.`);
     process.exit(1);
   }
-  if (!/^unreleased/.test(first.slice(MARKER.length).trim())) {
+  if (!/^unreleased\b/.test(first.slice(MARKER.length).trim())) {
     console.error("Die Baseline ist veröffentlicht (frozen) und wird nie neu erzeugt. Schema-Änderung: npm run db:migrate -- <name>");
     process.exit(1);
   }
