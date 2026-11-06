@@ -239,7 +239,9 @@ zu überschreiben. Prüfung und Schreiben, die zusammengehören (z. B. Doppelbel
 ### Anmeldung, Sitzung und Rechte-Hierarchie
 
 * **Sitzung:** serverseitig (Tabelle `Session`, nur der Hash des Tokens), Cookie `so_session` im HTTP-LAN, **`__Host-so_session`** (Secure)
-  über HTTPS; gelesen werden beide (`src/lib/session-cookie.ts`). Der Proxy (`src/proxy.ts`) prüft nur, ob ein Cookie da ist, und leitet
+  über HTTPS. **Gelesen wird nur der Name, der zum Übertragungsweg passt** (unter HTTPS ausschließlich `__Host-…`, ein untergeschobenes
+  Klartext-Cookie zählt nicht – Cookie Tossing; `src/lib/session-cookie.ts`, gilt auch im Proxy). Abmelden löscht den `__Host-`-Cookie mit
+  `Secure`, Pfad `/` und `Max-Age=0` (`cookies().delete()` täte das nicht, der Browser verwürfe es). Der Proxy (`src/proxy.ts`) prüft nur, ob ein Cookie da ist, und leitet
   **nie von `/login` weg** – die Anmeldeseite prüft die Sitzung selbst (totes Cookie → Formular statt Schleife). Ausgenommen vom Proxy
   (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons, `/api/health`, `/api/v1/*` (Bearer-Token), `/api/ical/*`
   (Token in der URL); übrige `/api/*` ohne Cookie antworten mit 401.

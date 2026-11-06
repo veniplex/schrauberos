@@ -10,7 +10,7 @@ import { authRuntime } from "./runtime";
 import { loginThrottle, normalizeUsername } from "./throttle";
 import { isLocale, LOCALE_COOKIE, THEME_COOKIE, type Locale } from "@/i18n/config";
 import { THEMES, type Theme } from "@/lib/constants";
-import { readSessionToken, SESSION_COOKIE_NAMES, sessionCookieName } from "@/lib/session-cookie";
+import { clearingAttributes, cookieAttributes, isSecureRequest, readSessionToken, SESSION_COOKIE, sessionCookieName } from "@/lib/session-cookie";
 import { ALL_PERMISSIONS, featureOfPermission, type Permission } from "@/modules/catalog";
 import { getActiveFeatureIds } from "@/modules/features";
 
@@ -20,15 +20,15 @@ const FAILURE_DECAY_MS = 15 * 60_000;
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 
-/**
- * Secure-Cookies nur über HTTPS – automatisch erkannt am Header des Reverse Proxys (`x-forwarded-proto`). Ohne Proxy (reines
- * HTTP im LAN) bleibt das Flag aus, sonst wäre kein Login möglich. SESSION_COOKIE_SECURE=true|false erzwingt einen Wert.
- */
+/** Läuft die Anfrage über HTTPS (siehe `isSecureRequest`)? Davon hängt der Cookie-Name ab: unter HTTPS nur `__Host-…`. */
 async function secureCookies(): Promise<boolean> {
-  const flag = process.env.SESSION_COOKIE_SECURE;
-  if (flag) return flag === "true";
-  const proto = (await headers()).get("x-forwarded-proto")?.split(",")[0]?.trim();
-  return proto === "https";
+  return isSecureRequest((await headers()).get("x-forwarded-proto"));
+}
+
+/** Sitzungs-Token der Anfrage (nur unter dem zum Übertragungsweg passenden Namen). */
+async function currentSessionToken(): Promise<string | undefined> {
+  const [jar, secure] = await Promise.all([cookies(), secureCookies()]);
+  return readSessionToken((name) => jar.get(name), secure);
 }
 
 export type SessionUser = {
@@ -173,28 +173,24 @@ async function startSession(userId: string) {
   await db.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   const jar = await cookies();
   const secure = await secureCookies();
-  jar.set(sessionCookieName(secure), token, {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    path: "/",
-    expires: expiresAt,
-  });
+  jar.set(sessionCookieName(secure), token, { ...cookieAttributes(secure), expires: expiresAt });
 }
 
 export async function logout() {
-  const jar = await cookies();
-  const token = readSessionToken((name) => jar.get(name));
+  const token = await currentSessionToken();
   if (token) await db.session.deleteMany({ where: { tokenHash: sha256(token) } });
-  for (const name of SESSION_COOKIE_NAMES) jar.delete(name);
+  const [jar, secure] = await Promise.all([cookies(), secureCookies()]);
+  // Ein `__Host-`-Cookie löscht der Browser nur, wenn das Löschen selbst Secure und Pfad „/“ trägt (cookies().delete() täte das nicht)
+  jar.set(sessionCookieName(secure), "", clearingAttributes(secure));
+  // Ein Klartext-Cookie aus HTTP-Zeiten räumen wir unter HTTPS gleich mit weg
+  if (secure && jar.has(SESSION_COOKIE)) jar.set(SESSION_COOKIE, "", clearingAttributes(false));
 }
 
 /** Alle Sessions eines Benutzers beenden (z. B. nach Passwortänderung/Deaktivierung). */
 export async function revokeSessions(userId: string, exceptCurrent = false) {
   let keep: string | undefined;
   if (exceptCurrent) {
-    const jar = await cookies();
-    const token = readSessionToken((name) => jar.get(name));
+    const token = await currentSessionToken();
     keep = token ? sha256(token) : undefined;
   }
   await db.session.deleteMany({ where: { userId, ...(keep ? { NOT: { tokenHash: keep } } : {}) } });
@@ -202,8 +198,7 @@ export async function revokeSessions(userId: string, exceptCurrent = false) {
 
 /** Aktuelle Sitzung inkl. effektiver Berechtigungen (pro Request gecacht). */
 export const getSession = cache(async (): Promise<AppSession | null> => {
-  const jar = await cookies();
-  const token = readSessionToken((name) => jar.get(name));
+  const token = await currentSessionToken();
   if (!token) return null;
 
   const row = await db.session.findUnique({

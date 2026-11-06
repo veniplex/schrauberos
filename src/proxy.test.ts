@@ -4,7 +4,9 @@ import { NextRequest } from "next/server";
 import { config, proxy } from "./proxy";
 
 /** Der Proxy ist nur die schnelle Vorprüfung (Cookie vorhanden?) – die echte Prüfung macht jede Seite selbst. */
-const request = (path: string, cookie?: string) => new NextRequest(`http://localhost:3000${path}`, cookie ? { headers: { cookie } } : undefined);
+const request = (path: string, cookie?: string, headers: Record<string, string> = {}) =>
+  new NextRequest(`http://localhost:3000${path}`, cookie || Object.keys(headers).length ? { headers: { ...(cookie ? { cookie } : {}), ...headers } } : undefined);
+const HTTPS = { "x-forwarded-proto": "https" };
 const location = (res: Response) => res.headers.get("location");
 const passes = (res: Response) => res.headers.get("x-middleware-next") === "1";
 
@@ -14,8 +16,8 @@ const matched = (path: string) => matcher.test(path);
 
 describe("Proxy: Anmeldeseite und Weiterleitungen", () => {
   it("leitet /login nie auf / um – auch nicht mit totem Cookie (Redirect-Schleife)", () => {
-    for (const cookie of ["so_session=abgelaufen", "__Host-so_session=abgelaufen"]) {
-      const res = proxy(request("/login", cookie));
+    for (const [cookie, headers] of [["so_session=abgelaufen", {}], ["__Host-so_session=abgelaufen", HTTPS]] as const) {
+      const res = proxy(request("/login", cookie, headers));
       assert.ok(passes(res), `/login mit ${cookie} muss durchgelassen werden, war: ${location(res)}`);
     }
   });
@@ -28,9 +30,12 @@ describe("Proxy: Anmeldeseite und Weiterleitungen", () => {
     assert.equal(to.searchParams.get("next"), "/appointments?view=day");
   });
 
-  it("kennt beide Cookie-Namen (Klartext im HTTP-LAN, __Host- bei HTTPS)", () => {
+  it("kennt den Cookie-Namen des Übertragungswegs: Klartext im HTTP-LAN, __Host- bei HTTPS – und nur den", () => {
     assert.ok(passes(proxy(request("/appointments", "so_session=abc"))));
-    assert.ok(passes(proxy(request("/appointments", "__Host-so_session=abc"))));
+    assert.ok(passes(proxy(request("/appointments", "__Host-so_session=abc", HTTPS))));
+    // Cookie Tossing: unter HTTPS zählt ein untergeschobenes Klartext-Cookie nicht (und umgekehrt)
+    assert.ok(!passes(proxy(request("/appointments", "so_session=abc", HTTPS))));
+    assert.ok(!passes(proxy(request("/appointments", "__Host-so_session=abc"))));
   });
 
   it("API-Pfade ohne Cookie antworten mit 401 statt Weiterleitung", async () => {

@@ -54,7 +54,7 @@ const reasonOf = (r: { ok: boolean } & Record<string, unknown>) => (r.ok ? "ok" 
 const loginForm = (name: string, pw: string, next?: string) => form({ username: name, password: pw, next });
 
 describe("Cookie", () => {
-  it("meldet im HTTP-LAN mit Klartext-Cookie an, über HTTPS mit __Host- und Secure – beide werden gelesen", async () => {
+  it("meldet im HTTP-LAN mit Klartext-Cookie an, über HTTPS mit __Host- und Secure", async () => {
     await makeUser();
     assert.equal((await attempt("anna", "richtiges-passwort-1")).ok, true);
     const plain = browser.writes.find((w) => w.name.endsWith("so_session"))!;
@@ -72,12 +72,55 @@ describe("Cookie", () => {
     assert.ok((await session.getSession())?.user.username === "anna");
   });
 
-  it("Abmelden löscht beide Cookie-Namen und die Sitzung", async () => {
+  it("Abmelden im HTTP-LAN löscht das Klartext-Cookie und die Sitzung", async () => {
     await makeUser();
     await attempt("anna", "richtiges-passwort-1");
     await session.logout();
     assert.equal(browser.cookies.size, 0);
     assert.equal(await env.db.session.count(), 0);
+  });
+
+  it("Abmelden unter HTTPS löscht __Host-so_session mit Secure, Pfad / und Max-Age=0 – sonst verwirft der Browser das Löschen", async () => {
+    await makeUser();
+    browser.setHeaders({ "x-forwarded-proto": "https" });
+    await attempt("anna", "richtiges-passwort-1");
+    assert.ok(browser.cookies.has("__Host-so_session"));
+    browser.writes.length = 0;
+    await session.logout();
+    const clear = browser.writes.find((w) => w.name === "__Host-so_session")!;
+    assert.equal(clear.value, "");
+    assert.equal(clear.options.secure, true);
+    assert.equal(clear.options.path, "/");
+    assert.equal(clear.options.maxAge, 0);
+    assert.equal(clear.options.httpOnly, true);
+    assert.equal(browser.cookies.has("__Host-so_session"), false, "der (nachgebildete) Browser hat das Cookie wirklich entfernt");
+    assert.equal(await env.db.session.count(), 0);
+    assert.equal(await session.getSession(), null);
+  });
+
+  it("Sitzungs-Cookie unter HTTPS: Attribute HttpOnly, Secure, SameSite=Lax, Pfad / (Voraussetzung für __Host-)", async () => {
+    await makeUser();
+    browser.setHeaders({ "x-forwarded-proto": "https" });
+    await attempt("anna", "richtiges-passwort-1");
+    const w = browser.writes.find((x) => x.name === "__Host-so_session")!;
+    assert.deepEqual({ h: w.options.httpOnly, s: w.options.secure, l: w.options.sameSite, p: w.options.path }, { h: true, s: true, l: "lax", p: "/" });
+    assert.ok(w.options.expires && !("domain" in w.options));
+  });
+
+  it("unter HTTPS zählt ein untergeschobenes Klartext-Cookie nicht (Cookie Tossing) – umgekehrt im HTTP-LAN auch nicht", async () => {
+    await makeUser();
+    await attempt("anna", "richtiges-passwort-1");
+    const token = browser.cookies.get("so_session")!;
+    assert.ok((await session.getSession())?.user.username === "anna");
+    // gleiche, gültige Sitzung, aber unter HTTPS nur im Klartext-Cookie: abgelehnt
+    browser.setHeaders({ "x-forwarded-proto": "https" });
+    assert.equal(await session.getSession(), null);
+    // im Cookie mit __Host- ist sie unter HTTPS gültig, im HTTP-LAN dagegen nicht
+    browser.cookies.clear();
+    browser.cookies.set("__Host-so_session", token);
+    assert.ok((await session.getSession())?.user.username === "anna");
+    browser.setHeaders({});
+    assert.equal(await session.getSession(), null);
   });
 });
 

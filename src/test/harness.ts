@@ -98,13 +98,17 @@ function fakeCookieJar() {
     getAll: () => [...browser.cookies].map(([name, value]) => ({ name, value })),
     set(nameOrOptions: string | ({ name: string; value: string } & CookieOptions), value?: string, options: CookieOptions = {}) {
       const [name, val, opts] = typeof nameOrOptions === "string" ? [nameOrOptions, value ?? "", options] : [nameOrOptions.name, nameOrOptions.value, nameOrOptions];
-      browser.cookies.set(name, val);
       browser.writes.push({ name, value: val, options: opts });
+      // Wie ein Browser: ein `__Host-`-Cookie wird nur mit Secure und Pfad „/“ angenommen (oder gelöscht) – sonst verworfen
+      if (name.startsWith("__Host-") && (!opts.secure || (opts.path ?? "/") !== "/")) return;
+      // Abgelaufen (Max-Age=0 oder Expires in der Vergangenheit) = gelöscht
+      if (opts.maxAge === 0 || (opts.maxAge === undefined && opts.expires && opts.expires.getTime() <= Date.now())) browser.cookies.delete(name);
+      else browser.cookies.set(name, val);
     },
-    delete(nameOrOptions: string | { name: string }) {
-      const name = typeof nameOrOptions === "string" ? nameOrOptions : nameOrOptions.name;
-      browser.cookies.delete(name);
-      browser.writes.push({ name, value: null, options: {} });
+    delete(nameOrOptions: string | ({ name: string } & CookieOptions)) {
+      // Wie Next: delete() setzt ein leeres, abgelaufenes Cookie mit den übergebenen Attributen (Standard: nur Pfad „/“)
+      const opts = typeof nameOrOptions === "string" ? { name: nameOrOptions } : nameOrOptions;
+      this.set({ ...opts, value: "", expires: new Date(0) });
     },
   };
 }

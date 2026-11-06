@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE_NAMES } from "@/lib/session-cookie";
+import { isSecureRequest, sessionCookieName } from "@/lib/session-cookie";
 
 // Nur eine schnelle, optimistische Prüfung (Cookie vorhanden?). Die echte Prüfung der Sitzung und der Berechtigungen passiert
 // serverseitig in getSession()/requirePermission(). Deshalb leitet der Proxy nie „von /login weg“: Ein totes Cookie führte sonst zu
@@ -8,7 +8,8 @@ const OPEN_PAGES = new Set(["/login", "/login/recover", "/setup"]);
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const hasSession = SESSION_COOKIE_NAMES.some((name) => request.cookies.has(name));
+  // Nur der Cookie-Name, der zum Übertragungsweg passt (unter HTTPS ausschließlich __Host-…), siehe lib/session-cookie.ts
+  const hasSession = request.cookies.has(sessionCookieName(isSecureRequest(request.headers.get("x-forwarded-proto"))));
 
   if (!hasSession && !OPEN_PAGES.has(pathname)) {
     // Programmzugriffe bekommen eine Antwort, keine Weiterleitung auf eine HTML-Seite
