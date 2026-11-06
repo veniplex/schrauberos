@@ -1,0 +1,92 @@
+GET /appointment-types appointment-types.list appointments.view sort=sortOrder,name
+GET /appointment-types/{id} appointment-types.get appointments.view
+GET /appointments appointments.list appointments.view query=from,to,status,bayId,vehicleId,customerId,assigneeId sort=startsAt,title,createdAt,updatedAt
+POST /appointments appointments.create appointments.create body=title,typeId,vehicleId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
+GET /appointments/{id} appointments.get appointments.view
+PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId,vehicleId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
+DELETE /appointments/{id} appointments.delete appointments.delete
+GET /bays bays.list appointments.view sort=sortOrder,name
+GET /bays/{id} bays.get appointments.view
+GET /customers customers.list customers.view query=q,city sort=lastName,customerNumber,city,createdAt,updatedAt
+POST /customers customers.create customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
+GET /customers/{id} customers.get customers.view
+PATCH /customers/{id} customers.update customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
+DELETE /customers/{id} customers.delete customers.delete
+GET /employee-absences employee-absences.list employees.view query=employeeId,type,from,to sort=startDate,endDate,createdAt
+POST /employee-absences employee-absences.create employees.edit body=employeeId,type,startDate,endDate,note
+GET /employee-absences/{id} employee-absences.get employees.view
+DELETE /employee-absences/{id} employee-absences.delete employees.edit
+GET /employee-qualifications employee-qualifications.list employees.view query=employeeId sort=name,expiresAt
+POST /employee-qualifications employee-qualifications.create employees.edit body=employeeId,name,issuedAt,expiresAt,note
+GET /employee-qualifications/{id} employee-qualifications.get employees.view
+DELETE /employee-qualifications/{id} employee-qualifications.delete employees.edit
+GET /employees employees.list employees.view query=q,department,active sort=lastName,firstName,createdAt,updatedAt
+POST /employees employees.create employees.edit body=firstName,lastName,personnelNumber,jobTitle,department,email,phone,mobile,hireDate,leaveDate,active,vacationDaysPerYear,notes
+GET /employees/{id} employees.get employees.view
+PATCH /employees/{id} employees.update employees.edit body=firstName,lastName,personnelNumber,jobTitle,department,email,phone,mobile,hireDate,leaveDate,active,vacationDaysPerYear,notes
+DELETE /employees/{id} employees.delete employees.delete
+GET /fleet-costs fleet-costs.list fleet.view query=fleetVehicleId,category sort=date,amountCents
+POST /fleet-costs fleet-costs.create fleet.edit body=fleetVehicleId,date,category,amountCents,km,note
+GET /fleet-costs/{id} fleet-costs.get fleet.view
+DELETE /fleet-costs/{id} fleet-costs.delete fleet.edit
+GET /fleet-license-checks fleet-license-checks.list fleet.view query=employeeId sort=checkedAt,nextDue
+POST /fleet-license-checks fleet-license-checks.create fleet.edit body=employeeId,checkedAt,method,note
+GET /fleet-license-checks/{id} fleet-license-checks.get fleet.view
+DELETE /fleet-license-checks/{id} fleet-license-checks.delete fleet.edit
+GET /fleet-mileage fleet-mileage.list fleet.view query=fleetVehicleId sort=date,km
+POST /fleet-mileage fleet-mileage.create fleet.edit body=fleetVehicleId,date,km,note
+GET /fleet-mileage/{id} fleet-mileage.get fleet.view
+DELETE /fleet-mileage/{id} fleet-mileage.delete fleet.edit
+GET /fleet-vehicles fleet-vehicles.list fleet.view query=q,status,driverId sort=plate,huDue,serviceDue,createdAt,updatedAt
+POST /fleet-vehicles fleet-vehicles.create fleet.edit body=plate,make,model,vin,year,fuelType,color,status,driverId,location,huDue,serviceDue,serviceDueKm,insuranceCompany,insurancePolicy,insuranceUntil,leasingProvider,leasingUntil,leasingRateCents,fuelCardNo,notes
+GET /fleet-vehicles/{id} fleet-vehicles.get fleet.view
+PATCH /fleet-vehicles/{id} fleet-vehicles.update fleet.edit body=plate,make,model,vin,year,fuelType,color,status,driverId,location,huDue,serviceDue,serviceDueKm,insuranceCompany,insurancePolicy,insuranceUntil,leasingProvider,leasingUntil,leasingRateCents,fuelCardNo,notes
+DELETE /fleet-vehicles/{id} fleet-vehicles.delete fleet.delete
+GET /invoices invoices.list invoices.view query=direction,status,customerId,q,issuedFrom,issuedTo sort=issueDate,dueDate,number,grossCents,createdAt
+POST /invoices invoices.create invoices.edit body=direction,number,partyName,customerId,issueDate,dueDate,netCents,vatCents,grossCents,status,paidAt,category,reference,notes
+GET /invoices/{id} invoices.get invoices.view
+PATCH /invoices/{id} invoices.update invoices.edit body=direction,number,partyName,customerId,issueDate,dueDate,netCents,vatCents,grossCents,status,paidAt,category,reference,notes
+DELETE /invoices/{id} invoices.delete invoices.delete
+POST /invoices/{id}/pay invoices.pay invoices.edit body=paidAt
+POST /invoices/{id}/reopen invoices.reopen invoices.edit
+GET /network/connections network-connections.list network.view query=deviceId sort=cableLabel
+POST /network/connections network-connections.create network.edit body=fromDeviceId,fromPort,toDeviceId,toPort,cableLabel,notes
+GET /network/connections/{id} network-connections.get network.view
+DELETE /network/connections/{id} network-connections.delete network.delete
+GET /network/devices network-devices.list network.view query=q,type,status,locationId sort=name,type,createdAt,updatedAt
+POST /network/devices network-devices.create network.edit body=name,type,status,manufacturer,model,serialNumber,locationId,rackInfo,portCount,assignedTo,purchaseDate,warrantyUntil,monitorEnabled,notes
+GET /network/devices/{id} network-devices.get network.view
+PATCH /network/devices/{id} network-devices.update network.edit body=name,type,status,manufacturer,model,serialNumber,locationId,rackInfo,portCount,assignedTo,purchaseDate,warrantyUntil,monitorEnabled,notes
+DELETE /network/devices/{id} network-devices.delete network.delete
+GET /network/ips network-ips.list network.view query=subnetId,deviceId,q sort=address,hostname,createdAt,updatedAt
+POST /network/ips network-ips.create network.edit body=subnetId,address,deviceId,hostname,kind,mac,notes
+GET /network/ips/{id} network-ips.get network.view
+PATCH /network/ips/{id} network-ips.update network.edit body=subnetId,address,deviceId,hostname,kind,mac,notes
+DELETE /network/ips/{id} network-ips.delete network.delete
+GET /network/locations network-locations.list network.view sort=name,sortOrder
+POST /network/locations network-locations.create network.edit body=name,description,sortOrder
+GET /network/locations/{id} network-locations.get network.view
+PATCH /network/locations/{id} network-locations.update network.edit body=name,description,sortOrder
+DELETE /network/locations/{id} network-locations.delete network.delete
+GET /network/subnets network-subnets.list network.view query=vlanId sort=name,cidr
+POST /network/subnets network-subnets.create network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
+GET /network/subnets/{id} network-subnets.get network.view
+PATCH /network/subnets/{id} network-subnets.update network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
+DELETE /network/subnets/{id} network-subnets.delete network.delete
+GET /network/vlans network-vlans.list network.view sort=number,name
+POST /network/vlans network-vlans.create network.edit body=number,name,description
+GET /network/vlans/{id} network-vlans.get network.view
+PATCH /network/vlans/{id} network-vlans.update network.edit body=number,name,description
+DELETE /network/vlans/{id} network-vlans.delete network.delete
+GET /tire-sets tire-sets.list tires.view query=vehicleId,status,season sort=storedAt,season,createdAt,updatedAt
+POST /tire-sets tire-sets.create tires.create body=vehicleId,season,status,brand,model,width,aspect,rim,loadIndex,speedIndex,rimType,storageLocation,storedAt,notes,spare,tires
+GET /tire-sets/{id} tire-sets.get tires.view
+PATCH /tire-sets/{id} tire-sets.update tires.edit body=vehicleId,season,status,brand,model,width,aspect,rim,loadIndex,speedIndex,rimType,storageLocation,storedAt,notes,spare,tires
+DELETE /tire-sets/{id} tire-sets.delete tires.delete
+POST /tire-sets/{id}/status tire-sets.status tires.edit body=status
+GET /vehicles vehicles.list vehicles.view query=q,customerId sort=plate,make,year,createdAt,updatedAt
+POST /vehicles vehicles.create vehicles.edit body=customerId,plate,make,model,vin,year,notes
+GET /vehicles/{id} vehicles.get vehicles.view
+PATCH /vehicles/{id} vehicles.update vehicles.edit body=plate,make,model,vin,year,notes
+DELETE /vehicles/{id} vehicles.delete vehicles.delete
+POST /vehicles/{id}/transfer vehicles.transfer vehicles.edit body=customerId,date,note

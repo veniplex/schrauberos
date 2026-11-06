@@ -1,6 +1,7 @@
 import "server-only";
 import { logError } from "@/lib/log-safe";
 import { audit } from "@/server/audit";
+import { runApiCleanup } from "@/server/api/cleanup";
 import { pruneAuditLog } from "@/server/audit-retention";
 import { cleanupBackupTemp, createBackup, listBackups, pruneAutomaticBackups } from "./core";
 import { getBackupSettings } from "./settings";
@@ -37,6 +38,7 @@ export function startBackupScheduler(): void {
   const tick = () => {
     runBackupCheck().catch((error) => logError("backup:auto", error));
     runAuditRetention().catch((error) => logError("audit:retention", error));
+    runApiCleanup().catch((error) => logError("api:cleanup", error));
   };
   setTimeout(tick, 60_000).unref();
   globalForScheduler.__backupTimer = setInterval(tick, CHECK_EVERY_MS);

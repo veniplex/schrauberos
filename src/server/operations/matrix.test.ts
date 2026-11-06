@@ -178,6 +178,8 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
 describe("Berechtigungs-Matrix: Route Handler", () => {
   // Ohne Anmeldung erreichbar (Liveness für Docker/Launcher); alles andere verlangt Sitzung und Recht
   const PUBLIC = new Set(["app/api/health/route.ts"]);
+  // Programmierschnittstelle: authentifiziert nur über Bearer-Token und ignoriert das Sitzungs-Cookie vollständig (eigene Matrix: server/api/matrix.test.ts)
+  const TOKEN_ONLY = new Set(["app/api/v1/[...path]/route.ts"]);
   const call = (route: (typeof routes)[number], method: string, handler: (typeof routes)[number]["methods"][number][1]) =>
     handler(new NextRequest(`http://localhost${route.url}`, { method }), { params: Promise.resolve({ id: "x", name: "x" }) });
 
@@ -197,10 +199,17 @@ describe("Berechtigungs-Matrix: Route Handler", () => {
     }
   });
 
+  it("die Programmierschnittstelle lässt sich mit einer Cookie-Sitzung nicht benutzen (auch nicht als Administrator): 401", async () => {
+    await signInAs({ admin: true });
+    const route = routes.find((r) => TOKEN_ONLY.has(r.file));
+    assert.ok(route, "API-Route nicht gefunden");
+    for (const [method, handler] of route.methods) assert.equal((await call(route, method, handler)).status, 401, `${method} ${route.url}`);
+  });
+
   it("mit falschem Recht (ohne jedes Recht): abgelehnt, nie 2xx", async () => {
     await signInAs({ permissions: [] });
     for (const route of routes) {
-      if (PUBLIC.has(route.file)) continue;
+      if (PUBLIC.has(route.file) || TOKEN_ONLY.has(route.file)) continue;
       for (const [method, handler] of route.methods) {
         const status = (await call(route, method, handler)).status;
         assert.ok(status >= 400 && status < 500 && status !== 401, `${method} ${route.url}: erwartet 4xx (Recht fehlt), war ${status}`);

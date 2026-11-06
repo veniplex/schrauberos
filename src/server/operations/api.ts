@@ -50,10 +50,14 @@ export class ApiProblemError extends Error {
 
 export const apiProblem = (code: Parameters<typeof problemOf>[0], extra?: Parameters<typeof problemOf>[1], headers?: Record<string, string>): ApiProblemError => new ApiProblemError(problemOf(code, extra), headers);
 
+/** Umbenennung von Feldnamen der Operation in die der API (wo beide abweichen): Tabelle oder Funktion. */
+export type Rename = Readonly<Record<string, string>> | ((name: string) => string);
+const renamed = (rename: Rename, name: string): string => (typeof rename === "function" ? rename(name) : (rename[name] ?? name));
+
 /** Fehler einer Operation → Problem. `rename`: Feldname der Operation → Feldname der API (wo beide abweichen). */
-export function failureToProblem(failure: OperationFailure, rename: Readonly<Record<string, string>> = {}): Problem {
+export function failureToProblem(failure: OperationFailure, rename: Rename = {}): Problem {
   const fields: ProblemFields | undefined = failure.fields
-    ? Object.fromEntries(Object.entries(failure.fields).map(([name, f]) => [rename[name] ?? name, { code: f.key, ...(f.params ? { params: f.params as Record<string, string | number> } : {}) }]))
+    ? Object.fromEntries(Object.entries(failure.fields).map(([name, f]) => [renamed(rename, name), { code: f.key, ...(f.params ? { params: f.params as Record<string, string | number> } : {}) }]))
     : undefined;
   const reason = failure.key ?? (failure.fields ? undefined : DEFAULT_KEYS[failure.code]);
   const extra = { ...(fields ? { fields } : {}), ...(reason && failure.code !== "invalid" ? { reason } : {}), ...(failure.params && !fields ? { params: failure.params as Record<string, string | number> } : {}) };
@@ -79,7 +83,7 @@ export function failureToProblem(failure: OperationFailure, rename: Readonly<Rec
 }
 
 /** Führt eine Operation für den API-Principal aus: Daten bei Erfolg, sonst `ApiProblemError`. */
-export async function runApiOperation<I, R>(operation: Operation<I, R>, principal: Principal, raw: unknown, rename: Readonly<Record<string, string>> = {}): Promise<R> {
+export async function runApiOperation<I, R>(operation: Operation<I, R>, principal: Principal, raw: unknown, rename: Rename = {}): Promise<R> {
   const outcome = await operation.execute(principal, raw);
   if (!outcome.ok) throw new ApiProblemError(failureToProblem(outcome.failure, rename));
   return outcome.data;

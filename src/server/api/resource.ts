@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { etagOf, isParamError, parseIfMatch, parsePaging, parseSort, type SortKey } from "@/lib/api/query";
 import type { FeatureId, Permission } from "@/modules/catalog";
-import { apiProblem, runApiOperation, type Operation } from "@/server/operations";
+import { apiProblem, runApiOperation, type Operation, type Rename } from "@/server/operations";
 import type { ApiCall, ApiEndpoint, ApiResult } from "./types";
 
 /**
@@ -36,6 +36,8 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
   read: Permission;
   model: Delegate<Row>;
   include?: object;
+  /** Zeilen, die die API nicht zeigen darf (z. B. Krankheit): gelten überall als nicht vorhanden */
+  visible?: (row: Row) => boolean;
   item: z.ZodObject;
   toItem: (row: Row) => Record<string, unknown>;
   /** Version der Zeile für ETag/If-Match (Tabellen mit `updatedAt`); ohne: keine ETags */
@@ -53,7 +55,7 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
     body: B;
     /** API-Körper → rohe Eingabe der Operation */
     toInput: (body: z.output<B>, ctx: Ctx<Row>) => unknown;
-    rename?: Record<string, string>;
+    rename?: Rename;
   };
   update?: {
     permission: Permission;
@@ -63,7 +65,7 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
     /** Aktueller Stand der Zeile in der Form des Körpers (PATCH legt den Teil-Körper darüber) */
     current: (row: Row) => Record<string, unknown>;
     toInput: (merged: Record<string, unknown>, ctx: Ctx<Row> & { id: string; version?: string }) => unknown;
-    rename?: Record<string, string>;
+    rename?: Rename;
   };
   remove?: {
     permission: Permission;
@@ -78,7 +80,7 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
     operation: Operation<unknown, unknown>;
     body?: z.ZodObject;
     toInput: (id: string, body: Record<string, unknown>, ctx: Ctx<Row>) => unknown;
-    rename?: Record<string, string>;
+    rename?: Rename;
   }>;
 };
 
@@ -103,7 +105,11 @@ const notFound = () => apiProblem("not_found");
 export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject>(cfg: ResourceConfig<Row, Q, B>): ApiEndpoint[] {
   const itemPath = `${cfg.path}/{id}`;
   const include = cfg.include;
-  const find = async (id: string): Promise<Row | null> => (ID_SHAPE.test(id) ? cfg.model.findUnique({ where: { id }, include }) : null);
+  const find = async (id: string): Promise<Row | null> => {
+    if (!ID_SHAPE.test(id)) return null;
+    const row = await cfg.model.findUnique({ where: { id }, include });
+    return row && (!cfg.visible || cfg.visible(row)) ? row : null;
+  };
   const common = { feature: cfg.feature, tag: cfg.tag };
 
   /** Antwort für eine Zeile (Lesen, Anlegen, Ändern): Daten und ETag. */
@@ -233,7 +239,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       operations: [remove.operation.name],
       status: 204,
       handler: async (call) => {
-        if (!ID_SHAPE.test(call.params.id)) throw notFound();
+        if (!ID_SHAPE.test(call.params.id) || (cfg.visible && !(await find(call.params.id)))) throw notFound();
         await runApiOperation(remove.operation, call.principal, remove.toInput ? remove.toInput(call.params.id) : { id: call.params.id });
         return { status: 204 };
       },
