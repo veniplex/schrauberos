@@ -10,7 +10,7 @@ Updates und alle Einstellungen über die Weboberfläche.
 | **Büro** | Rechnungsarchiv · Mitarbeiter (inkl. Abwesenheiten) · Fuhrpark |
 | **IT & Netzwerk** | Netzwerk (Geräte, IP-Verwaltung, Verkabelung, Standorte; Status nur als Demo) · IT-Dokumentation |
 | **Handbuch** | Unternehmenshandbuch (Markdown-Kapitel und -Seiten, Kapitel auf Rollen beschränkbar) – losgelöst von den anderen Modulen |
-| **Verwaltung** *(Plattform, nicht abschaltbar)* | Benutzer · Rollen & Rechte · Einstellungen · Module & Funktionen · Backups · Updates · Audit-Log |
+| **Verwaltung** *(Plattform, nicht abschaltbar)* | Benutzer · Rollen & Rechte · Einstellungen · Module & Funktionen · Backups · Updates · Audit-Log · Systemstatus |
 
 Dazu die Plattform: Anmeldung, Rechte, **Hilfe** für alle Benutzer, Deutsch/Englisch, Hell/Dunkel, Werkstatt-Branding.
 
@@ -75,7 +75,7 @@ Container muss nichts mehr angefasst werden. Alle Daten liegen im Volume `app-da
 ## Inhalt dieser README
 
 0. [Schnell starten (Docker)](#schnell-starten-docker) · 1. [Schnellstart Entwicklung](#schnellstart-lokale-entwicklung) · 2. [Befehle](#befehle) · 3. [Architektur](#architektur) ·
-4. [Datenhaltung](#datenhaltung) · 5. [Container, Starter und Updates](#container-starter-und-updates) ·
+4. [Datenhaltung](#datenhaltung) · 5. [Container, Starter und Updates](#container-starter-und-updates) (mit Backups, [Job-Runner](#job-runner-srcserverjobs), [Uploads und Archive](#uploads-und-archive)) ·
 6. [Neue Funktion anlegen](#eine-neue-funktion-anlegen) · 7. [Konventionen](#konventionen) · 8. [Tests](#tests) ·
 9. [Browser-CI](#browser-ci-playwright) · [Release und Signaturschlüssel](#release-und-signaturschlüssel) · 10. [Betrieb](#betrieb) · 11. [Grenzen](#bekannte-grenzen)
 
@@ -119,7 +119,7 @@ Vor jedem Abschluss: `npm run typecheck && npm run lint && npm test` – bei gr�
 
 | Begriff | Bedeutung | Beispiel |
 | --- | --- | --- |
-| **Plattform** | Immer an, kennt keine Fachlogik: Login, Rechte-Engine, Layout, Datenbank, i18n, UI-Kit, **Hilfe**, **Verwaltung** (Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit-Log) | `src/server`, `src/components`, `src/i18n`, `src/lib`, `src/platform`, `src/modules/admin` |
+| **Plattform** | Immer an, kennt keine Fachlogik: Login, Rechte-Engine, Layout, Datenbank, i18n, UI-Kit, **Hilfe**, **Verwaltung** (Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit-Log, Systemstatus) | `src/server`, `src/components`, `src/i18n`, `src/lib`, `src/platform`, `src/modules/admin` |
 | **Modul** | Fachlicher Bereich, als Ganzes ein-/ausschaltbar | Werkstatt, Büro, IT |
 | **Funktion** | Abgegrenzter Teil eines Moduls mit eigenen Seiten, Rechten, Texten, Einstellungen; einzeln schaltbar | Termine, Reifenlager, Rechnungsarchiv |
 | **Querschnittsfunktion** | Baustein, den mehrere Funktionen nutzen (`src/capabilities`) | Dokumentation (Markdown-Seiten mit Kapiteln und Rollen-Sichtbarkeit; genutzt von `handbook.manual` und `it.docs`) |
@@ -137,6 +137,7 @@ src/
     define.ts             Typen und defineModule()/defineFeature()
     features.ts           Aktivierung: Schalter lesen/schreiben (Datenbank)
     registry.ts           sammelt Dashboard-Bausteine und Einstellungs-Reiter der Funktionen ein
+    jobs.ts               sammelt die geplanten Jobs und Outbox-Abnehmer der Funktionen (`<funktion>/jobs.ts`) ein
     api.ts                sammelt die API-Endpunkte der Funktionen (`<funktion>/api.ts`) ein; api-exceptions.ts: UI-Aktionen ohne API-Pendant
     default-roles.ts      mitgelieferte Rollen
     workshop/ office/ it/ admin/      je Modul: module.ts + ein Ordner je Funktion
@@ -177,7 +178,7 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
 
 1. **Plattform kennt keine einzelne Funktion.** `src/server`, `src/components`, `src/i18n`, `src/lib`, `src/platform` und
    `src/capabilities` importieren nichts aus `src/modules/<modul>/<funktion>` (Ausnahmen: `catalog`, `define`, `features`,
-   `registry`, `types`, `default-roles`).
+   `registry`, `types`, `default-roles`, `jobs`, `operation-hooks`, `api`).
 2. **Funktionen sprechen nur über `public.ts` miteinander** – und nur, wenn die Abhängigkeit in der `feature.ts` deklariert ist:
    `requires` (zwingend) oder `uses` (optional).
 3. **Weiche Abhängigkeiten werden zur Laufzeit geprüft** (`session.features.has("workshop.customers")`).
@@ -316,9 +317,9 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
 * **Audit:** `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Beschriftungen `audit.actions.*`) oder `audit: false` mit `auditReason` (Begründung Pflicht). Fehlschläge außerhalb der
   Transaktion (z. B. `system.updateFailed`, `backup.restoreFailed`) schreibt `onFailure`. Bei `transaction: false` (Wiederherstellung, Update, Backup) ist die Wirkung beim Protokollieren schon eingetreten: Ein Fehler im Audit-Eintrag wird **protokolliert, bricht die Operation aber nicht ab**
   (sonst bliebe z. B. der vorgemerkte Neustart aus); innerhalb der Transaktion gilt weiter „keine Änderung ohne Eintrag“. Das Audit-Log wird nach der eingestellten Frist (Standard 730 Tage, **mindestens 30 Tage** oder 0 = unbegrenzt; Einstellungen → Sicherheit, die Änderung steht mit altem und neuem Wert im Log;
-  `src/server/audit-retention.ts`) vom Scheduler (`startScheduler`, `src/server/backup/scheduler.ts`) täglich bereinigt; ein Lauf gilt erst nach Erfolg als erledigt.
+  `src/server/audit-retention.ts`) vom Job-Runner (Job `audit.retention`, täglich nachts) bereinigt; scheitert ein Lauf, wiederholt der Runner mit Wartezeit.
 * **Outbox** (`OutboxEvent`, `src/server/outbox.ts`): `ctx.emit(type, payload, entityId)` schreibt ein Ereignis **in derselben Transaktion** – nach einem Rollback gibt es keines, nach dem
-  Commit genau eines. Der Runner (Job-Runner P1b-0) stellt zu; bis dahin emittiert noch keine Operation Ereignisse (sonst würde die Tabelle unbegrenzt wachsen).
+  Commit genau eines. Der Job-Runner stellt zu (Abschnitt „Job-Runner“); angemeldete Abnehmer gibt es noch keine – Ereignisse ohne Abnehmer gelten als erledigt und werden nach 14 Tagen aufgeräumt.
 * **Transaktionale Hooks:** Eine Funktion meldet sich in ihrer `hooks.ts` für eine Operation einer anderen an (`OperationHookDef`), eingesammelt in `src/modules/operation-hooks.ts`
   (nur von `src/server/operations/hooks.ts` importiert). Der Hook läuft **synchron in derselben Transaktion** (nur wenn seine Funktion aktiv ist) und kann mit einem Fehler die Operation verhindern; die
   auslösende Funktion kennt ihre Abonnenten nicht. Asynchrone Wirkungen (Webhooks, Mail) gehören in die Outbox.
@@ -486,7 +487,7 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
   Rückfälle (frische Version nicht gesund → Zeiger auf die Vorversion + Code 42; wiederhergestellte Datenbank nicht gesund →
   vorherige zurück). Eine installierte Version verwirft sich selbst, wenn die eingebaute neuer ist (neues Image gezogen).
 * **Die App migriert sich selbst:** `src/instrumentation.ts` → `src/server/startup.ts`: Sicherung vor Migrationen, Migrationen,
-  Basisdaten, Zeitzone, Backup-Zeitplan. `/api/health` meldet erst danach „ok“; scheitert etwas, beendet sich der Prozess.
+  Basisdaten, Zeitzone, Job-Runner. `/api/health` meldet erst danach „ok“; scheitert etwas, beendet sich der Prozess.
 * **Keine Fremdprogramme:** Archive bearbeitet die npm-Bibliothek `tar` – es gibt kein System-`tar`.
 * **Die eingebaute App ist `root:root` und für den Betriebsbenutzer (1000) nicht schreibbar** (`COPY` ohne `--chown`): Geschrieben wird nur nach `/data`
   (Datenbank, Dateien, Backups, installierte Versionen) und `/tmp`. Wer die laufende Anwendung kompromittiert, kann den eingebauten Code nicht
@@ -502,7 +503,16 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
 2. Neuestes GitHub-Release holen, **Ed25519-Signatur** des `manifest.json` prüfen (gegen den eingebauten öffentlichen Schlüssel),
    Paket laden und **SHA-256/Größe** gegen das Manifest prüfen.
 3. Nach `<DATA_DIR>/app/versions/<version>` entpacken, `state.json`/`active` schreiben, Neustart (Exit-Code 42).
-4. Starter → Launcher der neuen Version → Gesundheitsprüfung (90 s) oder Rückfall.
+4. Starter → Launcher der neuen Version → Gesundheitsprüfung oder Rückfall. Die Frist ist 90 s (`LAUNCHER_HEALTH_TIMEOUT_MS`) und **verlängert sich jedes Mal um ihre volle Länge,
+   solange `/api/health` mit `503 { "status": "starting" }` antwortet** (die App lebt und migriert noch – eine große Datenbank braucht länger), höchstens bis zur **harten Obergrenze**
+   von 15 Minuten ab Start (`LAUNCHER_HEALTH_MAX_MS`). Wer nicht antwortet oder 503 `error` meldet, hält die Grundfrist ein.
+
+**Sicherheit des Downloads** (`src/lib/updates/safe-fetch.ts`, Test mit echten lokalen Servern): Das Update-Token (`Authorization`) geht **nur an die API-Herkunft** (Schema, Host und Port von `UPDATE_API_URL`,
+Standard `https://api.github.com`); eine Asset-Adresse auf anderem Host wird gar nicht angefragt. GitHub antwortet auf den Asset-Abruf mit einer Weiterleitung auf einen Content-Server
+(`release-assets.githubusercontent.com`; die Liste `GITHUB_ASSET_HOSTS` enthält zusätzlich `objects.githubusercontent.com`, `objects-origin.githubusercontent.com`, `github-releases.githubusercontent.com` –
+geprüft gegen die Antwort der API und `GET /meta`, `domains.actions`). Weiterleitungen werden **von Hand** verfolgt (höchstens 5), nur auf HTTPS und nur auf diese Hosts, und tragen **nie** ein `Authorization`
+(Ausnahme: Metadaten-Abfragen der API selbst behalten es bei einem Ziel auf derselben Herkunft). `UPDATE_API_URL` und `UPDATE_REDIRECT_HOSTS` (Hosts, kommagetrennt) sind nur für Spiegel und Tests gedacht,
+keine Betriebseinstellung. Das Paket wird mit `lib/archive.ts` entpackt (Abschnitt „Uploads und Archive“).
 
 ### Backups und Wiederherstellung (Funktion `admin.backup`)
 
@@ -511,8 +521,46 @@ Online-Schnappschuss), `files/` (**Hardlinks** auf `/data/files`) und `info.json
 `pre-update`, `pre-restore`, `pre-migration`. Download als gestreamtes `.tar`, Upload nimmt `.tar`, `.tar.gz` und reine SQLite-Dateien
 (dann ohne Dateien) und prüft streng (nur Ordner/normale Dateien, gültige Datenbank, nicht von einer neueren Version).
 Wiederherstellung: App prüft, legt `pre-restore` an, stellt `restore/pending.db` (+ `pending-files/`) bereit und beendet sich; der
-Launcher tauscht Datenbank samt WAL und Dateien, bestätigt nach gesundem Start oder setzt alles zurück. Zeitplan:
-`src/server/backup/scheduler.ts` (Einstellung in `AppSetting`).
+Launcher tauscht Datenbank samt WAL und Dateien, bestätigt nach gesundem Start oder setzt alles zurück.
+
+* **Zeitplan:** Job `backup.auto` (alle 10 Minuten geprüft: Uhrzeit erreicht, heute noch keins – `src/server/backup/auto.ts`; Einstellung in `AppSetting`). **Scheitert** das Anlegen, wirft der Job:
+  Der Runner wiederholt nach 15 min, 30 min, 1 h … höchstens alle 4 h, der Fehlerstatus (`JobState.failures`, Meldung nur Art und Code) steht auf der Backup-Seite, im Dashboard-Baustein und im Systemstatus;
+  im Audit-Log nur der erste Fehlschlag der Serie (`backup.createFailed`).
+* **Aufbewahrung je Art** (`src/server/backup/settings.ts`, `pruneBackups` in `core.ts`): Je Art `keep` (neueste N) und `days` (höchstens so alt), 0 = unbegrenzt; Standard `auto` 14, `pre-*` 5, `manual`/`upload` unbegrenzt.
+  Das **neueste Backup überhaupt bleibt immer**. Angewendet nach jedem automatischen Backup und täglich (Job `backup.retention`, räumt auch liegengebliebene `.tmp-`/`.import-`-Ordner). Hilfe: DSGVO-Hinweis zur Speicherbegrenzung.
+* **`linkTree`/`countTree`/`assertPlainTree` sind asynchron** (`fs/promises`, Stapel von 64): Auch bei Hunderttausenden Dateien in `/data/files` bleibt der Event-Loop frei (Test misst, dass der Loop währenddessen läuft).
+* **Upload** (`/api/backups/upload`): Länge vorab gegen freien Platz (2 × Länge + 512 MiB Reserve → 507) und Obergrenze (100 GiB → 413); während des Empfangs werden die Bytes gezählt (Obergrenze auch ohne Längenangabe)
+  und alle 64 MiB der freie Platz geprüft; beim Entpacken zusätzlich Grenze für Einträge/Größe und freier Platz (`diskFull`/`tooLarge`). Abbruch löscht die halbe Datei.
+
+## Job-Runner (`src/server/jobs`)
+
+Persistenter Zeitgeber für alles, was die App im Hintergrund erledigt. Zustand in der Datenbank (`JobState`: nächster Lauf, Fehlerserie, Sperre; `JobRun`: Ergebnis jedes Laufs), Definitionen im Code.
+
+* **Anmelden:** Jede Funktion legt eine `jobs.ts` an (`export const jobs: JobDef[]` mit `id` `<bereich>.<name>`, `feature`, `schedule`, `run`; optional `retry`, `timeoutMs`) und trägt sie in `src/modules/jobs.ts` ein;
+  Abnehmer für die Outbox (`OutboxHandlerDef`) stehen im selben Wurzelmodul (`featureOutboxHandlers`). Jobs der Plattform: `src/server/jobs/platform.ts`. Die Plattform importiert keine Funktion (Architekturtest;
+  `feature` in einer `jobs.ts` muss die eigene Funktion sein). Ein Job läuft **nur, solange seine Funktion aktiv ist** (kein Lauf, kein Eintrag; beim Wiedereinschalten wird nachgeholt).
+* **Zeitplan** (`src/lib/jobs/schedule.ts`): `{ every: ms }` oder `{ cron: "m h dom mon dow" }` in der **Zeitzone der Werkstatt** (Prozess-`TZ`; ein Wechsel stellt die Cron-Termine um). Sommerzeit: eine ausgefallene Uhrzeit
+  läuft direkt nach der Lücke, eine doppelte nur einmal – ein Tagesjob läuft jeden Kalendertag genau einmal (getestet über ein Jahr). Verpasste Läufe (App war aus) werden einmal nachgeholt.
+* **Fehler:** `failures` zählt in Folge; nächster Versuch nach `Basis · 2^(n−1)`, höchstens `maxDelayMs` (Standard 1 min … 1 h). Ein Job gibt nie still auf – der Fehler bleibt sichtbar, bis ein Lauf gelingt.
+* **Sperre gegen Doppelläufe:** bedingtes Update von `JobState.lockedUntil` (Zeitlimit + 60 s) plus Merkliste im Prozess, bis die Funktion wirklich zurückkehrt (auch nach Zeitüberschreitung).
+  **Neustart mitten im Lauf:** `recover()` beim Start markiert laufende Läufe als `interrupted`, löst die Sperren und stellt die Jobs sofort fällig. Das gilt, weil es **einen Prozess** gibt (ein Container, eine SQLite-Datei);
+  Jobs müssen daher **wiederholbar** sein.
+* **Outbox-Zustellung** (`outbox.ts`, Job `platform.outbox` alle 15 s): mindestens einmal, je Abnehmer idempotent über `OutboxDelivery`; Wiederholung nach 30 s · 2^n (höchstens 1 h), nach `maxAttempts` (8) `failedAt`;
+  zugestellte Ereignisse 14 Tage, aufgegebene 60 Tage aufbewahrt (`platform.outbox-prune`). Abnehmer bekommen `message.id` als Idempotenzschlüssel.
+* **Ergebnisse:** 30 Tage bzw. 200 je Job (`platform.jobs-prune`, entfernt auch den Zustand nicht mehr bekannter Jobs). Ansicht für Administratoren: **Verwaltung → Systemstatus** (`admin.system`, Recht `system.view`, `adminOnly`).
+* **Testbar:** `createJobRunner({ jobs, now, timeZone, activeFeatures })` mit Fake-Uhr; `tick()` führt Fälliges aus. Tests: `src/server/jobs/jobs.test.ts`, `src/lib/jobs/schedule.test.ts`.
+
+## Uploads und Archive
+
+* **Inhalt statt Behauptung** (`src/lib/upload-sniff.ts`): Rechnungsbelege (PDF, PNG, JPEG, WebP, XML/XRechnung), Doku-Bilder (PNG, JPEG, WebP, GIF) und das Logo (zusätzlich SVG) werden an den ersten Bytes erkannt;
+  der gemeldete Typ muss passen, **gespeichert wird der erkannte Typ**. HTML als `.png` wird abgelehnt. XML nur mit `<?xml`-Deklaration und ohne HTML-/Formatvorlagen-Wurzel.
+* **Auslieferung** (`src/lib/file-delivery.ts`): `X-Content-Type-Options: nosniff` immer; PDF inline (ohne `sandbox`, der PDF-Betrachter verträgt sie nicht); Bilder und alles andere mit
+  `Content-Security-Policy: sandbox; default-src 'none'`; XML und unbekannte Typen nur als `attachment`; `Content-Disposition` mit ASCII-Name und UTF-8-Variante (kein Einschleusen von Kopfzeilen).
+* **Herkunft** (`src/server/request-guard.ts`): Upload-Routen verlangen `X-Requested-With: schrauberos`, gleiche `Origin` und kein fremdes `Sec-Fetch-Site`. Server Actions (Belege) prüft Next selbst (Origin gegen Host);
+  sie bleiben im 12-MB-Limit. Neue Upload-Wege gehören durch `checkUpload`, `deliveryHeaders` und `isSameOriginUpload`.
+* **Archive** (`src/lib/archive.ts`, `extractArchive`): nur Ordner und normale Dateien; Symlinks, Hardlinks, Geräte-Dateien, `..`, absolute Pfade, Laufwerke, Rückwärtsstriche, NUL werden abgelehnt;
+  Grenzen für Einträge und Gesamtgröße (aus den Köpfen, bevor etwas geschrieben wird). Backups: höchstens 500 000 Einträge/200 GiB und der freie Platz. Update-Pakete: 200 000 Einträge/3 GiB; **relative Symlinks innerhalb
+  des Pakets** sind dort erlaubt (`symlinks: "inside"`), falls Bibliotheken welche enthalten. Tests mit von Hand gebauten bösartigen Archiven (`src/test/tar.ts`).
 
 ## Eine neue Funktion anlegen
 
@@ -532,6 +580,8 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
    **Hilfe:** `help.ts` (`export const help: HelpTopicDef[]` mit `id`, `feature`, `permission`, `doc`), Kapitel als Markdown unter
    `docs/workshop/warranty.md` (nur Bedienung in der App, kein Entwicklerthema), `help.ts` in **`src/modules/help.ts`** eintragen.
    Eine Funktion darf mehrere Kapitel beitragen (`id` dann mit Zusatz, z. B. `workshop.warranty.claims`).
+6a. Hintergrundarbeit (Aufräumen, regelmäßige Prüfungen, Zustellung von Ereignissen): `jobs.ts` (`export const jobs: JobDef[]`, `feature` ist die eigene Funktion; Abnehmer für Outbox-Ereignisse als `OutboxHandlerDef`),
+    eingetragen in `src/modules/jobs.ts` – siehe „Job-Runner“. Der Job muss wiederholbar sein; ein Beschriftungsschlüssel `system.names.<bereich>.<name>` zeigt ihn im Systemstatus.
 7. Soll eine andere Funktion etwas nutzen, exportiert `public.ts` genau das – und die andere deklariert `requires`/`uses`.
 8. Neue Rechte in `default-roles.ts` den passenden Rollen zuordnen (Administratoren haben sie sofort).
 9. Server Actions **immer** über den Aktions-Rahmen (`defineOperation` + `defineAction`, siehe „Aktionen und Operationen“): Bearbeiten-Formulare tragen `version` mit, `run` nutzt `claimRow(tx.modell, id, version)`;
@@ -781,7 +831,7 @@ Wiederherstellung schreiben nur nach `/data` und funktionieren unverändert. In 
 ```text
 /data/schrauberos.db (+ -wal, -shm)   Datenbank
 /data/files/                          Belege und Bilder, lesbare Pfade (rechnungen/<Jahr>/<eingang|ausgang>/…, doku/<bereich>/…)
-/data/backups/<name>/                 Backups (database.db.gz, files/ als Hardlinks, info.json)
+/data/backups/<name>/                 Backups (database.db.gz, files/ als Hardlinks, info.json); Aufbewahrung je Art einstellbar
 /data/app/                            state.json, active, versions/<version>/ (installierte Pakete), launcher-crash
 /data/restore/                        vorgemerkte/ersetzte Daten während einer Wiederherstellung
 /data/secret.key                      Schlüssel für verschlüsselte Einstellungen (nicht in Backups)
@@ -824,6 +874,7 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 * Dateien wachsen mit dem Archiv; Backups verweisen per Hardlink darauf (kaum Zusatzplatz), schützen aber nicht vor dem Ausfall des
   Datenträgers – Kopien außerhalb des Servers über „Herunterladen“.
 * Backups sind unverschlüsselt.
+* Der Job-Runner setzt genau einen Prozess voraus (ein Container, eine SQLite-Datei): Nach einem Neustart gelten laufende Läufe als unterbrochen. Jobs sind deshalb wiederholbar auszulegen.
 * API: noch ohne Oberfläche zur Token-Verwaltung, ohne Webhooks, ohne Datei-Upload (Rechnungsbelege) und ohne Doku-Seite der Ressourcen (F11); Tokens entstehen bis dahin nur über die Server-Funktion `createApiTokenOperation`. Rate-Limit und Drosselung liegen im Speicher des Prozesses (ein Prozess, eine Datenbank).
 * Die Suche unterscheidet bei Umlauten Groß-/Kleinschreibung (SQLite).
 * Urlaubstage zählen Mo–Fr ohne Feiertage; kein Genehmigungs-Workflow.

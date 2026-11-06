@@ -4,13 +4,23 @@ Unter **Backups** sichert und stellt die Anwendung ihre Daten wieder her – ohn
 
 * **Was gesichert wird:** alles – Kunden, Termine, Rechnungen **samt Belegen**, Handbuch und IT-Dokumentation samt Bildern, Benutzer und
   Einstellungen. Ein Backup entsteht, während die Anwendung läuft; niemand muss warten.
-* **Automatisch:** jede Nacht (Standard ab 02:00 Uhr). Wie viele automatische Backups erhalten bleiben (Standard 14) und wann sie
-  entstehen, stellt man unter **Einstellungen → Backups** ein. Manuelle Backups werden nie automatisch gelöscht.
+* **Automatisch:** jede Nacht (Standard ab 02:00 Uhr); wann, stellt man unter **Einstellungen → Backups** ein.
+  **Schlägt ein automatisches Backup fehl** (meist fehlt Speicherplatz), steht oben auf dieser Seite und auf der Übersicht eine rote Meldung mit Anzahl der Versuche und dem nächsten
+  Versuch; die Anwendung probiert es mit wachsender Wartezeit (15 Minuten, 30 Minuten, 1 Stunde … höchstens alle 4 Stunden) immer wieder, bis es gelingt. Bis dahin besteht kein aktueller Schutz –
+  bitte Speicherplatz schaffen. Weitere Einzelheiten zeigt der **Systemstatus**.
+* **Aufbewahrung:** Unter **Einstellungen → Backups** legen Sie **je Art** fest (Automatisch, Manuell, Vor Update, Vor Wiederherstellung, Vor Datenbank-Änderung, Hochgeladen),
+  wie viele der neuesten Backups bleiben und wie alt sie höchstens werden dürfen; `0` bedeutet unbegrenzt. Aufgeräumt wird nach jedem automatischen Backup und nachts.
+  **Das neueste Backup bleibt immer erhalten.** Standard: 14 automatische, je 5 „Vor …“-Backups; Manuelle und Hochgeladene bleiben, bis Sie sie löschen.
+  **Datenschutz (DSGVO):** Backups enthalten personenbezogene Daten (Kunden, Mitarbeiter, Rechnungen) – auch solche, die Sie im Betrieb längst gelöscht haben. Der Grundsatz der
+  Speicherbegrenzung gilt auch für Backups: Legen Sie eine Frist fest, die zu Ihrem Datenschutzkonzept passt (üblich sind einige Wochen bis wenige Monate), und bewahren Sie
+  heruntergeladene Kopien nicht länger auf. Die Anwendung kann heruntergeladene Dateien nicht löschen.
 * **Jetzt sichern:** „Jetzt Backup erstellen“, z. B. vor größeren Änderungen.
 * **Herunterladen:** Jedes Backup lässt sich als Datei herunterladen – bitte gelegentlich eine Kopie **außerhalb des Servers**
   ablegen, denn ein Backup auf demselben Datenträger schützt nicht vor dessen Ausfall. Die Datei enthält alle Daten und ist nicht
   verschlüsselt: sicher aufbewahren.
-* **Hochladen:** Eine heruntergeladene Sicherung lässt sich wieder hochladen, z. B. beim Umzug auf einen neuen Server.
+* **Hochladen:** Eine heruntergeladene Sicherung lässt sich wieder hochladen, z. B. beim Umzug auf einen neuen Server. Die Anwendung prüft die Datei streng: Es werden nur
+  Ordner und normale Dateien übernommen (keine Verknüpfungen, keine Sonderdateien), und sie muss in den **freien Speicherplatz** passen – sonst weist die Seite sie ab, ohne
+  den Server vollzuschreiben.
 * **Wiederherstellen:** Wählen Sie ein Backup und „Wiederherstellen“. Die Anwendung legt vorher automatisch ein Backup des aktuellen
   Stands an („Vor Wiederherstellung“) und startet kurz neu. **Alle Änderungen seit dem gewählten Backup gehen dabei verloren.** Auch der Notzugang gehört zu den Daten: Nach der Wiederherstellung eines älteren Backups kann ein gedruckter Wiederherstellungs-Code veraltet sein (er gilt nur, solange er zum Stand der Datenbank passt). Erzeugen Sie dann unter **Mein Konto → Notzugang** einen neuen. **API-Tokens** für die Programmierschnittstelle werden bei der Wiederherstellung **alle widerrufen** (das Backup kennt Widerrufe nicht, die danach geschehen sind): Legen Sie die Tokens der angebundenen Systeme neu an.
   Gegebenenfalls müssen Sie sich danach neu anmelden.

@@ -11,7 +11,8 @@ Ein Update erneuert die **gesamte Anwendung samt Laufzeitumgebung** (nicht nur d
 einwandfrei, kehrt die Anwendung **automatisch zur bisherigen zurück**; das Ergebnis des letzten Updates steht auf der Seite.
 
 Für ein privates Repository braucht die Update-Prüfung ein **Zugriffs-Token** mit Leserecht auf die Versionen
-(**Einstellungen → Updates**). Es wird verschlüsselt gespeichert und gehört nicht zu den Backups.
+(**Einstellungen → Updates**). Es wird verschlüsselt gespeichert und gehört nicht zu den Backups. Die Anwendung schickt es **nur an GitHub selbst**
+(an die API), nie an die Server, auf die GitHub den Download weiterleitet; Weiterleitungen auf andere Adressen lehnt sie ab.
 
 Verlangt eine Version ausnahmsweise einen neuen Unterbau, sagt die Seite es und bietet kein Update per Klick an; dann
 muss der Server-Betreuer das Image einmal neu ziehen.
