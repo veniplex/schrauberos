@@ -1,7 +1,7 @@
 export const customersDe = {
   feature: {
     name: "Kunden",
-    description: "Kundenstammdaten (später per Werbas-Anbindung synchronisiert).",
+    description: "Kundenstammdaten: Kontakt, Adresse, Fahrzeuge und Termine.",
   },
   title: "Kunden & Fahrzeuge",
   description: "Stammdaten der Kunden mit ihren Fahrzeugen.",
@@ -9,9 +9,11 @@ export const customersDe = {
   edit: "Kunde bearbeiten",
   delete: "Kunde löschen",
   confirmDelete: "Kunde wirklich löschen? Seine Fahrzeuge bleiben ohne Halter erhalten.",
+  confirmDeleteAppointments_one: "{count} Termin verliert die Zuordnung zum Kunden.",
+  confirmDeleteAppointments_other: "{count} Termine verlieren die Zuordnung zum Kunden.",
   searchPlaceholder: "Name, Kundennummer, Ort, Telefon oder Kennzeichen …",
   empty: "Keine Kunden gefunden.",
-  emptyHint: "Lege den ersten Kunden an. Später können die Daten aus Werbas übernommen werden.",
+  emptyHint: "Lege den ersten Kunden an.",
   count_one: "{count} Kunde",
   count_other: "{count} Kunden",
   cols: { name: "Kunde", contact: "Kontakt", vehicles: "Fahrzeuge" },

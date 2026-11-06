@@ -47,8 +47,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   };
 
   // Summen immer über alle Rechnungen der Richtung im gewählten Jahr (ohne Status-/Suchfilter)
-  const [invoices, forTotals, years] = await Promise.all([
+  const [invoices, total, forTotals, years] = await Promise.all([
     db.invoice.findMany({ where, include: { file: { select: { id: true } } }, orderBy: [{ issueDate: "desc" }, { number: "desc" }], take: 300 }),
+    db.invoice.count({ where }),
     db.invoice.findMany({ where: { direction: dir, ...(year ? { issueDate: { gte: new Date(year, 0, 1), lt: new Date(year + 1, 0, 1) } } : {}) }, select: { status: true, dueDate: true, grossCents: true } }),
     db.invoice.findMany({ select: { issueDate: true }, distinct: ["issueDate"] }),
   ]);
@@ -103,7 +104,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
 
       <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto]" submitLabel={t("common.filter")}>
         <input type="hidden" name="dir" value={dir} />
-        <SearchInput name="q" defaultValue={q}  className="pl-9" placeholder={t("invoices.searchPlaceholder")} aria-label={t("common.search")} />
+        <SearchInput name="q" defaultValue={q} placeholder={t("invoices.searchPlaceholder")} aria-label={t("common.search")} />
         <Select name="status" defaultValue={state}  aria-label={t("common.status")}>
           <option value="">{t("invoices.filters.anyStatus")}</option>
           {STATES.map((s) => (
@@ -127,7 +128,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           <EmptyState title={t("invoices.empty")} hint={t("invoices.emptyHint")} />
         ) : (
           <>
-            <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("invoices.count", invoices.length)}</p>
+            <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("invoices.count", total)}{total > invoices.length ? ` · ${t("invoices.newestShown", { count: invoices.length })}` : ""}</p>
             <Table className="min-w-[52rem]">
                 <thead>
                   <tr>

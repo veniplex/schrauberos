@@ -23,13 +23,14 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const session = await requirePermission("customers.view");
   const canTires = session.can("tires.view");
   const [{ id }, i18n, tireRules] = await Promise.all([params, getI18n(), canTires ? getTireRules() : null]);
-  const { t, td, date } = i18n;
+  const { t, tp, td, date } = i18n;
 
   const customer = await db.customer.findUnique({
     where: { id },
     include: {
       vehicles: { orderBy: { plateNorm: "asc" }, include: { tireSets: { include: { tires: true } } } },
       appointments: { orderBy: { startsAt: "desc" }, take: 8, include: { vehicle: true } },
+      _count: { select: { appointments: true } },
     },
   });
   if (!customer) notFound();
@@ -162,7 +163,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           {canDelete ? (
             <form action={deleteCustomer}>
               <input type="hidden" name="id" value={customer.id} />
-              <ConfirmSubmitButton message={t("customers.confirmDelete")}>{t("customers.delete")}</ConfirmSubmitButton>
+              <ConfirmSubmitButton message={`${t("customers.confirmDelete")}${customer._count.appointments > 0 ? ` ${tp("customers.confirmDeleteAppointments", customer._count.appointments)}` : ""}`}>{t("customers.delete")}</ConfirmSubmitButton>
             </form>
           ) : null}
         </div>

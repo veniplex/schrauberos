@@ -13,6 +13,8 @@ export const vehiclesEn: typeof vehiclesDe = {
   edit: "Edit vehicle",
   delete: "Delete vehicle",
   confirmDelete: "Really delete this vehicle? Its tyre sets will be deleted as well.",
+  confirmDeleteAppointments_one: "{count} appointment loses its link to the vehicle.",
+  confirmDeleteAppointments_other: "{count} appointments lose their link to the vehicle.",
   empty: "No vehicle recorded yet.",
   listEmpty: "No vehicles found.",
   listEmptyHint: "Add the first vehicle. It does not need a customer.",

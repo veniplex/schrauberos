@@ -55,7 +55,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
       />
 
       <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_11rem_10rem_auto]" submitLabel={t("common.filter")}>
-        <SearchInput name="q" defaultValue={q}  className="pl-9" placeholder={t("employees.searchPlaceholder")} aria-label={t("common.search")} />
+        <SearchInput name="q" defaultValue={q} placeholder={t("employees.searchPlaceholder")} aria-label={t("common.search")} />
         <Select name="department" defaultValue={department}  aria-label={t("employees.fields.department")}>
           <option value="">{t("employees.filters.anyDepartment")}</option>
           {DEPARTMENTS.map((x) => (

@@ -3,7 +3,7 @@ import type { customersDe } from "./customers.de";
 export const customersEn: typeof customersDe = {
   feature: {
     name: "Customers",
-    description: "Customer master data (to be synced via the Werbas connector later).",
+    description: "Customer master data: contact, address, vehicles and appointments.",
   },
   title: "Customers & vehicles",
   description: "Customer master data with their vehicles.",
@@ -11,9 +11,11 @@ export const customersEn: typeof customersDe = {
   edit: "Edit customer",
   delete: "Delete customer",
   confirmDelete: "Really delete the customer? Their vehicles are kept without an owner.",
+  confirmDeleteAppointments_one: "{count} appointment loses its link to the customer.",
+  confirmDeleteAppointments_other: "{count} appointments lose their link to the customer.",
   searchPlaceholder: "Name, customer no., city, phone or plate …",
   empty: "No customers found.",
-  emptyHint: "Add the first customer. Data can later be imported from Werbas.",
+  emptyHint: "Add the first customer.",
   count_one: "{count} customer",
   count_other: "{count} customers",
   cols: { name: "Customer", contact: "Contact", vehicles: "Vehicles" },

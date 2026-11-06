@@ -30,7 +30,7 @@ export default async function VehiclePage({
 }) {
   const session = await requirePermission("vehicles.view");
   const [{ id }, sp, i18n, tireRules] = await Promise.all([params, searchParams, getI18n(), getTireRules()]);
-  const { t, td, date } = i18n;
+  const { t, tp, td, date } = i18n;
 
   const vehicle = await db.vehicle.findUnique({
     where: { id },
@@ -39,6 +39,7 @@ export default async function VehiclePage({
       ownerships: { include: { customer: true }, orderBy: { fromDate: "desc" } },
       tireSets: { include: { tires: true } },
       appointments: { orderBy: { startsAt: "desc" }, take: 8 },
+      _count: { select: { appointments: true } },
     },
   });
   if (!vehicle) notFound();
@@ -183,7 +184,7 @@ export default async function VehiclePage({
           {session.can("vehicles.delete") ? (
             <form action={deleteVehicle}>
               <input type="hidden" name="id" value={vehicle.id} />
-              <ConfirmSubmitButton message={t("vehicles.confirmDelete")}>{t("vehicles.delete")}</ConfirmSubmitButton>
+              <ConfirmSubmitButton message={`${t("vehicles.confirmDelete")}${vehicle._count.appointments > 0 ? ` ${tp("vehicles.confirmDeleteAppointments", vehicle._count.appointments)}` : ""}`}>{t("vehicles.delete")}</ConfirmSubmitButton>
             </form>
           ) : null}
         </div>

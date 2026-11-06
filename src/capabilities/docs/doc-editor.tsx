@@ -8,6 +8,8 @@ import { useI18n } from "@/i18n/client";
 import { saveDocPage } from "./actions";
 import { Markdown } from "@/components/ui/markdown";
 import { SegmentedControl } from "@/components/ui/segmented";
+import { Alert } from "@/components/ui/layout";
+import { DOC_AREAS_WITH_PASSWORD_HINT } from "./areas";
 
 export type DocEditorInitial = {
   id?: string;
@@ -112,6 +114,7 @@ export function DocEditor({
         </>
       ) : null}
       <input type="hidden" name="area" value={area} />
+      {(DOC_AREAS_WITH_PASSWORD_HINT as readonly string[]).includes(area) ? <Alert tone="warning">{t("docs.noPasswordsHint")}</Alert> : null}
 
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
         <Field label={t("docs.fields.title")} htmlFor="title" error={err.title} required>
@@ -129,7 +132,8 @@ export function DocEditor({
         </Field>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-line-strong">
+      {/* Fokusring am Rahmen: Die Textfläche selbst hat keinen (er würde vom overflow-hidden abgeschnitten) */}
+      <div className="overflow-hidden rounded-lg border border-line-strong focus-within:border-accent-text focus-within:ring-2 focus-within:ring-accent-text">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-2 py-1">
           <div className="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label={t("docs.toolbar")}>
             <ToolButton label={t("docs.tools.bold")} Icon={Bold} onClick={() => apply((v, s, e) => wrap(v, s, e, "**", "**", t("docs.tools.boldText")))} />

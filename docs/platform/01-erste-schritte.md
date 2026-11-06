@@ -22,7 +22,7 @@ zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
   aktuellen Seite ist von selbst aufgeklappt. Sie sehen nur, was Ihre Rolle erlaubt – fehlt ein Eintrag, ist er für Sie nicht
   freigeschaltet.
 * **Übersicht:** Heute anstehende Termine, einzulagernde oder zu prüfende Reifen, offene Rechnungen, Fälligkeiten und angeheftete
-  angeheftete Seiten aus Handbuch und IT-Dokumentation – je nachdem, was Sie sehen dürfen.
+  Seiten aus Handbuch und IT-Dokumentation – je nachdem, was Sie sehen dürfen.
 * **Unten in der Navigation:** Ihr Name und Ihre Rollen. Ein Klick öffnet das Benutzer-Menü: Sprache (Deutsch/Englisch),
   Darstellung (Hell, Dunkel oder wie das Gerät), **Mein Konto** und **Abmelden**.
 * **Am Handy:** Die Navigation klappt hinter dem Menü-Knopf links oben auf.

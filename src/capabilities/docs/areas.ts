@@ -17,6 +17,9 @@ export const DOC_PERMISSIONS = Object.fromEntries(
   DOC_FEATURES.map((f) => [f.docsArea, { view: `${f.permissions.group}.view`, edit: `${f.permissions.group}.edit` }]),
 ) as Record<DocArea, { view: Permission; edit: Permission }>;
 
+/** Bereiche, in deren Editor ein Hinweis „Keine Passwörter in die Dokumentation“ steht (IT-Dokumentation). */
+export const DOC_AREAS_WITH_PASSWORD_HINT = ["it"] as const satisfies readonly DocArea[];
+
 export const DOC_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 export const DOC_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 /** Älteste Versionen werden ab dieser Anzahl je Seite gelöscht. */

@@ -61,7 +61,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       <form method="get" className="mb-5 max-w-lg">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <Input name="q" defaultValue={q}  className="pl-9" placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />
+          <Input name="q" defaultValue={q} className="pl-9" placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />
         </div>
       </form>
 

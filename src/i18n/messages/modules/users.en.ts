@@ -3,7 +3,7 @@ import type { usersDe } from "./users.de";
 export const usersEn: typeof usersDe = {
   feature: {
     name: "Users",
-    description: "Manage user accounts and roles; sign-in locally or (later) via Active Directory.",
+    description: "Manage user accounts and assign roles.",
   },
   title: "Users",
   description: "Who may sign in and which roles do they have?",

@@ -15,6 +15,7 @@ export const docsEn: typeof docsDe = {
   categoryDeleteConfirm: "Delete empty chapter?",
   categoryNotEmpty: "The chapter still contains pages and cannot be deleted. Move or delete the pages first.",
   categoryNotEmptyHint: "Contains pages – move or delete them first",
+  noPasswordsHint: "Do not write passwords or credentials into the documentation – everyone with access can read it, and every old version stays in the history.",
   restricted: "Only for certain roles",
   searchPlaceholder: "Search title and content …",
   empty: "No pages yet.",

@@ -79,7 +79,7 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
       <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]" submitLabel={t("common.filter")}>
         {sp.attention ? <input type="hidden" name="attention" value="1" /> : null}
         {sp.swap ? <input type="hidden" name="swap" value="1" /> : null}
-        <SearchInput name="q" defaultValue={sp.q ?? ""}  className="pl-9" placeholder={t("tires.searchPlaceholder")} aria-label={t("common.search")} />
+        <SearchInput name="q" defaultValue={sp.q ?? ""} placeholder={t("tires.searchPlaceholder")} aria-label={t("common.search")} />
         <Select name="status" defaultValue={status}  aria-label={t("common.status")}>
           <option value="all">{t("tires.filters.anyStatus")}</option>
           {TIRE_SET_STATUSES.map((s) => (

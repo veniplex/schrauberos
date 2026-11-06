@@ -74,7 +74,7 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
 
       <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_11rem_auto]" submitLabel={t("common.filter")}>
         {sp.due ? <input type="hidden" name="due" value="1" /> : null}
-        <SearchInput name="q" defaultValue={q}  className="pl-9" placeholder={t("fleet.searchPlaceholder")} aria-label={t("common.search")} />
+        <SearchInput name="q" defaultValue={q} placeholder={t("fleet.searchPlaceholder")} aria-label={t("common.search")} />
         <Select name="status" defaultValue={status}  aria-label={t("common.status")}>
           <option value="current">{t("fleet.filters.current")}</option>
           <option value="all">{t("fleet.filters.anyStatus")}</option>

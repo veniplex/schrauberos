@@ -1,7 +1,7 @@
 export const usersDe = {
   feature: {
     name: "Benutzer",
-    description: "Benutzerkonten verwalten, Rollen zuweisen, Anmeldung lokal oder (später) per Active Directory.",
+    description: "Benutzerkonten verwalten und Rollen zuweisen.",
   },
   title: "Benutzer",
   description: "Wer darf sich anmelden und welche Rollen hat die Person?",

@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/buttons";
 import { Disclosure } from "@/components/ui/disclosure";
 import { NavLink } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
+import { activeHref } from "@/lib/nav-active";
 
 const ICONS: Record<IconName, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -69,8 +70,9 @@ export type SidebarItem = { href: string; label: string; icon: IconName };
 /** Eine Navigationsgruppe: ohne Titel immer sichtbar (Übersicht, Hilfe), sonst ein Modul – aufklappbar, außer es hat nur einen Eintrag. */
 export type SidebarGroup = { id: string; label: string | null; items: SidebarItem[] };
 
-function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+/** Der aktive Eintrag über alle Gruppen: der längste passende gewinnt (nie zwei gleichzeitig). */
+function activeItem(groups: SidebarGroup[], pathname: string): string | null {
+  return activeHref(pathname, groups.flatMap((g) => g.items.map((i) => i.href)));
 }
 
 export function Sidebar({
@@ -93,7 +95,10 @@ export function Sidebar({
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(pathname);
   // Aufgeklappte Gruppen: anfangs die der aktuellen Seite (auf Übersicht, Hilfe & Co. alle); wer weiter navigiert, bekommt die neue Gruppe aufgeklappt dazu
-  const groupOf = (path: string) => groups.find((g) => g.items.some((i) => isActive(path, i.href)))?.id;
+  const groupOf = (path: string) => {
+    const href = activeItem(groups, path);
+    return href ? groups.find((g) => g.items.some((i) => i.href === href))?.id : undefined;
+  };
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(groupOf(pathname) ? [groupOf(pathname)!] : groups.map((g) => g.id)));
 
   // State-Anpassung während des Renderns statt im Effect: Drawer bei Navigation schließen, Gruppe der neuen Seite öffnen
@@ -112,11 +117,12 @@ export function Sidebar({
       return next;
     });
 
+  const active = activeItem(groups, pathname);
   const link = (item: SidebarItem) => {
     const Icon = ICONS[item.icon];
     return (
       <li key={item.href}>
-        <NavLink href={item.href} active={isActive(pathname, item.href)} icon={<Icon className="size-[18px] shrink-0" aria-hidden />}>
+        <NavLink href={item.href} active={item.href === active} icon={<Icon className="size-[18px] shrink-0" aria-hidden />}>
           {item.label}
         </NavLink>
       </li>

@@ -60,7 +60,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
       />
 
       <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_10rem_10rem_10rem_auto]" submitLabel={t("common.filter")}>
-        <SearchInput name="q" defaultValue={sp.q ?? ""}  className="pl-9" placeholder={t("network.searchPlaceholder")} aria-label={t("common.search")} />
+        <SearchInput name="q" defaultValue={sp.q ?? ""} placeholder={t("network.searchPlaceholder")} aria-label={t("common.search")} />
         <Select name="type" defaultValue={type}  aria-label={t("network.fields.type")}>
           <option value="">{t("network.filters.anyType")}</option>
           {DEVICE_TYPES.map((x) => (
