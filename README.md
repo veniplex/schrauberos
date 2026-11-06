@@ -105,6 +105,8 @@ Die Datenbank ist `dev.db` im Projektordner; Backups, Dateien und Update-Daten l
 | `npm run db:baseline` | **bis zur Veröffentlichung:** aus `schema.prisma` die eine Baseline-Migration neu erzeugen (ersetzt alle Migrationsordner) |
 | `npm run db:migrate -- <name>` | **ab der Veröffentlichung:** neue Migration anlegen, lokal anwenden, Client neu erzeugen |
 | `npm run db:check` | Drift-Check: stimmt `schema.prisma` mit den Migrationen überein? (läuft auch in der Pipeline) |
+| `npm run db:freeze` | **beim Veröffentlichen:** Baseline auf `frozen sha256:…` setzen und alle Migrationen mit Prüfsumme in `prisma/published-migrations.json` eintragen |
+| `npm run db:release-check` | Pipeline bei einem Versions-Tag: alles eingefroren? Seit dem letzten eingefrorenen Release nur Neues hinzugekommen? |
 | `npm run db:fresh` | lokale Datenbank löschen, neu anlegen und seeden |
 | `npm run db:studio` | Datenbank im Browser ansehen |
 | `npm run e2e` | Browser-Tests (Playwright) gegen die gebaute App – vorher `npm run build`; siehe [Browser-CI](#browser-ci-playwright) |
@@ -221,18 +223,23 @@ Es gibt immer **eine Baseline** (`prisma/migrations/00000000000000_baseline`). I
   **keine Rückwärtskompatibilität zu 0.1.0**: Beim Start erkennt die App eine fremde Migrationshistorie (Baseline mit anderer Prüfsumme,
   fremde Namen, Tabellen ohne Historie) und startet **nicht** (siehe unten). Unbekannte *neuere* Migrationen in der Datenbank bleiben erlaubt
   (Rückfall auf eine ältere Version nach der Veröffentlichung).
-* **Mit der Veröffentlichung** (Release-Block): Marker auf `frozen` setzen (einziger Commit am Verlauf). Ab dann werden die Baseline und alle
-  veröffentlichten Migrationen **nie verändert** (die App prüft Prüfsummen und verweigert veränderte); `db:baseline` verweigert die
-  Arbeit, Schema-Änderungen gehen so:
+* **Mit der Veröffentlichung** (Release-Block): `npm run db:freeze` setzt den Marker auf `-- schrauberos:baseline frozen sha256:<Prüfsumme des Rumpfes>` und trägt
+  jede weitere Migration mit Prüfsumme in `prisma/published-migrations.json` ein (committen, dann Tag setzen). Ab dann werden die Baseline und alle
+  veröffentlichten Migrationen **nie verändert** – erzwungen an drei Stellen: `npm test` vergleicht die Prüfsummen (`src/lib/migration-freeze.ts`), die App
+  verweigert veränderte angewendete Migrationen, und die Pipeline lässt bei einem Versions-Tag `npm run db:release-check` laufen (alles eingefroren, und gegenüber dem
+  letzten Release-Tag mit eingefrorener Baseline ist nur Neues hinzugekommen: `git diff --name-status`, nur `A` erlaubt – das fängt auch ein „nachgezogenes“ Prüfsummen-Feld).
+  `db:baseline` verweigert die Arbeit bei `frozen` und bei einer Baseline ohne Marker. Schema-Änderungen gehen so:
 
 ```bash
 npm run db:migrate -- add_warranty    # legt die Migration an, wendet sie lokal an, erzeugt den Client neu
 ```
 
 * **Wächter** (`src/lib/migration-guard.ts`, Test `migration-guard.test.ts`): Jede Migration nach der Baseline darf kein `DROP`/`RENAME`, keine neue
-  Spalte `NOT NULL` ohne `DEFAULT`, keinen neuen `UNIQUE`-Index auf einer Bestandstabelle (Ausnahme: neue nullable Spalte) und kein
-  `DELETE`/`UPDATE` enthalten. Eine **begründete Ausnahme** steht als Kommentarzeile in der Migration:
-  `-- guard:allow <regel>: <Begründung>` (Regeln `drop`, `rename`, `not-null`, `unique`, `data-change`; Begründung Pflicht, fällt im Review auf).
+  Spalte `NOT NULL` ohne `DEFAULT`, keinen neuen `UNIQUE`-Index auf einer Bestandstabelle (Ausnahme: neue nullable Spalte), kein
+  `DELETE`/`UPDATE`/`REPLACE` (auch nicht über `WITH` oder `ON CONFLICT … DO UPDATE`), keinen `CREATE TRIGGER` und kein `PRAGMA`/`ATTACH`/`DETACH`/`VACUUM` enthalten.
+  Er prüft auf dem SQL ohne Zeilen- und Blockkommentare und ohne den Inhalt von Zeichenketten und Bezeichnern, unabhängig von Groß-/Kleinschreibung und Schema-Präfix
+  (`main."T"`), mit und ohne `COLUMN`. Eine **begründete Ausnahme** steht als Kommentarzeile in der Migration:
+  `-- guard:allow <regel>: <Begründung>` (Regeln `drop`, `rename`, `not-null`, `unique`, `data-change`, `trigger`, `pragma`; Begründung Pflicht, fällt im Review auf).
   Prisma-Tabellenumbauten (`RedefineTables`) enthalten `DROP`/`RENAME` – statt dessen additiv arbeiten.
 * **Drift-Check** `npm run db:check` (`prisma migrate diff --from-migrations … --to-schema … --exit-code`, Wegwerf-Datenbank legt Prisma selbst an): schlägt
   an, wenn `schema.prisma` und Migrationen auseinanderlaufen; läuft in der Pipeline im Check-Job.
@@ -247,8 +254,9 @@ Migrationsordner ablegen.
 
 **Fremdes Volume („Neuinstallation nötig“):** Erkennt `runMigrations` eine fremde Historie, wirft es `MigrationError("foreignHistory")` *bevor* es irgendetwas
 anwendet oder sichert. `startApp` fängt das: Status `reinstall` (`src/server/startup-state.ts`), klare Meldung im Log, **kein** `process.exit` (das gäbe
-eine Neustart-Schleife über Starter/Docker), die Datenbank bleibt unangetastet. `/api/health` antwortet 503 `{"status":"reinstall"}`, das Root-Layout zeigt
-nur den Hinweis (`src/app/reinstall-notice.tsx`, zweisprachig), und der Launcher wertet das (`src/lib/updates/health.ts`) als endgültig: Bei einem Update oder
+eine Neustart-Schleife über Starter/Docker), die Datenbank bleibt unangetastet – auch die Prüfung selbst liest nur (kein WAL-Modus, keine neue Tabelle, keine Nebendateien). `/api/health`
+antwortet 503 `{"status":"reinstall"}`; **jeder andere Pfad** (Seiten, Server Actions, Route Handler, `/api/v1`, `/api/ical`) beantwortet der Proxy (`src/proxy.ts`) mit 503 (Browser: kurze
+zweisprachige Seite, sonst JSON), das Root-Layout zeigt als zweite Sicherung nur den Hinweis (`src/app/reinstall-notice.tsx`, zweisprachig), und der Launcher wertet das (`src/lib/updates/health.ts`) als endgültig: Bei einem Update oder
 einer Wiederherstellung fällt er sofort zurück statt 90 s zu warten, sonst läuft der Container ungesund weiter, ohne zu starten und ohne Schleife.
 Test: `src/server/startup.test.ts` (präpariertes altes Volume), `migrate.test.ts`.
 
@@ -327,8 +335,10 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
   Klartext-Cookie zählt nicht – Cookie Tossing; `src/lib/session-cookie.ts`, gilt auch im Proxy). Abmelden löscht den `__Host-`-Cookie mit
   `Secure`, Pfad `/` und `Max-Age=0` (`cookies().delete()` täte das nicht, der Browser verwürfe es). Der Proxy (`src/proxy.ts`) prüft nur, ob ein Cookie da ist, und leitet
   **nie von `/login` weg** – die Anmeldeseite prüft die Sitzung selbst (totes Cookie → Formular statt Schleife). Ausgenommen vom Proxy
-  (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons, `/api/health`, `/api/v1/*` (Bearer-Token), `/api/ical/*`
-  (Token in der URL); übrige `/api/*` ohne Cookie antworten mit 401.
+  (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons und `/api/health`. `/api/v1/*` (Bearer-Token) und `/api/ical/*`
+  (Token in der URL) laufen durch den Proxy (wegen „Neuinstallation nötig“), brauchen aber kein Sitzungs-Cookie; übrige `/api/*` ohne Cookie antworten mit 401.
+  Der Titel einer Detailseite (`generateMetadata`) wird nur mit dem Recht der Seite aus der Datenbank gelesen (`sessionIfAllowed`, `src/server/auth/session.ts`; er steht sonst
+  schon im gestreamten HTML, bevor die Seite prüft – Test `app/metadata.test.ts`, Architekturregel).
 * **Passwörter:** scrypt aus `node:crypto` (`src/server/auth/scrypt.ts`, N=2^15, r=8, p=1, Kosten stehen im Hash). Anmeldungen: höchstens **2** Berechnungen
   gleichzeitig (`hashSemaphore`, teilt sich den libuv-Thread-Pool), Warteschlange begrenzt (voll → „bitte kurz warten“). Alles, was nicht hinter einer Flut
   fremder Anmeldungen warten darf – Passwort setzen, Passwortabfrage im Konto, das Hashen des neuen Passworts beim Notzugang und die Anmeldung von einem
@@ -439,7 +449,7 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 3. In **`src/modules/catalog.ts`** eintragen (Import und `FEATURES`). Ab jetzt kennt das System Rechte, Aktivierung und Admin-Seite.
 4. **Texte** in `src/i18n/messages/modules/warranty.de.ts` / `.en.ts` (englisch typisiert als `typeof warrantyDe`), in `de.ts` /
    `en.ts` einbinden; nötig sind `feature.name`, `feature.description`, Beschriftungen unter `permissionGroups.*` und `permissions.*`.
-6. **Seiten** unter `src/app/(app)/(workshop)/warranty/`. **Jede Seite beginnt mit `await requirePermission("…")`, jede Server
+5. **Seiten** unter `src/app/(app)/(workshop)/warranty/`. **Jede Seite beginnt mit `await requirePermission("…")`, jede Server
    Action ebenfalls.** Dazu **`pages.ts`** (`definePages`: alle Seiten mit Recht und Seed-Verweisen) und eine Zeile in `src/modules/pages.ts` –
    der Test `pages.test.ts` und die Browser-CI verlangen sie; der Demo-Seed muss für die `[id]`-Seiten Beispieldaten anlegen.
 6. Optional: `widgets.tsx` (`export const widgets: WidgetDef[]`) und `settings-tab.tsx` (`export const settingsTabs`), beides in
@@ -472,7 +482,7 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
   **Ausnahme für Spezialfälle:** Eine Funktion (`src/modules`, `src/capabilities`) darf ein eigenes Element mitbringen, wenn das Kit
   es nicht abdeckt (z. B. die Editorfläche des Markdown-Editors); die Datei sagt das mit einem Kommentar `ui-kit-exception: <Grund>`.
   Solche Elemente bauen, wo möglich, trotzdem auf den Bausteinen auf.
-* **Fehler-, Lade- und Wartezustände:** `not-found.tsx`, `error.tsx`, `loading.tsx` liegen unter `src/app` (Wurzel: ohne Navigation bzw. mit Navigation für Angemeldete) und `src/app/(app)` (im Anwendungsrahmen, die Navigation bleibt); `global-error.tsx` ersetzt das Wurzel-Layout und ist fest zweisprachig. Der Anwendungsrahmen steht in `src/app/app-shell.tsx`. `error.tsx` erkennt „Server Action nicht gefunden“ (offener Tab nach einem Web-Update, `src/lib/stale-deployment.ts`) und lädt **einmal** neu (kein Neuladen in Schleife). Jeder Dashboard-Baustein läuft in einer eigenen Fehlergrenze (`WidgetBoundary`): ein werfendes Widget zerstört die Übersicht nicht. Jeder Link der Bausteine (`LinkButton`, `NavLink`, `CardLink`, `TextLink`, `ChipLink`, `MenuLink`) zeigt über `LinkPending` (`useLinkStatus`) nach 150 ms ein Lade-Symbol und meldet die Navigation an den dünnen Fortschrittsbalken `NavProgress` (Wurzel-Layout). Neue Link-Bausteine übernehmen `LinkPending`. **Statuscode:** Seit `loading.tsx` die Ladeseite zuerst sendet, steht der HTTP-Status einer Seite mit `notFound()` (auch fehlendes Recht) schon auf 200; die Seite zeigt „nicht gefunden“ (`data-status="not-found"`, Next ergänzt `noindex`). Tests prüfen deshalb den Inhalt, nicht den Statuscode.
+* **Fehler-, Lade- und Wartezustände:** `not-found.tsx`, `error.tsx`, `loading.tsx` liegen unter `src/app` (Wurzel: ohne Navigation bzw. mit Navigation für Angemeldete) und `src/app/(app)` (im Anwendungsrahmen, die Navigation bleibt); `global-error.tsx` ersetzt das Wurzel-Layout und ist fest zweisprachig. Der Anwendungsrahmen steht in `src/app/app-shell.tsx`. `error.tsx` erkennt „Server Action nicht gefunden“ (offener Tab nach einem Web-Update, `src/lib/stale-deployment.ts`) und lädt **einmal** neu (kein Neuladen in Schleife). Jeder Dashboard-Baustein läuft in einer eigenen Fehlergrenze (`WidgetBoundary`): ein werfendes Widget zerstört die Übersicht nicht. Jeder Link der Bausteine (`LinkButton`, `NavLink`, `CardLink`, `TextLink`, `ChipLink`, `MenuLink`) zeigt über `LinkPending` (`useLinkStatus`) nach 150 ms ein Lade-Symbol und meldet die Navigation an den dünnen Fortschrittsbalken `NavProgress` (Wurzel-Layout). Neue Link-Bausteine übernehmen `LinkPending` (der Link ist `relative`; das Symbol liegt immer im DOM, absolut und ohne Platz, und wechselt nur die Deckkraft – so verschiebt sich nichts); `NavProgress` trägt zusätzlich die **dauerhafte** Live-Region „Wird geladen“ für Screenreader. Bei „weniger Bewegung“ stehen Spinner und Balken still. `StatusPage` setzt Fokus und Seitentitel auf die Überschrift (`StatusHeading`), ist im Vollbild das `<main>` und bei Fehlern eine Live-Region; Anmeldung, Einrichtung und „Kein Zugriff“ haben eigene Ladeseiten. **Statuscode:** Seit `loading.tsx` die Ladeseite zuerst sendet, steht der HTTP-Status einer Seite mit `notFound()` (auch fehlendes Recht) schon auf 200; die Seite zeigt „nicht gefunden“ (`data-status="not-found"`, Next ergänzt `noindex`). Tests prüfen deshalb den Inhalt, nicht den Statuscode.
 * **React:** kein `useEffect` mit synchronem `setState`; kein `Date.now()`/`new Date()` im Komponenten-Rumpf (Helfer aus `src/lib/dates.ts`).
 * **Server-only Code** darf vom Seed-Skript nicht importiert werden; dafür gibt es `src/server/db-client.ts`.
 * Commit-Nachrichten enden mit der `Co-Authored-By`-Zeile des verwendeten KI-Assistenten, falls einer beteiligt war.
@@ -486,9 +496,12 @@ Fake-Browser, `server-only`/`next/cache` sind leer). Der zu testende Code wird *
 `src/server/auth/login.test.ts`). Der **Aktions-Rahmen** hat einen generierten Berechtigungs-Matrixtest (`src/server/operations/matrix.test.ts`) und Architekturregeln (`architecture.test.ts`: jede Action benutzt `defineAction`, `run` bleibt transportneutral). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden), Architekturregeln, Migrations-Läufer (inkl. Verträglichkeit mit der Prisma-CLI), Backups/Restore (echte
 SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle.
+**Komponententests** rendern wirklich (`src/test/dom.ts`: happy-dom + `react-dom/client`; `installDom()`, `mount()`, `act()`): Fokus und Referenzen der Eingabebausteine (`components/ui/form.test.ts`), die Fehlergrenze der
+Dashboard-Bausteine (`components/shell/widget-boundary.test.ts`), Status- und Fehlerseiten (`components/ui/status.test.ts`, `components/shell/error-view.test.ts`). Quelltext-Muster-Tests gelten nur für echte Architekturregeln, nicht für Verhalten.
 
 ## Browser-CI (Playwright)
 
+Die Testseiten `/e2e-state/error` und `/e2e-fault/error|reinstall` erzeugen absichtlich Fehlerzustände und gibt es nur mit `SCHRAUBEROS_E2E=1` (setzt `e2e/start-server.mjs`; sonst 404).
 Playwright ist nur eine Entwicklungsabhängigkeit (nicht im Image). `npm run build`, dann `npm run e2e` (oder `npm run e2e:build`); Browser einmalig mit
 `npx playwright install chromium webkit` (offizielle Quelle). Die Konfiguration `playwright.config.ts` startet die gebaute App frisch gegen `.e2e-data`
 (`e2e/start-server.mjs`), richtet sie **wie ein Anwender** über die Ersteinrichtung im Browser ein (liest das Einrichtungs-Token aus `.e2e-data/setup-token`,
@@ -497,8 +510,10 @@ mit Beispieldaten; `e2e/global-setup.ts`), legt je Standardrolle ein Konto an un
 
 | Test | Prüft |
 | --- | --- |
-| `inventory.spec.ts` | jede Seite der **Routen-Inventur** (siehe unten) als Administrator: keine Überbreite (Elementrechte, nicht `scrollWidth`), bei Touch Ziele ≥ 44 px und Eingabeschrift ≥ 16 px, axe-core in Hell und Dunkel, **`securitypolicyviolation` = Fehler** |
-| `roles.spec.ts` | Zugriff je Standardrolle auf alle Seiten (sichtbar oder „nicht gefunden“) und Umleitung ohne Anmeldung |
+| `inventory.spec.ts` | jede Seite der **Routen-Inventur** (siehe unten) als Administrator: keine Überbreite (Elementrechte, nicht `scrollWidth`), bei Touch Ziele ≥ 44 px und Eingabeschrift ≥ 16 px, axe-core in Hell und Dunkel, **`securitypolicyviolation` = Fehler** (wirksam erst mit vollständiger CSP; Selbsttest in `states.spec.ts`), **Fehlerseite (`data-status="error"`) oder Browserfehler (`pageerror`, `console.error`) = Fehler** |
+| `roles.spec.ts` | Zugriff je Standardrolle auf alle Seiten (sichtbar, oder Umleitung auf „Kein Zugriff“ `/forbidden`; eine Fehlerseite ist nie ein gültiges Ergebnis) und Umleitung ohne Anmeldung |
+| `states.spec.ts` | Status- und Fehlerseiten (nicht gefunden, Fehler im Rahmen und im Vollbild, Neuinstallation, Kein Zugriff) durch axe/Touch/Überbreite, ihre Barrierefreiheit (Fokus, Titel, ein `<main>`, Live-Region) und **Selbsttests der Erkennung** (absichtliche Fehlerseite, CSP-Verstoß) |
+| `https.spec.ts` | HTTPS hinter einem TLS-Proxy mit selbstsigniertem Zertifikat (`e2e/support/https-proxy.ts`): `__Host-so_session` mit `Secure`, untergeschobenes Klartext-Cookie wirkungslos, Abmelden entfernt das Cookie |
 | `counter.spec.ts` | **Tresen-Durchlauf** Kunde → Fahrzeug → Termin → Reifen (iPhone und Desktop); später Termin → Auftrag → Rechnung → Mail/Druck |
 | `budget.spec.ts` | **JS-Budget** je Route (`e2e/baselines/js-budget.json`, Messung + 10 %, KB entpackt); Überschreitung bricht ab |
 | `screenshots.spec.ts` | Baseline-Screenshots der Schlüsselseiten (`key: true`) × Anzeigegröße × Hell/Dunkel – nur Linux (siehe unten) |
@@ -512,7 +527,10 @@ aus dem Demo-Seed (fehlt eine Zeile, bricht die Inventur ab: der Demo-Seed muss 
 
 **Baseline-Listen bekannter Verstöße** (`e2e/baselines/known-violations.json`, je Projekt, Regel und Seite): ein Lauf schlägt bei **neuen** Verstößen fehl *und* bei Einträgen,
 die es nicht mehr gibt (die Liste muss mit jedem Paket schrumpfen). Neu schreiben: `E2E_UPDATE_BASELINE=1 npm run e2e` (immer mit vollständigem Lauf je Projekt). Die Listen für
-Touch-Ziele und Eingabeschrift sind nach P1a-4 leer; axe-Verstöße bleiben bis zum Kontrast-/Beschriftungspaket (P2a-7) erlaubt.
+Eingabeschrift ist nach P1a-4 leer; bei Touch-Zielen stehen nur noch die Einträge des Terminkalenders (bis zur Überarbeitung des Kalenders, Block 6); die Überbreiten-Liste der
+iPhone-Größe (vier Detailseiten) soll vor dem Release leer sein; axe-Verstöße bleiben bis zum Kontrast-/Beschriftungspaket (P2a-7) erlaubt.
+**Die Listen dürfen nur schrumpfen – das wird beim Neuschreiben erzwungen** (`e2e/support/baseline-merge.ts`, Test `src/e2e-baseline.test.ts`): Wächst eine Liste oder ein JS-Budget, bricht das Neuschreiben ab,
+außer `E2E_ALLOW_BASELINE_GROWTH="<Begründung>"` (mindestens 10 Zeichen) ist gesetzt – die Begründung wird ausgegeben und in `e2e/baselines/growth.log` festgehalten. Ein Teillauf schreibt nur die geprüften Seiten neu.
 
 **Snapshots:** Baseline-Screenshots (`e2e/snapshots/<projekt>/`) gelten nur auf Linux. Aktualisieren ausschließlich in einem eigenen Commit „snapshots“: den Workflow „Build & publish“ von
 Hand mit `update_snapshots` starten (oder unter Linux/Docker `E2E_UPDATE_SNAPSHOTS=1 npm run e2e`), das Artefakt `snapshots` einchecken. Solange keine Baselines eingecheckt sind (oder auf Windows/macOS),
