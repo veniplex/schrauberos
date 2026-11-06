@@ -8,10 +8,11 @@ import { getAuthProvider } from "./providers";
 import { verifyPassword } from "./password";
 import { isLocale, LOCALE_COOKIE, THEME_COOKIE, type Locale } from "@/i18n/config";
 import { THEMES, type Theme } from "@/lib/constants";
+import { SESSION_COOKIE } from "@/lib/session-cookie";
 import { ALL_PERMISSIONS, featureOfPermission, type Permission } from "@/modules/catalog";
 import { getActiveFeatureIds } from "@/modules/features";
 
-export const SESSION_COOKIE = "so_session";
+export { SESSION_COOKIE };
 const SESSION_DAYS = 14;
 const MAX_FAILED_LOGINS = 5;
 const LOCK_MINUTES = 15;
