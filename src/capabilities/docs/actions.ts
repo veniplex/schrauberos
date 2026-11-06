@@ -148,6 +148,19 @@ export async function saveDocCategory(_prev: ActionState, formData: FormData): P
 export async function deleteDocCategory(formData: FormData) {
   const { area } = await requireEdit(String(formData.get("area") ?? ""));
   const id = String(formData.get("id") ?? "");
-  if (id) await db.docCategory.deleteMany({ where: { id, area } });
+  const category = id ? await db.docCategory.findFirst({ where: { id, area }, select: { name: true } }) : null;
+  if (category) {
+    // Löschen darf keine Beschränkung aufheben: Seiten würden sonst ohne Kapitel für alle sichtbar. Prüfen und Löschen zusammen.
+    const deleted = await db.$transaction(async (tx) => {
+      if ((await tx.docPage.count({ where: { categoryId: id } })) > 0) return false;
+      await tx.docCategory.delete({ where: { id } });
+      return true;
+    });
+    if (!deleted) {
+      refresh(area);
+      redirect(`/docs/${area}?notice=categoryNotEmpty`);
+    }
+    await audit("docs.categoryDelete", { target: category.name, entityId: id });
+  }
   refresh(area);
 }

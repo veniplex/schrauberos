@@ -32,6 +32,7 @@ export const AUDIT_ACTIONS = [
   "fleet.delete",
   "network.delete",
   "docs.delete",
+  "docs.categoryDelete",
   "backup.create",
   "backup.delete",
   "backup.download",

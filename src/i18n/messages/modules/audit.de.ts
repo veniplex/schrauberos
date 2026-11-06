@@ -105,6 +105,7 @@ export const auditDe = {
     },
     docs: {
       delete: "Dokumentation gelöscht",
+      categoryDelete: "Dokumentations-Kapitel gelöscht",
     },
   },
 };

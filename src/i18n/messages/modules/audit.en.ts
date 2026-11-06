@@ -107,6 +107,7 @@ export const auditEn: typeof auditDe = {
     },
     docs: {
       delete: "Documentation deleted",
+      categoryDelete: "Documentation chapter deleted",
     },
   },
 };

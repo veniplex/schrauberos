@@ -21,8 +21,9 @@ Ein Kapitel kann auf **Rollen** beschränkt werden – etwa „Personal“ nur f
 * **Administratoren und Bearbeiter** sehen immer alle Kapitel; eingeschränkte Kapitel sind für sie mit einem Schloss markiert.
 * Für alle anderen sind eingeschränkte Kapitel samt ihren Seiten unsichtbar – auch in der Suche, im Versionsverlauf und auf der
   Übersicht.
-* Wird ein Kapitel gelöscht, bleiben seine Seiten ohne Kapitel erhalten (und sind dann für alle sichtbar). Seiten also vorher
-  in ein anderes Kapitel verschieben, wenn sie geschützt bleiben sollen.
+* **Ein Kapitel mit Seiten lässt sich nicht löschen** – sonst würden seine Seiten ohne Kapitel für alle sichtbar. Erst die Seiten in
+  ein anderes Kapitel verschieben oder löschen, dann das leere Kapitel löschen (das Löschen steht im Audit-Log).
+* **Bilder** in Seiten eines eingeschränkten Kapitels sehen ebenfalls nur die zugelassenen Rollen.
 
 ## Wer darf was?
 

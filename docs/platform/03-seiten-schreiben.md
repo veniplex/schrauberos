@@ -18,8 +18,10 @@ Rohes HTML wird nicht ausgegeben (aus Sicherheitsgründen).
 
 ## Bilder
 
-Bilder lassen sich per Knopf hochladen oder aus der Zwischenablage einfügen (PNG, JPEG, WebP oder GIF, bis 2 MB). Bilder sehen
-nur Personen, die die jeweilige Dokumentation lesen dürfen.
+Bilder lassen sich per Knopf hochladen oder aus der Zwischenablage einfügen (PNG, JPEG, WebP oder GIF, bis 2 MB). Ein Bild sehen
+nur Personen, die eine Seite lesen dürfen, in der es eingebunden ist: Steht es nur auf einer Seite eines eingeschränkten Kapitels,
+bleibt es für alle anderen unsichtbar. Bilder, die auf keiner Seite stehen (hochgeladen, aber nicht gespeichert oder wieder
+entfernt), sehen nur Bearbeiter.
 
 ## Adresse und Versionsverlauf
 

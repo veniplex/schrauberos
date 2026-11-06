@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Lock, Pin, Plus, Trash2 } from "lucide-react";
-import { Badge, Card, CardLink, EmptyState, NavLink, PageHeader } from "@/components/ui/layout";
+import { Alert, Badge, Card, CardLink, EmptyState, NavLink, PageHeader } from "@/components/ui/layout";
 import { Disclosure } from "@/components/ui/disclosure";
 import { SearchInput } from "@/components/ui/form";
-import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
+import { Button, ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
@@ -23,7 +23,7 @@ function snippet(md: string, max = 150) {
   return text.length > max ? `${text.slice(0, max).trimEnd()} …` : text;
 }
 
-export default async function DocsIndexPage({ params, searchParams }: { params: Promise<{ area: string }>; searchParams: Promise<{ q?: string; cat?: string }> }) {
+export default async function DocsIndexPage({ params, searchParams }: { params: Promise<{ area: string }>; searchParams: Promise<{ q?: string; cat?: string; notice?: string }> }) {
   const [{ area: areaParam }, sp] = await Promise.all([params, searchParams]);
   const { area, session, canEdit } = await requireDocArea(areaParam);
   const { t, tp, date } = await getI18n();
@@ -94,13 +94,19 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
                     <div className="min-w-0 flex-1">
                       <CategoryForm area={area} roles={roles} initial={{ id: c.id, name: c.name, sortOrder: c.sortOrder, roleIds: c.roles.map((r) => r.roleId) }} />
                     </div>
-                    <form action={deleteDocCategory}>
-                      <input type="hidden" name="area" value={area} />
-                      <input type="hidden" name="id" value={c.id} />
-                      <ConfirmSubmitButton message={t("docs.categoryDeleteConfirm")} aria-label={t("common.delete")}>
+                    {c._count.pages > 0 ? (
+                      <Button type="button" variant="danger" size="sm" disabled aria-label={t("docs.categoryNotEmptyHint")} title={t("docs.categoryNotEmptyHint")}>
                         <Trash2 className="size-3.5" aria-hidden />
-                      </ConfirmSubmitButton>
-                    </form>
+                      </Button>
+                    ) : (
+                      <form action={deleteDocCategory}>
+                        <input type="hidden" name="area" value={area} />
+                        <input type="hidden" name="id" value={c.id} />
+                        <ConfirmSubmitButton message={t("docs.categoryDeleteConfirm")} aria-label={t("common.delete")}>
+                          <Trash2 className="size-3.5" aria-hidden />
+                        </ConfirmSubmitButton>
+                      </form>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -113,6 +119,11 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
         </aside>
 
         <div className="min-w-0">
+          {sp.notice === "categoryNotEmpty" ? (
+            <div className="mb-4">
+              <Alert tone="warning">{t("docs.categoryNotEmpty")}</Alert>
+            </div>
+          ) : null}
           <form method="get" role="search" className="mb-4">
             {sp.cat ? <input type="hidden" name="cat" value={sp.cat} /> : null}
             <SearchInput name="q" defaultValue={q} placeholder={t("docs.searchPlaceholder")} aria-label={t("common.search")} />
