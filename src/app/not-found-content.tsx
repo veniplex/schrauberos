@@ -11,6 +11,7 @@ export async function NotFoundContent({ fullscreen = false, withHelp = true }: {
       icon={SearchX}
       title={t("errors.notFoundTitle")}
       fullscreen={fullscreen}
+      status="not-found"
       actions={
         <>
           <LinkButton href="/" variant="primary">

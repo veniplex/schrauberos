@@ -13,6 +13,7 @@ export function StatusPage({
   actions,
   tone = "neutral",
   fullscreen = false,
+  status,
 }: {
   icon: LucideIcon;
   title: ReactNode;
@@ -20,9 +21,11 @@ export function StatusPage({
   actions?: ReactNode;
   tone?: "neutral" | "warning" | "danger";
   fullscreen?: boolean;
+  /** Maschinenlesbare Art der Seite (`data-status`), z. B. "not-found" – die Browser-Tests erkennen daran 404-Seiten, auch wenn gestreamt der Statuscode schon 200 war */
+  status?: string;
 }) {
   return (
-    <div className={clsx("grid place-items-center px-4", fullscreen ? "min-h-dvh" : "min-h-[50dvh] py-10")}>
+    <div data-status={status} className={clsx("grid place-items-center px-4", fullscreen ? "min-h-dvh" : "min-h-[50dvh] py-10")}>
       <div className="flex max-w-md flex-col items-center gap-3 text-center">
         <Icon className={clsx("size-10", tone === "neutral" && "text-ink-muted", tone === "warning" && "text-warning-ink", tone === "danger" && "text-danger-ink")} aria-hidden />
         <h1 className="text-xl font-semibold">{title}</h1>

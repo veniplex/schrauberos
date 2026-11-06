@@ -36,6 +36,8 @@ Architektur, Befehle und das Rezept für neue Features stehen in `README.md` –
 * **Server-only Code** (`server-only`-Import) darf nicht vom Seed-Skript (`prisma/seed.ts`) importiert werden – dafür gibt es `src/server/db-client.ts`.
 * Kein `useEffect` mit synchronem `setState` (ESLint `react-hooks/set-state-in-effect`), keine `Date.now()`/`new Date()` direkt im Komponenten-Body (`react-hooks/purity`) – in Helfer auslagern.
 
+* **Browser-CI** (`e2e/`, Playwright, nur Tests): Jede Funktion meldet ihre Seiten in `pages.ts` (`definePages`) und in `src/modules/pages.ts` (Routen-Inventur; `pages.test.ts` erzwingt es); der Demo-Seed muss jede Seite abdecken. Baseline-Listen bekannter Verstöße (`e2e/baselines/`) dürfen nur schrumpfen (neue Verstöße und erledigte Einträge brechen den Lauf); Screenshots nur in einem eigenen Commit „snapshots“. Der Job `e2e` läuft nicht bei jedem Push auf `main`.
+
 ## Prüfen vor dem Abschluss
 
 `npm run typecheck && npm run lint && npm test` – und bei größeren Änderungen `npm run build`.

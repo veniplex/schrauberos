@@ -77,7 +77,7 @@ Container muss nichts mehr angefasst werden. Alle Daten liegen im Volume `app-da
 0. [Schnell starten (Docker)](#schnell-starten-docker) · 1. [Schnellstart Entwicklung](#schnellstart-lokale-entwicklung) · 2. [Befehle](#befehle) · 3. [Architektur](#architektur) ·
 4. [Datenhaltung](#datenhaltung) · 5. [Container, Starter und Updates](#container-starter-und-updates) ·
 6. [Neue Funktion anlegen](#eine-neue-funktion-anlegen) · 7. [Konventionen](#konventionen) · 8. [Tests](#tests) ·
-9. [Release und Signaturschlüssel](#release-und-signaturschlüssel) · 10. [Betrieb](#betrieb) · 11. [Grenzen](#bekannte-grenzen)
+9. [Browser-CI](#browser-ci-playwright) · [Release und Signaturschlüssel](#release-und-signaturschlüssel) · 10. [Betrieb](#betrieb) · 11. [Grenzen](#bekannte-grenzen)
 
 ## Schnellstart (lokale Entwicklung)
 
@@ -107,6 +107,7 @@ Die Datenbank ist `dev.db` im Projektordner; Backups, Dateien und Update-Daten l
 | `npm run db:check` | Drift-Check: stimmt `schema.prisma` mit den Migrationen überein? (läuft auch in der Pipeline) |
 | `npm run db:fresh` | lokale Datenbank löschen, neu anlegen und seeden |
 | `npm run db:studio` | Datenbank im Browser ansehen |
+| `npm run e2e` | Browser-Tests (Playwright) gegen die gebaute App – vorher `npm run build`; siehe [Browser-CI](#browser-ci-playwright) |
 
 Vor jedem Abschluss: `npm run typecheck && npm run lint && npm test` – bei größeren Änderungen zusätzlich `npm run build`.
 
@@ -381,8 +382,9 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 3. In **`src/modules/catalog.ts`** eintragen (Import und `FEATURES`). Ab jetzt kennt das System Rechte, Aktivierung und Admin-Seite.
 4. **Texte** in `src/i18n/messages/modules/warranty.de.ts` / `.en.ts` (englisch typisiert als `typeof warrantyDe`), in `de.ts` /
    `en.ts` einbinden; nötig sind `feature.name`, `feature.description`, Beschriftungen unter `permissionGroups.*` und `permissions.*`.
-5. **Seiten** unter `src/app/(app)/(workshop)/warranty/`. **Jede Seite beginnt mit `await requirePermission("…")`, jede Server
-   Action ebenfalls.**
+6. **Seiten** unter `src/app/(app)/(workshop)/warranty/`. **Jede Seite beginnt mit `await requirePermission("…")`, jede Server
+   Action ebenfalls.** Dazu **`pages.ts`** (`definePages`: alle Seiten mit Recht und Seed-Verweisen) und eine Zeile in `src/modules/pages.ts` –
+   der Test `pages.test.ts` und die Browser-CI verlangen sie; der Demo-Seed muss für die `[id]`-Seiten Beispieldaten anlegen.
 6. Optional: `widgets.tsx` (`export const widgets: WidgetDef[]`) und `settings-tab.tsx` (`export const settingsTabs`), beides in
    `registry.ts` eintragen.
    **Hilfe:** `help.ts` (`export const help: HelpTopicDef[]` mit `id`, `feature`, `permission`, `doc`), Kapitel als Markdown unter
@@ -426,6 +428,39 @@ Fake-Browser, `server-only`/`next/cache` sind leer). Der zu testende Code wird *
 `src/server/auth/login.test.ts`). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden), Architekturregeln, Migrations-Läufer (inkl. Verträglichkeit mit der Prisma-CLI), Backups/Restore (echte
 SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle.
+
+## Browser-CI (Playwright)
+
+Playwright ist nur eine Entwicklungsabhängigkeit (nicht im Image). `npm run build`, dann `npm run e2e` (oder `npm run e2e:build`); Browser einmalig mit
+`npx playwright install chromium webkit` (offizielle Quelle). Die Konfiguration `playwright.config.ts` startet die gebaute App frisch gegen `.e2e-data`
+(`e2e/start-server.mjs`), richtet sie **wie ein Anwender** über die Ersteinrichtung im Browser ein (liest das Einrichtungs-Token aus `.e2e-data/setup-token`,
+mit Beispieldaten; `e2e/global-setup.ts`), legt je Standardrolle ein Konto an und prüft in vier Projekten: **iPhone** (WebKit 390 × 844, Touch), **Tablet hoch**
+820 × 1180 und **quer** 1180 × 820 (Touch) und **Desktop** 1440 × 900.
+
+| Test | Prüft |
+| --- | --- |
+| `inventory.spec.ts` | jede Seite der **Routen-Inventur** (siehe unten) als Administrator: keine Überbreite (Elementrechte, nicht `scrollWidth`), bei Touch Ziele ≥ 44 px und Eingabeschrift ≥ 16 px, axe-core in Hell und Dunkel, **`securitypolicyviolation` = Fehler** |
+| `roles.spec.ts` | Zugriff je Standardrolle auf alle Seiten (sichtbar oder „nicht gefunden“) und Umleitung ohne Anmeldung |
+| `counter.spec.ts` | **Tresen-Durchlauf** Kunde → Fahrzeug → Termin → Reifen (iPhone und Desktop); später Termin → Auftrag → Rechnung → Mail/Druck |
+| `budget.spec.ts` | **JS-Budget** je Route (`e2e/baselines/js-budget.json`, Messung + 10 %, KB entpackt); Überschreitung bricht ab |
+| `screenshots.spec.ts` | Baseline-Screenshots der Schlüsselseiten (`key: true`) × Anzeigegröße × Hell/Dunkel – nur Linux (siehe unten) |
+| `pages-states.spec.ts` | 404-Seiten im Anwendungsrahmen, Wartezustand beim Navigieren |
+
+**Routen-Inventur:** Jede Funktion bringt eine `pages.ts` mit (`definePages` aus `src/modules/types.ts`: Pfad wie im App-Verzeichnis, Art – Liste, Detail, neu, bearbeiten,
+Dialog, Druckansicht –, Recht, Seed-Verweise für `[id]`-Platzhalter, `key: true` für Schlüsselseiten), eingesammelt in `src/modules/pages.ts` (dazu `PLATFORM_PAGES`).
+`src/modules/pages.test.ts` schlägt fehl, wenn eine Funktion keine Seiten meldet, eine gemeldete Route nicht existiert, eine Seite unter `src/app` in keiner Liste steht,
+ein Navigationseintrag fehlt oder das Recht der Liste vom `requirePermission` der Seite abweicht. Die Browser-Tests laden dieselbe Liste und ersetzen die Verweise durch IDs
+aus dem Demo-Seed (fehlt eine Zeile, bricht die Inventur ab: der Demo-Seed muss jede Seite abdecken).
+
+**Baseline-Listen bekannter Verstöße** (`e2e/baselines/known-violations.json`, je Projekt, Regel und Seite): ein Lauf schlägt bei **neuen** Verstößen fehl *und* bei Einträgen,
+die es nicht mehr gibt (die Liste muss mit jedem Paket schrumpfen). Neu schreiben: `E2E_UPDATE_BASELINE=1 npm run e2e` (immer mit vollständigem Lauf je Projekt). Die Listen für
+Touch-Ziele und Eingabeschrift sind nach P1a-4 leer; axe-Verstöße bleiben bis zum Kontrast-/Beschriftungspaket (P2a-7) erlaubt.
+
+**Snapshots:** Baseline-Screenshots (`e2e/snapshots/<projekt>/`) gelten nur auf Linux. Aktualisieren ausschließlich in einem eigenen Commit „snapshots“: den Workflow „Build & publish“ von
+Hand mit `update_snapshots` starten (oder unter Linux/Docker `E2E_UPDATE_SNAPSHOTS=1 npm run e2e`), das Artefakt `snapshots` einchecken. Solange keine Baselines eingecheckt sind (oder auf Windows/macOS),
+werden die Screenshot-Tests übersprungen.
+
+**Pipeline:** Der Job `e2e` läuft **nicht** bei jedem Push auf `main` (Action-Minuten), sondern bei Versions-Tags (dort blockiert er Image und Release), Pull Requests und von Hand.
 
 ## Release und Signaturschlüssel
 

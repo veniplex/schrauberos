@@ -52,3 +52,9 @@ next-env.d.ts
 /*.db-shm
 /*.db-wal
 .data/
+
+# Browser-CI (Playwright)
+/.e2e-data/
+/test-results/
+/playwright-report/
+/e2e/.auth/

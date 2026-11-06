@@ -1,0 +1,3870 @@
+{
+  "desktop": {
+    "axe-dark": {
+      "/": [
+        "label-content-name-mismatch"
+      ],
+      "/account": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/audit": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/backup": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/modules": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/new": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/updates": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/new": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=day": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=list": [
+        "label-content-name-mismatch"
+      ],
+      "/customers": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]": [
+        "label",
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/new": [
+        "label-content-name-mismatch"
+      ],
+      "/employees": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/absences": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/new": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/licenses": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/new": [
+        "label-content-name-mismatch"
+      ],
+      "/help": [
+        "label-content-name-mismatch"
+      ],
+      "/help/workshop.customers": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network": [
+        "label-content-name-mismatch"
+      ],
+      "/network/cabling": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/new": [
+        "label-content-name-mismatch"
+      ],
+      "/settings": [
+        "label-content-name-mismatch"
+      ],
+      "/settings?tab=security": [
+        "label-content-name-mismatch"
+      ],
+      "/tires": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/new": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/new": [
+        "label-content-name-mismatch"
+      ]
+    },
+    "axe-light": {
+      "/": [
+        "label-content-name-mismatch"
+      ],
+      "/account": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/audit": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/backup": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/modules": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/new": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/updates": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/new": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=day": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=list": [
+        "label-content-name-mismatch"
+      ],
+      "/customers": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]": [
+        "label",
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/new": [
+        "label-content-name-mismatch"
+      ],
+      "/employees": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/absences": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/new": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/licenses": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/new": [
+        "label-content-name-mismatch"
+      ],
+      "/help": [
+        "label-content-name-mismatch"
+      ],
+      "/help/workshop.customers": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network": [
+        "label-content-name-mismatch"
+      ],
+      "/network/cabling": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/new": [
+        "label-content-name-mismatch"
+      ],
+      "/settings": [
+        "label-content-name-mismatch"
+      ],
+      "/settings?tab=security": [
+        "label-content-name-mismatch"
+      ],
+      "/tires": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/new": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/new": [
+        "label-content-name-mismatch"
+      ]
+    }
+  },
+  "iphone": {
+    "axe-dark": {
+      "/": [
+        "color-contrast"
+      ],
+      "/account": [
+        "color-contrast"
+      ],
+      "/admin/audit": [
+        "color-contrast",
+        "scrollable-region-focusable"
+      ],
+      "/admin/backup": [
+        "color-contrast"
+      ],
+      "/admin/modules": [
+        "color-contrast"
+      ],
+      "/admin/roles": [
+        "color-contrast"
+      ],
+      "/admin/roles/[id]": [
+        "color-contrast"
+      ],
+      "/admin/roles/new": [
+        "color-contrast"
+      ],
+      "/admin/updates": [
+        "color-contrast"
+      ],
+      "/admin/users": [
+        "color-contrast"
+      ],
+      "/admin/users/[id]": [
+        "color-contrast"
+      ],
+      "/admin/users/new": [
+        "color-contrast"
+      ],
+      "/appointments?new=1": [
+        "color-contrast"
+      ],
+      "/appointments?view=day": [
+        "color-contrast"
+      ],
+      "/appointments?view=list": [
+        "color-contrast"
+      ],
+      "/customers": [
+        "color-contrast"
+      ],
+      "/customers/[id]": [
+        "color-contrast"
+      ],
+      "/customers/[id]/edit": [
+        "color-contrast"
+      ],
+      "/customers/new": [
+        "color-contrast"
+      ],
+      "/docs/handbook": [
+        "color-contrast"
+      ],
+      "/docs/handbook/[slug]": [
+        "color-contrast",
+        "label"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "color-contrast"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "color-contrast"
+      ],
+      "/docs/it": [
+        "color-contrast"
+      ],
+      "/docs/it/[slug]/edit": [
+        "color-contrast"
+      ],
+      "/docs/it/[slug]/history": [
+        "color-contrast"
+      ],
+      "/docs/it/new": [
+        "color-contrast"
+      ],
+      "/employees": [
+        "color-contrast"
+      ],
+      "/employees/[id]": [
+        "color-contrast"
+      ],
+      "/employees/[id]/edit": [
+        "color-contrast"
+      ],
+      "/employees/absences": [
+        "color-contrast"
+      ],
+      "/employees/new": [
+        "color-contrast"
+      ],
+      "/fleet": [
+        "color-contrast"
+      ],
+      "/fleet/[id]": [
+        "color-contrast"
+      ],
+      "/fleet/[id]/edit": [
+        "color-contrast"
+      ],
+      "/fleet/licenses": [
+        "color-contrast"
+      ],
+      "/fleet/new": [
+        "color-contrast"
+      ],
+      "/help/workshop.customers": [
+        "color-contrast"
+      ],
+      "/invoices": [
+        "color-contrast"
+      ],
+      "/invoices/[id]": [
+        "color-contrast"
+      ],
+      "/invoices/[id]/edit": [
+        "color-contrast"
+      ],
+      "/invoices/new": [
+        "color-contrast"
+      ],
+      "/login": [
+        "color-contrast"
+      ],
+      "/login/recover": [
+        "color-contrast"
+      ],
+      "/network": [
+        "color-contrast"
+      ],
+      "/network/cabling": [
+        "color-contrast"
+      ],
+      "/network/devices": [
+        "color-contrast"
+      ],
+      "/network/devices/[id]": [
+        "color-contrast"
+      ],
+      "/network/devices/[id]/edit": [
+        "color-contrast"
+      ],
+      "/network/devices/new": [
+        "color-contrast"
+      ],
+      "/network/ip": [
+        "color-contrast"
+      ],
+      "/network/ip/[subnetId]": [
+        "color-contrast"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "color-contrast"
+      ],
+      "/settings": [
+        "color-contrast"
+      ],
+      "/settings?tab=security": [
+        "color-contrast"
+      ],
+      "/tires": [
+        "color-contrast"
+      ],
+      "/tires/[id]": [
+        "color-contrast"
+      ],
+      "/tires/[id]/edit": [
+        "color-contrast"
+      ],
+      "/tires/new": [
+        "color-contrast"
+      ],
+      "/vehicles": [
+        "color-contrast"
+      ],
+      "/vehicles/[id]": [
+        "color-contrast"
+      ],
+      "/vehicles/[id]/edit": [
+        "color-contrast"
+      ],
+      "/vehicles/new": [
+        "color-contrast"
+      ]
+    },
+    "axe-light": {
+      "/admin/audit": [
+        "scrollable-region-focusable"
+      ],
+      "/docs/handbook/[slug]": [
+        "label"
+      ]
+    },
+    "font": {
+      "/account": [
+        "input.input"
+      ],
+      "/admin/audit": [
+        "input.input.min-w-56.flex-1",
+        "select.input.w-56"
+      ],
+      "/admin/roles/[id]": [
+        "input.input"
+      ],
+      "/admin/roles/new": [
+        "input.input"
+      ],
+      "/admin/users/[id]": [
+        "input.input"
+      ],
+      "/admin/users/new": [
+        "input.input"
+      ],
+      "/appointments?new=1": [
+        "input.input",
+        "input.input.pl-9",
+        "select.input",
+        "textarea.input"
+      ],
+      "/customers": [
+        "input.input.pl-9"
+      ],
+      "/customers/[id]/edit": [
+        "input.input",
+        "textarea.input"
+      ],
+      "/customers/new": [
+        "input.input",
+        "textarea.input"
+      ],
+      "/docs/handbook": [
+        "input.input.pl-9"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/handbook/new": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/it": [
+        "input.input.pl-9"
+      ],
+      "/docs/it/[slug]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/it/new": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/employees": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/employees/[id]": [
+        "input.input",
+        "input.input.min-w-48.flex-[2]"
+      ],
+      "/employees/[id]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/employees/absences?new=1": [
+        "input.input",
+        "select.input"
+      ],
+      "/employees/new": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/fleet": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/fleet/[id]": [
+        "input.input.min-w-32.flex-1",
+        "input.input.w-28",
+        "input.input.w-32",
+        "input.input.w-36",
+        "input.input.w-40",
+        "select.input.w-40"
+      ],
+      "/fleet/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input",
+        "textarea.input"
+      ],
+      "/fleet/new": [
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input",
+        "textarea.input"
+      ],
+      "/help": [
+        "input.input.min-w-56.flex-1"
+      ],
+      "/help/workshop.customers": [
+        "input.input.min-w-56.flex-1"
+      ],
+      "/invoices": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/invoices/[id]": [
+        "input.input.w-40"
+      ],
+      "/invoices/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/invoices/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/login": [
+        "input.input"
+      ],
+      "/login/recover": [
+        "input.input",
+        "input.input.font-mono"
+      ],
+      "/network/cabling": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/devices": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/network/devices/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/devices/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/ip": [
+        "input.input.min-w-36.flex-1",
+        "input.input.min-w-40.flex-[2]",
+        "input.input.w-28"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/ip/[subnetId]?new=1": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/settings": [
+        "input.h-9.w-14.cursor-pointer",
+        "input.input",
+        "input.input.w-28",
+        "select.input"
+      ],
+      "/tires": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/tires/[id]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/tires/new": [
+        "input.input",
+        "input.input.pl-9",
+        "select.input",
+        "textarea.input"
+      ],
+      "/vehicles": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/vehicles/[id]/edit": [
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "textarea.input"
+      ],
+      "/vehicles/[id]?transfer=1": [
+        "input.input",
+        "input.input.pl-9"
+      ],
+      "/vehicles/new": [
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "input.input.pl-9",
+        "textarea.input"
+      ]
+    },
+    "overflow": {
+      "/fleet/[id]": [
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "dd.mt-0.5.break-words",
+        "div",
+        "div.border-t.border-line.px-5",
+        "div.card-pad",
+        "div.flex.flex-col.gap-5",
+        "div.flex.flex-wrap.gap-2",
+        "div.flex.flex-wrap.items-baseline",
+        "div.flex.items-center.justify-between",
+        "div.min-w-0",
+        "div.overflow-x-auto.max-h-72.overflow-auto",
+        "dl.flex.flex-col.gap-3",
+        "dt.text-xs.text-ink-muted",
+        "form",
+        "form.flex.flex-wrap.items-start",
+        "input.input.min-w-32.flex-1",
+        "section.card.min-w-0",
+        "table.table",
+        "tbody",
+        "td.text-sm.text-ink-muted",
+        "td.w-12",
+        "tr"
+      ],
+      "/network/devices/[id]": [
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary.btn-sm",
+        "dd.mt-0.5.break-words",
+        "div",
+        "div.card-pad",
+        "div.flex.flex-col.gap-5",
+        "div.flex.items-center.justify-between",
+        "div.min-w-0",
+        "div.overflow-x-auto",
+        "div.relative",
+        "dl.flex.flex-col.gap-3",
+        "dt.text-xs.text-ink-muted",
+        "form",
+        "section.card.min-w-0",
+        "table.table.min-w-[32rem]",
+        "tbody",
+        "td.font-mono.text-[13px]",
+        "td.text-sm",
+        "th",
+        "thead",
+        "tr"
+      ],
+      "/network/ip/[subnetId]": [
+        "a.text-accent-text.hover:underline",
+        "dd.mt-0.5.break-words",
+        "div",
+        "div.card-pad",
+        "div.flex.flex-col.gap-5",
+        "div.flex.items-center.justify-between",
+        "div.min-w-0",
+        "div.overflow-x-auto",
+        "div.xl:col-span-2",
+        "dl.flex.flex-col.gap-3",
+        "dt.text-xs.text-ink-muted",
+        "li.flex.items-center.justify-between",
+        "section.card.min-w-0",
+        "span.font-sans.text-ink-muted",
+        "table.table.min-w-[40rem]",
+        "tbody",
+        "td.font-mono.text-[13px]",
+        "td.text-sm",
+        "th",
+        "thead",
+        "tr",
+        "tr.row-link",
+        "ul.divide-y.divide-line"
+      ],
+      "/network/ip/[subnetId]?new=1": [
+        "a.text-accent-text.hover:underline",
+        "dd.mt-0.5.break-words",
+        "div",
+        "div.card-pad",
+        "div.flex.flex-col.gap-5",
+        "div.flex.items-center.justify-between",
+        "div.min-w-0",
+        "div.overflow-x-auto",
+        "div.xl:col-span-2",
+        "dl.flex.flex-col.gap-3",
+        "dt.text-xs.text-ink-muted",
+        "li.flex.items-center.justify-between",
+        "section.card.min-w-0",
+        "span.font-sans.text-ink-muted",
+        "table.table.min-w-[40rem]",
+        "tbody",
+        "td.font-mono.text-[13px]",
+        "td.text-sm",
+        "th",
+        "thead",
+        "tr",
+        "tr.row-link",
+        "ul.divide-y.divide-line"
+      ]
+    },
+    "touch": {
+      "/": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.items-center.gap-2",
+        "a.font-medium.hover:underline",
+        "a.text-accent-text.hover:underline.text-sm",
+        "a.text-sm.text-accent-text.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/account": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input"
+      ],
+      "/admin/audit": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.min-w-56.flex-1",
+        "select.input.w-56"
+      ],
+      "/admin/backup": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/modules": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/roles": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/roles/[id]": [
+        "a.btn.btn-ghost",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/roles/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/updates": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/users": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/users/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/users/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/appointments": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/appointments?new=1": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/appointments?view=day": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/appointments?view=list": [
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/customers": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9"
+      ],
+      "/customers/[id]": [
+        "a.btn.btn-ghost.btn-sm",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/customers/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input"
+      ],
+      "/customers/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input"
+      ],
+      "/docs/handbook": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9"
+      ],
+      "/docs/handbook/[slug]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.min-w-0.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/handbook/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/it": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9"
+      ],
+      "/docs/it/[slug]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/it/[slug]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/it/[slug]/history": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.min-w-0.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/it/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/employees": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/employees/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.min-w-48.flex-[2]"
+      ],
+      "/employees/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/employees/absences": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.font-medium.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/employees/absences?new=1": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.font-medium.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "select.input"
+      ],
+      "/employees/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/fleet": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.badge.px-3.py-1",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/fleet/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.min-w-32.flex-1",
+        "input.input.w-28",
+        "input.input.w-32",
+        "input.input.w-36",
+        "input.input.w-40",
+        "select.input.w-40"
+      ],
+      "/fleet/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input"
+      ],
+      "/fleet/licenses": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/fleet/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input"
+      ],
+      "/help": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-56.flex-1"
+      ],
+      "/help/workshop.customers": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-56.flex-1"
+      ],
+      "/invoices": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/invoices/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.w-40"
+      ],
+      "/invoices/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.block.w-full.text-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/invoices/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.block.w-full.text-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/login": [
+        "button.btn.btn-primary.w-full",
+        "input.input"
+      ],
+      "/login/recover": [
+        "a.btn.btn-ghost.w-full",
+        "button.btn.btn-primary.w-full",
+        "input.input",
+        "input.input.font-mono"
+      ],
+      "/network": [
+        "a.badge.px-3.py-1",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/network/cabling": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/devices": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/network/devices/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/network/devices/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/devices/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.min-w-36.flex-1",
+        "input.input.min-w-40.flex-[2]",
+        "input.input.w-28"
+      ],
+      "/network/ip/[subnetId]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/[subnetId]?new=1": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/settings": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.size-8.cursor-pointer.rounded-full",
+        "input.block.w-full.text-sm",
+        "input.h-9.w-14.cursor-pointer",
+        "input.input",
+        "input.input.w-28",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/settings?tab=security": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/tires": [
+        "a.badge.px-3.py-1",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/tires/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/tires/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/tires/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.pl-9",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/vehicles": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/vehicles/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/vehicles/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono.uppercase"
+      ],
+      "/vehicles/[id]?transfer=1": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.pl-9"
+      ],
+      "/vehicles/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "input.input.pl-9"
+      ]
+    }
+  },
+  "tablet-hoch": {
+    "axe-dark": {
+      "/docs/handbook": [
+        "color-contrast"
+      ],
+      "/docs/handbook/[slug]": [
+        "label"
+      ]
+    },
+    "axe-light": {
+      "/docs/handbook/[slug]": [
+        "label"
+      ]
+    },
+    "font": {
+      "/account": [
+        "input.input"
+      ],
+      "/admin/audit": [
+        "input.input.min-w-56.flex-1",
+        "select.input.w-56"
+      ],
+      "/admin/roles/[id]": [
+        "input.input"
+      ],
+      "/admin/roles/new": [
+        "input.input"
+      ],
+      "/admin/users/[id]": [
+        "input.input"
+      ],
+      "/admin/users/new": [
+        "input.input"
+      ],
+      "/appointments?new=1": [
+        "input.input",
+        "input.input.pl-9",
+        "select.input",
+        "textarea.input"
+      ],
+      "/customers": [
+        "input.input.pl-9"
+      ],
+      "/customers/[id]/edit": [
+        "input.input",
+        "textarea.input"
+      ],
+      "/customers/new": [
+        "input.input",
+        "textarea.input"
+      ],
+      "/docs/handbook": [
+        "input.input.pl-9"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/handbook/new": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/it": [
+        "input.input.pl-9"
+      ],
+      "/docs/it/[slug]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/it/new": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/employees": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/employees/[id]": [
+        "input.input",
+        "input.input.min-w-48.flex-[2]"
+      ],
+      "/employees/[id]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/employees/absences?new=1": [
+        "input.input",
+        "select.input"
+      ],
+      "/employees/new": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/fleet": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/fleet/[id]": [
+        "input.input.min-w-32.flex-1",
+        "input.input.w-28",
+        "input.input.w-32",
+        "input.input.w-36",
+        "input.input.w-40",
+        "select.input.w-40"
+      ],
+      "/fleet/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input",
+        "textarea.input"
+      ],
+      "/fleet/new": [
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input",
+        "textarea.input"
+      ],
+      "/help/workshop.customers": [
+        "input.input.min-w-56.flex-1"
+      ],
+      "/invoices": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/invoices/[id]": [
+        "input.input.w-40"
+      ],
+      "/invoices/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/invoices/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/login": [
+        "input.input"
+      ],
+      "/login/recover": [
+        "input.input",
+        "input.input.font-mono"
+      ],
+      "/network/cabling": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/devices": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/network/devices/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/devices/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/ip": [
+        "input.input.min-w-36.flex-1",
+        "input.input.min-w-40.flex-[2]",
+        "input.input.w-28"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/ip/[subnetId]?new=1": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/settings": [
+        "input.input",
+        "input.input.w-28",
+        "select.input"
+      ],
+      "/tires": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/tires/[id]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/tires/new": [
+        "input.input",
+        "input.input.pl-9",
+        "select.input",
+        "textarea.input"
+      ],
+      "/vehicles": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/vehicles/[id]/edit": [
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "textarea.input"
+      ],
+      "/vehicles/[id]?transfer=1": [
+        "input.input",
+        "input.input.pl-9"
+      ],
+      "/vehicles/new": [
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "input.input.pl-9",
+        "textarea.input"
+      ]
+    },
+    "touch": {
+      "/": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.items-center.gap-2",
+        "a.font-medium.hover:underline",
+        "a.text-accent-text.hover:underline.text-sm",
+        "a.text-sm.text-accent-text.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/account": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input"
+      ],
+      "/admin/audit": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.min-w-56.flex-1",
+        "select.input.w-56"
+      ],
+      "/admin/backup": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/modules": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/roles": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/roles/[id]": [
+        "a.btn.btn-ghost",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/roles/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/updates": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/users": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/admin/users/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/users/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/appointments": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/appointments?new=1": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/appointments?view=day": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/appointments?view=list": [
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/customers": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9"
+      ],
+      "/customers/[id]": [
+        "a.btn.btn-ghost.btn-sm",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.flex-wrap.items-center",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/customers/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input"
+      ],
+      "/customers/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input"
+      ],
+      "/docs/handbook": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9"
+      ],
+      "/docs/handbook/[slug]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.min-w-0.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/handbook/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/it": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9"
+      ],
+      "/docs/it/[slug]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/it/[slug]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/it/[slug]/history": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.min-w-0.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/docs/it/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/employees": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/employees/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.min-w-48.flex-[2]"
+      ],
+      "/employees/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/employees/absences": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.font-medium.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/employees/absences?new=1": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.font-medium.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "select.input"
+      ],
+      "/employees/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/fleet": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.badge.px-3.py-1",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/fleet/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.min-w-32.flex-1",
+        "input.input.w-28",
+        "input.input.w-32",
+        "input.input.w-36",
+        "input.input.w-40",
+        "select.input.w-40"
+      ],
+      "/fleet/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input"
+      ],
+      "/fleet/licenses": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/fleet/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input"
+      ],
+      "/help": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/help/workshop.customers": [
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-56.flex-1"
+      ],
+      "/invoices": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/invoices/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.w-40"
+      ],
+      "/invoices/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.block.w-full.text-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/invoices/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.block.w-full.text-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/login": [
+        "button.btn.btn-primary.w-full",
+        "input.input"
+      ],
+      "/login/recover": [
+        "a.btn.btn-ghost.w-full",
+        "button.btn.btn-primary.w-full",
+        "input.input",
+        "input.input.font-mono"
+      ],
+      "/network": [
+        "a.badge.px-3.py-1",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/network/cabling": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/devices": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/network/devices/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/network/devices/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/network/devices/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/network/ip": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.min-w-36.flex-1",
+        "input.input.min-w-40.flex-[2]",
+        "input.input.w-28"
+      ],
+      "/network/ip/[subnetId]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/[subnetId]?new=1": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/settings": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "button.size-8.cursor-pointer.rounded-full",
+        "input.block.w-full.text-sm",
+        "input.h-9.w-14.cursor-pointer",
+        "input.input",
+        "input.input.w-28",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/settings?tab=security": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/tires": [
+        "a.badge.px-3.py-1",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/tires/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/tires/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/tires/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.pl-9",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/vehicles": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/vehicles/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm"
+      ],
+      "/vehicles/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono.uppercase"
+      ],
+      "/vehicles/[id]?transfer=1": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.pl-9"
+      ],
+      "/vehicles/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-icon",
+        "button.btn.btn-secondary.btn-sm",
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "input.input.pl-9"
+      ]
+    }
+  },
+  "tablet-quer": {
+    "axe-dark": {
+      "/": [
+        "label-content-name-mismatch"
+      ],
+      "/account": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/audit": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/backup": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/modules": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/new": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/updates": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/new": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=day": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=list": [
+        "label-content-name-mismatch"
+      ],
+      "/customers": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]": [
+        "label",
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/new": [
+        "label-content-name-mismatch"
+      ],
+      "/employees": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/absences": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/new": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/licenses": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/new": [
+        "label-content-name-mismatch"
+      ],
+      "/help": [
+        "label-content-name-mismatch"
+      ],
+      "/help/workshop.customers": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network": [
+        "label-content-name-mismatch"
+      ],
+      "/network/cabling": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/new": [
+        "label-content-name-mismatch"
+      ],
+      "/settings": [
+        "label-content-name-mismatch"
+      ],
+      "/settings?tab=security": [
+        "label-content-name-mismatch"
+      ],
+      "/tires": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/new": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/new": [
+        "label-content-name-mismatch"
+      ]
+    },
+    "axe-light": {
+      "/": [
+        "label-content-name-mismatch"
+      ],
+      "/account": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/audit": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/backup": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/modules": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/roles/new": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/updates": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/admin/users/new": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=day": [
+        "label-content-name-mismatch"
+      ],
+      "/appointments?view=list": [
+        "label-content-name-mismatch"
+      ],
+      "/customers": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/customers/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]": [
+        "label",
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/handbook/new": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/[slug]/history": [
+        "label-content-name-mismatch"
+      ],
+      "/docs/it/new": [
+        "label-content-name-mismatch"
+      ],
+      "/employees": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/absences": [
+        "label-content-name-mismatch"
+      ],
+      "/employees/new": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/licenses": [
+        "label-content-name-mismatch"
+      ],
+      "/fleet/new": [
+        "label-content-name-mismatch"
+      ],
+      "/help": [
+        "label-content-name-mismatch"
+      ],
+      "/help/workshop.customers": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/invoices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network": [
+        "label-content-name-mismatch"
+      ],
+      "/network/cabling": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/devices/new": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/network/ip/new": [
+        "label-content-name-mismatch"
+      ],
+      "/settings": [
+        "label-content-name-mismatch"
+      ],
+      "/settings?tab=security": [
+        "label-content-name-mismatch"
+      ],
+      "/tires": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/tires/new": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/[id]/edit": [
+        "label-content-name-mismatch"
+      ],
+      "/vehicles/new": [
+        "label-content-name-mismatch"
+      ]
+    },
+    "font": {
+      "/account": [
+        "input.input"
+      ],
+      "/admin/audit": [
+        "input.input.min-w-56.flex-1",
+        "select.input.w-56"
+      ],
+      "/admin/roles/[id]": [
+        "input.input"
+      ],
+      "/admin/roles/new": [
+        "input.input"
+      ],
+      "/admin/users/[id]": [
+        "input.input"
+      ],
+      "/admin/users/new": [
+        "input.input"
+      ],
+      "/appointments?new=1": [
+        "input.input",
+        "input.input.pl-9",
+        "select.input",
+        "textarea.input"
+      ],
+      "/customers": [
+        "input.input.pl-9"
+      ],
+      "/customers/[id]/edit": [
+        "input.input",
+        "textarea.input"
+      ],
+      "/customers/new": [
+        "input.input",
+        "textarea.input"
+      ],
+      "/docs/handbook": [
+        "input.input.pl-9"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/handbook/new": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/it": [
+        "input.input.pl-9"
+      ],
+      "/docs/it/[slug]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/docs/it/new": [
+        "input.input",
+        "select.input",
+        "textarea.block.min-h-[26rem].w-full"
+      ],
+      "/employees": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/employees/[id]": [
+        "input.input",
+        "input.input.min-w-48.flex-[2]"
+      ],
+      "/employees/[id]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/employees/absences?new=1": [
+        "input.input",
+        "select.input"
+      ],
+      "/employees/new": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/fleet": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/fleet/[id]": [
+        "input.input.min-w-32.flex-1",
+        "input.input.w-28",
+        "input.input.w-32",
+        "input.input.w-36",
+        "input.input.w-40",
+        "select.input.w-40"
+      ],
+      "/fleet/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input",
+        "textarea.input"
+      ],
+      "/fleet/new": [
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input",
+        "textarea.input"
+      ],
+      "/help": [
+        "input.input.min-w-56.flex-1"
+      ],
+      "/help/workshop.customers": [
+        "input.input.min-w-56.flex-1"
+      ],
+      "/invoices": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/invoices/[id]": [
+        "input.input.w-40"
+      ],
+      "/invoices/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/invoices/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/login": [
+        "input.input"
+      ],
+      "/login/recover": [
+        "input.input",
+        "input.input.font-mono"
+      ],
+      "/network/cabling": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/devices": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/network/devices/[id]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/devices/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/ip": [
+        "input.input.min-w-36.flex-1",
+        "input.input.min-w-40.flex-[2]",
+        "input.input.w-28"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/network/ip/[subnetId]?new=1": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/new": [
+        "input.input",
+        "input.input.font-mono",
+        "select.input",
+        "textarea.input"
+      ],
+      "/settings": [
+        "input.input",
+        "input.input.w-28",
+        "select.input"
+      ],
+      "/tires": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/tires/[id]/edit": [
+        "input.input",
+        "select.input",
+        "textarea.input"
+      ],
+      "/vehicles": [
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/vehicles/[id]/edit": [
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "textarea.input"
+      ],
+      "/vehicles/[id]?transfer=1": [
+        "input.input",
+        "input.input.pl-9"
+      ],
+      "/vehicles/new": [
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "input.input.pl-9",
+        "textarea.input"
+      ]
+    },
+    "touch": {
+      "/": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.items-center.gap-2",
+        "a.flex.min-h-9.items-center",
+        "a.font-medium.hover:underline",
+        "a.text-accent-text.hover:underline.text-sm",
+        "a.text-sm.text-accent-text.hover:underline",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/account": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "button.grid.min-h-8.min-w-8",
+        "input.input"
+      ],
+      "/admin/audit": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-56.flex-1",
+        "select.input.w-56"
+      ],
+      "/admin/backup": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/admin/modules": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/admin/roles": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/admin/roles/[id]": [
+        "a.btn.btn-ghost",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/roles/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/updates": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/admin/users": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/admin/users/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/admin/users/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0"
+      ],
+      "/appointments": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/appointments?new=1": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/appointments?view=day": [
+        "a.absolute.inset-x-0.z-0",
+        "a.absolute.z-10.overflow-hidden",
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/appointments?view=list": [
+        "a.btn.btn-ghost",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.grid.min-h-8.place-items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/customers": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9"
+      ],
+      "/customers/[id]": [
+        "a.btn.btn-ghost.btn-sm",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.flex-wrap.items-center",
+        "a.flex.min-h-9.items-center",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/customers/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input"
+      ],
+      "/customers/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input"
+      ],
+      "/docs/handbook": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9"
+      ],
+      "/docs/handbook/[slug]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/docs/handbook/[slug]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/handbook/[slug]/history": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.min-w-0.hover:underline",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/docs/handbook/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/it": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9"
+      ],
+      "/docs/it/[slug]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/docs/it/[slug]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/docs/it/[slug]/history": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.min-w-0.hover:underline",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/docs/it/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "button.grid.min-h-8.min-w-8",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/employees": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/employees/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.min-w-48.flex-[2]"
+      ],
+      "/employees/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/employees/absences": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.font-medium.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/employees/absences?new=1": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-icon",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.font-medium.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "select.input"
+      ],
+      "/employees/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/fleet": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.badge.px-3.py-1",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/fleet/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-32.flex-1",
+        "input.input.w-28",
+        "input.input.w-32",
+        "input.input.w-36",
+        "input.input.w-40",
+        "select.input.w-40"
+      ],
+      "/fleet/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input"
+      ],
+      "/fleet/licenses": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/fleet/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "input.input.font-mono.uppercase",
+        "select.input"
+      ],
+      "/help": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-56.flex-1"
+      ],
+      "/help/workshop.customers": [
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-56.flex-1"
+      ],
+      "/invoices": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/invoices/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.w-40"
+      ],
+      "/invoices/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.block.w-full.text-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/invoices/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.block.w-full.text-sm",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/login": [
+        "button.btn.btn-primary.w-full",
+        "input.input"
+      ],
+      "/login/recover": [
+        "a.btn.btn-ghost.w-full",
+        "button.btn.btn-primary.w-full",
+        "input.input",
+        "input.input.font-mono"
+      ],
+      "/network": [
+        "a.badge.px-3.py-1",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/network/cabling": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/devices": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/network/devices/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/network/devices/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/network/devices/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/network/ip": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.min-w-36.flex-1",
+        "input.input.min-w-40.flex-[2]",
+        "input.input.w-28"
+      ],
+      "/network/ip/[subnetId]": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/network/ip/[subnetId]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/[subnetId]?new=1": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.text-accent-text.hover:underline",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/network/ip/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono",
+        "select.input"
+      ],
+      "/settings": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "button.size-8.cursor-pointer.rounded-full",
+        "input.block.w-full.text-sm",
+        "input.h-9.w-14.cursor-pointer",
+        "input.input",
+        "input.input.w-28",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/settings?tab=security": [
+        "a.-mb-px.whitespace-nowrap.border-b-2",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/tires": [
+        "a.badge.px-3.py-1",
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/tires/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/tires/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-ghost.btn-sm",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.mt-0.5.size-4.shrink-0",
+        "select.input"
+      ],
+      "/vehicles": [
+        "a.btn.btn-primary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-secondary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input.pl-9",
+        "select.input"
+      ],
+      "/vehicles/[id]": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer"
+      ],
+      "/vehicles/[id]/edit": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono.uppercase"
+      ],
+      "/vehicles/[id]?transfer=1": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "a.hover:underline",
+        "button.btn.btn-danger.btn-sm",
+        "button.btn.btn-ghost.btn-icon",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.pl-9"
+      ],
+      "/vehicles/new": [
+        "a.btn.btn-secondary",
+        "a.btn.btn-secondary.btn-sm",
+        "a.flex.min-h-9.items-center",
+        "button.btn.btn-primary",
+        "button.btn.btn-secondary.btn-sm",
+        "button.flex.w-full.cursor-pointer",
+        "input.input",
+        "input.input.font-mono.uppercase",
+        "input.input.pl-9"
+      ]
+    }
+  }
+}

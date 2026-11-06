@@ -14,9 +14,9 @@ import { featureKey } from "@/modules/catalog-logic";
 
 const SRC = path.resolve(process.cwd(), "src");
 /** Kompositionswurzeln: dürfen die Beschreibungen und Beiträge aller Funktionen einsammeln. */
-const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts"]);
+const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts", "modules/pages.ts"]);
 /** Dateien im Modul-Wurzelordner, die Plattform-Code importieren darf (Katalog, Aktivierung, Registry …). */
-const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "registry", "types", "default-roles"]);
+const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "pages", "registry", "types", "default-roles"]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

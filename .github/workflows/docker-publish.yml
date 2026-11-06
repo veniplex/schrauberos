@@ -3,6 +3,9 @@ name: Build & publish Docker image
 # Bei jedem Push auf main (Tag "latest") und bei Versions-Tags v1.2.3 (Tags "1.2.3", "1.2", "latest").
 # Versions-Tags erzeugen zusätzlich ein signiertes Release-Paket für Web-Updates (Job "release").
 #
+# Browser-Tests (Playwright, Job "e2e") kosten viele Minuten: Sie laufen NICHT bei jedem Push auf main, sondern nur bei Versions-Tags (und blockieren
+# dort Image und Release), bei Pull Requests und von Hand ("Run workflow"; optional "update_snapshots" für neue Baseline-Screenshots).
+#
 # Auf main läuft die Pipeline nur, wenn sich etwas ändert, das in Image oder Tests eingeht: reine Änderungen an README, CLAUDE.md, AGENTS.md,
 # .claude/, docker-compose.yml und den .env-Vorlagen lösen nichts aus (sie sind nicht im Image: siehe .dockerignore). Die Docs unter docs/
 # gehören dagegen zum Image (Hilfe in der App). Versions-Tags bauen immer; "Run workflow" erzwingt einen Lauf von Hand.
@@ -19,7 +22,22 @@ on:
       - .env.example
       - .gitignore
     tags: ["v*"]
+  pull_request:
+    paths-ignore:
+      - README.md
+      - CLAUDE.md
+      - AGENTS.md
+      - .claude/**
+      - docker-compose.yml
+      - docker.env.example
+      - .env.example
+      - .gitignore
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: "Baseline-Screenshots neu erzeugen (Ergebnis als Artefakt; danach in einem eigenen Commit \"snapshots\" einchecken)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,9 +60,49 @@ jobs:
       - name: Schema und Migrationen stimmen überein (Drift-Check)
         run: npm run db:check
 
+  e2e:
+    name: Browser-Tests (Playwright)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      # Browser aus der offiziellen Playwright-Quelle (nur Tests, nicht im Image)
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run build
+      - name: Browser-Tests
+        env:
+          E2E_UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots && '1' || '0' }}
+        run: npm run e2e
+      - name: Bericht und Fehlerspuren
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - name: Neue Baseline-Screenshots
+        if: ${{ inputs.update_snapshots }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshots
+          path: e2e/snapshots/
+          retention-days: 14
+
   publish:
     name: Image bauen und nach ghcr.io pushen
-    needs: check
+    # Nicht bei Pull Requests; bei Tags erst, wenn die Browser-Tests grün sind (auf main sind sie übersprungen)
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') }}
+    needs: [check, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,8 +146,8 @@ jobs:
 
   release:
     name: Release-Paket signieren und veröffentlichen
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: check
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.check.result == 'success' && needs.e2e.result == 'success' }}
+    needs: [check, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: write

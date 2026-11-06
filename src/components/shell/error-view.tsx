@@ -55,6 +55,7 @@ export function ErrorView({ error, retry, fullscreen = false }: { error: unknown
     <StatusPage
       icon={TriangleAlert}
       tone="danger"
+      status="error"
       title={t("errors.errorTitle")}
       fullscreen={fullscreen}
       actions={

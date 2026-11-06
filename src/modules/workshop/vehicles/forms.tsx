@@ -35,7 +35,7 @@ export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValue
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("vehicles.fields.plate")} htmlFor="plate" error={err.plate} required>
-          <Input id="plate" name="plate" defaultValue={initial.plate} invalid={!!err.plate} className="font-mono uppercase" placeholder="B-AB 1234" autoComplete="off" required />
+          <Input id="plate" name="plate" defaultValue={initial.plate} invalid={!!err.plate} className="font-mono uppercase" placeholder="B-AB 1234" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
         </Field>
         <Field label={t("vehicles.fields.year")} htmlFor="year" error={err.year}>
           <Input id="year" name="year" type="number" inputMode="numeric" defaultValue={initial.year} invalid={!!err.year} placeholder="2021" />
@@ -48,7 +48,7 @@ export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValue
         </Field>
       </div>
       <Field label={t("vehicles.fields.vin")} htmlFor="vin" error={err.vin} hint={t("vehicles.fields.vinHint")}>
-        <Input id="vin" name="vin" defaultValue={initial.vin} invalid={!!err.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" />
+        <Input id="vin" name="vin" defaultValue={initial.vin} invalid={!!err.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
       </Field>
       {!initial.id ? (
         <Field label={t("vehicles.fields.owner")} error={err.customerId} hint={t("vehicles.fields.ownerHint")}>

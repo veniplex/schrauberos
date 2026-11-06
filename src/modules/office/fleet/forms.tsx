@@ -51,7 +51,7 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
       <Card title={t("fleet.sections.vehicle")}>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label={t("vehicles.fields.plate")} htmlFor="plate" error={err.plate} required>
-            <Input id="plate" name="plate" defaultValue={initial.plate} invalid={!!err.plate} className="font-mono uppercase" placeholder="B-FW 100" autoComplete="off" required />
+            <Input id="plate" name="plate" defaultValue={initial.plate} invalid={!!err.plate} className="font-mono uppercase" placeholder="B-FW 100" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
           </Field>
           <Field label={t("vehicles.fields.make")} htmlFor="make">
             <Input id="make" name="make" defaultValue={initial.make} autoComplete="off" />
@@ -76,7 +76,7 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
             <Input id="color" name="color" defaultValue={initial.color} maxLength={30} />
           </Field>
           <Field label={t("vehicles.fields.vin")} htmlFor="vin" error={err.vin} hint={t("vehicles.fields.vinHint")} className="sm:col-span-2">
-            <Input id="vin" name="vin" defaultValue={initial.vin} invalid={!!err.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" />
+            <Input id="vin" name="vin" defaultValue={initial.vin} invalid={!!err.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
           </Field>
           <Field label={t("common.status")} htmlFor="status">
             <Select id="status" name="status" defaultValue={initial.status}>

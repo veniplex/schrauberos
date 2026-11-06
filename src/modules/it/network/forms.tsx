@@ -147,7 +147,7 @@ export function SubnetForm({
           <Input id="name" name="name" defaultValue={initial.name} invalid={!!err.name} maxLength={80} required autoComplete="off" />
         </Field>
         <Field label={t("network.fields.cidr")} htmlFor="cidr" error={err.cidr} hint={t("network.fields.cidrHint")} required>
-          <Input id="cidr" name="cidr" defaultValue={initial.cidr} invalid={!!err.cidr} placeholder="192.168.10.0/24" className="font-mono" required autoComplete="off" />
+          <Input id="cidr" name="cidr" defaultValue={initial.cidr} invalid={!!err.cidr} placeholder="192.168.10.0/24" className="font-mono" required autoComplete="off" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field label="VLAN" htmlFor="vlanId">
           <Select id="vlanId" name="vlanId" defaultValue={initial.vlanId}>
@@ -160,7 +160,7 @@ export function SubnetForm({
           </Select>
         </Field>
         <Field label={t("network.fields.gateway")} htmlFor="gateway" error={err.gateway}>
-          <Input id="gateway" name="gateway" defaultValue={initial.gateway} invalid={!!err.gateway} className="font-mono" placeholder="192.168.10.1" autoComplete="off" />
+          <Input id="gateway" name="gateway" defaultValue={initial.gateway} invalid={!!err.gateway} className="font-mono" placeholder="192.168.10.1" autoComplete="off" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field label={t("network.fields.dhcpStart")} htmlFor="dhcpStart" error={err.dhcpStart}>
           <Input id="dhcpStart" name="dhcpStart" defaultValue={initial.dhcpStart} invalid={!!err.dhcpStart} className="font-mono" placeholder="192.168.10.100" autoComplete="off" />
@@ -222,7 +222,7 @@ export function IpForm({
       <input type="hidden" name="returnTo" value={returnTo} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("network.cols.address")} htmlFor="address" error={err.address} hint={cidr} required>
-          <Input id="address" name="address" defaultValue={initial.address} invalid={!!err.address} className="font-mono" autoComplete="off" required />
+          <Input id="address" name="address" defaultValue={initial.address} invalid={!!err.address} className="font-mono" autoComplete="off" required inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field label={t("network.fields.ipKind")} htmlFor="kind">
           <Select id="kind" name="kind" defaultValue={initial.kind}>
@@ -244,10 +244,10 @@ export function IpForm({
           </Select>
         </Field>
         <Field label={t("network.cols.hostname")} htmlFor="hostname">
-          <Input id="hostname" name="hostname" defaultValue={initial.hostname} maxLength={100} autoComplete="off" />
+          <Input id="hostname" name="hostname" defaultValue={initial.hostname} maxLength={100} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field label={t("network.cols.mac")} htmlFor="mac" error={err.mac} className="sm:col-span-2">
-          <Input id="mac" name="mac" defaultValue={initial.mac} invalid={!!err.mac} className="font-mono" placeholder="AA:BB:CC:DD:EE:FF" autoComplete="off" />
+          <Input id="mac" name="mac" defaultValue={initial.mac} invalid={!!err.mac} className="font-mono" placeholder="AA:BB:CC:DD:EE:FF" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
         </Field>
       </div>
       <Field label={t("common.notes")} htmlFor="notes">
