@@ -13,12 +13,13 @@ import { verifyPassword } from "./password";
  */
 export interface AuthProvider {
   id: string;
-  verify(user: User, password: string): Promise<boolean>;
+  /** `bounded`: bei voller Warteschlange der Passwortprüfung abweisen (`QueueFullError`), statt zu warten */
+  verify(user: User, password: string, options?: { bounded?: boolean }): Promise<boolean>;
 }
 
 const localProvider: AuthProvider = {
   id: "local",
-  verify: (user, password) => verifyPassword(password, user.passwordHash),
+  verify: (user, password, options) => verifyPassword(password, user.passwordHash, options),
 };
 
 const externalProviders: Record<string, AuthProvider> = {

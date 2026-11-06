@@ -50,10 +50,10 @@ export function SetupForm({ timezones }: { timezones: string[] }) {
         <Input id="username" name="username" invalid={!!err.username} autoComplete="username" autoCapitalize="none" required />
       </Field>
       <Field label={t("users.fields.password")} htmlFor="password" error={err.password} hint={t("account.passwordRules")} required>
-        <Input id="password" name="password" type="password" invalid={!!err.password} autoComplete="new-password" required />
+        <Input id="password" name="password" type="password" maxLength={128} invalid={!!err.password} autoComplete="new-password" required />
       </Field>
       <Field label={t("account.confirmPassword")} htmlFor="confirm" error={err.confirm} required>
-        <Input id="confirm" name="confirm" type="password" invalid={!!err.confirm} autoComplete="new-password" required />
+        <Input id="confirm" name="confirm" type="password" maxLength={128} invalid={!!err.confirm} autoComplete="new-password" required />
       </Field>
 
       <Checkbox name="demo" label={t("setup.demo")} hint={t("setup.demoHint")} />

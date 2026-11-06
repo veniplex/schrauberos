@@ -8,6 +8,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { hasAdminOnlyRights, isDenial } from "@/lib/rbac";
 import { toRights } from "@/server/rbac/hierarchy";
+import { nowDate } from "@/lib/dates";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -22,6 +23,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     include: { roles: { include: { role: { include: { permissions: true } } } } },
   });
   const canManage = session.can("users.manage");
+  const now = nowDate();
 
   return (
     <>
@@ -77,7 +79,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   <td className="text-sm text-ink-muted">{u.authSource === "local" ? t("users.sourceLocal") : u.authSource}</td>
                   <td className="text-sm tabular text-ink-muted">{u.lastLoginAt ? date(u.lastLoginAt, { dateStyle: "medium", timeStyle: "short" }) : "–"}</td>
                   <td>
-                    <Badge tone={u.active ? "success" : "neutral"}>{u.active ? t("users.active") : t("users.inactive")}</Badge>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge tone={u.active ? "success" : "neutral"}>{u.active ? t("users.active") : t("users.inactive")}</Badge>
+                      {u.lockedUntil && u.lockedUntil > now ? <Badge tone="warning">{t("users.throttledBadge")}</Badge> : null}
+                    </div>
                   </td>
                 </tr>
               ))}

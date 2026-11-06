@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { login } from "@/server/auth/session";
-import { hashPassword, MIN_PASSWORD_LENGTH } from "@/server/auth/password";
+import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
 import { audit } from "@/server/audit";
 import { seedAllDemo } from "@/server/seed/demo";
 import { applyTimezone } from "@/server/startup";
@@ -20,7 +20,7 @@ const schema = z.object({
     .trim()
     .toLowerCase()
     .regex(/^[a-z0-9._-]{2,40}$/),
-  password: z.string().min(MIN_PASSWORD_LENGTH).max(200),
+  password: z.string(),
   confirm: z.string(),
   timezone: z.string().max(60),
 });
@@ -31,6 +31,9 @@ export async function completeSetup(_prev: ActionState, formData: FormData): Pro
   const parsed = schema.safeParse(formObject(formData));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
   const d = parsed.data;
+  const problem = passwordProblem(d.password);
+  if (problem === "short") return { fieldErrors: { password: t("account.errors.passwordShort", { min: MIN_PASSWORD_LENGTH }) } };
+  if (problem === "long") return { fieldErrors: { password: t("account.errors.passwordLong", { max: MAX_PASSWORD_CHARS }) } };
   if (d.password !== d.confirm) return { fieldErrors: { confirm: t("account.errors.mismatch") } };
   if (!applyTimezone(d.timezone)) return { fieldErrors: { timezone: t("validation.invalid") } };
 

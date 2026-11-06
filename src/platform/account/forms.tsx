@@ -33,13 +33,13 @@ export function PasswordForm() {
   return (
     <form action={action} className="flex flex-col gap-4">
       <Field label={t("account.currentPassword")} htmlFor="current" error={err.current} required>
-        <Input id="current" name="current" type="password" autoComplete="current-password" invalid={!!err.current} required />
+        <Input id="current" name="current" type="password" maxLength={128} autoComplete="current-password" invalid={!!err.current} required />
       </Field>
       <Field label={t("account.newPassword")} htmlFor="next" error={err.next} hint={t("account.passwordRules")} required>
-        <Input id="next" name="next" type="password" autoComplete="new-password" invalid={!!err.next} required />
+        <Input id="next" name="next" type="password" maxLength={128} autoComplete="new-password" invalid={!!err.next} required />
       </Field>
       <Field label={t("account.confirmPassword")} htmlFor="confirm" error={err.confirm} required>
-        <Input id="confirm" name="confirm" type="password" autoComplete="new-password" invalid={!!err.confirm} required />
+        <Input id="confirm" name="confirm" type="password" maxLength={128} autoComplete="new-password" invalid={!!err.confirm} required />
       </Field>
       <FormMessage state={state} />
       <div>

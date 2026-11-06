@@ -41,7 +41,8 @@ describe("Testharness", () => {
   it("Cookies bleiben zwischen Aufrufen erhalten und Header sind pro Test setzbar", async () => {
     env.signOut();
     await env.user({ username: "bert", password: "geheim-123" });
-    assert.deepEqual(await session.login("bert", "geheim-123"), { ok: true, mustChangePassword: false });
+    const result = await session.login("bert", "geheim-123");
+    assert.ok(result.ok && !result.mustChangePassword);
     assert.ok(browser.writes.some((w) => w.name === "so_session" && w.options.secure === false), "Sitzungs-Cookie ohne Secure im HTTP-LAN");
     browser.setHeaders({ "x-forwarded-proto": "https" });
     assert.equal(browser.headers.get("X-Forwarded-Proto"), "https");

@@ -221,6 +221,31 @@ Bearbeiten-Formulare tragen die Version der Zeile (`updatedAt`) als Feld `versio
 zu überschreiben. Prüfung und Schreiben, die zusammengehören (z. B. Doppelbelegung eines Arbeitsplatzes), laufen in
 `db.$transaction`. Neue Bearbeiten-Formulare müssen das übernehmen (nur Tabellen mit `updatedAt`).
 
+### Anmeldung, Sitzung und Rechte-Hierarchie
+
+* **Sitzung:** serverseitig (Tabelle `Session`, nur der Hash des Tokens), Cookie `so_session` im HTTP-LAN, **`__Host-so_session`** (Secure)
+  über HTTPS; gelesen werden beide (`src/lib/session-cookie.ts`). Der Proxy (`src/proxy.ts`) prüft nur, ob ein Cookie da ist, und leitet
+  **nie von `/login` weg** – die Anmeldeseite prüft die Sitzung selbst (totes Cookie → Formular statt Schleife). Ausgenommen vom Proxy
+  (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons, `/api/health`, `/api/v1/*` (Bearer-Token), `/api/ical/*`
+  (Token in der URL); übrige `/api/*` ohne Cookie antworten mit 401.
+* **Passwörter:** scrypt aus `node:crypto` (`src/server/auth/scrypt.ts`, N=2^15, r=8, p=1, Kosten stehen im Hash). Höchstens **2** Berechnungen
+  gleichzeitig (`hashSemaphore`, teilt sich den libuv-Thread-Pool), Warteschlange begrenzt (voll → „bitte kurz warten“). Länge: 8–128 Zeichen,
+  zusätzlich höchstens 512 Bytes (`src/lib/password-rules.ts`).
+* **Drosselung** (`src/lib/login-throttle.ts`, Zustand `src/server/auth/throttle.ts`): je Konto 3 freie Versuche, dann 2 s, 4 s, 8 s … höchstens
+  90 s – **keine harte Sperre**, gleich für unbekannte Namen. Prüfen und Belegen laufen synchron vor dem ersten `await` (Schwung paralleler Versuche
+  kommt nur bis zu den freien Versuchen durch); abgewiesene Versuche verlängern nichts; gedrosselte Anmeldungen kosten nur einen Timer, keinen
+  Hash. Die Zähler stehen zusätzlich atomar in der Datenbank (`User.failedLogins/lockedUntil`, überstehen Neustarts); die Administration hebt sie auf
+  der Benutzerseite auf. Das **globale Fehlversuchs-Budget** (30/min) verlangsamt, weist nie ab. **IP-Limit** nur mit der Einstellung
+  „Hinter Reverse-Proxy“ (Einstellungen → Sicherheit): dann zählt der **letzte** Eintrag von `X-Forwarded-For`, sonst wird der Header ignoriert.
+  Audit-Einträge für Fehlversuche sind gedrosselt, unbekannte Namen stehen nur als Kürzel darin. Der Passwortwechsel im Konto hat ein eigenes Limit.
+  Uhr/Warten sind in Tests über `authRuntime` (`src/server/auth/runtime.ts`) ersetzbar.
+* **Rücksprungziel** (`?next=`): `safeNext` (`src/lib/safe-next.ts`) löst per `new URL` auf und vergleicht den Origin.
+* **Rechte-Hierarchie** (`src/lib/rbac.ts`, DB-Teil `src/server/rbac/hierarchy.ts`): Ein Nicht-Admin ändert nur Konten, deren **Rohrechte**
+  (ungefiltert nach Funktionsaktivierung) eine Teilmenge der eigenen sind, vergibt/entzieht nur Rollen, die er vollständig besitzt, ändert Rollen nur
+  um selbst besessene Rechte (Differenz), nie die eigene Rolle und nie Administrator-Rollen. Rechte mit `adminOnly` in der `feature.ts`
+  (`permissions.adminOnly`: Benutzer, Rollen, Einstellungen, Module, Backups, Updates) vergeben nur Administratoren; Standardrollen enthalten sie nie
+  (Test). Prüfen und Schreiben laufen in einer Transaktion. Arbeitsplätze/Terminarten hängen am eigenen Recht `appointments.configure`.
+
 ## Container, Starter und Updates
 
 Ein Container, ein Volume (`/data`). Das Image ist **`FROM scratch`** und enthält nur den **Starter** und die eingebaute App-Version
@@ -317,7 +342,11 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 
 ## Tests
 
-`node:test` über `tsx`: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
+`node:test` über `tsx`. **Testharness** `src/test/harness.ts`: `createTestEnv()` legt eine echte temporäre SQLite an (alle Migrationen), macht sie zur
+Datenbank der Anwendung und ersetzt nur den Rand von Next.js (`redirect()`/`notFound()` werfen abfangbare Signale, `cookies()`/`headers()` lesen einen
+Fake-Browser, `server-only`/`next/cache` sind leer). Der zu testende Code wird **danach** mit `await import(...)` geladen; `env.role()`, `env.user()`,
+`env.signIn()`, `form({...})` und `redirectOf(() => action(...))` bilden Formulare und Sitzungen nach (Beispiele: `src/modules/admin/users/actions.test.ts`,
+`src/server/auth/login.test.ts`). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden), Architekturregeln, Migrations-Läufer (inkl. Verträglichkeit mit der Prisma-CLI), Backups/Restore (echte
 SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle.
 
@@ -445,7 +474,8 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 ### Weiteres
 
 * **HTTPS/Reverse Proxy:** Hinter einem Proxy mit HTTPS erkennt die App das am Header `x-forwarded-proto` und setzt das
-  Cookie-Flag „Secure“ selbst (erzwingen: `SESSION_COOKIE_SECURE=true|false`). Erscheint beim Speichern „Invalid Server Actions
+  Cookie-Flag „Secure“ selbst (Cookie dann `__Host-so_session`; erzwingen: `SESSION_COOKIE_SECURE=true|false`). Zusätzlich unter **Einstellungen →
+  Sicherheit** „Hinter Reverse-Proxy“ einschalten, damit die Anmeldung die Client-Adresse auswertet (Proxy muss sie als letzten `X-Forwarded-For`-Eintrag anhängen). Erscheint beim Speichern „Invalid Server Actions
   request“, leitet der Proxy den öffentlichen Host nicht per `x-forwarded-host` weiter – dann die Domain in `next.config.ts` unter
   `experimental.serverActions.allowedOrigins` eintragen.
 * **Zeitzone:** Einstellungen → Werkstatt; wird bei jedem Start angewendet.
@@ -470,6 +500,6 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 
 ## Technik
 
-Next.js 16 (App Router, Server Actions) · TypeScript · Tailwind CSS 4 · Prisma 7 (SQLite) · eigene Sitzungs-Authentifizierung (bcrypt,
+Next.js 16 (App Router, Server Actions) · TypeScript · Tailwind CSS 4 · Prisma 7 (SQLite) · eigene Sitzungs-Authentifizierung (scrypt,
 serverseitige Sitzungen) · eigene schlanke i18n · Zod · react-markdown + remark-gfm · node-tar · esbuild. Design-Tokens in
 `src/app/tokens.css`.

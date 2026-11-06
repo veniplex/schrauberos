@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Alert, PageHeader } from "@/components/ui/layout";
-import { ConfirmSubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { UserForm } from "@/modules/admin/users/forms";
-import { deleteUser } from "@/modules/admin/users/actions";
+import { deleteUser, unlockUser } from "@/modules/admin/users/actions";
+import { nowDate } from "@/lib/dates";
 import { versionOf } from "@/lib/concurrency";
 import { checkGrantRole, checkManageUser } from "@/lib/rbac";
 import { loadActor, toRights } from "@/server/rbac/hierarchy";
@@ -17,9 +18,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("users.edit") };
 }
 
-export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditUserPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ unlocked?: string }> }) {
   const session = await requirePermission("users.manage");
-  const [{ t }, { id }] = await Promise.all([getI18n(), params]);
+  const [{ t }, { id }, sp] = await Promise.all([getI18n(), params, searchParams]);
   const [user, roles, actor] = await Promise.all([
     db.user.findUnique({ where: { id }, include: { roles: { include: { role: { include: { permissions: true } } } }, employee: true } }),
     db.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }], include: { permissions: true } }),
@@ -52,6 +53,16 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
       />
       <div className="flex flex-col gap-4">
         {readOnly ? <Alert tone="warning">{t("users.readOnlyNotice")}</Alert> : null}
+        {sp.unlocked ? <Alert tone="success">{t("users.unlocked")}</Alert> : null}
+        {!readOnly && user.lockedUntil && user.lockedUntil > nowDate() ? (
+          <Alert tone="warning">
+            <form action={unlockUser} className="flex flex-wrap items-center justify-between gap-3">
+              <input type="hidden" name="id" value={user.id} />
+              <span>{t("users.unlockHint")}</span>
+              <SubmitButton size="sm">{t("users.unlock")}</SubmitButton>
+            </form>
+          </Alert>
+        ) : null}
         {!readOnly ? <UserForm
           initial={{
             id: user.id,

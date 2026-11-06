@@ -66,7 +66,7 @@ export function UserForm({
             hint={initial.id ? t("users.fields.passwordResetHint") : t("account.passwordRules")}
             required={!initial.id}
           >
-            <Input id="password" name="password" type="password" autoComplete="new-password" invalid={!!err.password} required={!initial.id} />
+            <Input id="password" name="password" type="password" maxLength={128} autoComplete="new-password" invalid={!!err.password} required={!initial.id} />
           </Field>
         )}
       </div>

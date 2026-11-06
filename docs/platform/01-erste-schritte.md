@@ -3,10 +3,12 @@
 ## Anmelden
 
 Melden Sie sich mit Ihrem Benutzernamen und Passwort an. Wurde Ihr Konto neu angelegt oder Ihr Passwort zurückgesetzt, verlangt die
-Anwendung beim ersten Anmelden ein eigenes Passwort (mindestens 8 Zeichen).
+Anwendung beim ersten Anmelden ein eigenes Passwort (mindestens 8, höchstens 128 Zeichen).
 
-Nach fünf Fehlversuchen wird das Konto für 15 Minuten gesperrt. Wer sein Passwort vergessen hat, bittet einen Administrator,
-es unter **Verwaltung → Benutzer** zurückzusetzen.
+Nach drei Fehlversuchen muss man vor dem nächsten Versuch warten: erst 2 Sekunden, dann immer länger, höchstens 90 Sekunden. Die
+Meldung nennt die Restzeit; ein richtiges Passwort hebt die Wartezeit auf. Das gilt für jeden Namen gleich – die Anwendung verrät
+nicht, ob es ein Konto gibt. Wer sein Passwort vergessen hat, bittet einen Administrator, es unter **Verwaltung → Benutzer**
+zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
 
 > **Erste Einrichtung:** Beim allerersten Aufruf einer neuen Installation erscheint statt der Anmeldung die Ersteinrichtung:
 > Werkstattname, Zeitzone und das Konto des ersten Administrators. Auf Wunsch startet die Anwendung mit Beispieldaten zum

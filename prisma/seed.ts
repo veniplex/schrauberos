@@ -1,5 +1,5 @@
 import "dotenv/config";
-import bcrypt from "bcryptjs";
+import { scryptHash } from "../src/server/auth/scrypt";
 import { createPrismaClient, databaseFile } from "../src/server/db-client";
 import { runMigrations } from "../src/server/migrate";
 import { ensureBaseData } from "../src/server/seed/base";
@@ -17,7 +17,7 @@ async function seedAdmin() {
   const password = process.env.SEED_ADMIN_PASSWORD ?? "admin";
   const adminRole = await db.role.findUniqueOrThrow({ where: { key: "admin" } });
   await db.user.create({
-    data: { username, name: "Administrator", passwordHash: await bcrypt.hash(password, 11), mustChangePassword: false, roles: { create: [{ roleId: adminRole.id }] } },
+    data: { username, name: "Administrator", passwordHash: await scryptHash(password), mustChangePassword: false, roles: { create: [{ roleId: adminRole.id }] } },
   });
   console.log(`Entwicklungs-Admin angelegt: ${username}`);
 }

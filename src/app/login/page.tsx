@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { Wrench } from "lucide-react";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
+import { getSession } from "@/server/auth/session";
+import { safeNext } from "@/lib/safe-next";
 import { getWorkshop } from "@/server/workshop";
 import { LoginForm } from "./login-form";
 import { Card } from "@/components/ui/layout";
@@ -16,6 +18,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   // Frische Installation: erst den Administrator einrichten
   if ((await db.user.count()) === 0) redirect("/setup");
   const [{ t }, workshop, { next }] = await Promise.all([getI18n(), getWorkshop(), searchParams]);
+  // Die Anmeldeseite prüft die Sitzung selbst (der Proxy sieht nur, ob ein Cookie da ist): Ein totes Cookie führt hierher, nicht im Kreis.
+  if (await getSession()) redirect(safeNext(next));
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
@@ -35,7 +39,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </div>
         <Card as="div">
           <h2 className="mb-4 text-base font-semibold">{t("auth.signIn")}</h2>
-          <LoginForm next={next ?? "/"} />
+          <LoginForm next={safeNext(next)} />
         </Card>
       </div>
     </main>

@@ -5,17 +5,18 @@ import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/server/db";
 import { getAuthProvider } from "./providers";
-import { verifyPassword } from "./password";
+import { QueueFullError, verifyPassword } from "./password";
+import { authRuntime } from "./runtime";
+import { loginThrottle, normalizeUsername } from "./throttle";
 import { isLocale, LOCALE_COOKIE, THEME_COOKIE, type Locale } from "@/i18n/config";
 import { THEMES, type Theme } from "@/lib/constants";
-import { SESSION_COOKIE } from "@/lib/session-cookie";
+import { readSessionToken, SESSION_COOKIE_NAMES, sessionCookieName } from "@/lib/session-cookie";
 import { ALL_PERMISSIONS, featureOfPermission, type Permission } from "@/modules/catalog";
 import { getActiveFeatureIds } from "@/modules/features";
 
-export { SESSION_COOKIE };
 const SESSION_DAYS = 14;
-const MAX_FAILED_LOGINS = 5;
-const LOCK_MINUTES = 15;
+/** Nach dieser Ruhezeit beginnt die Fehlversuchs-Zählung eines Kontos von vorn (wie im Speicher: `loginThrottle.accounts`). */
+const FAILURE_DECAY_MS = 15 * 60_000;
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 
@@ -53,40 +54,79 @@ export type AppSession = {
   can: (permission: Permission) => boolean;
 };
 
+type Account = { id: string; name: string };
+
 export type LoginResult =
-  | { ok: true; mustChangePassword: boolean }
-  | { ok: false; reason: "invalid" | "locked" | "inactive" };
+  | { ok: true; mustChangePassword: boolean; account: Account }
+  /** Falsches Passwort oder unbekannter Benutzer (nicht unterscheidbar); `newlyThrottled`: dieser Versuch hat die Wartezeit ausgelöst */
+  | { ok: false; reason: "invalid"; account: Account | null; newlyThrottled: boolean }
+  | { ok: false; reason: "inactive"; account: Account }
+  /** Gedrosselt: das Konto (oder die Adresse) muss noch warten – es wurde nichts geprüft */
+  | { ok: false; reason: "throttled"; retryAfterSeconds: number }
+  /** Zu viele gleichzeitige Anmeldungen – bitte kurz warten */
+  | { ok: false; reason: "busy" };
 
-export async function login(username: string, password: string): Promise<LoginResult> {
-  const user = await db.user.findUnique({ where: { username: username.trim().toLowerCase() } });
+export type LoginContext = {
+  /** Adresse des Clients (nur hinter einem Reverse-Proxy bekannt, sonst null) */
+  ip?: string | null;
+};
+
+/** Gedrosselt: eine zufällige, feste Zeit per Timer warten (kein Hash, keine CPU) und die Restzeit nennen. */
+async function throttledResult(waitMs: number): Promise<LoginResult> {
+  await authRuntime.sleep(authRuntime.between(300, 700));
+  return { ok: false, reason: "throttled", retryAfterSeconds: Math.max(1, Math.ceil(waitMs / 1000)) };
+}
+
+/**
+ * Meldet einen Benutzer an. Reihenfolge ist Absicht:
+ *  1. **Synchron** (vor dem ersten `await`) prüfen, ob Konto/Adresse warten müssen, und den Versuch belegen – so kann ein Schwung
+ *     paralleler Versuche die Drosselung nicht unterlaufen. Gedrosselte Versuche kosten nur einen Timer, keinen Hash.
+ *  2. Globales Fehlversuchs-Budget: verlangsamt, weist aber nie ab.
+ *  3. Passwort prüfen (höchstens 2 gleichzeitig, begrenzte Warteschlange). Unbekannte Namen werden wie bekannte behandelt.
+ *  4. Dauerhafte Zähler in der Datenbank (atomar), überstehen einen Neustart.
+ */
+export async function login(username: string, password: string, context: LoginContext = {}): Promise<LoginResult> {
+  const { accounts, ips, budget } = loginThrottle;
+  const key = normalizeUsername(username);
+  const ip = context.ip ?? null;
+
+  const wait = Math.max(accounts.check(key), ip ? ips.check(ip) : 0);
+  if (wait > 0) return throttledResult(wait);
+  const taken = accounts.take(key);
+  if (ip) ips.take(ip);
+  const newlyThrottled = taken.delayMs > 0 && accounts.delayAfter(taken.attempts - 1) === 0;
+
+  const extra = budget.delayMs();
+  if (extra > 0) await authRuntime.sleep(extra);
+
+  const user = await db.user.findUnique({ where: { username: key } });
+  // Dauerhafte Wartezeit aus der Datenbank (z. B. nach einem Neustart): ebenfalls ohne Hash
+  if (user?.lockedUntil && user.lockedUntil.getTime() > authRuntime.now()) return throttledResult(user.lockedUntil.getTime() - authRuntime.now());
+
   const provider = user ? getAuthProvider(user.authSource) : null;
-
-  if (user?.lockedUntil && user.lockedUntil > new Date()) {
-    return { ok: false, reason: "locked" };
+  let valid: boolean;
+  try {
+    // Immer einen Hash prüfen (auch bei unbekanntem Benutzer) -> kein Timing-Orakel.
+    valid = user && provider ? await provider.verify(user, password, { bounded: true }) : await verifyPassword(password, null, { bounded: true });
+  } catch (error) {
+    if (!(error instanceof QueueFullError)) throw error;
+    // Überlast ist kein Fehlversuch des Benutzers
+    accounts.forgive(key);
+    if (ip) ips.forgive(ip);
+    return { ok: false, reason: "busy" };
   }
 
-  // Immer einen Hash prüfen (auch bei unbekanntem Benutzer) -> kein Timing-Orakel.
-  const valid = user && provider ? await provider.verify(user, password) : await verifyPassword(password, null);
-
+  const account = user ? { id: user.id, name: user.name } : null;
   if (!user || !valid) {
-    if (user) {
-      const failed = user.failedLogins + 1;
-      await db.user.update({
-        where: { id: user.id },
-        data:
-          failed >= MAX_FAILED_LOGINS
-            ? { failedLogins: 0, lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60_000) }
-            : { failedLogins: failed },
-      });
-    }
-    return { ok: false, reason: "invalid" };
+    budget.record();
+    if (user) await recordFailure(user);
+    return { ok: false, reason: "invalid", account, newlyThrottled };
   }
-  if (!user.active) return { ok: false, reason: "inactive" };
+  if (!user.active) return { ok: false, reason: "inactive", account: account! };
 
-  await db.user.update({
-    where: { id: user.id },
-    data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() },
-  });
+  accounts.succeed(key);
+  if (ip) ips.forgive(ip); // andere Nutzer derselben Adresse sollen sich nicht gegenseitig bremsen
+  await db.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date(authRuntime.now()) } });
   await startSession(user.id);
 
   // Persönliche Einstellungen in Cookies spiegeln (Server rendert damit ohne DB-Zugriff)
@@ -95,12 +135,31 @@ export async function login(username: string, password: string): Promise<LoginRe
   if (isLocale(user.locale)) jar.set(LOCALE_COOKIE, user.locale, opts);
   if (user.theme && (THEMES as readonly string[]).includes(user.theme)) jar.set(THEME_COOKIE, user.theme, opts);
 
-  return { ok: true, mustChangePassword: user.mustChangePassword };
+  return { ok: true, mustChangePassword: user.mustChangePassword, account: account! };
+}
+
+/** Fehlversuch dauerhaft festhalten: Zähler atomar erhöhen, Wartezeit daraus ableiten (und nur verlängern, nie verkürzen). */
+async function recordFailure(user: { id: string; lockedUntil: Date | null }): Promise<void> {
+  const now = authRuntime.now();
+  const stale = user.lockedUntil !== null && now - user.lockedUntil.getTime() > FAILURE_DECAY_MS;
+  const { failedLogins } = await db.user.update({
+    where: { id: user.id },
+    data: { failedLogins: stale ? 1 : { increment: 1 } },
+    select: { failedLogins: true },
+  });
+  const until = new Date(now + loginThrottle.accounts.delayAfter(failedLogins));
+  await db.user.updateMany({ where: { id: user.id, OR: [{ lockedUntil: null }, { lockedUntil: { lt: until } }] }, data: { lockedUntil: until } });
+}
+
+/** Wartezeit eines Kontos aufheben (Administration): Zähler in Datenbank und Speicher zurücksetzen. */
+export async function resetAccountThrottle(userId: string): Promise<void> {
+  const user = await db.user.update({ where: { id: userId }, data: { failedLogins: 0, lockedUntil: null }, select: { username: true } });
+  loginThrottle.accounts.reset(normalizeUsername(user.username));
 }
 
 async function startSession(userId: string) {
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
+  const expiresAt = new Date(authRuntime.now() + SESSION_DAYS * 86_400_000);
   const h = await headers();
   await db.session.create({
     data: {
@@ -113,9 +172,10 @@ async function startSession(userId: string) {
   // abgelaufene Sessions nebenbei aufräumen
   await db.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
+  const secure = await secureCookies();
+  jar.set(sessionCookieName(secure), token, {
     httpOnly: true,
-    secure: await secureCookies(),
+    secure,
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
@@ -124,16 +184,17 @@ async function startSession(userId: string) {
 
 export async function logout() {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const token = readSessionToken((name) => jar.get(name));
   if (token) await db.session.deleteMany({ where: { tokenHash: sha256(token) } });
-  jar.delete(SESSION_COOKIE);
+  for (const name of SESSION_COOKIE_NAMES) jar.delete(name);
 }
 
 /** Alle Sessions eines Benutzers beenden (z. B. nach Passwortänderung/Deaktivierung). */
 export async function revokeSessions(userId: string, exceptCurrent = false) {
   let keep: string | undefined;
   if (exceptCurrent) {
-    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    const jar = await cookies();
+    const token = readSessionToken((name) => jar.get(name));
     keep = token ? sha256(token) : undefined;
   }
   await db.session.deleteMany({ where: { userId, ...(keep ? { NOT: { tokenHash: keep } } : {}) } });
@@ -141,7 +202,8 @@ export async function revokeSessions(userId: string, exceptCurrent = false) {
 
 /** Aktuelle Sitzung inkl. effektiver Berechtigungen (pro Request gecacht). */
 export const getSession = cache(async (): Promise<AppSession | null> => {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const jar = await cookies();
+  const token = readSessionToken((name) => jar.get(name));
   if (!token) return null;
 
   const row = await db.session.findUnique({

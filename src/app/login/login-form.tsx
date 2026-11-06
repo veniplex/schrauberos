@@ -16,7 +16,7 @@ export function LoginForm({ next }: { next: string }) {
         <Input id="username" name="username" autoComplete="username" autoCapitalize="none" autoFocus required />
       </Field>
       <Field label={t("auth.password")} htmlFor="password">
-        <Input id="password" name="password" type="password" autoComplete="current-password" required />
+        <Input id="password" name="password" type="password" autoComplete="current-password" maxLength={128} required />
       </Field>
       <FormMessage state={state} />
       <SubmitButton className="w-full">{t("auth.signIn")}</SubmitButton>

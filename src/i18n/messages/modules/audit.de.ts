@@ -50,6 +50,7 @@ export const auditDe = {
     auth: {
       login: "Angemeldet",
       loginFailed: "Anmeldung fehlgeschlagen",
+      loginThrottled: "Anmeldung gedrosselt (zu viele Fehlversuche)",
       logout: "Abgemeldet",
     },
     account: {
@@ -60,6 +61,7 @@ export const auditDe = {
       create: "Benutzer angelegt",
       update: "Benutzer geändert",
       delete: "Benutzer gelöscht",
+      unlock: "Anmeldesperre aufgehoben",
     },
     role: {
       create: "Rolle angelegt",
@@ -74,6 +76,7 @@ export const auditDe = {
       workshop: "Werkstatt-Profil geändert",
       appointments: "Termin-Einstellungen geändert",
       tires: "Reifen-Einstellungen geändert",
+      security: "Sicherheits-Einstellungen geändert",
     },
     appointment: {
       delete: "Termin gelöscht",

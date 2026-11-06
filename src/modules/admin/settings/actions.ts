@@ -12,6 +12,8 @@ import { isValidTime } from "@/lib/opening-hours";
 import { fieldErrors, formObject } from "@/lib/forms";
 import { audit } from "@/server/audit";
 import { applyTimezone } from "@/server/startup";
+import { BEHIND_PROXY_KEY } from "@/server/auth/network";
+import { setSetting } from "@/server/settings";
 
 const MAX_LOGO_BYTES = 200 * 1024;
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
@@ -84,5 +86,15 @@ export async function saveWorkshop(_prev: ActionState, formData: FormData): Prom
 
   await audit("settings.workshop", { target: d.name });
   revalidatePath("/", "layout");
+  return { ok: true, message: t("common.saved") };
+}
+
+/** Sicherheit: Läuft die Anwendung hinter einem Reverse-Proxy? Nur dann wird die Client-Adresse aus X-Forwarded-For ausgewertet. */
+export async function saveSecurity(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePermission("settings.manage");
+  const { t } = await getI18n();
+  await setSetting(BEHIND_PROXY_KEY, formData.get("behindProxy") === "on" ? "true" : "false");
+  await audit("settings.security");
+  revalidatePath("/settings");
   return { ok: true, message: t("common.saved") };
 }

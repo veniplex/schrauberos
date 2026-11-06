@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireSession, revokeSessions } from "@/server/auth/session";
-import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "@/server/auth/password";
+import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem, verifyPassword } from "@/server/auth/password";
+import { loginThrottle } from "@/server/auth/throttle";
 import { getI18n } from "@/i18n/server";
 import type { ActionState } from "@/components/ui/form";
 import { fieldErrors, formObject } from "@/lib/forms";
@@ -36,8 +37,16 @@ export async function changePassword(_prev: ActionState, formData: FormData): Pr
 
   const user = await db.user.findUniqueOrThrow({ where: { id: session.user.id } });
   if (user.authSource !== "local") return { error: t("account.errors.externalPassword") };
+  // Eigenes Limit: Die Prüfung des aktuellen Passworts darf mit einer gestohlenen Sitzung kein unbegrenztes Rätselraten erlauben
+  const gate = loginThrottle.passwordChange;
+  const wait = gate.check(user.id);
+  if (wait > 0) return { error: t("account.errors.tooManyAttempts", { seconds: Math.ceil(wait / 1000) }) };
+  gate.take(user.id);
   if (!(await verifyPassword(current, user.passwordHash))) return { fieldErrors: { current: t("account.errors.currentWrong") } };
-  if (next.length < MIN_PASSWORD_LENGTH) return { fieldErrors: { next: t("account.errors.passwordShort", { min: MIN_PASSWORD_LENGTH }) } };
+  gate.succeed(user.id);
+  const problem = passwordProblem(next);
+  if (problem === "short") return { fieldErrors: { next: t("account.errors.passwordShort", { min: MIN_PASSWORD_LENGTH }) } };
+  if (problem === "long") return { fieldErrors: { next: t("account.errors.passwordLong", { max: MAX_PASSWORD_CHARS }) } };
   if (next !== confirm) return { fieldErrors: { confirm: t("account.errors.mismatch") } };
   if (next === current) return { fieldErrors: { next: t("account.errors.sameAsOld") } };
 

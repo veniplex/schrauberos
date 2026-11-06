@@ -52,6 +52,7 @@ export const auditEn: typeof auditDe = {
     auth: {
       login: "Signed in",
       loginFailed: "Sign-in failed",
+      loginThrottled: "Sign-in throttled (too many failed attempts)",
       logout: "Signed out",
     },
     account: {
@@ -62,6 +63,7 @@ export const auditEn: typeof auditDe = {
       create: "User created",
       update: "User changed",
       delete: "User deleted",
+      unlock: "Sign-in delay lifted",
     },
     role: {
       create: "Role created",
@@ -76,6 +78,7 @@ export const auditEn: typeof auditDe = {
       workshop: "Workshop profile changed",
       appointments: "Appointment settings changed",
       tires: "Tyre settings changed",
+      security: "Security settings changed",
     },
     appointment: {
       delete: "Appointment deleted",

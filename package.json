@@ -21,7 +21,6 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.1",
     "@prisma/client": "^7.10.1",
-    "bcryptjs": "^3.0.3",
     "better-sqlite3": "12.11.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",

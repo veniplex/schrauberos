@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
-import { requirePermission, revokeSessions } from "@/server/auth/session";
-import { hashPassword, MIN_PASSWORD_LENGTH } from "@/server/auth/password";
+import { requirePermission, resetAccountThrottle, revokeSessions } from "@/server/auth/session";
+import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
 import { getI18n } from "@/i18n/server";
 import type { ActionState } from "@/components/ui/form";
 import { fieldErrors, formObject } from "@/lib/forms";
@@ -25,7 +25,7 @@ const schema = z.object({
     .regex(/^[a-z0-9._-]{2,40}$/),
   name: z.string().trim().min(1).max(120),
   email: z.string().email().max(200).optional(),
-  password: z.string().max(200).optional(),
+  password: z.string().optional(),
 });
 
 /** Ist nach der Änderung noch mindestens ein aktiver Admin übrig? */
@@ -52,9 +52,9 @@ export async function saveUser(_prev: ActionState, formData: FormData): Promise<
 
   // Passwort
   const password = d.password && d.password.length > 0 ? d.password : undefined;
-  if (password && password.length < MIN_PASSWORD_LENGTH) {
-    return { fieldErrors: { password: t("account.errors.passwordShort", { min: MIN_PASSWORD_LENGTH }) } };
-  }
+  const problem = password ? passwordProblem(password) : null;
+  if (problem === "short") return { fieldErrors: { password: t("account.errors.passwordShort", { min: MIN_PASSWORD_LENGTH }) } };
+  if (problem === "long") return { fieldErrors: { password: t("account.errors.passwordLong", { max: MAX_PASSWORD_CHARS }) } };
   const passwordHash = password ? await hashPassword(password) : undefined; // aufwendig, deshalb vor der Transaktion
 
   // Prüfen und Schreiben gehören zusammen: Rechte-Hierarchie, Schutz des letzten Administrators und Speichern in einer Transaktion
@@ -114,6 +114,23 @@ export async function saveUser(_prev: ActionState, formData: FormData): Promise<
   await audit(d.id ? "user.update" : "user.create", { target: d.username, entityId: userId });
   revalidatePath("/admin/users");
   redirect(`/admin/users?saved=${userId}`);
+}
+
+/** Wartezeit nach Fehlversuchen aufheben (Administration) – gleiche Rechte-Hierarchie wie beim Ändern des Kontos. */
+export async function unlockUser(formData: FormData) {
+  const session = await requirePermission("users.manage");
+  const id = String(formData.get("id") ?? "");
+  const denied = await db.$transaction(async (tx) => {
+    const user = id ? await tx.user.findUnique({ where: { id }, include: { roles: { include: { role: { include: { permissions: true } } } } } }) : null;
+    if (!user) return "missing" as const;
+    return checkManageUser(await loadActor(tx, session.user.id), user.roles.map((r) => toRights(r.role)));
+  });
+  if (denied === "missing") redirect("/admin/users");
+  if (denied) redirect(`/admin/users?error=${denied}`);
+  await resetAccountThrottle(id);
+  await audit("user.unlock", { entityId: id });
+  revalidatePath("/admin/users");
+  redirect(`/admin/users/${id}?unlocked=1`);
 }
 
 export async function deleteUser(formData: FormData) {
