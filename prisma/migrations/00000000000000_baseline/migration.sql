@@ -175,7 +175,7 @@ CREATE TABLE "Vehicle" (
     "syncedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Vehicle_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Vehicle_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -187,7 +187,7 @@ CREATE TABLE "VehicleOwnership" (
     "toDate" DATETIME,
     "note" TEXT,
     CONSTRAINT "VehicleOwnership_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "VehicleOwnership_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "VehicleOwnership_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -469,6 +469,7 @@ CREATE TABLE "Invoice" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "direction" TEXT NOT NULL,
     "number" TEXT NOT NULL,
+    "outgoingKey" TEXT,
     "partyName" TEXT NOT NULL,
     "customerId" TEXT,
     "issueDate" DATETIME NOT NULL,
@@ -483,7 +484,7 @@ CREATE TABLE "Invoice" (
     "notes" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Invoice_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Invoice_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -580,6 +581,20 @@ CREATE TABLE "AppSetting" (
     "updatedAt" DATETIME NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "OutboxEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "type" TEXT NOT NULL,
+    "entityId" TEXT,
+    "payload" TEXT NOT NULL DEFAULT '{}',
+    "actorId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "availableAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "lastError" TEXT,
+    "processedAt" DATETIME
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
@@ -639,6 +654,18 @@ CREATE INDEX "Appointment_vehicleId_idx" ON "Appointment"("vehicleId");
 
 -- CreateIndex
 CREATE INDEX "Appointment_tireSetId_idx" ON "Appointment"("tireSetId");
+
+-- CreateIndex
+CREATE INDEX "Appointment_customerId_idx" ON "Appointment"("customerId");
+
+-- CreateIndex
+CREATE INDEX "Appointment_bayId_idx" ON "Appointment"("bayId");
+
+-- CreateIndex
+CREATE INDEX "Appointment_typeId_idx" ON "Appointment"("typeId");
+
+-- CreateIndex
+CREATE INDEX "Appointment_assigneeId_idx" ON "Appointment"("assigneeId");
 
 -- CreateIndex
 CREATE INDEX "TireSet_vehicleId_idx" ON "TireSet"("vehicleId");
@@ -710,6 +737,9 @@ CREATE INDEX "FleetCost_fleetVehicleId_date_idx" ON "FleetCost"("fleetVehicleId"
 CREATE INDEX "FleetLicenseCheck_employeeId_checkedAt_idx" ON "FleetLicenseCheck"("employeeId", "checkedAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Invoice_outgoingKey_key" ON "Invoice"("outgoingKey");
+
+-- CreateIndex
 CREATE INDEX "Invoice_direction_status_idx" ON "Invoice"("direction", "status");
 
 -- CreateIndex
@@ -717,6 +747,9 @@ CREATE INDEX "Invoice_issueDate_idx" ON "Invoice"("issueDate");
 
 -- CreateIndex
 CREATE INDEX "Invoice_dueDate_idx" ON "Invoice"("dueDate");
+
+-- CreateIndex
+CREATE INDEX "Invoice_customerId_idx" ON "Invoice"("customerId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "InvoiceFile_invoiceId_key" ON "InvoiceFile"("invoiceId");
@@ -729,6 +762,9 @@ CREATE INDEX "DocCategory_area_idx" ON "DocCategory"("area");
 
 -- CreateIndex
 CREATE INDEX "DocPage_area_idx" ON "DocPage"("area");
+
+-- CreateIndex
+CREATE INDEX "DocPage_categoryId_idx" ON "DocPage"("categoryId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "DocPage_area_slug_key" ON "DocPage"("area", "slug");
@@ -750,3 +786,9 @@ CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
 
 -- CreateIndex
 CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
+
+-- CreateIndex
+CREATE INDEX "OutboxEvent_processedAt_availableAt_idx" ON "OutboxEvent"("processedAt", "availableAt");
+
+-- CreateIndex
+CREATE INDEX "OutboxEvent_type_idx" ON "OutboxEvent"("type");

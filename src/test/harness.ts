@@ -13,7 +13,7 @@
  *
  * Was ersetzt wird (nur Rand der Next.js-Laufzeit, nie die eigene Logik):
  *  - `server-only` → leer, `next/cache` → keine Wirkung (Aufrufe werden mitgeschrieben),
- *  - `next/navigation`: `redirect()`/`notFound()` werfen abfangbare Fehler (`RedirectSignal`/`NotFoundSignal`),
+ *  - `next/navigation`: `redirect()`/`notFound()` werfen abfangbare Fehler (`RedirectSignal`/`NotFoundSignal`, `unstable_rethrow` reicht sie weiter),
  *  - `next/headers`: `cookies()`/`headers()` lesen den Zustand des Fake-Browsers (`env.browser`).
  */
 import assert from "node:assert/strict";
@@ -129,6 +129,10 @@ const FAKES: Record<string, unknown> = {
     },
     notFound: (): never => {
       throw new NotFoundSignal();
+    },
+    // wie Next: Steuerfluss-Signale (redirect/notFound) weiterreichen, alles andere ignorieren
+    unstable_rethrow: (error: unknown): void => {
+      if (error instanceof RedirectSignal || error instanceof NotFoundSignal) throw error;
     },
   },
   "next/cache": {

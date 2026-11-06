@@ -239,7 +239,7 @@ model Vehicle {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  customer     Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer     Customer?          @relation(fields: [customerId], references: [id], onDelete: Restrict)
   ownerships   VehicleOwnership[]
   tireSets     TireSet[]
   appointments Appointment[]
@@ -260,7 +260,7 @@ model VehicleOwnership {
   note       String?
 
   vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   @@index([vehicleId])
   @@index([customerId])
@@ -320,6 +320,10 @@ model Appointment {
   @@index([startsAt])
   @@index([vehicleId])
   @@index([tireSetId])
+  @@index([customerId])
+  @@index([bayId])
+  @@index([typeId])
+  @@index([assigneeId])
 }
 
 // ───────────── Digitale Reifenliste ─────────────
@@ -638,6 +642,8 @@ model Invoice {
   // incoming = Eingangsrechnung, outgoing = Ausgangsrechnung
   direction  String
   number     String
+  // Eindeutigkeit der Ausgangsrechnungsnummer: normalisierte Nummer (siehe normalizeInvoiceNumber), nur bei direction = outgoing, bei Eingang NULL
+  outgoingKey String?   @unique
   // Lieferant (incoming) bzw. Rechnungsempfänger (outgoing)
   partyName  String
   // optional: Kunde aus der Kundenverwaltung (nur outgoing)
@@ -657,12 +663,13 @@ model Invoice {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
   file     InvoiceFile?
 
   @@index([direction, status])
   @@index([issueDate])
   @@index([dueDate])
+  @@index([customerId])
 }
 
 // Datei (PDF/Bild) zur Rechnung – bewusst eigenes Modell, damit Listen die Binärdaten nie mitladen
@@ -723,6 +730,7 @@ model DocPage {
 
   @@unique([area, slug])
   @@index([area])
+  @@index([categoryId])
 }
 
 model DocVersion {
@@ -784,4 +792,26 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ───────────── Ereignisse (Outbox) ─────────────
+// Ereignisse für Webhooks, E-Mail u. a. entstehen nur im Aktions-Rahmen (src/server/operations): sie werden in derselben Transaktion wie die
+// Änderung geschrieben und sind damit erst nach dem Commit sichtbar. Der Runner (Job-Runner, P1b-0) verarbeitet sie später.
+model OutboxEvent {
+  id          String    @id @default(cuid())
+  // z. B. "invoice.paid"
+  type        String
+  entityId    String?
+  // JSON als Text (bewusst kein Json-Feld)
+  payload     String    @default("{}")
+  actorId     String?
+  createdAt   DateTime  @default(now())
+  // frühester Zeitpunkt der nächsten Zustellung (Wiederholung mit Wartezeit)
+  availableAt DateTime  @default(now())
+  attempts    Int       @default(0)
+  lastError   String?
+  processedAt DateTime?
+
+  @@index([processedAt, availableAt])
+  @@index([type])
 }

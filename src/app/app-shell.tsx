@@ -7,6 +7,7 @@ import { navFor } from "@/modules/registry";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import type { AppSession } from "@/server/auth/session";
 import { RecoveryBanner } from "@/platform/account/recovery-banner";
+import { FlashNotice } from "@/components/shell/flash-notice";
 import { getWorkshop } from "@/server/workshop";
 
 /** Der Anwendungsrahmen (Seitenleiste, Benutzermenü, Hinweisbanner) um den Seiteninhalt – für `(app)/layout.tsx` und die Fehlerseite 404. */
@@ -40,6 +41,7 @@ export async function AppShell({ session, children }: { session: AppSession; chi
       footer={<UserMenu name={session.user.name} roles={session.user.roleNames.join(", ") || "–"} locale={locale} theme={theme} logoutAction={logoutAction} />}
     >
       <main className="mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 lg:py-8">
+        <FlashNotice />
         <RecoveryBanner user={{ id: session.user.id, isAdmin: session.user.isAdmin }} />
         {children}
       </main>

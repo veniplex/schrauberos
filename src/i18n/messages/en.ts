@@ -49,6 +49,16 @@ export const en: Messages = {
     toDashboard: "Back to overview",
     actions: "Actions",
     limited: "showing the first {limit}",
+    deleted: "Deleted.",
+    errors: {
+      unauthenticated: "Please sign in.",
+      forbidden: "You do not have permission for that.",
+      notFound: "This entry no longer exists.",
+      duplicate: "This entry already exists.",
+      inUse: "This entry is still in use and cannot be changed.",
+      failed: "That did not work. Please try again.",
+      badRequest: "The request is invalid.",
+    },
   },
   errors: {
     notFoundTitle: "Page not found",

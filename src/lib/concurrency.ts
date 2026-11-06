@@ -24,3 +24,17 @@ export async function claimed(version: string | undefined | null, run: (stamp: D
   const stamp = versionDate(version);
   return stamp !== null && (await run(stamp, new Date(Math.max(Date.now(), stamp.getTime() + 1)))).count > 0;
 }
+
+/** Was `claimRow` von einem Prisma-Modell braucht (`tx.user`, `tx.invoice` …): nur `updateMany`. */
+type ClaimableModel = {
+  updateMany(args: { where: { id: string; updatedAt: Date }; data: { updatedAt: Date } }): PromiseLike<{ count: number }>;
+};
+
+/**
+ * Belegt eine Zeile für die Bearbeitung (siehe `claimed`) – kurz für `claimed(version, (stamp, next) => model.updateMany(...))`.
+ * Immer mit dem Modell der **Transaktion** aufrufen (`claimRow(tx.invoice, id, version)`), damit Belegen und Schreiben zusammengehören.
+ * Liefert false bei Konflikt (fehlende/veraltete Version oder Zeile weg).
+ */
+export function claimRow(model: ClaimableModel, id: string, version: string | undefined | null): Promise<boolean> {
+  return claimed(version, async (stamp, next) => model.updateMany({ where: { id, updatedAt: stamp }, data: { updatedAt: next } }));
+}

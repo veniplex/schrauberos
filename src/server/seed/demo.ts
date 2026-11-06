@@ -1,5 +1,6 @@
 import { addDays, setHours, setMinutes, startOfDay, startOfWeek } from "date-fns";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { outgoingKeyOf } from "@/lib/invoice-number";
 import { normalizePlate } from "@/lib/plate";
 import { slugify } from "@/lib/slug";
 
@@ -296,7 +297,7 @@ async function seedOfficeDemo(db: PrismaClient) {
   const inv = (direction: "incoming" | "outgoing", number: string, partyName: string, issueAgo: number, dueIn: number | null, grossCents: number, status = "open", extra: Record<string, unknown> = {}) =>
     db.invoice.create({
       data: {
-        direction, number, partyName, issueDate: noonOf(at(-issueAgo)), dueDate: dueIn == null ? null : noonOf(at(dueIn)),
+        direction, number, outgoingKey: outgoingKeyOf(direction, number), partyName, issueDate: noonOf(at(-issueAgo)), dueDate: dueIn == null ? null : noonOf(at(dueIn)),
         grossCents, netCents: Math.round(grossCents / 1.19), vatCents: grossCents - Math.round(grossCents / 1.19),
         status, paidAt: status === "paid" ? noonOf(at(-Math.max(issueAgo - 10, 1))) : null, ...extra,
       },

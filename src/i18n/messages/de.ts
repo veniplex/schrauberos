@@ -49,6 +49,16 @@ export const de = {
     toDashboard: "Zur Übersicht",
     actions: "Aktionen",
     limited: "angezeigt werden die ersten {limit}",
+    deleted: "Gelöscht.",
+    errors: {
+      unauthenticated: "Bitte melde dich an.",
+      forbidden: "Dafür fehlt dir die Berechtigung.",
+      notFound: "Dieser Eintrag existiert nicht mehr.",
+      duplicate: "Dieser Eintrag existiert bereits.",
+      inUse: "Dieser Eintrag wird noch verwendet und kann nicht geändert werden.",
+      failed: "Das hat nicht geklappt. Bitte versuche es noch einmal.",
+      badRequest: "Die Anfrage ist ungültig.",
+    },
   },
   errors: {
     notFoundTitle: "Seite nicht gefunden",
