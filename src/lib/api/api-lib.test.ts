@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { ALL_PERMISSIONS, FEATURES } from "@/modules/catalog";
 import { WindowLimiter } from "./limit";
 import { PROBLEMS, problemOf } from "./problem";
-import { DEFAULT_LIMIT, etagOf, isParamError, MAX_LIMIT, parseIfMatch, parsePaging, parseSort } from "./query";
+import { DEFAULT_LIMIT, etagOf, ifNoneMatchHit, isParamError, MAX_LIMIT, parseIfMatch, parsePaging, parseSort } from "./query";
 import { API_NEVER, checkTokenScope, effectivePermissions, grantablePermissions, isApiForbidden, isPlatformFeature } from "./scope";
 import { bearerToken, generateApiToken, hashApiToken, TOKEN_SHAPE, tokenHint } from "./token";
 
@@ -121,6 +121,13 @@ describe("Abfrageparameter", () => {
     assert.deepEqual(parseIfMatch('W/"123"'), { kind: "version", version: "123" });
     assert.deepEqual(parseIfMatch(null), { kind: "none" });
     for (const bad of ["*", "123", '"abc"', '"1", "2"', '""']) assert.deepEqual(parseIfMatch(bad), { kind: "invalid" }, bad);
+    // If-None-Match (Lesen): exakt, schwach, Liste, Stern – und alles andere ist kein Treffer
+    assert.equal(ifNoneMatchHit('"123"', '"123"'), true);
+    assert.equal(ifNoneMatchHit('W/"123"', '"123"'), true);
+    assert.equal(ifNoneMatchHit('"1", "123", "9"', '"123"'), true);
+    assert.equal(ifNoneMatchHit('"1",W/"123"', '"123"'), true);
+    assert.equal(ifNoneMatchHit("*", '"123"'), true);
+    for (const miss of [null, "", '"124"', '"1", "2"', "123", "W/", "x"]) assert.equal(ifNoneMatchHit(miss, '"123"'), false, String(miss));
   });
 });
 

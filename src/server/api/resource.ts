@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { etagOf, isParamError, parseIfMatch, parsePaging, parseSort, type SortKey } from "@/lib/api/query";
+import { etagOf, ifNoneMatchHit, isParamError, parseIfMatch, parsePaging, parseSort, type SortKey } from "@/lib/api/query";
 import type { FeatureId, Permission } from "@/modules/catalog";
 import { apiProblem, runApiOperation, type Operation, type Rename } from "@/server/operations";
 import type { ApiCall, ApiEndpoint, ApiResult } from "./types";
@@ -160,7 +160,8 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       const row = await find(call.params.id);
       if (!row) throw notFound();
       const result = itemResult(row, 200);
-      if (call.ifNoneMatch && result.headers?.etag === call.ifNoneMatch) return { status: 304, headers: result.headers };
+      const etag = result.headers?.etag;
+      if (etag && ifNoneMatchHit(call.ifNoneMatch, etag)) return { status: 304, headers: result.headers };
       return result;
     },
   });

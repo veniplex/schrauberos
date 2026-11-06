@@ -356,19 +356,25 @@ Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen 
 * **Drosselung nur im Fehlerpfad:** Zuerst der Hash-Lookup; **nur ungültige** Tokens (und Anfragen ohne Token) laufen in die Drosselung (`auth.ts`, `state.ts`): 120 Fehlversuche pro Minute
   insgesamt, 30 je Adresse – je Adresse nur mit der Proxy-Einstellung (`src/lib/client-ip.ts`, sonst wäre der Header fälschbar) – dann 429 mit `Retry-After`. Kein scrypt, nur ein Zähler im Speicher.
   Gültige Tokens werden davon nie berührt. Zusätzlich je Token ein Fenster pro Minute (Standard 120, am Token einstellbar): 429, `Retry-After`, Header `RateLimit-Limit/-Remaining/-Reset`.
-* **Idempotenz** (`Idempotency-Key`, bei POST/PATCH/DELETE): je Token, `<Methode> <Pfad>` und Schlüssel (1–128 Zeichen `A-Za-z0-9._:~-`) eine Zeile (`ApiIdempotencyKey`, Unique); Körper-Hash. Gleicher
-  Schlüssel + anderer Körper → 422 `idempotency_key_reuse`; Wiederholung → gespeicherte Antwort mit `Idempotent-Replayed: true`; parallele Doppelanfrage → 409 `idempotency_in_progress` (die Unique-Zeile
-  entscheidet, wer läuft); eine Zeile ohne Antwort, die älter als 60 s ist, gilt als verwaist und wird übernommen. 24 Stunden gültig; Serverfehler (5xx) und 429 werden nicht festgehalten. Aufräumen im
-  Scheduler (`runApiCleanup`). Bekannte Grenze: Stürzt der Prozess zwischen Commit der Operation und dem Speichern der Antwort ab, kann die Wiederholung nach 60 s die Operation erneut ausführen.
+* **Idempotenz** (`Idempotency-Key`, bei POST/PATCH/DELETE): je Token, `<Methode> <Pfad>` und Schlüssel (1–128 Zeichen `A-Za-z0-9._:~-`) eine Zeile (`ApiIdempotencyKey`, Unique); Fingerabdruck der Anfrage = Körper **und** `If-Match`. Gleicher
+  Schlüssel + anderer Fingerabdruck → 422 `idempotency_key_reuse`; Wiederholung → gespeicherte Antwort mit `Idempotent-Replayed: true`; parallele Doppelanfrage → 409 `idempotency_in_progress` (die Unique-Zeile
+  entscheidet, wer läuft); eine Zeile ohne Antwort, die älter als 60 s ist, gilt als verwaist und wird übernommen. **Gespeichert werden nur Erfolge (2xx)**; jede andere Antwort (404, 409, 412, 428, 422, 5xx, 429 …)
+  gibt den Schlüssel frei – die Operation hat dort nichts verändert, und eine Wiederholung nach einer Korrektur soll neu entscheiden dürfen. **Antworten liegen 24 Stunden in der Datenbank** (Körper des Ergebnisses, also
+  fachliche Daten wie Kundenname oder Adresse; sie fallen unter dieselbe Aufbewahrung wie die Daten selbst und gehören zum Backup); je Token höchstens 10 000 Schlüssel, darüber 429 bis zum Ablauf der ältesten.
+  Scheitert der Endpunkt **nach dem Commit** der Operation (Nachlesen der Zeile …), liefert die Pipeline eine **Mindestantwort** (`id`, bei 201 `Location`; `ApiCall.committed`) und hält sie fest – die Wiederholung legt nichts
+  doppelt an. Aufräumen im Scheduler (`runApiCleanup`). Bekannte Grenze: Stürzt der Prozess zwischen Commit der Operation und dem Speichern der Antwort ab, kann die Wiederholung nach 60 s die Operation erneut ausführen.
 * **Fehlerformat** (`application/problem+json`, angelehnt an RFC 9457): `{ type, title, status, code, detail, fields?, reason?, params? }`; `code` ist maschinenlesbar (`src/lib/api/problem.ts`),
   `fields` nennt je Eingabefeld einen Meldungsschlüssel (`code`, Pfad mit Punkten, z. B. `tires.FL.dot`). Fachliche Fehler der Operation: 422 (Eingabe), 404, 409 (Eindeutigkeit/„wird noch verwendet“),
   **412** (Version veraltet). Keine Stacks, Pfade oder SQL.
 * **Lesen:** `GET /x` mit `page`/`limit` (Standard 50, höchstens 200), `sort` (`-name,city`, nur Whitelist der Ressource, höchstens 3 Schlüssel), Filter je Ressource (unbekannte Parameter → 422). Antwort
-  `{ data: [...], page: { number, limit, total, pages } }`; Element `{ data: {...} }` mit `ETag` und `version`; `If-None-Match` → 304.
+  `{ data: [...], page: { number, limit, total, pages } }`; Element `{ data: {...} }` mit `ETag` und `version`; `If-None-Match` → 304 (exakter ETag, schwacher `W/"…"`, Liste, `*`).
 * **Schreiben:** `POST` (201, `Location`), `PATCH` (Teil-Update; **`If-Match` ist Pflicht** → 428 ohne, 412 bei veralteter Version; `null` löscht ein Feld), `DELETE` (204), Aktionen als `POST /x/{id}/<aktion>`.
-  Alles läuft über **dieselben Operationen** wie die Oberfläche (Recht, Prüfung der Sache, Konfliktprüfung, Transaktion, Hooks, **Audit** – der Handelnde heißt `<Name> [API: <Tokenname>]`, nie das Token).
-  Geld sind ganze Cent, Kalendertage `JJJJ-MM-TT`, Zeitpunkte ISO 8601.
-* **OpenAPI 3.1:** `GET /api/v1/openapi.json` (gültiges Token nötig), erzeugt aus den Zod-Schemas der Endpunkte (`z.toJSONSchema`), deterministisch, nur aktive Funktionen, ohne Daten und Interna.
+  Alles läuft über **dieselben Operationen** wie die Oberfläche (Recht, Prüfung der Sache, Konfliktprüfung, Transaktion, Hooks, **Audit** – der Handelnde heißt `<Name> [API: <Tokenname> · sos_ab12…]` – Name **und** Tokenanfang, denn Namen sind nicht eindeutig; nie das ganze Token).
+  Geld sind ganze Cent, Kalendertage `JJJJ-MM-TT` (**echte Kalendertage**: `2026-02-30` und `2026-13-45` sind 422, Formulare und API prüfen gleich über `isCalendarDay`/`dateText`), Zeitpunkte ISO 8601.
+  Eine Ortszeit, die es nicht gibt (Lücke der Sommerzeitumstellung), ist ein Feldfehler. **Pfade** sind flach, mit dem Namen der Funktion als Präfix (`/employee-absences`, `/fleet-costs`, `/network-devices`, `/appointment-bays`).
+  `permission: "authenticated"` (Konto-Operationen) gilt nur für Sitzungen – ein Token wird vom Kern zentral abgelehnt.
+* **OpenAPI 3.1:** `GET /api/v1/openapi.json` (gültiges Token nötig), erzeugt aus den Zod-Schemas der Endpunkte (`z.toJSONSchema`), deterministisch, nur aktive Funktionen, ohne Daten und Interna. Sie nennt alle Statuscodes (400, 401, 403, 404, 405, 409, 412, 413, 415, 422, 428, 429, 503, 304 am Element), die Header (`ETag`, `Location`, `RateLimit-*`, `Retry-After`, `Allow`) und
+  `If-None-Match`; `src/server/api/contract.test.ts` prüft das Dokument gegen **echte Antworten** (Schema aus dem Dokument neu aufgebaut, streng; beobachtete Statuscodes und Header müssen dokumentiert sein).
   `src/server/api/openapi-structure.txt` ist die Struktur-Momentaufnahme (Endpunkte, Rechte, Filter, Sortierungen, Körperfelder); Änderungen der API fallen im Review auf
   (`UPDATE_API_SNAPSHOT=1 npx tsx --test src/server/api/openapi.test.ts`).
 * **Nie API-Ressourcen:** Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit-Log und die API selbst (Plattform/Verwaltung); Architekturtest `src/modules/api.test.ts`. **Vertragstest:** Jede
@@ -379,7 +385,7 @@ Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen 
   widerruft `revokeApiTokensAfterRestore` (`src/server/startup.ts`) jedes gültige Token und vermerkt das im Audit-Log (`apiToken.restoreRevoked`) – die Sicherung kennt keine Widerrufe, die seitdem geschehen sind,
   und ein gestohlenes Token würde sonst wieder gültig. Ebenso widerrufen Passwortwechsel, Deaktivierung und Notzugang die Tokens des Kontos (`revokeAccess`, in derselben Transaktion).
 * **Tests:** `src/server/api/api.test.ts` (Authentifizierung, Drosselung, Rate-Limit, Idempotenz, Lesen/Schreiben, Fehler), `matrix.test.ts` (generierte Berechtigungs-Matrix über alle Endpunkte: ohne/ungültiges/abgelaufenes/
-  widerrufenes Token, Besitzer gesperrt, Cookie allein, Scope fehlt, Besitzer ohne Recht, Funktion aus), `tokens.test.ts`, `resources.test.ts` (Eigenheiten je Ressource), `openapi.test.ts`, `src/lib/api/api-lib.test.ts`.
+  widerrufenes Token, Besitzer gesperrt, Cookie allein, Scope fehlt, Besitzer ohne Recht, Funktion aus), `tokens.test.ts`, `resources.test.ts` (Eigenheiten je Ressource), `calendar-days.test.ts` (Kalendertage in Körper, Filter und Operationen, Sommerzeit), `contract.test.ts`, `openapi.test.ts`, `src/lib/api/api-lib.test.ts`.
 
 #### Neue API-Ressource anlegen (Rezept)
 

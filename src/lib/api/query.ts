@@ -45,6 +45,22 @@ export const isParamError = (value: unknown): value is ParamError => typeof valu
 /** ETag einer Zeile aus ihrer Version (Millisekunden der letzten Änderung, siehe `versionOf`). */
 export const etagOf = (version: string): string => `"${version}"`;
 
+/**
+ * `If-None-Match` (nur Lesen): Hat der Client den aktuellen Stand schon? `*` passt auf jedes vorhandene Element; sonst eine Liste von Entity-Tags, schwache (`W/"…"`)
+ * gelten für den Vergleich beim Lesen genauso (RFC 9110, schwacher Vergleich). Unlesbares ist „kein Treffer“ (der Client bekommt die volle Antwort).
+ */
+export function ifNoneMatchHit(header: string | null, etag: string): boolean {
+  if (header === null) return false;
+  const value = header.trim();
+  if (value === "*") return true;
+  const wanted = etag.replace(/^W\//, "");
+  for (const part of value.split(",")) {
+    const tag = part.trim().replace(/^W\//, "");
+    if (tag === wanted) return true;
+  }
+  return false;
+}
+
 /** `If-Match` → Version. `*` und Listen werden nicht unterstützt (die Version muss genau benannt werden). */
 export function parseIfMatch(header: string | null): { kind: "none" } | { kind: "invalid" } | { kind: "version"; version: string } {
   if (header === null || header.trim() === "") return { kind: "none" };
