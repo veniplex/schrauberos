@@ -13,6 +13,51 @@ Updates und alle Einstellungen über die Weboberfläche.
 
 Dazu die Plattform: Anmeldung, Rechte, **Hilfe** für alle Benutzer, Deutsch/Englisch, Hell/Dunkel, Werkstatt-Branding.
 
+## Schnell starten (Docker)
+
+Zwei Dateien in einen leeren Ordner auf dem Server legen – `docker-compose.yml` und (optional) `.env` – und starten.
+
+**`docker-compose.yml`**
+
+```yaml
+services:
+  app:
+    image: ghcr.io/veniplex/schrauberos:${SCHRAUBEROS_VERSION:-latest}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - app-data:/data
+
+volumes:
+  app-data:
+```
+
+**`.env`** (daneben; ohne die Datei gelten die Standardwerte, sie wird nur beim Neu-Erstellen des Containers gelesen)
+
+```env
+# Port auf dem Server
+APP_PORT=3000
+# Image-Version: latest oder z. B. 0.1.0 (Updates im Betrieb laufen über die Weboberfläche)
+SCHRAUBEROS_VERSION=latest
+```
+
+**Starten**
+
+```bash
+# einmalig, solange das Repository privat ist: bei ghcr.io anmelden (GitHub-Token mit Recht "read:packages")
+echo <TOKEN> | docker login ghcr.io -u <github-benutzer> --password-stdin
+
+docker compose up -d
+```
+
+Dann `http://<server>:3000` öffnen: Die **Ersteinrichtung** legt Werkstattname, Zeitzone und den ersten Administrator an
+(optional mit Beispieldaten). **Bis dahin darf die Anwendung nicht von außen erreichbar sein** – wer sie zuerst aufruft, wird
+Administrator. Alles Weitere (Backups, Updates, Einstellungen, Module) geschieht in der Weboberfläche unter **Verwaltung**; am
+Container muss nichts mehr angefasst werden. Alle Daten liegen im Volume `app-data` (lokale Platte, kein SMB/NFS). Mehr:
+[Betrieb](#betrieb). Aus dem Quellcode bauen statt ziehen: `docker compose up -d --build` (im Repository).
+
 ## Zwei Arten von Dokumentation
 
 * **Anwendungsdokumentation** (für die Nutzer): in der App unter **Hilfe**, für alle angemeldeten Benutzer sichtbar. Sie
@@ -26,7 +71,7 @@ Dazu die Plattform: Anmeldung, Rechte, **Hilfe** für alle Benutzer, Deutsch/Eng
 
 ## Inhalt dieser README
 
-1. [Schnellstart](#schnellstart-lokale-entwicklung) · 2. [Befehle](#befehle) · 3. [Architektur](#architektur) ·
+0. [Schnell starten (Docker)](#schnell-starten-docker) · 1. [Schnellstart Entwicklung](#schnellstart-lokale-entwicklung) · 2. [Befehle](#befehle) · 3. [Architektur](#architektur) ·
 4. [Datenhaltung](#datenhaltung) · 5. [Container, Starter und Updates](#container-starter-und-updates) ·
 6. [Neue Funktion anlegen](#eine-neue-funktion-anlegen) · 7. [Konventionen](#konventionen) · 8. [Tests](#tests) ·
 9. [Release und Signaturschlüssel](#release-und-signaturschlüssel) · 10. [Betrieb](#betrieb) · 11. [Grenzen](#bekannte-grenzen)
