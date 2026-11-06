@@ -406,7 +406,7 @@ Paket** und bringt alles andere mit:
 | Bestandteil | Wo | Aktualisierung |
 | --- | --- | --- |
 | **Starter** (`docker/bootstrap.c`, statisch, ~150 Zeilen) | Image | praktisch nie (nur bei geändertem Vertrag: `docker/BASE_VERSION`) |
-| **Launcher** (`src/launcher/main.ts`, mit esbuild zu `launcher.mjs`) | Paket | mit jedem Update |
+| **Launcher** (`src/launcher/main.ts` verdrahtet Prozess/Netz/Zeit, der Ablauf steht in `src/launcher/launcher.ts` und ist mit Fake-Prozess getestet; mit esbuild zu `launcher.mjs`) | Paket | mit jedem Update |
 | **Node** und **Systembibliotheken** (glibc, libstdc++, nss, Lader) | Paket (`runtime/`) | mit jedem Update |
 | **Anwendung** samt `node_modules`, Migrationen, Hilfe | Paket | mit jedem Update |
 
