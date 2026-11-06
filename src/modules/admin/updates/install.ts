@@ -4,15 +4,18 @@ import { createWriteStream, existsSync, mkdirSync, rmSync, renameSync, statSync 
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import * as tar from "tar";
+import { extractArchive } from "@/lib/archive";
 import { compareVersions } from "@/lib/updates/semver";
 import { afterInstall } from "@/lib/updates/state";
 import { pruneVersions, readMeta, readState, updatesDir, versionDir, versionsDir, writeState } from "@/lib/updates/store";
 import { runningMeta, updaterEnabled } from "./config";
 import { UpdateError, needsNewImage } from "./manifest";
-import { assetHeaders, type Release } from "./releases";
+import { downloadAsset, type Release } from "./releases";
 
 const LOCK_STALE_MS = 30 * 60 * 1000;
+
+/** Obergrenzen beim Entpacken eines Pakets (App samt node_modules, Node und Bibliotheken; das gepackte Paket ist auf 400 MiB begrenzt). */
+export const BUNDLE_ARCHIVE_LIMITS = { maxEntries: 200_000, maxBytes: 3 * 1024 ** 3 };
 
 /** Nur ein Update gleichzeitig: Sperre als Verzeichnis (atomar), veraltete Sperren nach einem Absturz verfallen. */
 function acquireLock(): () => void {
@@ -30,12 +33,7 @@ function acquireLock(): () => void {
 
 /** Lädt das Paket in eine Datei und prüft dabei Größe und SHA-256 gegen das signierte Manifest. */
 async function download(release: Release, file: string): Promise<void> {
-  let res: Response;
-  try {
-    res = await fetch(release.bundle.url, { headers: await assetHeaders(), signal: AbortSignal.timeout(15 * 60_000) });
-  } catch {
-    throw new UpdateError("network");
-  }
+  const res = await downloadAsset(release.bundle.url, 15 * 60_000);
   if (!res.ok || !res.body) throw new UpdateError("network", `HTTP ${res.status}`);
 
   const hash = createHash("sha256");
@@ -82,8 +80,8 @@ export async function installRelease(release: Release): Promise<void> {
     await download(release, archive);
 
     try {
-      // Das Paket ist signiert und geprüft; node-tar schreibt nie außerhalb des Zielordners (auch nicht über Symlinks)
-      await tar.x({ file: archive, cwd: staging, strict: true });
+      // Das Paket ist signiert und geprüft – trotzdem nur Ordner, Dateien und Symlinks innerhalb des Pakets, keine gefährlichen Pfade, mit Obergrenzen (lib/archive.ts)
+      await extractArchive(archive, staging, BUNDLE_ARCHIVE_LIMITS, { symlinks: "inside" });
     } catch {
       throw new UpdateError("extract");
     }

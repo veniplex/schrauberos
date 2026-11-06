@@ -16,7 +16,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { databaseFile } from "../server/db-client-path";
-import { healthVerdict } from "../lib/updates/health";
+import { healthVerdict, isStarting } from "../lib/updates/health";
 import { applyPendingRestore, confirmRestore, readApplied, rollbackRestore } from "../lib/updates/restore";
 import { compareVersions } from "../lib/updates/semver";
 import { afterFailure, afterHealthy, isCompatible, RESTART_EXIT_CODE, versionsToKeep, type VersionMeta } from "../lib/updates/state";
@@ -47,7 +47,10 @@ export type LauncherConfig = {
   /** Verzeichnis der eingebauten Version (im Image /app) */
   builtin: string;
   port: string;
+  /** Wie lange die App ohne Lebenszeichen „starting“ gesund werden darf */
   healthTimeoutMs: number;
+  /** Harte Obergrenze, auch wenn die App ständig „starting“ meldet (Standard 15 Minuten, mindestens `healthTimeoutMs`) */
+  healthMaxMs?: number;
   /** Prozessumgebung, die an die App weitergegeben wird */
   env: NodeJS.ProcessEnv;
   execPath: string;
@@ -66,6 +69,9 @@ export function appCommand(own: string, execPath: string): { command: string; ar
   return { command: execPath, args: ["server.js"] };
 }
 
+/** Standard für die harte Obergrenze der Wartezeit auf die Gesundheit einer frisch gestarteten App. */
+export const DEFAULT_HEALTH_MAX_MS = 15 * 60_000;
+
 export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
   const OWN = path.resolve(config.own);
   const BUILTIN = path.resolve(config.builtin);
@@ -82,12 +88,18 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
     return !child;
   }
 
-  /** Wartet, bis die App gesund antwortet; false bei Zeitüberschreitung, vorzeitigem Ende oder „Neuinstallation nötig“. */
+  /**
+   * Wartet, bis die App gesund antwortet; false bei Zeitüberschreitung, vorzeitigem Ende oder „Neuinstallation nötig“. Die Frist (`healthTimeoutMs`) verlängert sich
+   * jedes Mal um ihre volle Länge, wenn die App mit „starting“ antwortet (sie lebt und migriert noch) – höchstens bis zur harten Obergrenze `healthMaxMs` ab Start.
+   */
   async function waitHealthy(proc: AppProcess): Promise<boolean> {
-    const deadline = deps.now() + config.healthTimeoutMs;
+    const started = deps.now();
+    const hardLimit = started + Math.max(config.healthMaxMs ?? DEFAULT_HEALTH_MAX_MS, config.healthTimeoutMs);
+    let deadline = started + config.healthTimeoutMs;
     while (!proc.hasExited() && !stopping && deps.now() < deadline) {
       const res = await deps.health().catch(() => null);
       if (res) {
+        if (isStarting(res.status, res.body)) deadline = Math.min(hardLimit, Math.max(deadline, deps.now() + config.healthTimeoutMs));
         const verdict = healthVerdict(res.status, res.body);
         if (verdict === "ok") return true;
         if (verdict === "fatal") {

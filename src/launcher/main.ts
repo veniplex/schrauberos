@@ -45,6 +45,7 @@ const launcher = createLauncher(
     builtin: path.resolve(process.env.BUILTIN_DIR ?? "/app"),
     port: PORT,
     healthTimeoutMs: Number(process.env.LAUNCHER_HEALTH_TIMEOUT_MS ?? 90_000),
+    healthMaxMs: Number(process.env.LAUNCHER_HEALTH_MAX_MS ?? 15 * 60_000),
     env: process.env,
     execPath: process.execPath,
   },

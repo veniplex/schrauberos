@@ -6,7 +6,7 @@ import { after, afterEach, beforeEach, describe, it } from "node:test";
 import { applyPendingRestore, pendingDbFile, readApplied, readRestoreResult, restoreDir, writePending } from "../lib/updates/restore";
 import { RESTART_EXIT_CODE, emptyState } from "../lib/updates/state";
 import { launcherCrashFile, readState, versionDir, writeState } from "../lib/updates/store";
-import { createLauncher, type AppProcess, type LauncherConfig, type LauncherDeps, type SpawnSpec } from "./launcher";
+import { createLauncher, DEFAULT_HEALTH_MAX_MS, type AppProcess, type LauncherConfig, type LauncherDeps, type SpawnSpec } from "./launcher";
 
 /**
  * Ablauf des Launchers mit Fake-Prozess, Fake-Gesundheitsabfrage und Fake-Uhr gegen ein echtes temporäres Datenverzeichnis:
@@ -200,6 +200,72 @@ describe("installierte Version (Update)", () => {
     assert.deepEqual(state.failed, ["1.1.0"]);
     assert.equal(state.last?.reason, "antwortet nicht gesund");
     assert.ok(rig.clock.ms - Date.parse("2026-01-01T00:00:00Z") >= 10_000, "es wurde bis zur Frist gewartet");
+  });
+
+  describe("Gesundheitsfenster bei langen Migrationen", () => {
+    const starting = { status: 503, body: { status: "starting" } };
+    const started = () => Date.parse("2026-01-01T00:00:00Z");
+
+    it("verlängert sich, solange die App „starting“ meldet: eine Migration, die länger als die übliche Frist dauert, führt nicht zum Rückfall", async () => {
+      install();
+      // 40 Sekunden „starting“ bei einer Frist von 10 Sekunden, dann gesund
+      rig.healthReplies = [...Array.from({ length: 40 }, () => starting), ok];
+      rig.onSpawn = (proc) => void proc.exited;
+      const finished = launcherFor(volume("1.1.0"), { healthTimeoutMs: 10_000, healthMaxMs: 120_000 }).run();
+      for (let i = 0; i < 200 && readState(data).pending; i++) await new Promise((r) => setImmediate(r));
+      assert.equal(readState(data).pending, false, "Update bestätigt");
+      assert.equal(readState(data).current, "1.1.0");
+      assert.ok(rig.clock.ms - started() >= 40_000, "es wurde länger als die Grundfrist gewartet");
+      assert.deepEqual(rig.spawned[0].kills, [], "die App wurde nicht abgeschossen");
+      rig.spawned[0].exit(0);
+      assert.equal(await finished, 0);
+    });
+
+    it("hat eine harte Obergrenze: eine App, die ewig „starting“ meldet, wird nach healthMaxMs verworfen", async () => {
+      meta(volume("1.0.5"), "1.0.5");
+      meta(volume("1.1.0"), "1.1.0");
+      writeState({ ...emptyState(), current: "1.1.0", previous: "1.0.5", pending: true }, data);
+      rig.healthReplies = Array.from({ length: 1000 }, () => starting);
+      rig.onSpawn = () => undefined;
+      assert.equal(await launcherFor(volume("1.1.0"), { healthTimeoutMs: 10_000, healthMaxMs: 60_000 }).run(), RESTART_EXIT_CODE);
+      assert.deepEqual(rig.spawned[0].kills, ["SIGKILL"]);
+      const waited = rig.clock.ms - started();
+      assert.ok(waited >= 60_000 && waited <= 62_000, `bis zur Obergrenze gewartet, nicht länger: ${waited} ms`);
+      assert.equal(readState(data).current, "1.0.5");
+      assert.deepEqual(readState(data).failed, ["1.1.0"]);
+    });
+
+    it("verlängert nur bei „starting“: eine nicht erreichbare App (null) oder ein 503 „error“ hält die Grundfrist ein", async () => {
+      for (const reply of [null, { status: 503, body: { status: "error" } }, { status: 502, body: null }]) {
+        install();
+        rig.healthReplies = Array.from({ length: 1000 }, () => reply);
+        rig.onSpawn = () => undefined;
+        const before = rig.clock.ms;
+        assert.equal(await launcherFor(volume("1.1.0"), { healthTimeoutMs: 10_000, healthMaxMs: 600_000 }).run(), RESTART_EXIT_CODE);
+        const waited = rig.clock.ms - before;
+        assert.ok(waited >= 10_000 && waited <= 12_000, `Grundfrist: ${waited} ms`);
+        rig.spawned.length = 0;
+        rig.healthCalls = 0;
+      }
+    });
+
+    it("ohne healthMaxMs gilt ein Standard von 15 Minuten; die Grundfrist wird nie unterschritten", async () => {
+      assert.equal(DEFAULT_HEALTH_MAX_MS, 15 * 60_000);
+      install();
+      rig.healthReplies = Array.from({ length: 5000 }, () => starting);
+      rig.onSpawn = () => undefined;
+      const before = rig.clock.ms;
+      assert.equal(await launcherFor(volume("1.1.0"), { healthTimeoutMs: 10_000 }).run(), RESTART_EXIT_CODE);
+      const waited = rig.clock.ms - before;
+      assert.ok(waited >= 15 * 60_000 && waited <= 15 * 60_000 + 2000, `${waited} ms`);
+
+      install();
+      rig.spawned.length = 0;
+      rig.healthReplies = Array.from({ length: 5000 }, () => starting);
+      const before2 = rig.clock.ms;
+      assert.equal(await launcherFor(volume("1.1.0"), { healthTimeoutMs: 20_000, healthMaxMs: 5_000 }).run(), RESTART_EXIT_CODE);
+      assert.ok(rig.clock.ms - before2 >= 20_000, "die Obergrenze liegt nie unter der Grundfrist");
+    });
   });
 
   it("wartet bei „Neuinstallation nötig“ (503 reinstall) nicht bis zur Frist, sondern fällt sofort zurück", async () => {

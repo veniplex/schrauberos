@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 import * as tar from "tar";
+import { gzipSync } from "node:zlib";
+import { rawTar, type RawEntry } from "@/test/tar";
 import { createTestEnv, type TestEnv } from "@/test/harness";
 
 /**
@@ -65,9 +67,24 @@ function fakeDownload(answer: Buffer | number | "offline") {
   return requests;
 }
 
+/** Fake-GitHub mit Weiterleitung: die Asset-Adresse der API antwortet mit 302 auf `target`, dort liegen die Bytes. */
+function fakeRedirectingDownload(bytes: Buffer, target: string) {
+  const requests: Array<{ url: string; auth: string | null }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    requests.push({ url, auth: new Headers(init?.headers).get("Authorization") });
+    if (url === target) return new Response(new Uint8Array(bytes));
+    return new Response(null, { status: 302, headers: { location: target } });
+  }) as typeof fetch;
+  return requests;
+}
+
 before(async () => {
   env = await createTestEnv();
   process.env.APP_UPDATER = "1";
+  // Die „GitHub-API“ des Tests: Asset-Adressen liegen auf derselben Herkunft (nur dorthin darf das Token); `cdn.fake` ist der erlaubte Content-Server
+  process.env.UPDATE_API_URL = "http://fake";
+  process.env.UPDATE_REDIRECT_HOSTS = "cdn.fake";
   // „Laufende Version“ = version.json im Arbeitsverzeichnis
   const running = path.join(work, "running");
   mkdirSync(running, { recursive: true });
@@ -81,6 +98,8 @@ after(async () => {
   process.chdir(realCwd);
   globalThis.fetch = realFetch;
   delete process.env.APP_UPDATER;
+  delete process.env.UPDATE_API_URL;
+  delete process.env.UPDATE_REDIRECT_HOSTS;
   await env.cleanup();
   rmSync(work, { recursive: true, force: true });
 });
@@ -199,6 +218,62 @@ describe("installRelease", () => {
     assert.ok(Date.now() - statSync(lock).mtimeMs > 30 * 60_000);
     await install.installRelease(release("1.1.0", bytes));
     assert.equal(store.readState().current, "1.1.0");
+  });
+
+  it("Weiterleitung des Downloads auf den GitHub-Content-Server: das Token geht nur an die API, nie an das Weiterleitungsziel (SEC-09)", async () => {
+    const bytes = await bundle("1.1.0");
+    await env.db.appSetting.deleteMany();
+    const { setSecret } = await import("@/server/settings");
+    await setSecret("update.token", "geheim-token-123");
+    const requests = fakeRedirectingDownload(bytes, "http://cdn.fake/release-assets/abc?sig=1");
+    await install.installRelease(release("1.1.0", bytes));
+    assert.deepEqual(requests.map((r) => [new URL(r.url).host, r.auth]), [["fake", "Bearer geheim-token-123"], ["cdn.fake", null]]);
+    assert.equal(store.readState().current, "1.1.0");
+  });
+
+  it("Weiterleitung auf einen Fremdhost: Abbruch (badRelease), der Fremdhost wird nie angefragt, nichts bleibt liegen (SEC-09)", async () => {
+    const bytes = await bundle("1.1.0");
+    const { setSecret } = await import("@/server/settings");
+    await setSecret("update.token", "geheim-token-123");
+    for (const evil of ["http://evil.example/steal", "http://cdn.fake.evil.example/x", "http://cdn.fake@evil.example/x", "ftp://cdn.fake/x"]) {
+      const requests = fakeRedirectingDownload(bytes, evil);
+      await rejectsWith(install.installRelease(release("1.1.0", bytes)), "badRelease");
+      assert.deepEqual(requests.map((r) => new URL(r.url).host), ["fake"], evil);
+    }
+    assert.equal(store.readState().current, null);
+    assert.equal(existsSync(store.versionDir("1.1.0")), false);
+    assert.equal(existsSync(path.join(store.updatesDir(), ".install.lock")), false, "die Sperre wird freigegeben");
+  });
+
+  it("eine Asset-Adresse auf fremdem Host wird gar nicht angefragt – das Token verlässt die App nicht", async () => {
+    const bytes = await bundle("1.1.0");
+    const { setSecret } = await import("@/server/settings");
+    await setSecret("update.token", "geheim-token-123");
+    const requests = fakeDownload(bytes);
+    const foreign = release("1.1.0", bytes);
+    foreign.bundle.url = "http://evil.example/asset/schrauberos-1.1.0.tar.gz";
+    await rejectsWith(install.installRelease(foreign), "badRelease");
+    assert.equal(requests.length, 0);
+  });
+
+  it("lehnt Pakete mit Symlink nach außen, Hardlink, ..-Pfad, absolutem Pfad oder Geräte-Datei beim Entpacken ab (SEC-14) – nichts außerhalb, nichts liegt danach da", async () => {
+    const base: RawEntry[] = [{ name: "version.json", data: JSON.stringify({ version: "1.1.0", base: 1 }) }, { name: "server.js", data: "//" }];
+    const evil: Array<[string, RawEntry]> = [
+      ["Symlink nach außen", { name: "runtime/lib/libx.so", type: "2", linkname: "../../../../etc/passwd" }],
+      ["absoluter Symlink", { name: "runtime/lib/liby.so", type: "2", linkname: "/etc/passwd" }],
+      ["Hardlink", { name: "hart", type: "1", linkname: "server.js" }],
+      ["..-Pfad", { name: "../draussen.txt", data: "böse" }],
+      ["Geräte-Datei", { name: "dev/null", type: "3" }],
+    ];
+    for (const [name, entry] of evil) {
+      const bytes = gzipSync(rawTar([...base, entry]));
+      fakeDownload(bytes);
+      await rejectsWith(install.installRelease(release("1.1.0", bytes)), "extract");
+      assert.equal(existsSync(store.versionDir("1.1.0")), false, name);
+      assert.equal(existsSync(path.join(store.versionsDir(), ".partial-1.1.0")), false, name);
+    }
+    assert.equal(existsSync(path.join(work, "draussen.txt")), false);
+    assert.equal(store.readState().current, null);
   });
 
   it("sendet das Update-Token nur als Autorisierungs-Kopf des Downloads", async () => {

@@ -1,5 +1,6 @@
 import "server-only";
-import { updateConfig } from "./config";
+import { FetchPolicyError, fetchWithPolicy } from "@/lib/updates/safe-fetch";
+import { fetchPolicy, updateConfig } from "./config";
 import { parseEndorsements, trustedReleaseKeys, validEndorsements } from "@/lib/updates/keychain";
 import { readEndorsements, writeEndorsements } from "@/lib/updates/store";
 import { UpdateError, verifyManifest, type Manifest } from "./manifest";
@@ -15,30 +16,33 @@ export type Release = {
   bundle: GithubAsset;
 };
 
-const headers = async (accept: string) => {
-  const { token } = await updateConfig();
-  return {
-    Accept: accept,
-    "User-Agent": "SchrauberOS-Updater",
-    "X-GitHub-Api-Version": "2022-11-28",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
+const baseHeaders = (accept: string) => ({ Accept: accept, "User-Agent": "SchrauberOS-Updater", "X-GitHub-Api-Version": "2022-11-28" });
 
-/** Header (inkl. Token) für den Download eines Release-Assets. */
-export const assetHeaders = () => headers("application/octet-stream");
+/** Übersetzt Verstöße gegen die Abruf-Regeln (fremder Host, schlechte Weiterleitung) in einen Fehler des Releases, alles andere in „Netzwerk“. */
+function asUpdateError(error: unknown): UpdateError {
+  return error instanceof FetchPolicyError ? new UpdateError("badRelease", error.code) : new UpdateError("network");
+}
 
-async function request(url: string, accept: string): Promise<Response> {
+/**
+ * Ruft eine Adresse bei GitHub ab (mit dem Update-Token, falls eingerichtet – nur an die API; Weiterleitungen nur auf die Content-Server von GitHub und ohne Token,
+ * siehe `lib/updates/safe-fetch.ts`). `metadata`: Abfrage der API selbst (ein Ziel auf derselben Herkunft behält das Token).
+ */
+async function githubFetch(url: string, accept: string, options: { timeoutMs?: number; metadata?: boolean } = {}): Promise<Response> {
   try {
-    return await fetch(url, { headers: await headers(accept), signal: AbortSignal.timeout(15_000) });
-  } catch {
-    throw new UpdateError("network");
+    return await fetchWithPolicy(url, baseHeaders(accept), await fetchPolicy({ timeoutMs: options.timeoutMs ?? 15_000, sameOriginRedirectKeepsAuth: options.metadata ?? false }));
+  } catch (error) {
+    throw asUpdateError(error);
   }
 }
 
+/** Download eines Release-Assets (Paket): Token nur an die API, die Weiterleitung auf den Content-Server geht ohne Token. */
+export const downloadAsset = (url: string, timeoutMs: number) => githubFetch(url, "application/octet-stream", { timeoutMs });
+
+const request = (url: string, accept: string) => githubFetch(url, accept, { metadata: true });
+
 async function smallAsset(asset: GithubAsset): Promise<Buffer> {
   if (asset.size > 64 * 1024) throw new UpdateError("badRelease", `${asset.name} zu groß`);
-  const res = await request(asset.url, "application/octet-stream");
+  const res = await githubFetch(asset.url, "application/octet-stream");
   if (!res.ok) throw new UpdateError("badRelease", `${asset.name}: HTTP ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
