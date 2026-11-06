@@ -91,6 +91,9 @@ describe("Authentifizierung", () => {
     const actions = await import("@/modules/workshop/customers/actions");
     assert.equal(await redirectOf(() => actions.saveCustomer({}, form({ lastName: "Eingeschmuggelt" }))), "/login");
     assert.equal(await env.db.customer.count(), 0);
+    // auch die Sitzung selbst (Seiten, requirePermission) kennt das Token nicht
+    const { getSession } = await import("@/server/auth/session");
+    assert.equal(await getSession(), null);
     env.browser.setHeaders({});
   });
 
@@ -293,6 +296,16 @@ describe("Schreiben über dieselben Operationen wie die Oberfläche", () => {
     assert.equal(await env.db.customer.count(), 1);
   });
 
+  it("HEAD und OPTIONS: ohne Token 401, mit Token 405 – es gibt kein CORS", async () => {
+    const { token } = await makeToken(env, owner());
+    for (const method of ["HEAD", "OPTIONS"]) {
+      assert.equal((await call(apiRequest(method, "/customers"))).status, 401, method);
+      const response = await call(apiRequest(method, "/customers", { token }));
+      assert.equal(response.status, 405, method);
+      assert.equal(response.headers.get("access-control-allow-origin"), null);
+    }
+  });
+
   it("Methode nicht erlaubt: 405 mit Allow", async () => {
     const { token } = await makeToken(env, owner());
     const response = await call(apiRequest("PUT", "/customers", { token, body: {} }));
@@ -331,6 +344,22 @@ describe("Idempotenz", () => {
     // derselbe Schlüssel auf einem anderen Pfad ist ein anderer Vorgang
     const id = (await env.db.customer.findFirstOrThrow({ where: { lastName: "Eins" } })).id;
     assert.equal((await call(apiRequest("DELETE", `/customers/${id}`, { token: a.token, headers: { "idempotency-key": key } }))).status, 204);
+  });
+
+  it("auch fachliche Fehler werden festgehalten und wiederholt (mit Problem-Format); der Schlüssel auf GET wird ignoriert", async () => {
+    const { token } = await makeToken(env, { ownerPermissions: ["vehicles.view", "vehicles.edit"], scope: ["vehicles.view", "vehicles.edit"] });
+    await env.db.vehicle.create({ data: { plate: "B-AB 1", plateNorm: "BAB1" } });
+    const send = (k: string) => call(apiRequest("POST", "/vehicles", { token, body: { plate: "B-AB 1" }, headers: { "idempotency-key": k } }));
+    const first = await send("fehler-1");
+    assert.equal(first.status, 422);
+    const replay = await send("fehler-1");
+    assert.equal(replay.status, 422);
+    assert.equal(replay.headers.get("idempotent-replayed"), "true");
+    assert.match(replay.headers.get("content-type") ?? "", /application\/problem\+json/);
+    assert.deepEqual(await replay.json(), await first.json());
+    const get = await call(apiRequest("GET", "/vehicles", { token, headers: { "idempotency-key": "nur-fuer-get" } }));
+    assert.equal(get.status, 200);
+    assert.equal(await env.db.apiIdempotencyKey.count({ where: { key: "nur-fuer-get" } }), 0);
   });
 
   it("Schlüsselform ist begrenzt; abgelaufene Schlüssel werden ignoriert und aufgeräumt", async () => {

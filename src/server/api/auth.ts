@@ -28,14 +28,15 @@ const challenge = { "www-authenticate": 'Bearer realm="schrauberos"' };
 
 /** Ungültiges Token: 401 – oder 429, wenn die Fehlversuche überhandnehmen (nur dieser Pfad). */
 async function reject(request: Request): Promise<ApiAuthResult> {
-  const ip = clientIp(request.headers.get("x-forwarded-for"), await isBehindProxy());
-  const perIp = ip ? apiLimiters.failuresPerIp.hit(ip, apiLimits.failuresPerIp) : null;
+  // Zuerst das billige globale Budget (nur ein Zähler); die Proxy-Einstellung (eine Datenbankabfrage) erst, wenn es nicht schon reicht
   const global = apiLimiters.failuresGlobal.hit("all", apiLimits.failuresGlobal);
-  const blocked = [perIp, global].filter((r) => r && !r.allowed);
-  if (blocked.length > 0) {
-    const wait = Math.max(...blocked.map((r) => r!.resetSeconds));
-    return { ok: false, response: problemResponse(problemOf("rate_limited"), { "retry-after": String(wait) }) };
+  let wait = global.allowed ? 0 : global.resetSeconds;
+  if (global.allowed) {
+    const ip = clientIp(request.headers.get("x-forwarded-for"), await isBehindProxy());
+    const perIp = ip ? apiLimiters.failuresPerIp.hit(ip, apiLimits.failuresPerIp) : null;
+    if (perIp && !perIp.allowed) wait = perIp.resetSeconds;
   }
+  if (wait > 0) return { ok: false, response: problemResponse(problemOf("rate_limited"), { "retry-after": String(wait) }) };
   return { ok: false, response: problemResponse(problemOf("unauthenticated"), challenge) };
 }
 

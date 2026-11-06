@@ -44,18 +44,6 @@ export const DEFAULT_KEYS: Record<ErrorCode, MessageKey> = {
   failed: "common.errors.failed",
 };
 
-/** HTTP-Statuscode je Fehlercode (API-Adapter). */
-export const STATUS: Record<ErrorCode, number> = {
-  invalid: 422,
-  unauthenticated: 401,
-  forbidden: 403,
-  notFound: 404,
-  conflict: 409,
-  duplicate: 409,
-  inUse: 409,
-  failed: 500,
-};
-
 /**
  * Fachlicher Fehler innerhalb von `run`. Wird er geworfen, rollt die Transaktion zurück und der Adapter meldet ihn als Ergebnis
  * (Aktion: Fehlermeldung bzw. Flash, API: Statuscode). `run` kennt weder `redirect` noch Flash.

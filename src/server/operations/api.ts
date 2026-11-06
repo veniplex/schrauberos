@@ -22,12 +22,13 @@ export type ApiAuthResult =
 export type ApiAuthenticator = (request: Request) => Promise<ApiAuthResult>;
 
 const unauthenticated = async (): Promise<ApiAuthResult> => ({ ok: false, response: problemResponse(problemOf("unauthenticated"), { "www-authenticate": 'Bearer realm="schrauberos"' }) });
-let authenticator: ApiAuthenticator = unauthenticated;
+// im globalen Objekt, damit jede Instanz des Moduls (Route, Tests) denselben Authentifizierer sieht
+const globalForApi = globalThis as unknown as { __apiAuthenticator?: ApiAuthenticator };
 
 export function setApiAuthenticator(next: ApiAuthenticator): void {
-  authenticator = next;
+  globalForApi.__apiAuthenticator = next;
 }
-export const getApiAuthenticator = (): ApiAuthenticator => authenticator;
+export const getApiAuthenticator = (): ApiAuthenticator => globalForApi.__apiAuthenticator ?? unauthenticated;
 
 /** Problem-Antwort (`application/problem+json`, nie zwischenspeichern). */
 export function problemResponse(problem: Problem, headers: Record<string, string> = {}): Response {
