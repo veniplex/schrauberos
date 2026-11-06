@@ -53,9 +53,10 @@ echo <TOKEN> | docker login ghcr.io -u <github-benutzer> --password-stdin
 docker compose up -d
 ```
 
-Dann `http://<server>:3000` öffnen: Die **Ersteinrichtung** legt Werkstattname, Zeitzone und den ersten Administrator an
-(optional mit Beispieldaten). **Bis dahin darf die Anwendung nicht von außen erreichbar sein** – wer sie zuerst aufruft, wird
-Administrator. Alles Weitere (Backups, Updates, Einstellungen, Module) geschieht in der Weboberfläche unter **Verwaltung**; am
+Das **Einrichtungs-Token** steht im Container-Log: `docker compose logs app` (Zeile `[setup] Einrichtungs-Token: …`; die Datei
+`setup-token` im Volume enthält denselben Wert). Dann `http://<server>:3000` öffnen: Die **Ersteinrichtung** verlangt dieses Token
+und legt Werkstattname, Zeitzone und den ersten Administrator an (optional mit Beispieldaten). Ohne Token kann niemand die
+Einrichtung übernehmen; trotzdem sollte die Anwendung bis zum Abschluss nicht von außen erreichbar sein. Alles Weitere (Backups, Updates, Einstellungen, Module) geschieht in der Weboberfläche unter **Verwaltung**; am
 Container muss nichts mehr angefasst werden. Alle Daten liegen im Volume `app-data` (lokale Platte, kein SMB/NFS). Mehr:
 [Betrieb](#betrieb). Aus dem Quellcode bauen statt ziehen: `docker compose up -d --build` (im Repository).
 
@@ -213,6 +214,16 @@ Web-Update bei Problemen auf die vorherige Version zurückfällt – auf dem dan
 Migrationen, die sie nicht kennt). Prisma verlangt bei Daten-verlustigen Änderungen eine Bestätigung im Terminal; geht das nicht
 (`migrate dev` bleibt dann stumm), SQL per `prisma migrate diff --from-schema … --to-schema … --script` erzeugen und als
 Migrationsordner ablegen.
+
+### Ersteinrichtung und Einrichtungs-Token
+
+Beim App-Start (`src/server/startup.ts`) erzeugt `ensureSetupToken` (`src/server/setup-token.ts`), solange es **keinen Benutzer** gibt, ein
+zufälliges Token (160 Bit), schreibt es als `<DATA_DIR>/setup-token` (Modus 0600, nicht Teil der Backups) und ins Container-Log. Die
+Ersteinrichtung (`src/app/setup/actions.ts`) prüft in dieser Reihenfolge: gibt es schon einen Benutzer (→ `/login`, nichts anderes
+wird angefasst), Token (Vergleich über SHA-256 in konstanter Zeit, global gedrosselt: 5 freie Versuche, dann 5 s … 60 s), Eingaben,
+dann Anlegen in einer Transaktion; **erst danach** wird die Zeitzone angewendet (`applyTimezone`, vorher `isValidTimezone`) und das
+Token gelöscht. Dasselbe gilt für die Einstellungen (Zeitzone erst nach dem Speichern). Das Token ist die bewusste Ausnahme vom Grundsatz
+„alles über die Weboberfläche“: **einmalige Installationshandlung, kein laufender Betrieb**.
 
 ### Gleichzeitiges Bearbeiten
 
@@ -445,9 +456,9 @@ echo <TOKEN> | docker login ghcr.io -u <github-benutzer> --password-stdin
 docker compose up -d
 ```
 
-In **Portainer** genügt es, den Inhalt von `docker-compose.yml` als Stack einzufügen. Danach im Browser `http://<server>:3000`
-öffnen: Die **Ersteinrichtung** legt Werkstattname, Zeitzone und den ersten Administrator an. **Vorher darf die Anwendung nicht von
-außen erreichbar sein** – wer sie zuerst aufruft, wird Administrator. Alles Weitere erledigt die Weboberfläche (Verwaltung →
+In **Portainer** genügt es, den Inhalt von `docker-compose.yml` als Stack einzufügen. Das Einrichtungs-Token
+aus `docker compose logs app` (bzw. dem Log des Stacks in Portainer) bereithalten, dann im Browser `http://<server>:3000` öffnen:
+Die **Ersteinrichtung** legt Werkstattname, Zeitzone und den ersten Administrator an. Alles Weitere erledigt die Weboberfläche (Verwaltung →
 Backups, Updates, Einstellungen). Das Volume `app-data` muss auf einer **lokalen Platte** liegen.
 
 Optional, nur beim Neu-Erstellen des Containers: `.env` neben der `docker-compose.yml` (Vorlage `docker.env.example`) mit `APP_PORT`
@@ -462,6 +473,7 @@ und `SCHRAUBEROS_VERSION` (Image-Version, Standard `latest`).
 /data/app/                            state.json, active, versions/<version>/ (installierte Pakete), launcher-crash
 /data/restore/                        vorgemerkte/ersetzte Daten während einer Wiederherstellung
 /data/secret.key                      Schlüssel für verschlüsselte Einstellungen (nicht in Backups)
+/data/setup-token                     Einrichtungs-Token (nur bis zur Ersteinrichtung, Modus 0600, nicht in Backups)
 ```
 
 ### Notfall ohne Weboberfläche

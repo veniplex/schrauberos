@@ -11,8 +11,9 @@ nicht, ob es ein Konto gibt. Wer sein Passwort vergessen hat, bittet einen Admin
 zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
 
 > **Erste Einrichtung:** Beim allerersten Aufruf einer neuen Installation erscheint statt der Anmeldung die Ersteinrichtung:
-> Werkstattname, Zeitzone und das Konto des ersten Administrators. Auf Wunsch startet die Anwendung mit Beispieldaten zum
-> Ausprobieren.
+> Einrichtungs-Token, Werkstattname, Zeitzone und das Konto des ersten Administrators. Das Token steht im Protokoll des Containers
+> (`docker compose logs app`); es verhindert, dass Fremde die Einrichtung übernehmen. Auf Wunsch startet die Anwendung mit
+> Beispieldaten zum Ausprobieren.
 
 ## Die Oberfläche
 

@@ -100,6 +100,8 @@ export const en: Messages = {
   },
   setup: {
     title: "Initial setup",
+    token: "Setup token",
+    tokenHint: "It is printed in the container log (docker compose logs app) when the application starts.",
     intro: "Welcome! Two minutes and the application is ready to use.",
     workshopName: "Workshop name",
     timezone: "Time zone",
@@ -108,8 +110,12 @@ export const en: Messages = {
     demo: "Start with sample data",
     demoHint: "Creates sample customers, vehicles, appointments etc. for trying things out (only sensible for a test).",
     submit: "Finish setup",
-    warning: "Please complete the setup before the application is reachable from outside: whoever opens it first becomes administrator.",
-    errors: { notReady: "The application is not ready yet. Please try again in a moment." },
+    warning: "Setup is protected by the token from the container log. Still, the application should not be reachable from outside until setup is finished.",
+    errors: {
+      token: "The setup token is wrong.",
+      tokenThrottled: "Too many attempts. Please try again in about {seconds} seconds.",
+      notReady: "The application is not ready yet. Please try again in a moment.",
+    },
   },
   auth: {
     signIn: "Sign in",

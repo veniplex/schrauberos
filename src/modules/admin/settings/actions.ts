@@ -11,7 +11,7 @@ import { WEEKDAYS } from "@/lib/constants";
 import { isValidTime } from "@/lib/opening-hours";
 import { fieldErrors, formObject } from "@/lib/forms";
 import { audit } from "@/server/audit";
-import { applyTimezone } from "@/server/startup";
+import { applyTimezone, isValidTimezone } from "@/server/startup";
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
 import { setSetting } from "@/server/settings";
 
@@ -37,7 +37,7 @@ export async function saveWorkshop(_prev: ActionState, formData: FormData): Prom
   const parsed = workshopSchema.safeParse(formObject(formData));
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
   const d = parsed.data;
-  if (!applyTimezone(d.timezone)) return { fieldErrors: { timezone: t("validation.invalid") } };
+  if (!isValidTimezone(d.timezone)) return { fieldErrors: { timezone: t("validation.invalid") } };
 
   // Öffnungszeiten
   const hours: Record<string, [string, string] | null> = {};
@@ -83,6 +83,7 @@ export async function saveWorkshop(_prev: ActionState, formData: FormData): Prom
     ...(logoDataUrl !== undefined ? { logoDataUrl } : {}),
   };
   await db.workshop.upsert({ where: { id: "default" }, update: data, create: { id: "default", ...data } });
+  applyTimezone(d.timezone); // erst nach dem Speichern, nie bei einem abgebrochenen Vorgang
 
   await audit("settings.workshop", { target: d.name });
   revalidatePath("/", "layout");

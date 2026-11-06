@@ -28,8 +28,11 @@ export function SetupForm({ timezones }: { timezones: string[] }) {
 
   return (
     <form action={action} className="flex flex-col gap-4">
+      <Field label={t("setup.token")} htmlFor="token" error={err.token} hint={t("setup.tokenHint")} required>
+        <Input id="token" name="token" invalid={!!err.token} maxLength={100} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus required />
+      </Field>
       <Field label={t("setup.workshopName")} htmlFor="workshopName" error={err.workshopName} required>
-        <Input id="workshopName" name="workshopName" invalid={!!err.workshopName} maxLength={80} autoFocus required />
+        <Input id="workshopName" name="workshopName" invalid={!!err.workshopName} maxLength={80} required />
       </Field>
       <Field label={t("setup.timezone")} htmlFor="timezone" error={err.timezone} hint={t("setup.timezoneHint")}>
         <Select id="timezone" name="timezone" value={zone} onChange={(e) => setChosen(e.target.value)}>

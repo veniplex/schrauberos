@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Wrench } from "lucide-react";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
+import { ensureSetupToken } from "@/server/setup-token";
 import { SetupForm } from "./setup-form";
 import { Card } from "@/components/ui/layout";
 
@@ -14,6 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 /** Ersteinrichtung im Browser: nur erreichbar, solange noch kein Benutzer existiert. */
 export default async function SetupPage() {
   if ((await db.user.count()) > 0) redirect("/login");
+  ensureSetupToken(true); // falls die Datei fehlt (z. B. Entwicklung): neu anlegen und loggen
   const { t } = await getI18n();
   const timezones = Intl.supportedValuesOf("timeZone");
 

@@ -100,6 +100,8 @@ export const de = {
   },
   setup: {
     title: "Ersteinrichtung",
+    token: "Einrichtungs-Token",
+    tokenHint: "Steht im Container-Log (docker compose logs app) und wurde beim Start dort ausgegeben.",
     intro: "Willkommen! Zwei Minuten, dann ist die Anwendung einsatzbereit.",
     workshopName: "Name der Werkstatt",
     timezone: "Zeitzone",
@@ -108,8 +110,12 @@ export const de = {
     demo: "Mit Beispieldaten starten",
     demoHint: "Legt Beispiel-Kunden, -Fahrzeuge, -Termine usw. zum Ausprobieren an (nur sinnvoll für einen Test).",
     submit: "Einrichtung abschließen",
-    warning: "Bitte die Einrichtung durchführen, bevor die Anwendung von außen erreichbar ist: Wer sie zuerst aufruft, wird Administrator.",
-    errors: { notReady: "Die Anwendung ist noch nicht bereit. Bitte in einem Moment erneut versuchen." },
+    warning: "Die Einrichtung ist durch das Token aus dem Container-Log geschützt. Trotzdem sollte die Anwendung bis zum Abschluss nicht von außen erreichbar sein.",
+    errors: {
+      token: "Das Einrichtungs-Token stimmt nicht.",
+      tokenThrottled: "Zu viele Versuche. Bitte in etwa {seconds} Sekunden erneut versuchen.",
+      notReady: "Die Anwendung ist noch nicht bereit. Bitte in einem Moment erneut versuchen.",
+    },
   },
   auth: {
     signIn: "Anmelden",
