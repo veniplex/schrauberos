@@ -101,12 +101,18 @@ test.describe("Erkennung von Fehlerseiten in der Browser-CI (Selbsttest)", () =>
     expect((await cspViolations(page)).join(" ")).toMatch(/script-src/);
   });
 
-  test("Vermerk: Solange die CSP nur frame-ancestors enthält, bleibt die Prüfung der Verstöße in der Inventur wirkungslos", async ({ page }, info) => {
+  test("jede Antwort trägt die erzwungene CSP: Seiten, Statik und Programmschnittstelle (sonst ist die Prüfung der Verstöße in der Inventur blind)", async ({ page, request }) => {
+    const header = (headers: Record<string, string>, name: string) => headers[name];
     const response = await page.goto("/login");
-    const csp = response?.headers()["content-security-policy"] ?? "";
-    if (!/\b(default-src|script-src)\b/.test(csp)) {
-      info.annotations.push({ type: "hinweis", description: "CSP ohne default-src/script-src: securitypolicyviolation kann nicht auftreten. Mit der vollständigen CSP (P1a-7) wird die Prüfung wirksam." });
+    const csp = header(response?.headers() ?? {}, "content-security-policy") ?? "";
+    for (const directive of ["default-src 'self'", "script-src", "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'self'"]) {
+      expect(csp, `Seite /login: ${directive}`).toContain(directive);
     }
-    expect(csp, "die Antwort trägt eine CSP").not.toBe("");
+    expect(header(response?.headers() ?? {}, "content-security-policy-report-only"), "erzwungen, nicht nur gemeldet").toBeUndefined();
+    // Statik und Health-Check laufen an der Proxy-Logik vorbei und bekommen ihre Header über next.config
+    const health = await request.get("/api/health");
+    expect(header(health.headers(), "content-security-policy") ?? "").toContain("default-src 'self'");
+    const asset = await page.evaluate(() => Array.from(document.scripts).map((s) => s.src).find((src) => src.includes("/_next/static/")));
+    if (asset) expect(header((await request.get(asset)).headers(), "content-security-policy") ?? "").toContain("default-src 'self'");
   });
 });

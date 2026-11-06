@@ -14,7 +14,9 @@
 #     App beim Start selbst, eine Prisma-CLI gibt es nicht.
 #   • Stufe "bundle" = das Paket: daraus entsteht auch das signierte Release-Paket für Web-Updates.
 
-FROM node:24-slim AS base
+# Basisimage per Digest festgelegt (Lieferkette): ein verschobenes Tag ändert den Build nicht. Dependabot (docker) schlägt neue Digests als Pull
+# Request vor. Von Hand erneuern: Digest von `node:24-slim` (Index über alle Architekturen) aus dem Docker-Hub-Register lesen und hier ersetzen.
+FROM node:24-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
@@ -77,7 +79,9 @@ ENV NODE_ENV=production \
     DATA_DIR=/data \
     DATABASE_URL=file:/data/schrauberos.db
 COPY --from=bootstrap /bootstrap /bootstrap
-COPY --from=bundle --chown=1000:1000 / /app/
+# Die eingebaute App gehört root und ist für den Betriebsbenutzer nicht schreibbar (kein --chown): Wer die Anwendung kompromittiert, kann den
+# eingebauten Code nicht ändern. Geschrieben wird nur nach /data (Datenbank, Dateien, Backups, installierte Versionen) und /tmp.
+COPY --from=bundle / /app/
 COPY --from=skeleton --chown=1000:1000 /skeleton/ /
 
 USER 1000:1000

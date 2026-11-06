@@ -13,12 +13,13 @@ import nextConfig, { SECURITY_HEADERS } from "../next.config";
 const PATHS = ["/", "/login", "/login/recover", "/setup", "/appointments", "/appointments/abc123/edit", "/admin/users", "/api/health", "/api/v1/customers", "/api/ical/abc.ics", "/api/files/invoice/xyz", "/_next/static/chunks/a.js", "/_next/image", "/sw.js", "/manifest.webmanifest", "/favicon.ico", "/icons/192.png"];
 
 describe("next.config: Basis-Header", () => {
-  it("setzt nosniff, Referrer-Policy, X-Frame-Options SAMEORIGIN und frame-ancestors 'self'", () => {
+  it("setzt nosniff, Referrer-Policy, X-Frame-Options SAMEORIGIN und eine erzwungene Content-Security-Policy", () => {
     const header = (key: string) => SECURITY_HEADERS.find((h) => h.key === key)?.value;
     assert.equal(header("X-Content-Type-Options"), "nosniff");
     assert.equal(header("Referrer-Policy"), "strict-origin-when-cross-origin");
     assert.equal(header("X-Frame-Options"), "SAMEORIGIN");
-    assert.equal(header("Content-Security-Policy"), "frame-ancestors 'self'");
+    assert.match(header("Content-Security-Policy") ?? "", /default-src 'self'.*frame-ancestors 'self'/);
+    assert.equal(SECURITY_HEADERS.some((h) => h.key.toLowerCase().includes("report-only")), false, "die Richtlinie wird erzwungen, nicht nur gemeldet");
   });
 
   it("die Regel gilt für alle Pfade (Seiten, API, Statik, Dateien), und keine andere Regel überschreibt die Header", async () => {

@@ -8,7 +8,7 @@ import { loadInventory, type InventoryEntry } from "../support/inventory";
  *   - Überbreite (Elementrechte, nicht scrollWidth),
  *   - Touch-Ziele ≥ 44 px und Eingabeschrift ≥ 16 px (nur bei Touch),
  *   - axe-core in Hell und Dunkel,
- *   - Verstöße gegen die Content-Security-Policy (`securitypolicyviolation`; wirksam erst mit einer vollständigen CSP, Selbsttest: states.spec.ts),
+ *   - Verstöße gegen die Content-Security-Policy (`securitypolicyviolation`; die CSP wird erzwungen, Selbsttest und Header-Prüfung: states.spec.ts),
  *   - Fehlerseiten (`data-status="error"`) und Fehler des Browsers (`pageerror`, `console.error`),
  * mit Baseline-Listen bekannter Verstöße (e2e/baselines/known-violations.json), die mit jedem Paket schrumpfen.
  * Zugriff je Rolle: roles.spec.ts.

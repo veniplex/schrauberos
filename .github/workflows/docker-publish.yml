@@ -1,14 +1,18 @@
 name: Build & publish Docker image
 
-# Bei jedem Push auf main (Tag "latest") und bei Versions-Tags v1.2.3 (Tags "1.2.3", "1.2", "latest").
-# Versions-Tags erzeugen zusätzlich ein signiertes Release-Paket für Web-Updates (Job "release").
+# Push auf main veröffentlicht das Image nur als "edge" (und "sha-…"), nie als "latest". "latest" und die Versions-Tags "1.2.3" / "1.2" entstehen
+# erst mit einem Versions-Tag v1.2.3 (Vorabversionen wie v1.2.3-rc1 bekommen kein "latest"). Das Image wird vor dem Veröffentlichen gestartet
+# (scripts/smoke-image.sh: Standard- und gehärtete Compose-Datei). Versions-Tags erzeugen zusätzlich ein signiertes Release-Paket für
+# Web-Updates (Job "release", erst nach dem erfolgreichen Veröffentlichen des Images).
+#
+# Alle Actions sind auf einen Commit-SHA festgelegt (Kommentar = Version); Dependabot (.github/dependabot.yml) schlägt Updates vor.
 #
 # Browser-Tests (Playwright, Job "e2e") kosten viele Minuten: Sie laufen NICHT bei jedem Push auf main, sondern nur bei Versions-Tags (und blockieren
 # dort Image und Release), bei Pull Requests und von Hand ("Run workflow"; optional "update_snapshots" für neue Baseline-Screenshots).
 #
 # Auf main läuft die Pipeline nur, wenn sich etwas ändert, das in Image oder Tests eingeht: reine Änderungen an README, CLAUDE.md, AGENTS.md,
-# .claude/, docker-compose.yml und den .env-Vorlagen lösen nichts aus (sie sind nicht im Image: siehe .dockerignore). Die Docs unter docs/
-# gehören dagegen zum Image (Hilfe in der App). Versions-Tags bauen immer; "Run workflow" erzwingt einen Lauf von Hand.
+# .claude/ und den .env-Vorlagen lösen nichts aus (sie sind nicht im Image: siehe .dockerignore). Die Compose-Dateien gehen in den Smoke-Test
+# ein und lösen deshalb einen Lauf aus; die Docs unter docs/ gehören zum Image (Hilfe in der App). Versions-Tags bauen immer; "Run workflow" erzwingt einen Lauf von Hand.
 on:
   push:
     branches: [main]
@@ -17,7 +21,6 @@ on:
       - CLAUDE.md
       - AGENTS.md
       - .claude/**
-      - docker-compose.yml
       - docker.env.example
       - .env.example
       - .gitignore
@@ -28,7 +31,6 @@ on:
       - CLAUDE.md
       - AGENTS.md
       - .claude/**
-      - docker-compose.yml
       - docker.env.example
       - .env.example
       - .gitignore
@@ -47,8 +49,8 @@ jobs:
     name: Typecheck, Lint, Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -57,6 +59,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - run: npm run build
+      # Bekannte Schwachstellen in den Laufzeit-Abhängigkeiten (ohne Entwicklungswerkzeuge); neue Funde können einen Lauf ohne Codeänderung brechen
+      - run: npm audit --omit=dev
       - name: Schema und Migrationen stimmen überein (Drift-Check)
         run: npm run db:check
       # Versions-Tag: Baseline und Migrationen müssen eingefroren sein (npm run db:freeze) und seit dem letzten eingefrorenen Release unverändert bleiben
@@ -73,8 +78,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -89,7 +94,7 @@ jobs:
         run: npm run e2e
       - name: Bericht und Fehlerspuren
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report
           path: |
@@ -98,23 +103,24 @@ jobs:
           retention-days: 7
       - name: Neue Baseline-Screenshots
         if: ${{ inputs.update_snapshots }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: snapshots
           path: e2e/snapshots/
           retention-days: 14
 
   publish:
-    name: Image bauen und nach ghcr.io pushen
+    name: Image bauen, testen und nach ghcr.io pushen
     # Nicht bei Pull Requests; bei Tags erst, wenn die Browser-Tests grün sind (auf main sind sie übersprungen)
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') }}
     needs: [check, e2e]
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: ver
         run: |
           pkg=$(node -p "require('./package.json').version")
@@ -125,22 +131,42 @@ jobs:
             v="$pkg-dev.${GITHUB_SHA::7}"
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ghcr.io/${{ github.repository }}
+          # "latest" nur mit einem Versions-Tag (und nicht für Vorabversionen), nie durch einen Push auf main
+          flavor: |
+            latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=edge,branch=main
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
             type=sha
-      - uses: docker/build-push-action@v6
+      # 1) Bauen und lokal laden (noch nichts veröffentlicht) ...
+      - name: Image bauen (lokal)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          load: true
+          push: false
+          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          tags: schrauberos:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # 2) ... starten (Standard und gehärtet) ...
+      - name: Smoke-Test des Images
+        run: bash scripts/smoke-image.sh schrauberos:smoke
+      # 3) ... und erst dann veröffentlichen (aus dem Build-Cache, ohne neu zu bauen)
+      - name: Image veröffentlichen
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           push: true
@@ -148,18 +174,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   release:
     name: Release-Paket signieren und veröffentlichen
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.check.result == 'success' && needs.e2e.result == 'success' }}
-    needs: [check, e2e]
+    # Erst wenn das Image veröffentlicht ist: Ein Release-Paket ohne passendes Image (oder umgekehrt) gibt es nicht
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.check.result == 'success' && needs.e2e.result == 'success' && needs.publish.result == 'success' }}
+    needs: [check, e2e, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - id: ver
@@ -168,7 +194,7 @@ jobs:
           v="${GITHUB_REF_NAME#v}"
           [ "$v" = "$pkg" ] || { echo "Tag v$v passt nicht zur Version in package.json ($pkg)"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Paket bauen (nur Code, identisch mit dem Image-Inhalt)
         run: |
           # Als tar exportieren: bewahrt Symlinks (.next/node_modules) unverändert

@@ -1,15 +1,16 @@
 import type { NextConfig } from "next";
+import { contentSecurityPolicy } from "./src/lib/csp";
 
 /**
- * Basis-Header für alle Antworten. Die Content-Security-Policy enthält vorerst nur `frame-ancestors` (die App darf nur in
- * Seiten der eigenen Herkunft eingebettet werden, die PDF-Vorschau bleibt möglich); die vollständige, erzwungene CSP folgt später
- * (Nonce für Skripte). `X-Frame-Options` ist die Entsprechung für ältere Browser.
+ * Basis-Header für alle Antworten – auch für Statik und den Service Worker (die Nonce-Logik des Proxys betrifft sie nicht). Die
+ * Content-Security-Policy ist die strikte Grundlage aus `src/lib/csp.ts` und wird erzwungen (nicht nur gemeldet); `X-Frame-Options` ist die
+ * Entsprechung von `frame-ancestors` für ältere Browser. Der Nonce für Skripte folgt mit P1b-1.
  */
 export const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+  { key: "Content-Security-Policy", value: contentSecurityPolicy({ dev: process.env.NODE_ENV !== "production" }) },
 ];
 
 const nextConfig: NextConfig = {

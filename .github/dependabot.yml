@@ -1,0 +1,28 @@
+# Dependabot: schlägt Updates für Abhängigkeiten, GitHub Actions (Commit-SHAs) und das Basisimage (Digest) als Pull Requests vor.
+# Nichts wird von selbst eingespielt – jede Änderung läuft durch dieselbe Pipeline (Typen, Lint, Tests, Build, Audit, Browser-Tests bei PRs).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Kleine Änderungen gebündelt, größere Versionssprünge (Next.js, Prisma, React …) einzeln
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly

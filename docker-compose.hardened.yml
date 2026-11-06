@@ -1,0 +1,22 @@
+# SchrauberOS – gehärtete Variante (optional). Wird über die Standard-Datei gelegt:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d
+#
+# Was sie ändert:
+#   * read_only:        Das Wurzeldateisystem des Containers ist schreibgeschützt. Geschrieben wird nur ins Volume /data und nach /tmp.
+#   * tmpfs /tmp:       Zwischenspeicher im Arbeitsspeicher (geht beim Neustart verloren, das ist gewollt).
+#   * cap_drop: ALL:    Der Prozess läuft ohne jede Linux-Capability (er braucht keine; der Port 3000 liegt über 1024).
+#   * no-new-privileges: Kein Prozess im Container kann Rechte hinzugewinnen.
+#
+# Die Pipeline startet das Image vor jeder Veröffentlichung mit genau diesen beiden Dateien (scripts/smoke-image.sh): Läuft es dort nicht
+# gesund, wird nichts veröffentlicht. Web-Updates, Backups und Wiederherstellung schreiben nur nach /data und funktionieren unverändert.
+
+services:
+  app:
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

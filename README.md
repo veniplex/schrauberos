@@ -423,6 +423,9 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
 * **Die App migriert sich selbst:** `src/instrumentation.ts` → `src/server/startup.ts`: Sicherung vor Migrationen, Migrationen,
   Basisdaten, Zeitzone, Backup-Zeitplan. `/api/health` meldet erst danach „ok“; scheitert etwas, beendet sich der Prozess.
 * **Keine Fremdprogramme:** Archive bearbeitet die npm-Bibliothek `tar` – es gibt kein System-`tar`.
+* **Die eingebaute App ist `root:root` und für den Betriebsbenutzer (1000) nicht schreibbar** (`COPY` ohne `--chown`): Geschrieben wird nur nach `/data`
+  (Datenbank, Dateien, Backups, installierte Versionen) und `/tmp`. Wer die laufende Anwendung kompromittiert, kann den eingebauten Code nicht
+  ändern. Der Smoke-Test der Pipeline prüft Besitzer und Start (`scripts/smoke-image.sh`).
 * **Zustand:** `<DATA_DIR>/app/state.json` (+ Zeiger `active`); reine, getestete Logik in `src/lib/updates` (`state.ts`, `store.ts`,
   `restore.ts`). `writeState` schreibt immer auch den Zeiger.
 * `docker/BASE_VERSION` nur erhöhen, wenn sich der Vertrag des Starters ändert (Zeiger-Format, Exit-Codes, Aufruf der Laufzeit)
@@ -517,7 +520,7 @@ mit Beispieldaten; `e2e/global-setup.ts`), legt je Standardrolle ein Konto an un
 
 | Test | Prüft |
 | --- | --- |
-| `inventory.spec.ts` | jede Seite der **Routen-Inventur** (siehe unten) als Administrator: keine Überbreite (Elementrechte, nicht `scrollWidth`), bei Touch Ziele ≥ 44 px und Eingabeschrift ≥ 16 px, axe-core in Hell und Dunkel, **`securitypolicyviolation` = Fehler** (wirksam erst mit vollständiger CSP; Selbsttest in `states.spec.ts`), **Fehlerseite (`data-status="error"`) oder Browserfehler (`pageerror`, `console.error`) = Fehler** |
+| `inventory.spec.ts` | jede Seite der **Routen-Inventur** (siehe unten) als Administrator: keine Überbreite (Elementrechte, nicht `scrollWidth`), bei Touch Ziele ≥ 44 px und Eingabeschrift ≥ 16 px, axe-core in Hell und Dunkel, **`securitypolicyviolation` = Fehler** (die CSP wird erzwungen; Selbsttest und Header-Prüfung in `states.spec.ts`), **Fehlerseite (`data-status="error"`) oder Browserfehler (`pageerror`, `console.error`) = Fehler** |
 | `roles.spec.ts` | Zugriff je Standardrolle auf alle Seiten (sichtbar, oder Umleitung auf „Kein Zugriff“ `/forbidden`; eine Fehlerseite ist nie ein gültiges Ergebnis) und Umleitung ohne Anmeldung |
 | `states.spec.ts` | Status- und Fehlerseiten (nicht gefunden, Fehler im Rahmen und im Vollbild, Neuinstallation, Kein Zugriff) durch axe/Touch/Überbreite, ihre Barrierefreiheit (Fokus, Titel, ein `<main>`, Live-Region) und **Selbsttests der Erkennung** (absichtliche Fehlerseite, CSP-Verstoß) |
 | `https.spec.ts` | HTTPS hinter einem TLS-Proxy mit selbstsigniertem Zertifikat (`e2e/support/https-proxy.ts`): `__Host-so_session` mit `Secure`, untergeschobenes Klartext-Cookie wirkungslos, Abmelden entfernt das Cookie |
@@ -642,12 +645,23 @@ veröffentlichen, Installationen einmal per `docker compose pull && docker compo
 
 1. `version` in `package.json` auf die neue Nummer setzen (z. B. `0.2.0`), committen, pushen.
 2. Tag setzen und pushen: `git tag v0.2.0 && git push origin v0.2.0`.
-3. Die GitHub-Action (`.github/workflows/docker-publish.yml`) prüft Typen/Lint/Tests, baut das Image nach `ghcr.io` (`0.2.0`, `0.2`,
-   `latest`) und – Job *Release* – das Paket (`docker buildx build --target bundle`), erzeugt `manifest.json` samt Signatur
-   (`scripts/make-release.mjs`) und legt das GitHub-Release mit Paket, Manifest und Signatur an (Änderungen aus den Commits).
+3. Die GitHub-Action (`.github/workflows/docker-publish.yml`) prüft Typen/Lint/Tests, den Produktions-Build (`npm run build`) und die Laufzeit-Abhängigkeiten
+   (`npm audit --omit=dev`), baut das Image, **startet es vor dem Veröffentlichen** (`scripts/smoke-image.sh`, siehe unten) und schiebt es erst dann nach `ghcr.io`
+   (`0.2.0`, `0.2`, `latest`). Danach – Job *Release*, hängt am erfolgreichen Veröffentlichen – baut sie das Paket (`docker buildx build --target bundle`), erzeugt
+   `manifest.json` samt Signatur (`scripts/make-release.mjs`) und legt das GitHub-Release mit Paket, Manifest und Signatur an (Änderungen aus den Commits).
 
-Die Pipeline bricht ab, wenn Tag und `package.json` nicht übereinstimmen. Nur Versionen der Form `x.y.z` sind installierbar;
-Images von `main` heißen `x.y.z-dev.<sha>` und werden von Web-Updates nie angeboten.
+Die Pipeline bricht ab, wenn Tag und `package.json` nicht übereinstimmen. Nur Versionen der Form `x.y.z` sind installierbar.
+**Ein Push auf `main` veröffentlicht nur `edge` (und `sha-…`), nie `latest`** – `latest` und die Versions-Tags gibt es erst mit dem Tag (Vorabversionen wie `v0.2.0-rc1`
+bekommen kein `latest`). Der Inhalt von `main` heißt `x.y.z-dev.<sha>` und wird von Web-Updates nie angeboten.
+
+**Lieferkette:** Alle Actions in der Pipeline sind auf einen Commit-SHA festgelegt (Version im Kommentar, per `gh api` gegen den Tag aufgelöst); das Basisimage im
+`Dockerfile` ist per Digest festgelegt. Dependabot (`.github/dependabot.yml`: npm, Actions, Docker, Compose) schlägt Updates als Pull Requests vor – nichts wird
+von selbst eingespielt, jede Änderung läuft durch dieselbe Pipeline. Digest von Hand erneuern: den Digest des Index von `node:24-slim` aus dem Docker-Hub-Register
+lesen und im `Dockerfile` ersetzen.
+
+**Smoke-Test des Images** (`bash scripts/smoke-image.sh <lokales-image>`, lokal mit Docker ebenso): prüft den Besitzer im Image (`/app` root, `/data` 1000), startet
+es mit `docker-compose.yml` **und** mit `docker-compose.hardened.yml` und verlangt je: gesund, `/api/health` ok, `/login` mit erzwungener CSP, Weiterleitung ohne Anmeldung,
+Einrichtungs-Token im Log (die App hat in `/data` geschrieben). Schlägt er fehl, wird nichts veröffentlicht.
 
 Lokal ein Paket bauen und signieren (zum Testen):
 
@@ -680,7 +694,12 @@ Die **Ersteinrichtung** legt Werkstattname, Zeitzone und den ersten Administrato
 Backups, Updates, Einstellungen). Das Volume `app-data` muss auf einer **lokalen Platte** liegen.
 
 Optional, nur beim Neu-Erstellen des Containers: `.env` neben der `docker-compose.yml` (Vorlage `docker.env.example`) mit `APP_PORT`
-und `SCHRAUBEROS_VERSION` (Image-Version, Standard `latest`).
+und `SCHRAUBEROS_VERSION` (Image-Version, Standard `latest`; `edge` = neuester Stand von `main`, nur zum Ausprobieren).
+
+**Gehärtete Variante (optional):** `docker-compose.hardened.yml` über die Standard-Datei legen –
+`docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d`. Sie setzt `read_only: true` (Wurzeldateisystem schreibgeschützt, beschrieben werden nur das Volume
+und `tmpfs /tmp`), `cap_drop: [ALL]` und `security_opt: [no-new-privileges:true]`. Die Pipeline startet das Image vor jeder Veröffentlichung genau so; Web-Updates, Backups und
+Wiederherstellung schreiben nur nach `/data` und funktionieren unverändert. In Portainer die drei Schlüssel in den Stack übernehmen.
 
 ### Was im Volume liegt
 
@@ -708,8 +727,17 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
   Sicherheit** „Hinter Reverse-Proxy“ einschalten, damit die Anmeldung die Client-Adresse auswertet (Proxy muss sie als letzten `X-Forwarded-For`-Eintrag anhängen). Erscheint beim Speichern „Invalid Server Actions
   request“, leitet der Proxy den öffentlichen Host nicht per `x-forwarded-host` weiter – dann die Domain in `next.config.ts` unter
   `experimental.serverActions.allowedOrigins` eintragen.
-* **Sicherheits-Header:** `next.config.ts` setzt auf allen Antworten `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` und eine
-  CSP, die vorerst nur `frame-ancestors 'self'` enthält (Test `src/next-config.test.ts`); die vollständige CSP folgt später.
+* **Sicherheits-Header und Content-Security-Policy:** `next.config.ts` setzt auf **allen** Antworten (Seiten, Programmschnittstelle, Statik, später auch `sw.js`) `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` und die **erzwungene** CSP aus `src/lib/csp.ts` (kein Report-Only): `default-src`, Skripte, Verbindungen, Frames, Worker, Manifest
+  nur `'self'`; Bilder zusätzlich `data:`/`blob:`; `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'self'` (die PDF-Vorschau derselben Herkunft bleibt möglich);
+  kein `upgrade-insecure-requests` (die App läuft im LAN auch über HTTP). In `next dev` kommen `'unsafe-eval'` (React) und `ws:` (Entwicklungsserver) hinzu. Die Header kommen aus
+  `next.config`, nicht aus dem Proxy – Statik und Service Worker brauchen keine Nonce-Logik. Tests: `src/lib/csp.test.ts`, `src/next-config.test.ts`; die Browser-CI wertet jeden
+  `securitypolicyviolation` der Inventur als Fehler und prüft die Header an echten Antworten (`states.spec.ts`).
+  **Noch offen (P1b-1):** `script-src` enthält `'unsafe-inline'` (Next.js bettet Start-Skripte inline ein) – Ziel ist ein Nonce je Anfrage im Proxy (`'nonce-…' 'strict-dynamic'`, `x-nonce`,
+  alle Routen dynamisch gerendert, Fehler-/Nicht-gefunden-/Verboten-Seiten eingeschlossen) und `style-src` mit Nonce plus `style-src-attr 'unsafe-inline'`; `Permissions-Policy`
+  (ohne pauschales `camera=()`), HSTS nur bei erkanntem HTTPS samt Hinweis ohne HTTPS, `default-src 'none'` für die JSON-Antworten unter `/api/v1`, eigene Header der PDF-Routen,
+  Markdown ohne `//host`-Links und externe Bilder, der Not-Schalter „nur melden“ in der Oberfläche (für den Proxy lesbar) und der Lauf der Browser-CI über alle Rollen, Dialoge,
+  Druckansichten und den Service Worker.
 * **Zeitzone:** Einstellungen → Werkstatt; wird bei jedem Start angewendet.
 * **Image neu ziehen** ist nur nötig, wenn ein Release den Vertrag des Starters ändert (die Update-Seite sagt es) oder bei einem
   Schlüsselwechsel: `docker compose pull && docker compose up -d` (die Daten bleiben).
