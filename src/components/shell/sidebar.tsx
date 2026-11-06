@@ -12,6 +12,7 @@ import {
   FileText,
   CircleHelp,
   HardDriveDownload,
+  Activity,
   Cable,
   CalendarDays,
   CalendarOff,
@@ -63,6 +64,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   audit: ScrollText,
   updates: Download,
   backup: HardDriveDownload,
+  system: Activity,
   help: CircleHelp,
 };
 

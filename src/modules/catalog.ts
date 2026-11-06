@@ -20,6 +20,7 @@ import { modulesFeature } from "./admin/modules/feature";
 import { auditFeature } from "./admin/audit/feature";
 import { updatesFeature } from "./admin/updates/feature";
 import { backupFeature } from "./admin/backup/feature";
+import { systemFeature } from "./admin/system/feature";
 import { featureKey } from "./catalog-logic";
 import type { FeatureDef } from "./define";
 
@@ -48,6 +49,7 @@ export const FEATURES = [
   auditFeature,
   updatesFeature,
   backupFeature,
+  systemFeature,
 ] as const;
 
 export type ModuleId = (typeof MODULES)[number]["id"];

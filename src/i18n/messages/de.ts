@@ -15,6 +15,7 @@ import { auditDe } from "./modules/audit.de";
 import { apiDe } from "./modules/api.de";
 import { updatesDe } from "./modules/updates.de";
 import { backupDe } from "./modules/backup.de";
+import { systemDe } from "./modules/system.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
@@ -27,6 +28,7 @@ export const de = {
   api: apiDe,
   updates: updatesDe,
   backup: backupDe,
+  system: systemDe,
   common: {
     conflict: "Dieser Datensatz wurde inzwischen von jemand anderem geändert. Bitte die Seite neu laden und die Änderung erneut vornehmen – nichts wurde überschrieben.",
     sortOrder: "Reihenfolge",
@@ -83,6 +85,7 @@ export const de = {
     backup: "Backups",
     updates: "Updates",
     audit: "Audit-Log",
+    system: "Systemstatus",
     help: "Hilfe",
     main: "Hauptnavigation",
     menu: "Menü öffnen",
@@ -208,6 +211,7 @@ export const de = {
     updates: "Updates",
     audit: "Audit-Log",
     modules: "Module & Funktionen",
+    system: "Systemstatus",
   },
   permissions: {
     appointments: {
@@ -277,6 +281,9 @@ export const de = {
     },
     updates: {
       manage: "Updates installieren",
+    },
+    system: {
+      view: "Systemstatus und geplante Jobs einsehen",
     },
     backup: {
       manage: "Backups verwalten und wiederherstellen",

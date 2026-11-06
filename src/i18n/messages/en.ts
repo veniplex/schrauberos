@@ -16,6 +16,7 @@ import { auditEn } from "./modules/audit.en";
 import { apiEn } from "./modules/api.en";
 import { updatesEn } from "./modules/updates.en";
 import { backupEn } from "./modules/backup.en";
+import { systemEn } from "./modules/system.en";
 
 export const en: Messages = {
   docs: docsEn,
@@ -27,6 +28,7 @@ export const en: Messages = {
   api: apiEn,
   updates: updatesEn,
   backup: backupEn,
+  system: systemEn,
   common: {
     conflict: "This record has been changed by someone else in the meantime. Please reload the page and make your change again – nothing was overwritten.",
     sortOrder: "Order",
@@ -83,6 +85,7 @@ export const en: Messages = {
     backup: "Backups",
     updates: "Updates",
     audit: "Audit log",
+    system: "System status",
     help: "Help",
     main: "Main navigation",
     menu: "Open menu",
@@ -208,6 +211,7 @@ export const en: Messages = {
     updates: "Updates",
     audit: "Audit log",
     modules: "Modules & features",
+    system: "System status",
   },
   permissions: {
     appointments: {
@@ -277,6 +281,9 @@ export const en: Messages = {
     },
     updates: {
       manage: "Install updates",
+    },
+    system: {
+      view: "View system status and scheduled jobs",
     },
     backup: {
       manage: "Manage and restore backups",

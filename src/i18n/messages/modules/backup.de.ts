@@ -33,6 +33,13 @@ export const backupDe = {
     "pre-restore": "Vor Wiederherstellung",
     "pre-migration": "Vor Datenbank-Änderung",
   },
+  widget: {
+    title: "Backups",
+    open: "Zu den Backups",
+    last: "Letztes Backup: {date}",
+    none: "Es gibt noch kein Backup.",
+    failed: "Das automatische Backup ist fehlgeschlagen ({count} Versuche in Folge). Bitte den freien Speicherplatz auf dem Server prüfen.",
+  },
   failed: "Das automatische Backup ist fehlgeschlagen ({count} Versuche in Folge, zuletzt {date}: {reason}). Nächster Versuch: {next}. Bitte freien Speicherplatz auf dem Server prüfen; bis ein Backup gelingt, besteht kein aktueller Schutz.",
   retention: {
     title: "Aufbewahrung",

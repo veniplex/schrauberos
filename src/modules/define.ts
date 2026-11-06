@@ -31,6 +31,7 @@ export type IconName =
   | "audit"
   | "updates"
   | "backup"
+  | "system"
   | "help";
 
 export type ModuleDef = {

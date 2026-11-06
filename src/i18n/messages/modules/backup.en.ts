@@ -35,6 +35,13 @@ export const backupEn: typeof backupDe = {
     "pre-restore": "Before restore",
     "pre-migration": "Before database change",
   },
+  widget: {
+    title: "Backups",
+    open: "Go to backups",
+    last: "Latest backup: {date}",
+    none: "There is no backup yet.",
+    failed: "The automatic backup failed ({count} attempts in a row). Please check the free disk space on the server.",
+  },
   failed: "The automatic backup failed ({count} attempts in a row, last {date}: {reason}). Next attempt: {next}. Please check the free disk space on the server; until a backup succeeds, there is no current protection.",
   retention: {
     title: "Retention",

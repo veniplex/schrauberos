@@ -19,6 +19,7 @@ import { help as modules } from "./admin/modules/help";
 import { help as backup } from "./admin/backup/help";
 import { help as updates } from "./admin/updates/help";
 import { help as audit } from "./admin/audit/help";
+import { help as system } from "./admin/system/help";
 
 /**
  * Composition Root der Hilfe: hier werden die Themen aller Funktionen eingesammelt (angezeigt wird in der Reihenfolge
@@ -42,6 +43,7 @@ export const ALL_HELP_TOPICS: readonly HelpTopicDef[] = [
   ...backup,
   ...updates,
   ...audit,
+  ...system,
 ];
 
 export type HelpTopic = { id: string; doc: string };

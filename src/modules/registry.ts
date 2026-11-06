@@ -16,6 +16,7 @@ import { widgets as itDocsWidgets } from "./it/docs/widgets";
 import { widgets as handbookWidgets } from "./handbook/manual/widgets";
 import { settingsTabs as workshopProfileSettings } from "./admin/settings/settings-tab";
 import { settingsTabs as backupSettings } from "./admin/backup/settings-tab";
+import { widgets as backupWidgets } from "./admin/backup/widgets";
 import { settingsTabs as updatesSettings } from "./admin/updates/settings-tab";
 
 /**
@@ -31,6 +32,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   ...networkWidgets,
   ...itDocsWidgets,
   ...handbookWidgets,
+  ...backupWidgets,
 ];
 
 const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...backupSettings, ...updatesSettings];

@@ -17,6 +17,7 @@ import { pages as modules } from "./admin/modules/pages";
 import { pages as backup } from "./admin/backup/pages";
 import { pages as updates } from "./admin/updates/pages";
 import { pages as audit } from "./admin/audit/pages";
+import { pages as system } from "./admin/system/pages";
 
 /**
  * Composition Root der Routen-Inventur für die Browser-CI (`e2e/`): hier werden die Seitenlisten aller Funktionen eingesammelt.
@@ -41,6 +42,7 @@ export const ALL_PAGES: readonly PageDef[] = [
   ...backup,
   ...updates,
   ...audit,
+  ...system,
 ];
 
 /** Seiten der Plattform (keiner Funktion zugeordnet): Übersicht, Konto, Hilfe, Anmeldung … */

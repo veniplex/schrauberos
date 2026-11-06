@@ -7,7 +7,7 @@ Geschäftsführung, Büro / Verwaltung, Serviceberater, Mechaniker, Lager und IT
 * **Administrator-Rollen** haben immer alle Rechte, auch für künftige Funktionen.
 * Rechte ausgeschalteter Funktionen sind markiert und wirken erst nach dem Wiedereinschalten.
 * **Rechte der Verwaltung** („Benutzer verwalten“, „Rollen & Rechte verwalten“, „Werkstatt-Einstellungen verwalten“, „Module und
-  Funktionen ein-/ausschalten“, „Backups verwalten und wiederherstellen“, „Updates installieren“) sind faktisch Administratorrechte. Sie vergeben **nur Administratoren**; die Standardrollen
+  Funktionen ein-/ausschalten“, „Backups verwalten und wiederherstellen“, „Updates installieren“, „Systemstatus und geplante Jobs einsehen“) sind faktisch Administratorrechte. Sie vergeben **nur Administratoren**; die Standardrollen
   enthalten sie nicht. Rollen, die sie enthalten, kennzeichnet die Liste mit „Verwaltungsrechte“.
 * **Wer Rollen ändern darf:** Ein Konto ohne Administrator-Rolle, dem ein Administrator „Rollen verwalten“ gegeben hat, kann nur
   Rechte hinzufügen oder entfernen, die es selbst besitzt, und keine Verwaltungsrechte. Die eigene Rolle, Administrator-Rollen und Rollen

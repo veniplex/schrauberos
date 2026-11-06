@@ -1,0 +1,50 @@
+export const systemDe = {
+  feature: {
+    name: "Systemstatus",
+    description: "Geplante Hintergrund-Jobs (Backups, Aufräumen, Zustellung von Ereignissen) mit ihren letzten Ergebnissen – Fehler sind sofort sichtbar.",
+  },
+  title: "Systemstatus",
+  description: "Was die Anwendung im Hintergrund erledigt: wann ein Job zuletzt lief, ob er geklappt hat und wann er wieder dran ist.",
+  fine: "Alle geplanten Jobs laufen ohne Fehler.",
+  problems_one: "Ein geplanter Job ist fehlgeschlagen. Er wird mit wachsender Wartezeit automatisch wiederholt.",
+  problems_other: "{count} geplante Jobs sind fehlgeschlagen. Sie werden mit wachsender Wartezeit automatisch wiederholt.",
+  jobs: {
+    title: "Geplante Jobs",
+    cols: { job: "Job", schedule: "Zeitplan", last: "Letzter Lauf", result: "Ergebnis", next: "Nächster Lauf", failures: "Fehlversuche in Folge" },
+    never: "noch nie",
+    running: "läuft gerade",
+    inactive: "ruht (Funktion ausgeschaltet)",
+    empty: "Keine Jobs angemeldet.",
+  },
+  schedule: {
+    everySeconds: "alle {n} Sekunden",
+    everyMinutes: "alle {n} Minuten",
+    everyHours: "alle {n} Stunden",
+    cron: "{cron} (Ortszeit der Werkstatt)",
+  },
+  names: {
+    backup: { auto: "Automatisches Backup", retention: "Backups aufräumen (Aufbewahrung)" },
+    audit: { retention: "Audit-Log aufräumen (Aufbewahrung)" },
+    platform: {
+      outbox: "Ereignisse zustellen (Outbox)",
+      "outbox-prune": "Zugestellte Ereignisse aufräumen",
+      "jobs-prune": "Alte Job-Ergebnisse aufräumen",
+      "api-cleanup": "API-Daten aufräumen (Schlüssel, alte Tokens)",
+    },
+  },
+  status: { ok: "OK", error: "Fehler", interrupted: "Unterbrochen", running: "Läuft" },
+  runs: {
+    title: "Letzte Läufe",
+    cols: { time: "Zeitpunkt", job: "Job", status: "Status", duration: "Dauer", message: "Meldung" },
+    empty: "Noch keine Läufe.",
+    seconds: "{n} s",
+    millis: "{n} ms",
+  },
+  outbox: {
+    title: "Ereignisse (Outbox)",
+    hint: "Änderungen, die andere Systeme erfahren sollen (E-Mail, Webhooks), werden hier zwischengespeichert und zugestellt. Fehlgeschlagene werden nach mehreren Versuchen aufgegeben.",
+    pending: "Wartend",
+    failed: "Aufgegeben",
+    lastError: "Zuletzt: {error}",
+  },
+};
