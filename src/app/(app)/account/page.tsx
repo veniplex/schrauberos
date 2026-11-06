@@ -16,21 +16,24 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AccountPage() {
   const session = await requireSession({ allowPasswordChange: true });
   const [{ t, date }, locale, theme] = await Promise.all([getI18n(), getLocale(), getTheme()]);
-  const recovery = session.user.isAdmin && session.user.authSource === "local" && !session.user.mustChangePassword ? await db.recoveryCode.findUnique({ where: { userId: session.user.id } }) : null;
   const showRecovery = session.user.isAdmin && session.user.authSource === "local" && !session.user.mustChangePassword;
+  const recovery = showRecovery ? await db.recoveryCode.findUnique({ where: { userId: session.user.id } }) : null;
   const forced = session.user.mustChangePassword;
 
   return (
     <>
-      <PageHeader title={t("account.title")} description={`${session.user.username} · ${session.user.roleNames.join(", ") || "–"}`} />
-      {forced ? (
-        <div className="mb-5 max-w-2xl">
-          <Alert tone="warning">{t("account.mustChange")}</Alert>
-        </div>
-      ) : null}
+      {/* Beim Drucken (Wiederherstellungs-Code) erscheint nur die Karte des Codes: alles andere ist print:hidden */}
+      <div className="print:hidden">
+        <PageHeader title={t("account.title")} description={`${session.user.username} · ${session.user.roleNames.join(", ") || "–"}`} />
+        {forced ? (
+          <div className="mb-5 max-w-2xl">
+            <Alert tone="warning">{t("account.mustChange")}</Alert>
+          </div>
+        ) : null}
+      </div>
       <div className="grid max-w-5xl gap-5 lg:grid-cols-2">
         {!forced ? (
-          <>
+          <div className="contents print:hidden">
             <Card title={t("account.profile")}>
               <ProfileForm initial={{ name: session.user.name, email: session.user.email ?? "" }} />
             </Card>
@@ -47,17 +50,19 @@ export default async function AccountPage() {
                 </div>
               </div>
             </Card>
-          </>
+          </div>
         ) : null}
-        {session.user.authSource === "local" ? (
-          <Card title={t("account.password")}>
-            <PasswordForm />
-          </Card>
-        ) : (
-          <Card title={t("account.password")}>
-            <p className="text-sm text-ink-muted">{t("account.errors.externalPassword")}</p>
-          </Card>
-        )}
+        <div className="contents print:hidden">
+          {session.user.authSource === "local" ? (
+            <Card title={t("account.password")}>
+              <PasswordForm />
+            </Card>
+          ) : (
+            <Card title={t("account.password")}>
+              <p className="text-sm text-ink-muted">{t("account.errors.externalPassword")}</p>
+            </Card>
+          )}
+        </div>
         {showRecovery ? (
           <Card title={t("recovery.title")}>
             <RecoveryCard

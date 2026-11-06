@@ -38,9 +38,10 @@ export async function createRecoveryCode(_prev: RecoveryActionState, formData: F
 /** „Ich habe den Code gesichert“ – merkt sich die Bestätigung des eigenen Codes. */
 export async function confirmRecoveryCode(): Promise<{ ok: boolean }> {
   const session = await requireSession({ allowPasswordChange: true });
-  const { count } = await db.recoveryCode.updateMany({ where: { userId: session.user.id, confirmedAt: null }, data: { confirmedAt: new Date() } });
+  await db.recoveryCode.updateMany({ where: { userId: session.user.id, confirmedAt: null }, data: { confirmedAt: new Date() } });
   revalidatePath("/", "layout");
-  return { ok: count >= 0 };
+  // „ok“ heißt: Das Konto hat einen Code (bestätigt jetzt oder schon früher) – nicht, dass diesmal etwas geschrieben wurde
+  return { ok: (await db.recoveryCode.count({ where: { userId: session.user.id, confirmedAt: { not: null } } })) > 0 };
 }
 
 /** Banner „Notzugang wurde verwendet“ als gesehen markieren (für den angemeldeten Benutzer). */

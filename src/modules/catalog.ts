@@ -21,6 +21,7 @@ import { auditFeature } from "./admin/audit/feature";
 import { updatesFeature } from "./admin/updates/feature";
 import { backupFeature } from "./admin/backup/feature";
 import { featureKey } from "./catalog-logic";
+import type { FeatureDef } from "./define";
 
 /**
  * Der Katalog: alle Module und Funktionen der Anwendung – rein statisch (keine UI, keine DB).
@@ -74,7 +75,7 @@ export const featureOfPermission = (permission: string): FeatureId | undefined =
 export const isPermission = (value: string): value is Permission => FEATURE_OF_PERMISSION.has(value);
 
 /** Rechte der Verwaltung, die nur Administratoren vergeben dürfen (Markierung `adminOnly` in der `feature.ts`). */
-export const ADMIN_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(FEATURES.flatMap((f) => (f.permissions as { adminOnly?: readonly string[] }).adminOnly ?? []));
+export const ADMIN_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(FEATURES.flatMap((f) => (f.permissions as FeatureDef["permissions"]).adminOnly ?? []));
 export const isAdminOnly = (permission: string): boolean => ADMIN_ONLY_PERMISSIONS.has(permission);
 
 export const fullFeatureId = (f: { module: string; id: string }) => featureKey(f) as FeatureId;

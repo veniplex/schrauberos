@@ -124,15 +124,15 @@ export async function saveUser(_prev: ActionState, formData: FormData): Promise<
 export async function unlockUser(formData: FormData) {
   const session = await requirePermission("users.manage");
   const id = String(formData.get("id") ?? "");
-  const denied = await db.$transaction(async (tx) => {
+  const checked = await db.$transaction(async (tx) => {
     const user = id ? await tx.user.findUnique({ where: { id }, include: { roles: { include: { role: { include: { permissions: true } } } } } }) : null;
-    if (!user) return "missing" as const;
-    return checkManageUser(await loadActor(tx, session.user.id), user.roles.map((r) => toRights(r.role)));
+    if (!user) return { denied: "missing" as const };
+    return { denied: checkManageUser(await loadActor(tx, session.user.id), user.roles.map((r) => toRights(r.role))), username: user.username };
   });
-  if (denied === "missing") redirect("/admin/users");
-  if (denied) redirect(`/admin/users?error=${denied}`);
+  if (checked.denied === "missing") redirect("/admin/users");
+  if (checked.denied) redirect(`/admin/users?error=${checked.denied}`);
   await resetAccountThrottle(id);
-  await audit("user.unlock", { entityId: id });
+  await audit("user.unlock", { target: checked.username, entityId: id });
   revalidatePath("/admin/users");
   redirect(`/admin/users/${id}?unlocked=1`);
 }

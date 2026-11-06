@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Field, FieldHint, FormMessage, Input } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
@@ -15,15 +15,21 @@ export function RecoveryCard({ status, account }: { status: { createdOn: string 
   const router = useRouter();
   const [state, action] = useActionState<RecoveryActionState, FormData>(createRecoveryCode, {});
   const err = state.fieldErrors ?? {};
+  // useActionState behält die letzte Antwort (samt Code): „Weiter“ merkt sich deshalb, **welcher** Code schon abgehakt ist.
+  // Ein neu erzeugter Code ist ein anderer und wird wieder angezeigt.
+  const [dismissed, setDismissed] = useState<string | null>(null);
 
-  if (state.recoveryCode) {
+  if (state.recoveryCode && state.recoveryCode !== dismissed) {
     return (
       <RecoveryCodeView
         code={state.recoveryCode}
         issuedOn={state.issuedOn}
         account={account}
         onConfirm={confirmRecoveryCode}
-        onContinue={() => router.refresh()}
+        onContinue={() => {
+          setDismissed(state.recoveryCode ?? null);
+          router.refresh();
+        }}
       />
     );
   }
