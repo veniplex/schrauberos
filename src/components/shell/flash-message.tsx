@@ -7,7 +7,8 @@ import { Alert } from "@/components/ui/layout";
 
 /**
  * Zeigt eine Flash-Meldung (siehe `FlashNotice`) und räumt danach das Cookie weg, damit sie nur einmal erscheint. Erfolg blendet sich nach
- * einigen Sekunden aus, Fehler bleiben stehen, bis man sie schließt. Minimaler Meldungsbereich – der Toast (P2a-2) löst ihn ab.
+ * einigen Sekunden aus, Fehler bleiben stehen, bis man sie schließt. Minimaler Meldungsbereich – der Toast (P2a-2) löst ihn ab. Die Ansage für Screenreader
+ * übernimmt der Container in `FlashNotice` (immer im DOM, `aria-live`), deshalb hat das Hinweisfeld hier keine eigene Rolle (`live={false}`).
  */
 export function FlashMessage({ id, cookieName, tone, text, closeLabel }: { id: string; cookieName: string; tone: "success" | "error"; text: string; closeLabel: string }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export function FlashMessage({ id, cookieName, tone, text, closeLabel }: { id: s
   if (dismissed === id) return null;
   return (
     <div className="no-print mb-5" data-flash={tone}>
-      <Alert tone={tone === "error" ? "danger" : "success"}>
+      <Alert tone={tone === "error" ? "danger" : "success"} live={false}>
         <div className="flex items-start justify-between gap-3">
           <span>{text}</span>
           <Button variant="ghost" size="icon-sm" aria-label={closeLabel} onClick={() => setDismissed(id)}>

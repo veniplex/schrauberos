@@ -36,7 +36,7 @@ export const customersDe = {
   },
   errors: {
     nameRequired: "Nachname oder Firma angeben.",
-    inUse: "Dieser Kunde kann nicht gelöscht werden: Es gibt noch Fahrzeuge bzw. Halter-Einträge ({vehicles}) oder Rechnungen ({invoices}). Fahrzeuge zuerst umschreiben und Rechnungen entfernen.",
+    inUse: "Dieser Kunde kann nicht gelöscht werden: {vehicles} Fahrzeuge, {ownerships} Halter-Einträge (die Halter-Historie bleibt auch nach einem Halterwechsel bestehen), {invoices} Rechnungen.",
   },
-  deleteBlocked: "Löschen nicht möglich, solange Fahrzeuge, Halter-Historie oder Rechnungen mit diesem Kunden verknüpft sind ({vehicles} Fahrzeug-Einträge, {invoices} Rechnungen).",
+  deleteBlocked: "Löschen nicht möglich, solange Fahrzeuge, Halter-Historie oder Rechnungen mit diesem Kunden verknüpft sind: {vehicles} Fahrzeuge, {ownerships} Halter-Einträge (auch frühere Halterschaft), {invoices} Rechnungen.",
 };

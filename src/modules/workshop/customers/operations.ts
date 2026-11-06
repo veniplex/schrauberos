@@ -58,7 +58,7 @@ export const deleteCustomerOperation = defineOperation({
     if (!customer) fail("notFound");
     // Kunden mit Fahrzeugen, Halter-Historie oder Rechnungen bleiben erhalten (Nachvollziehbarkeit); im Schema zusätzlich per Restrict gesichert
     const links = customer._count;
-    if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles + links.ownerships, invoices: links.invoices });
+    if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles, ownerships: links.ownerships, invoices: links.invoices });
     await tx.customer.delete({ where: { id: input.id } });
     audit({ target: customerDisplayName(customer), entityId: input.id });
     return { id: input.id };

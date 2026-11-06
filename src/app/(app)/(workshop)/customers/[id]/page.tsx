@@ -162,7 +162,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             />
           </Card>
           {canDelete && customerHasLinks(customer._count) ? (
-            <p className="text-sm text-ink-muted">{t("customers.deleteBlocked", { vehicles: customer._count.vehicles + customer._count.ownerships, invoices: customer._count.invoices })}</p>
+            <p className="text-sm text-ink-muted">{t("customers.deleteBlocked", { vehicles: customer._count.vehicles, ownerships: customer._count.ownerships, invoices: customer._count.invoices })}</p>
           ) : canDelete ? (
             <form action={deleteCustomer}>
               <input type="hidden" name="id" value={customer.id} />

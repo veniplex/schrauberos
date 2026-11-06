@@ -78,9 +78,16 @@ describe("deleteCustomer", () => {
     const billed = await env.db.customer.create({ data: { lastName: "Rechnung" } });
     await env.db.invoice.create({ data: { direction: "outgoing", number: "1", outgoingKey: "1", partyName: "Rechnung", customerId: billed.id, issueDate: new Date(), grossCents: 100 } });
 
+    // die Zahlen sind getrennt: aktuelle Fahrzeuge, Halter-Einträge (auch frühere Halterschaft), Rechnungen – nicht addiert
+    const expected = new Map([
+      [withVehicle.id, { vehicles: 1, ownerships: 0, invoices: 0 }],
+      [history.id, { vehicles: 0, ownerships: 1, invoices: 0 }],
+      [billed.id, { vehicles: 0, ownerships: 0, invoices: 1 }],
+    ]);
     for (const c of [withVehicle, history, billed]) {
       assert.equal(await redirectOf(() => actions.deleteCustomer(form({ id: c.id }))), null, "bleibt auf der Seite");
       assert.equal(lastFlash()?.key, "customers.errors.inUse");
+      assert.deepEqual(lastFlash()?.params, expected.get(c.id));
       assert.equal(await env.db.customer.count({ where: { id: c.id } }), 1);
     }
     assert.equal(await env.db.auditLog.count({ where: { action: "customer.delete" } }), 0);

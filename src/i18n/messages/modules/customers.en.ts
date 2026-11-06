@@ -38,7 +38,7 @@ export const customersEn: typeof customersDe = {
   },
   errors: {
     nameRequired: "Enter a last name or a company.",
-    inUse: "This customer cannot be deleted: vehicles or owner entries ({vehicles}) or invoices ({invoices}) still exist. Transfer the vehicles first and remove the invoices.",
+    inUse: "This customer cannot be deleted: {vehicles} vehicles, {ownerships} owner entries (the owner history stays even after a change of owner), {invoices} invoices.",
   },
-  deleteBlocked: "Cannot be deleted while vehicles, owner history or invoices are linked to this customer ({vehicles} vehicle entries, {invoices} invoices).",
+  deleteBlocked: "Cannot be deleted while vehicles, owner history or invoices are linked to this customer: {vehicles} vehicles, {ownerships} owner entries (including past ownership), {invoices} invoices.",
 };
