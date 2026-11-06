@@ -130,7 +130,8 @@ async function attempt(input: RedeemInput): Promise<RedeemResult> {
   const user = await db.user.findUnique({ where: { id: found.userId }, include: { roles: { include: { role: true } } } });
   if (!user || !user.active || user.authSource !== "local" || !user.roles.some((r) => r.role.isAdmin)) throw new Invalid();
 
-  // Das neue Passwort wird erst jetzt gehasht (nur für einen gültigen Code); die Antwortdauer ist aufgefüllt
+  // Das neue Passwort wird erst jetzt gehasht (nur für einen gültigen Code) – auf dem eigenen Pfad `ownerSemaphore`, nie in der
+  // Warteschlange der Anmeldungen; die Antwortdauer ist aufgefüllt
   const passwordHash = await hashPassword(input.password);
   const newCode = await db.$transaction(async (tx) => {
     // Der Code wird verbraucht: nur wer die Zeile tatsächlich löscht, hat ihn eingelöst (zwei gleichzeitige Einlösungen: eine gewinnt)
@@ -138,6 +139,7 @@ async function attempt(input: RedeemInput): Promise<RedeemResult> {
     if (used.count !== 1) throw new Invalid();
     await tx.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false, failedLogins: 0, lockedUntil: null } });
     await tx.session.deleteMany({ where: { userId: user.id } }); // alle Sitzungen des Kontos enden, kein automatisches Anmelden
+    await tx.knownDevice.deleteMany({ where: { userId: user.id } }); // Zugang verloren: auch die bekannten Geräte gelten nicht mehr
     await resetSecondFactor(tx, user.id);
     await tx.recoveryNotice.create({ data: { userId: user.id, userName: user.name } });
     return replaceRecoveryCode(tx, user.id);

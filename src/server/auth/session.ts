@@ -8,6 +8,7 @@ import { getAuthProvider } from "./providers";
 import { QueueFullError, verifyPassword } from "./password";
 import { authRuntime } from "./runtime";
 import { loginThrottle, normalizeUsername } from "./throttle";
+import { findKnownDevice, rememberDevice } from "./devices";
 import { isLocale, LOCALE_COOKIE, THEME_COOKIE, type Locale } from "@/i18n/config";
 import { THEMES, type Theme } from "@/lib/constants";
 import { clearingAttributes, cookieAttributes, isSecureRequest, readSessionToken, SESSION_COOKIE, sessionCookieName } from "@/lib/session-cookie";
@@ -69,6 +70,8 @@ export type LoginResult =
 export type LoginContext = {
   /** Adresse des Clients (nur hinter einem Reverse-Proxy bekannt, sonst null) */
   ip?: string | null;
+  /** Geräte-Token aus dem Cookie `so_device` (siehe `devices.ts`); fehlt oder ungültig = neues Gerät */
+  deviceToken?: string | null;
 };
 
 /** Gedrosselt: eine zufällige, feste Zeit per Timer warten (kein Hash, keine CPU) und die Restzeit nennen. */
@@ -79,55 +82,81 @@ async function throttledResult(waitMs: number): Promise<LoginResult> {
 
 /**
  * Meldet einen Benutzer an. Reihenfolge ist Absicht:
- *  1. **Synchron** (vor dem ersten `await`) prüfen, ob Konto/Adresse warten müssen, und den Versuch belegen – so kann ein Schwung
- *     paralleler Versuche die Drosselung nicht unterlaufen. Gedrosselte Versuche kosten nur einen Timer, keinen Hash.
+ *  0. Ist das Gerät bekannt (gültiges Geräte-Cookie **dieses** Kontos)? Eine einzige indizierte Abfrage, nur wenn ein Cookie da ist.
+ *  1. **Synchron** (ohne `await` dazwischen) prüfen, ob Konto/Adresse – bei bekanntem Gerät das Gerät – warten müssen, und den
+ *     Versuch belegen: so kann ein Schwung paralleler Versuche die Drosselung nicht unterlaufen. Gedrosselte Versuche kosten nur
+ *     einen Timer, keinen Hash. **Ein bekanntes Gerät unterliegt nicht der Konto-Wartezeit** (die ein Angreifer ohne das Cookie
+ *     auslösen kann), sondern einer eigenen Drosselung je Gerät; seine Fehlversuche zählen nicht gegen das Konto.
  *  2. Globales Fehlversuchs-Budget: verlangsamt, weist aber nie ab.
- *  3. Passwort prüfen (höchstens 2 gleichzeitig, begrenzte Warteschlange). Unbekannte Namen werden wie bekannte behandelt.
+ *  3. Passwort prüfen. Anmeldungen: höchstens 2 gleichzeitig, begrenzte Warteschlange. Bekannte Geräte nutzen den eigenen Pfad
+ *     (`ownerSemaphore`), sie können von einer Flut fremder Anmeldungen nicht verdrängt werden. Unbekannte Namen **rechnen keinen
+ *     Hash**; die Antwort wird per Timer auf die typische Dauer aufgefüllt (`verifyPassword`).
  *  4. Dauerhafte Zähler in der Datenbank (atomar), überstehen einen Neustart.
  */
 export async function login(username: string, password: string, context: LoginContext = {}): Promise<LoginResult> {
-  const { accounts, ips, budget } = loginThrottle;
+  const { accounts, ips, devices, budget } = loginThrottle;
   const key = normalizeUsername(username);
   const ip = context.ip ?? null;
 
-  const wait = Math.max(accounts.check(key), ip ? ips.check(ip) : 0);
-  if (wait > 0) return throttledResult(wait);
-  const taken = accounts.take(key);
-  if (ip) ips.take(ip);
-  const newlyThrottled = taken.delayMs > 0 && accounts.delayAfter(taken.attempts - 1) === 0;
+  const presented = context.deviceToken ? { token: context.deviceToken, device: await findKnownDevice(context.deviceToken) } : null;
+  const device = presented?.device && presented.device.username === key ? presented.device : null;
+
+  let newlyThrottled: boolean;
+  if (device) {
+    const wait = devices.check(device.id);
+    if (wait > 0) return throttledResult(wait);
+    const taken = devices.take(device.id);
+    newlyThrottled = taken.delayMs > 0 && devices.delayAfter(taken.attempts - 1) === 0;
+  } else {
+    const wait = Math.max(accounts.check(key), ip ? ips.check(ip) : 0);
+    if (wait > 0) return throttledResult(wait);
+    const taken = accounts.take(key);
+    if (ip) ips.take(ip);
+    newlyThrottled = taken.delayMs > 0 && accounts.delayAfter(taken.attempts - 1) === 0;
+  }
+  /** Überlast ist kein Fehlversuch des Benutzers */
+  const forgive = () => {
+    if (device) devices.forgive(device.id);
+    else {
+      accounts.forgive(key);
+      if (ip) ips.forgive(ip);
+    }
+  };
 
   const extra = budget.delayMs();
   if (extra > 0) await authRuntime.sleep(extra);
 
   const user = await db.user.findUnique({ where: { username: key } });
-  // Dauerhafte Wartezeit aus der Datenbank (z. B. nach einem Neustart): ebenfalls ohne Hash
-  if (user?.lockedUntil && user.lockedUntil.getTime() > authRuntime.now()) return throttledResult(user.lockedUntil.getTime() - authRuntime.now());
+  // Dauerhafte Wartezeit aus der Datenbank (z. B. nach einem Neustart): ebenfalls ohne Hash – außer für das bekannte Gerät
+  if (!device && user?.lockedUntil && user.lockedUntil.getTime() > authRuntime.now()) return throttledResult(user.lockedUntil.getTime() - authRuntime.now());
 
   const provider = user ? getAuthProvider(user.authSource) : null;
   let valid: boolean;
   try {
-    // Immer einen Hash prüfen (auch bei unbekanntem Benutzer) -> kein Timing-Orakel.
-    valid = user && provider ? await provider.verify(user, password, { bounded: true }) : await verifyPassword(password, null, { bounded: true });
+    // Unbekannte Namen und Konten ohne lokales Passwort rechnen keinen Hash (`verifyPassword` füllt per Timer auf).
+    valid = user && provider ? await provider.verify(user, password, { bounded: !device }) : await verifyPassword(password, null);
   } catch (error) {
     if (!(error instanceof QueueFullError)) throw error;
-    // Überlast ist kein Fehlversuch des Benutzers
-    accounts.forgive(key);
-    if (ip) ips.forgive(ip);
+    forgive();
     return { ok: false, reason: "busy" };
   }
 
   const account = user ? { id: user.id, name: user.name } : null;
   if (!user || !valid) {
     budget.record();
-    if (user) await recordFailure(user);
+    if (user && !device) await recordFailure(user.id);
     return { ok: false, reason: "invalid", account, newlyThrottled };
   }
   if (!user.active) return { ok: false, reason: "inactive", account: account! };
 
-  accounts.succeed(key);
-  if (ip) ips.forgive(ip); // andere Nutzer derselben Adresse sollen sich nicht gegenseitig bremsen
-  await db.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date(authRuntime.now()) } });
+  if (device) devices.succeed(device.id);
+  else {
+    accounts.succeed(key);
+    if (ip) ips.forgive(ip); // andere Nutzer derselben Adresse sollen sich nicht gegenseitig bremsen
+  }
+  await recordSuccess(user.id, !device);
   await startSession(user.id);
+  await rememberDevice(user.id, presented ?? undefined);
 
   // Persönliche Einstellungen in Cookies spiegeln (Server rendert damit ohne DB-Zugriff)
   const jar = await cookies();
@@ -138,17 +167,37 @@ export async function login(username: string, password: string, context: LoginCo
   return { ok: true, mustChangePassword: user.mustChangePassword, account: account! };
 }
 
-/** Fehlversuch dauerhaft festhalten: Zähler atomar erhöhen, Wartezeit daraus ableiten (und nur verlängern, nie verkürzen). */
-async function recordFailure(user: { id: string; lockedUntil: Date | null }): Promise<void> {
-  const now = authRuntime.now();
-  const stale = user.lockedUntil !== null && now - user.lockedUntil.getTime() > FAILURE_DECAY_MS;
-  const { failedLogins } = await db.user.update({
-    where: { id: user.id },
-    data: { failedLogins: stale ? 1 : { increment: 1 } },
-    select: { failedLogins: true },
+/**
+ * Anmeldezähler eines Kontos schreiben, **ohne `updatedAt` zu verändern**: Das Benutzerformular nutzt `updatedAt` als Version
+ * (gleichzeitiges Bearbeiten); ein Fehlversuch oder eine Anmeldung darf kein „Das wurde zwischenzeitlich geändert“ auslösen. Lesen
+ * und Schreiben laufen in einer Transaktion (atomar). `compute` bekommt den aktuellen Stand und liefert die zu schreibenden Felder.
+ */
+async function updateLoginState(
+  userId: string,
+  compute: (current: { failedLogins: number; lockedUntil: Date | null }) => { failedLogins?: number; lockedUntil?: Date | null; lastLoginAt?: Date },
+): Promise<void> {
+  await db.$transaction(async (tx) => {
+    const current = await tx.user.findUnique({ where: { id: userId }, select: { updatedAt: true, failedLogins: true, lockedUntil: true } });
+    if (!current) return;
+    await tx.user.update({ where: { id: userId }, data: { ...compute(current), updatedAt: current.updatedAt } });
   });
-  const until = new Date(now + loginThrottle.accounts.delayAfter(failedLogins));
-  await db.user.updateMany({ where: { id: user.id, OR: [{ lockedUntil: null }, { lockedUntil: { lt: until } }] }, data: { lockedUntil: until } });
+}
+
+/** Fehlversuch dauerhaft festhalten: Zähler erhöhen, Wartezeit daraus ableiten (nur verlängern, nie verkürzen). */
+async function recordFailure(userId: string): Promise<void> {
+  const now = authRuntime.now();
+  await updateLoginState(userId, (current) => {
+    const stale = current.lockedUntil !== null && now - current.lockedUntil.getTime() > FAILURE_DECAY_MS;
+    const failedLogins = stale ? 1 : current.failedLogins + 1;
+    const until = now + loginThrottle.accounts.delayAfter(failedLogins);
+    if (!current.lockedUntil || current.lockedUntil.getTime() < until) return { failedLogins, lockedUntil: new Date(until) };
+    return { failedLogins };
+  });
+}
+
+/** Erfolgreiche Anmeldung: Zeitpunkt festhalten; nur eine Anmeldung ohne bekanntes Gerät setzt die Zähler des Kontos zurück. */
+async function recordSuccess(userId: string, resetCounters: boolean): Promise<void> {
+  await updateLoginState(userId, () => ({ lastLoginAt: new Date(authRuntime.now()), ...(resetCounters ? { failedLogins: 0, lockedUntil: null } : {}) }));
 }
 
 /** Wartezeit eines Kontos aufheben (Administration): Zähler in Datenbank und Speicher zurücksetzen. */

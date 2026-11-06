@@ -6,8 +6,15 @@ Melden Sie sich mit Ihrem Benutzernamen und Passwort an. Wurde Ihr Konto neu ang
 Anwendung beim ersten Anmelden ein eigenes Passwort (mindestens 8, höchstens 128 Zeichen).
 
 Nach drei Fehlversuchen muss man vor dem nächsten Versuch warten: erst 2 Sekunden, dann immer länger, höchstens 90 Sekunden. Die
-Meldung nennt die Restzeit; ein richtiges Passwort hebt die Wartezeit auf. Das gilt für jeden Namen gleich – die Anwendung verrät
-nicht, ob es ein Konto gibt. Wer sein Passwort vergessen hat, bittet einen Administrator, es unter **Verwaltung → Benutzer**
+Meldung nennt die Restzeit. Das gilt für jeden Namen gleich – die Anwendung verrät nicht, ob es ein Konto gibt.
+
+Die Wartezeit hängt **am Konto**, nicht an Ihnen persönlich: Versucht jemand anderes ständig, sich mit Ihrem Namen anzumelden, müssen
+auch Sie auf einem **neuen Gerät** warten – ein richtiges Passwort hebt die Wartezeit dort nicht auf, solange der Beschuss andauert
+(Abwarten, höchstens 90 Sekunden, oder der Wiederherstellungs-Code hilft). **Bekannte Geräte** sind davon ausgenommen: Nach einer
+erfolgreichen Anmeldung merkt sich die Anwendung den Browser in einem Cookie (180 Tage, nur für Ihr Konto, in der Datenbank nur als
+Prüfsumme). Von dort aus melden Sie sich auch während eines Angriffs mit dem richtigen Passwort an; für falsche Eingaben gilt dort ein
+eigenes Limit. Das Cookie ersetzt das Passwort nicht. Ändert eine Administratorin Ihr Passwort oder wird der Notzugang benutzt, gelten
+Ihre bekannten Geräte nicht mehr. Wer sein Passwort vergessen hat, bittet einen Administrator, es unter **Verwaltung → Benutzer**
 zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
 
 > **Erste Einrichtung:** Beim allerersten Aufruf einer neuen Installation erscheint statt der Anmeldung die Ersteinrichtung:

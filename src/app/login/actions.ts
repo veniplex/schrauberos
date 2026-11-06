@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { login, logout, type LoginResult } from "@/server/auth/session";
 import { currentClientIp } from "@/server/auth/network";
+import { readDeviceToken } from "@/server/auth/devices";
 import { loginThrottle, nameFingerprint, normalizeUsername } from "@/server/auth/throttle";
 import { getI18n } from "@/i18n/server";
 import type { ActionState } from "@/components/ui/form";
@@ -43,7 +44,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   // Überlange Eingaben werden gar nicht erst geprüft (und verursachen keine Arbeit)
   if (!parsed.success || passwordTooLong(parsed.data.password)) return { error: t("auth.errors.invalid") };
 
-  const result = await login(parsed.data.username, parsed.data.password, { ip: await currentClientIp() });
+  const result = await login(parsed.data.username, parsed.data.password, { ip: await currentClientIp(), deviceToken: await readDeviceToken() });
   await auditLogin(parsed.data.username, result);
   if (!result.ok) {
     if (result.reason === "throttled") return { error: t("auth.errors.throttled", { seconds: result.retryAfterSeconds }) };

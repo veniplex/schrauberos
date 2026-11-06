@@ -245,17 +245,31 @@ zu überschreiben. Prüfung und Schreiben, die zusammengehören (z. B. Doppelbel
   **nie von `/login` weg** – die Anmeldeseite prüft die Sitzung selbst (totes Cookie → Formular statt Schleife). Ausgenommen vom Proxy
   (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons, `/api/health`, `/api/v1/*` (Bearer-Token), `/api/ical/*`
   (Token in der URL); übrige `/api/*` ohne Cookie antworten mit 401.
-* **Passwörter:** scrypt aus `node:crypto` (`src/server/auth/scrypt.ts`, N=2^15, r=8, p=1, Kosten stehen im Hash). Höchstens **2** Berechnungen
-  gleichzeitig (`hashSemaphore`, teilt sich den libuv-Thread-Pool), Warteschlange begrenzt (voll → „bitte kurz warten“). Länge: 8–128 Zeichen,
-  zusätzlich höchstens 512 Bytes (`src/lib/password-rules.ts`).
+* **Passwörter:** scrypt aus `node:crypto` (`src/server/auth/scrypt.ts`, N=2^15, r=8, p=1, Kosten stehen im Hash). Anmeldungen: höchstens **2** Berechnungen
+  gleichzeitig (`hashSemaphore`, teilt sich den libuv-Thread-Pool), Warteschlange begrenzt (voll → „bitte kurz warten“). Alles, was nicht hinter einer Flut
+  fremder Anmeldungen warten darf – Passwort setzen, Passwortabfrage im Konto, das Hashen des neuen Passworts beim Notzugang und die Anmeldung von einem
+  bekannten Gerät –, läuft auf dem **eigenen Pfad** `ownerSemaphore` (1 gleichzeitig; zusammen bleibt ein Thread des Pools frei). **Unbekannte Namen rechnen
+  keinen Hash**: Die Antwort wird per Timer auf die gemessene typische Hash-Dauer aufgefüllt (`hashStats.typicalMs`), sonst ließen sich die Hash-Plätze mit
+  erfundenen Namen belegen. Länge: 8–128 Zeichen, zusätzlich höchstens 512 Bytes (`src/lib/password-rules.ts`).
 * **Drosselung** (`src/lib/login-throttle.ts`, Zustand `src/server/auth/throttle.ts`): je Konto 3 freie Versuche, dann 2 s, 4 s, 8 s … höchstens
-  90 s – **keine harte Sperre**, gleich für unbekannte Namen. Prüfen und Belegen laufen synchron vor dem ersten `await` (Schwung paralleler Versuche
+  90 s – **keine harte Sperre**, gleich für unbekannte Namen. Prüfen und Belegen laufen synchron ohne `await` dazwischen (Schwung paralleler Versuche
   kommt nur bis zu den freien Versuchen durch); abgewiesene Versuche verlängern nichts; gedrosselte Anmeldungen kosten nur einen Timer, keinen
-  Hash. Die Zähler stehen zusätzlich atomar in der Datenbank (`User.failedLogins/lockedUntil`, überstehen Neustarts); die Administration hebt sie auf
+  Hash. Der Speicher verdrängt bei Überlauf **nie eine laufende Wartezeit** zugunsten eines neuen Namens (zuerst Einträge ohne Wartezeit, dann bis zum
+  Doppelten der Grenze wachsen, darüber der am frühesten ablaufende). Die Zähler stehen zusätzlich atomar in der Datenbank (`User.failedLogins/lockedUntil`,
+  überstehen Neustarts; geschrieben ohne `updatedAt`, damit das Benutzerformular keinen Schein-Konflikt meldet); die Administration hebt sie auf
   der Benutzerseite auf. Das **globale Fehlversuchs-Budget** (30/min) verlangsamt, weist nie ab. **IP-Limit** nur mit der Einstellung
   „Hinter Reverse-Proxy“ (Einstellungen → Sicherheit): dann zählt der **letzte** Eintrag von `X-Forwarded-For`, sonst wird der Header ignoriert.
   Audit-Einträge für Fehlversuche sind gedrosselt, unbekannte Namen stehen nur als Kürzel darin. Der Passwortwechsel im Konto hat ein eigenes Limit.
   Uhr/Warten sind in Tests über `authRuntime` (`src/server/auth/runtime.ts`) ersetzbar.
+* **Bekanntes Gerät** (`src/server/auth/devices.ts`, Tabelle `KnownDevice`): Gegen den **Dauerbeschuss eines Kontos** – wer ohne Pause auf einen Namen schießt,
+  gewinnt jedes frei werdende Zeitfenster der Konto-Wartezeit und sperrte so den Besitzer praktisch aus – setzt die App nach jeder erfolgreichen Anmeldung
+  ein zufälliges 256-Bit-Cookie (`so_device`, unter HTTPS `__Host-so_device`; HttpOnly, SameSite=Lax, 180 Tage, gleitend), in der Datenbank nur der SHA-256-Hash,
+  gebunden an das Konto (höchstens 10 je Konto). Eine Anmeldung **mit gültigem Cookie dieses Kontos** unterliegt nicht der Konto-Wartezeit (und nicht der
+  Datenbank-Sperre), sondern einer eigenen Drosselung je Gerät (`loginThrottle.devices`: 5 freie Versuche, dann 2 s … 90 s) und dem globalen Budget; ihre
+  Fehlversuche zählen nicht gegen das Konto. Ohne Cookie (neues Gerät, Angreifer) bleibt die Konto-Wartezeit, Ausweg: abwarten (≤ 90 s) oder der
+  Wiederherstellungs-Code. Das Cookie ersetzt nie das Passwort. Geräte werden vergessen bei Passwortänderung/Deaktivierung durch die Administration, beim
+  Passwortwechsel im Konto (andere Geräte) und beim Notzugang. **Restrisiko:** Wer das Geräte-Cookie *und* ein Ratefenster am selben Gerät hat, ist durch das
+  Geräte-Limit gebremst, aber nicht durch die Konto-Wartezeit; ein gestohlenes Geräte-Cookie erleichtert Raten also nur im Rahmen des Geräte-Limits.
 * **Rücksprungziel** (`?next=`): `safeNext` (`src/lib/safe-next.ts`) löst per `new URL` auf und vergleicht den Origin.
 * **Rechte-Hierarchie** (`src/lib/rbac.ts`, DB-Teil `src/server/rbac/hierarchy.ts`): Ein Nicht-Admin ändert nur Konten, deren **Rohrechte**
   (ungefiltert nach Funktionsaktivierung) eine Teilmenge der eigenen sind, vergibt/entzieht nur Rollen, die er vollständig besitzt, ändert Rollen nur
@@ -271,14 +285,14 @@ Action** angezeigt (Einrichtung, Konto, Einlösen): eigene Seite mit Pflicht-Bes
 (`RecoveryCodeView`), nie in URL, Log oder Audit. Erzeugen/Neu-Erzeugen nur für Administrator-Konten und mit erneuter Passwortabfrage
 (`src/platform/account/recovery-actions.ts`, im Konto).
 
-**Einlösen** (`/login/recover`, `src/server/auth/recovery.ts`): eigener Pfad, **nicht** über die scrypt-Semaphore. SHA-256, Vergleich in
+**Einlösen** (`/login/recover`, `src/server/auth/recovery.ts`): eigener Pfad, **nicht** über die scrypt-Semaphore der Anmeldungen (das Hashen des neuen Passworts läuft auf `ownerSemaphore`, nie hinter einer Flut von Anmeldungen). SHA-256, Vergleich in
 konstanter Zeit über alle gespeicherten Hashes; Drosselung **ausschließlich global** (`loginThrottle.recovery`: Budget verlangsamt ab 10
 Versuchen/min um je 200 ms bis 5 s, weist nie ab) und je Adresse nur mit der Proxy-Einstellung – **nie pro Konto**. Alle Fehler (kein
 Code, falsch, Prüfsumme, benutzt, Konto inaktiv/kein Administrator) liefern dieselbe Meldung und werden per Timer auf eine feste Dauer
 (1,2–1,5 s) aufgefüllt, ebenso der Erfolg. Bei Erfolg in **einer Transaktion**: Code verbrauchen (Löschen der Zeile entscheidet bei
 Gleichzeitigkeit), neues Passwort, alle Sitzungen des Kontos löschen, `resetSecondFactor` (Erweiterungsstelle für 2FA, P1b-5), Hinweis
-anlegen, **neuer Code** (der alte ist ungültig). Kein automatisches Anmelden. Der Hinweis „Notzugang wurde verwendet“ (`RecoveryNotice`)
-erscheint als Banner (`RecoveryBanner` im Layout) beim Konto und bei allen Administratoren, bis sie ihn bestätigen; Audit
+anlegen, bekannte Geräte vergessen, **neuer Code** (der alte ist ungültig). Kein automatisches Anmelden. Der Hinweis „Notzugang wurde verwendet“ (`RecoveryNotice`;
+überlebt das Löschen des Kontos, der Name steht in `userName`) erscheint als Banner (`RecoveryBanner` im Layout) beim Konto und bei allen Administratoren, bis sie ihn bestätigen; Audit
 `auth.recoveryCreated/Used/Failed` (Fehlversuche gedrosselt, ohne Code-Material). Der Code gehört zu den Daten: Nach einer
 Backup-Wiederherstellung kann ein gedruckter Code veraltet sein (Hinweis in Hilfe und Wiederherstellungs-Rückfrage).
 

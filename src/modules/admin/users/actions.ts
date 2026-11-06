@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requirePermission, resetAccountThrottle, revokeSessions } from "@/server/auth/session";
+import { revokeDevices } from "@/server/auth/devices";
 import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
 import { getI18n } from "@/i18n/server";
 import type { ActionState } from "@/components/ui/form";
@@ -110,7 +111,10 @@ export async function saveUser(_prev: ActionState, formData: FormData): Promise<
   const userId = outcome.userId;
 
   // Passwort geändert oder deaktiviert -> bestehende Sitzungen beenden
-  if (d.id && (password || !active)) await revokeSessions(d.id, d.id === session.user.id);
+  if (d.id && (password || !active)) {
+    await revokeSessions(d.id, d.id === session.user.id);
+    await revokeDevices(d.id, d.id === session.user.id);
+  }
   await audit(d.id ? "user.update" : "user.create", { target: d.username, entityId: userId });
   revalidatePath("/admin/users");
   redirect(`/admin/users?saved=${userId}`);

@@ -34,6 +34,11 @@ export function readSessionToken(get: (name: string) => { value: string } | unde
   return get(sessionCookieName(secure))?.value || undefined;
 }
 
+/** Das Geräte-Token lesen – ebenfalls nur unter dem Namen, der zum Übertragungsweg passt. */
+export function readDeviceToken(get: (name: string) => { value: string } | undefined, secure: boolean): string | undefined {
+  return get(deviceCookieName(secure))?.value || undefined;
+}
+
 /** Attribute eines Cookies, das der Browser sicher behält (HttpOnly, SameSite=Lax; unter HTTPS Secure und Pfad „/“ für `__Host-`). */
 export function cookieAttributes(secure: boolean) {
   return { httpOnly: true, secure, sameSite: "lax" as const, path: "/" };

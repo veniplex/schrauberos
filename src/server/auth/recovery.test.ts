@@ -136,6 +136,30 @@ describe("Einlösen", () => {
     assert.equal(passwordMod.hashSemaphore.waiting, 0);
   });
 
+  it("kommt durch, während eine Flut von Anmeldungen läuft und alle Hash-Plätze der Anmeldung belegt sind (eigener Pfad für das neue Passwort)", async () => {
+    const code = await issue();
+    let release!: () => void;
+    const blocker = new Promise<void>((resolve) => (release = resolve));
+    const blocked = Array.from({ length: 34 }, () => passwordMod.hashSemaphore.run(() => blocker));
+    const flood = Array.from({ length: 100 }, (_, i) => session.login(`flut-${i}`, "falsches-passwort-123"));
+    try {
+      const result = await redeem(code);
+      assert.equal(result.ok, true);
+      assert.equal(passwordMod.hashSemaphore.waiting, 32, "die Warteschlange der Anmeldungen war die ganze Zeit voll");
+    } finally {
+      release();
+      await Promise.all([...blocked, ...flood]);
+    }
+    assert.equal((await session.login("chef", NEW_PASSWORD)).ok, true);
+  });
+
+  it("macht die bekannten Geräte des Kontos ungültig", async () => {
+    await session.login("chef", PASSWORD);
+    assert.equal(await env.db.knownDevice.count({ where: { userId: admin.id } }), 1);
+    assert.equal((await redeem(await issue())).ok, true);
+    assert.equal(await env.db.knownDevice.count({ where: { userId: admin.id } }), 0);
+  });
+
   it("2FA-Erweiterungsstelle ist in der Transaktion verdrahtet (Aufruf beim Einlösen)", async () => {
     // Solange es keine 2FA gibt, ist die Stelle leer – sie muss existieren und aufrufbar sein
     await assert.doesNotReject(env.db.$transaction((tx) => recovery.resetSecondFactor(tx, admin.id)));

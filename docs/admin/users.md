@@ -8,6 +8,9 @@ Unter **Benutzer** werden Konten angelegt, geändert und deaktiviert.
 * **Notzugang:** Haben alle Administratoren ihr Passwort verloren, hilft der **Wiederherstellungs-Code** (siehe „Erste Schritte“): Auf der Anmeldeseite „Zugang verloren? Wiederherstellungs-Code verwenden“ wählen. Nach jeder Verwendung sehen das Konto und alle Administratoren einen Hinweis.
 * **Wartezeit nach Fehlversuchen:** Nach mehreren falschen Passwörtern muss ein Konto vor dem nächsten Versuch warten (höchstens 90
   Sekunden, keine Sperre). Die Liste zeigt „Anmeldung gedrosselt“; auf der Seite des Kontos hebt **Wartezeit aufheben** sie sofort auf.
+  Die Wartezeit gilt nicht für **bekannte Geräte** des Kontos (Browser, mit denen sich die Person schon angemeldet hat): So kann ein
+  Dauerbeschuss mit ihrem Namen sie nicht aussperren. Geräte werden vergessen, wenn Sie das Passwort der Person ändern oder sie
+  deaktivieren.
 * **Schutzregeln:** Der letzte aktive Administrator kann weder gelöscht noch deaktiviert werden, das eigene Konto lässt sich nicht
   deaktivieren, und Administrator-Rollen vergeben nur Administratoren.
 * **Wer wen ändern darf:** Ein Konto ohne Administrator-Rolle darf nur Konten ändern oder löschen, deren Rechte es **vollständig

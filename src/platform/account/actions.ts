@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireSession, revokeSessions } from "@/server/auth/session";
+import { revokeDevices } from "@/server/auth/devices";
 import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem, verifyPassword } from "@/server/auth/password";
 import { loginThrottle } from "@/server/auth/throttle";
 import { getI18n } from "@/i18n/server";
@@ -53,6 +54,7 @@ export async function changePassword(_prev: ActionState, formData: FormData): Pr
   await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), mustChangePassword: false } });
   // Alle anderen Geräte abmelden
   await revokeSessions(user.id, true);
+  await revokeDevices(user.id, true);
   await audit("account.password");
   if (user.mustChangePassword) redirect("/");
   return { ok: true, message: t("account.passwordChanged") };

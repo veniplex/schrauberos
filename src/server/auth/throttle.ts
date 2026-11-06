@@ -17,6 +17,12 @@ function create() {
     accounts: new Gate({ free: 3, baseMs: 2_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 5_000, now }),
     /** Je Client-Adresse (nur hinter Reverse-Proxy): großzügig, 20 freie Versuche in 10 Minuten. */
     ips: new Gate({ free: 20, baseMs: 2_000, capMs: CAP_MS, decayMs: 10 * 60_000, maxEntries: 5_000, now }),
+    /**
+     * Je **bekanntem Gerät** (gültiges Geräte-Cookie des Kontos, siehe `devices.ts`): 5 freie Versuche, dann 2 s, 4 s … bis 90 s. Dieses
+     * Gate ersetzt für das Gerät die Konto-Wartezeit; ein Angreifer ohne das Cookie kann sie nicht auslösen. Der Schlüssel ist die
+     * Geräte-Id (nur gültige Geräte kommen hierher), deshalb ist die Tabelle durch Konten × 10 begrenzt.
+     */
+    devices: new Gate({ free: 5, baseMs: 2_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 2_000, now }),
     /** Passwortwechsel im Konto: eigenes Limit (die Prüfung des aktuellen Passworts darf kein Rate-Orakel für gestohlene Sitzungen sein). */
     passwordChange: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
     /** Alle Fehlversuche zusammen: ab 30 pro Minute wird jede Anmeldung bis zu 3 s langsamer, aber nie abgewiesen. */

@@ -76,7 +76,8 @@ describe("Cookie", () => {
     await makeUser();
     await attempt("anna", "richtiges-passwort-1");
     await session.logout();
-    assert.equal(browser.cookies.size, 0);
+    assert.equal(browser.cookies.has("so_session"), false);
+    assert.equal(browser.cookies.has("so_device"), true, "das Geräte-Cookie bleibt über das Abmelden hinaus bestehen");
     assert.equal(await env.db.session.count(), 0);
   });
 
@@ -168,7 +169,7 @@ describe("Drosselung", () => {
     assert.ok(sleeps.length === 100 && sleeps.every((ms) => ms >= 300 && ms <= 700));
   });
 
-  it("unbekannte Namen verhalten sich genau wie bekannte (kein Existenz-Orakel)", async () => {
+  it("unbekannte Namen verhalten sich genau wie bekannte (kein Existenz-Orakel) – rechnen aber keinen Hash, sondern warten per Timer", async () => {
     await makeUser("anna");
     const script = async (name: string) => {
       const out: string[] = [];
@@ -179,16 +180,36 @@ describe("Drosselung", () => {
       return out;
     };
     const known = await script("anna");
+    assert.equal(passwordMod.hashStats.computed, 3, "bekannte Namen werden gerechnet");
     passwordMod.hashStats.computed = 0;
+    sleeps = [];
     const unknown = await script("gespenst");
     assert.deepEqual(unknown, known);
-    assert.equal(passwordMod.hashStats.computed, 3, "auch unbekannte Namen werden (wie bekannte) gerechnet, damit die Zeit nichts verrät");
+    assert.equal(passwordMod.hashStats.computed, 0, "unbekannte Namen rechnen keinen Hash (sonst ließen sich die Hash-Plätze mit erfundenen Namen belegen)");
+    assert.equal(passwordMod.hashSemaphore.active + passwordMod.hashSemaphore.waiting, 0);
+    // Stattdessen füllt ein Timer die Antwort auf die typische Hash-Dauer auf
+    const typical = passwordMod.hashStats.typicalMs;
+    assert.equal(sleeps.filter((ms) => ms >= typical * 0.9 && ms <= typical * 1.2).length, 3, `drei Auffüll-Timer um ${typical} ms: ${sleeps}`);
     // gleiche Meldung für falsches Passwort und unbekannten Namen
     throttleMod.resetLoginThrottle();
     await env.db.user.updateMany({ data: { failedLogins: 0, lockedUntil: null } });
     const a = await loginActions.loginAction({}, loginForm("anna", "falsch-123456"));
     const b = await loginActions.loginAction({}, loginForm("gespenst", "falsch-123456"));
     assert.equal(a.error, b.error);
+  });
+
+  it("eine Flut erfundener Namen verdrängt keine laufende Wartezeit: das gedrosselte Konto bleibt gedrosselt (gleiche Antwort wie ein gedrosselter erfundener Name)", async () => {
+    await makeUser("admin", "admin-passwort-1");
+    for (let i = 0; i < 3; i++) await attempt("admin");
+    for (let i = 0; i < 3; i++) await attempt("ghost-throttled");
+    const known = await attempt("admin", "admin-passwort-1");
+    const unknown = await attempt("ghost-throttled", "admin-passwort-1");
+    assert.equal(reasonOf(known), "throttled");
+    assert.deepEqual(known, unknown, "bekanntes gedrosseltes Konto und gedrosselter erfundener Name geben dieselbe Antwort");
+    for (let i = 0; i < 5_300; i++) await attempt(`flut-${i}`);
+    assert.equal(reasonOf(await attempt("admin", "admin-passwort-1")), "throttled", "die Flut hat die Wartezeit nicht aus dem Speicher gedrängt");
+    assert.equal(reasonOf(await attempt("ghost-throttled")), "throttled");
+    assert.ok(throttleMod.loginThrottle.accounts.size <= 10_000);
   });
 
   it("Dauerbeschuss des Kontos verlängert die Wartezeit nicht: danach kommt der Administrator nach höchstens 90 s durch", async () => {
@@ -241,6 +262,210 @@ describe("Drosselung", () => {
     await makeUser("anna", "richtiges-passwort-1", { active: false });
     assert.equal(reasonOf(await attempt("anna", "falsch")), "invalid");
     assert.equal(reasonOf(await attempt("anna", "richtiges-passwort-1")), "inactive");
+  });
+});
+
+describe("Bekanntes Gerät: Dauerbeschuss sperrt den Besitzer nicht aus", () => {
+  const ADMIN_PW = "admin-passwort-1";
+  /** Meldet an, merkt sich das Geräte-Cookie und gibt es zurück (so, wie es der Browser des Administrators hätte). */
+  const knownDevice = async (name = "admin", pw = ADMIN_PW) => {
+    assert.equal((await attempt(name, pw)).ok, true);
+    const token = browser.cookies.get("so_device");
+    assert.ok(token, "nach der Anmeldung gibt es ein Geräte-Cookie");
+    browser.reset(); // der Angreifer hat dieses Cookie nicht
+    throttleMod.resetLoginThrottle();
+    return token;
+  };
+  const withDevice = (name: string, pw: string, deviceToken: string | undefined, ip: string | null = null) => session.login(name, pw, { ip, deviceToken });
+
+  it("setzt nach der Anmeldung ein langes, zufälliges Cookie (HttpOnly, SameSite=Lax, 180 Tage); in der Datenbank steht nur sein Hash", async () => {
+    await makeUser("admin", ADMIN_PW);
+    assert.equal((await attempt("admin", ADMIN_PW)).ok, true);
+    const w = browser.writes.find((x) => x.name === "so_device")!;
+    assert.ok(w.value && w.value.length >= 40);
+    assert.deepEqual({ h: w.options.httpOnly, l: w.options.sameSite, p: w.options.path, s: w.options.secure, a: w.options.maxAge }, { h: true, l: "lax", p: "/", s: false, a: 180 * 86_400 });
+    const rows = await env.db.knownDevice.findMany();
+    assert.equal(rows.length, 1);
+    assert.match(rows[0].tokenHash, /^[0-9a-f]{64}$/);
+    assert.equal(JSON.stringify(rows[0]).includes(w.value!), false);
+    // eine zweite Anmeldung mit demselben Cookie legt kein weiteres Gerät an
+    assert.equal((await withDevice("admin", ADMIN_PW, w.value!)).ok, true);
+    assert.equal(await env.db.knownDevice.count(), 1);
+  });
+
+  it("unter HTTPS heißt es __Host-so_device (Secure, Pfad /); ein Klartext-Cookie wird dort nicht gelesen", async () => {
+    await makeUser("admin", ADMIN_PW);
+    browser.setHeaders({ "x-forwarded-proto": "https" });
+    await attempt("admin", ADMIN_PW);
+    const w = browser.writes.find((x) => x.name === "__Host-so_device")!;
+    assert.deepEqual({ s: w.options.secure, p: w.options.path, h: w.options.httpOnly }, { s: true, p: "/", h: true });
+    const devices = await import("./devices");
+    assert.equal(await devices.readDeviceToken(), w.value);
+    browser.cookies.set("so_device", "untergeschoben".padEnd(50, "x"));
+    browser.cookies.delete("__Host-so_device");
+    assert.equal(await devices.readDeviceToken(), undefined);
+  });
+
+  it("der Angreifer schießt ohne Pause weiter, der Administrator kommt mit seinem Gerät jedes Mal durch – auch gleichzeitig mit dem Beschuss", async () => {
+    await makeUser("admin", ADMIN_PW);
+    const token = await knownDevice();
+    const attackerResults: string[] = [];
+    let adminOk = 0;
+    // 10 Minuten lang alle 250 ms ein falscher Versuch ohne Cookie – dazwischen und gleichzeitig der Administrator
+    for (let t = 0, round = 0; t < 600_000; t += 250, round++) {
+      clock += 250;
+      if (round % 20 === 0) {
+        // gleichzeitig: ein Schwung Angriffsversuche und die echte Anmeldung
+        const [mine, ...attack] = await Promise.all([withDevice("admin", ADMIN_PW, token), ...Array.from({ length: 10 }, () => attempt("admin", "geraten-123456"))]);
+        assert.equal(mine.ok, true, `Administrator mit Gerät muss durchkommen (Runde ${round}): ${JSON.stringify(mine)}`);
+        adminOk++;
+        attackerResults.push(...attack.map(reasonOf));
+      } else {
+        attackerResults.push(reasonOf(await attempt("admin", "geraten-123456")));
+      }
+    }
+    assert.ok(adminOk >= 100);
+    assert.ok(attackerResults.includes("throttled"), "der Beschuss lief in die Konto-Wartezeit");
+    // Kein Vorteil für den Angreifer: Es kommen nur wenige Versuche zur Passwortprüfung
+    const reachedCheck = attackerResults.filter((r) => r === "invalid").length;
+    assert.ok(reachedCheck < 40, `Versuche bis zur Passwortprüfung: ${reachedCheck}`);
+    // Ohne Cookie (neues Gerät) bleibt die Wartezeit bestehen – auch mit dem richtigen Passwort
+    for (let i = 0; i < 4; i++) await attempt("admin", "geraten-123456");
+    assert.equal(reasonOf(await attempt("admin", ADMIN_PW)), "throttled");
+  });
+
+  it("ohne Geräte-Cookie greift die Drosselung weiter: auch das richtige Passwort muss warten, bis zu 90 s", async () => {
+    await makeUser("admin", ADMIN_PW);
+    for (let i = 0; i < 4; i++) await attempt("admin", "geraten-123456");
+    const r = await attempt("admin", ADMIN_PW);
+    assert.equal(reasonOf(r), "throttled");
+    assert.ok((r as { retryAfterSeconds: number }).retryAfterSeconds <= 90);
+    // ein falsches, zufälliges oder abgelaufenes Cookie hilft nicht
+    assert.equal(reasonOf(await withDevice("admin", ADMIN_PW, "zufaellig".padEnd(50, "z"))), "throttled");
+  });
+
+  it("das Cookie gilt nur für das eigene Konto und nur, solange es in der Datenbank steht", async () => {
+    const admin = await makeUser("admin", ADMIN_PW);
+    await makeUser("bob", "bobs-passwort-12");
+    const adminToken = await knownDevice();
+    for (let i = 0; i < 4; i++) await attempt("bob", "geraten-123456");
+    // Cookie eines anderen Kontos hebt Bobs Wartezeit nicht auf
+    assert.equal(reasonOf(await withDevice("bob", "bobs-passwort-12", adminToken)), "throttled");
+    // ... aber das eigene Konto des Cookies kommt durch, selbst wenn es gedrosselt wäre
+    for (let i = 0; i < 4; i++) await attempt("admin", "geraten-123456");
+    assert.equal((await withDevice("admin", ADMIN_PW, adminToken)).ok, true);
+    // Widerruf: Gerät aus der Datenbank -> wieder gedrosselt
+    await env.db.knownDevice.deleteMany({ where: { userId: admin.id } });
+    assert.equal(reasonOf(await withDevice("admin", ADMIN_PW, adminToken)), "throttled");
+  });
+
+  it("Gerät läuft nach 180 Tagen ohne Anmeldung ab", async () => {
+    const admin = await makeUser("admin", ADMIN_PW);
+    const token = await knownDevice();
+    for (let i = 0; i < 4; i++) await attempt("admin", "geraten-123456");
+    await env.db.knownDevice.updateMany({ where: { userId: admin.id }, data: { lastUsedAt: new Date(clock - 181 * 86_400_000) } });
+    assert.equal(reasonOf(await withDevice("admin", ADMIN_PW, token)), "throttled");
+  });
+
+  it("vom bekannten Gerät aus wird das Raten trotzdem gebremst (eigene Drosselung je Gerät) – und es sperrt das Konto für andere nicht", async () => {
+    await makeUser("admin", ADMIN_PW);
+    const token = await knownDevice();
+    const results: string[] = [];
+    for (let i = 0; i < 12; i++) results.push(reasonOf(await withDevice("admin", "geraten-123456", token)));
+    assert.deepEqual(results.slice(0, 5), ["invalid", "invalid", "invalid", "invalid", "invalid"]);
+    assert.ok(results.slice(5).every((r) => r === "throttled"), `ab dem 6. Fehlversuch Wartezeit: ${results}`);
+    const row = await env.db.user.findUniqueOrThrow({ where: { username: "admin" } });
+    assert.equal(row.failedLogins, 0, "Fehlversuche vom bekannten Gerät zählen nicht gegen das Konto");
+    assert.equal(throttleMod.loginThrottle.accounts.attemptsOf("admin"), 0);
+    // das Gerät selbst muss warten (auch mit richtigem Passwort), ein anderes Gerät ohne Wartezeit des Kontos nicht
+    assert.equal(reasonOf(await withDevice("admin", ADMIN_PW, token)), "throttled");
+    assert.equal((await attempt("admin", ADMIN_PW)).ok, true);
+  });
+
+  it("die Administration (Passwort ändern, deaktivieren) und der Notzugang vergessen die bekannten Geräte; das eigene Gerät bleibt beim Wechsel im Konto", async () => {
+    const admin = await makeUser("admin", ADMIN_PW);
+    await knownDevice();
+    assert.equal(await env.db.knownDevice.count(), 1);
+    const devices = await import("./devices");
+    await devices.revokeDevices(admin.id);
+    assert.equal(await env.db.knownDevice.count(), 0);
+    // Wechsel im Konto: das eigene Gerät behalten, andere vergessen
+    await attempt("admin", ADMIN_PW);
+    await env.db.knownDevice.create({ data: { tokenHash: "x".repeat(64), userId: admin.id } });
+    await devices.revokeDevices(admin.id, true);
+    const left = await env.db.knownDevice.findMany();
+    assert.equal(left.length, 1);
+    assert.notEqual(left[0].tokenHash, "x".repeat(64));
+  });
+
+  it("je Konto bleiben höchstens 10 Geräte (die zuletzt benutzten)", async () => {
+    const admin = await makeUser("admin", ADMIN_PW);
+    for (let i = 0; i < 13; i++) {
+      browser.reset();
+      clock += 1_000;
+      throttleMod.resetLoginThrottle();
+      assert.equal((await attempt("admin", ADMIN_PW)).ok, true);
+    }
+    assert.equal(await env.db.knownDevice.count({ where: { userId: admin.id } }), 10);
+  });
+
+  it("Fehlversuche und Anmeldungen ändern die „Version“ des Benutzers nicht (kein Schein-Konflikt im Benutzerformular)", async () => {
+    const user = await makeUser("anna");
+    const { versionOf } = await import("@/lib/concurrency");
+    const before = versionOf(await env.db.user.findUniqueOrThrow({ where: { id: user.id } }));
+    for (let i = 0; i < 4; i++) await attempt("anna");
+    assert.ok((await env.db.user.findUniqueOrThrow({ where: { id: user.id } })).failedLogins >= 3);
+    clock += 100_000;
+    assert.equal((await attempt("anna", "richtiges-passwort-1")).ok, true);
+    const row = await env.db.user.findUniqueOrThrow({ where: { id: user.id } });
+    assert.ok(row.lastLoginAt, "letzte Anmeldung wird festgehalten");
+    assert.equal(versionOf(row), before);
+  });
+});
+
+describe("Flut von Anmeldungen: Administrator und Notzugang kommen durch", () => {
+  const ADMIN_PW = "admin-passwort-1";
+
+  it("200 parallele Versuche mit erfundenen Namen rechnen keinen Hash und belegen keinen Platz; eine echte Anmeldung läuft gleichzeitig", async () => {
+    await makeUser("admin", ADMIN_PW);
+    const flood = Array.from({ length: 200 }, (_, i) => attempt(`flut-${i}`, "falsches-passwort-123"));
+    const real = attempt("admin", ADMIN_PW);
+    const [mine, ...rest] = await Promise.all([real, ...flood]);
+    assert.equal(mine.ok, true);
+    assert.equal(rest.filter((r) => reasonOf(r) === "busy").length, 0, "keine Anmeldung wird wegen der Flut abgewiesen");
+    assert.equal(passwordMod.hashStats.computed, 1, "nur die echte Anmeldung wurde gerechnet");
+  });
+
+  it("selbst bei voller Warteschlange der Anmeldungen: Anmeldung vom bekannten Gerät, Passwort setzen und Einlösen des Notzugangs warten nicht darauf", async () => {
+    const role = await env.role({ isAdmin: true });
+    const admin = await env.user({ username: "admin", password: ADMIN_PW, roles: [role] });
+    passwordMod.hashStats.computed = 0;
+    await makeUser("anna");
+    assert.equal((await attempt("admin", ADMIN_PW)).ok, true);
+    const token = browser.cookies.get("so_device")!;
+    browser.reset();
+    throttleMod.resetLoginThrottle();
+    const recovery = await import("./recovery");
+    const code = await env.db.$transaction((tx) => recovery.replaceRecoveryCode(tx, admin.id));
+
+    // Die Hash-Plätze der Anmeldungen sind belegt: 2 laufen, 32 warten
+    let release!: () => void;
+    const blocker = new Promise<void>((resolve) => (release = resolve));
+    const blocked = Array.from({ length: 34 }, () => passwordMod.hashSemaphore.run(() => blocker));
+    try {
+      assert.equal(passwordMod.hashSemaphore.active, 2);
+      assert.equal(passwordMod.hashSemaphore.waiting, 32);
+      // eine weitere gewöhnliche Anmeldung wird abgewiesen ...
+      assert.equal(reasonOf(await attempt("anna", "richtiges-passwort-1")), "busy");
+      // ... die vom bekannten Gerät, das Passwort-Setzen und der Notzugang nicht
+      assert.equal((await session.login("admin", ADMIN_PW, { deviceToken: token })).ok, true);
+      assert.ok((await passwordMod.hashPassword("neues-passwort-123")).startsWith("scrypt$"));
+      const result = await recovery.redeemRecoveryCode({ code, password: "notweg-passwort-456", ip: null });
+      assert.equal(result.ok, true);
+    } finally {
+      release();
+      await Promise.all(blocked);
+    }
   });
 });
 

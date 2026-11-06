@@ -43,6 +43,7 @@ model User {
   recoveryCode    RecoveryCode?
   recoveryNotices RecoveryNotice[]
   recoveryAcks    RecoveryNoticeAck[]
+  knownDevices    KnownDevice[]
 
   @@unique([authSource, externalId])
 }
@@ -130,6 +131,21 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// „Bekanntes Gerät“: Nach einer erfolgreichen Anmeldung bekommt der Browser ein langes, zufälliges Geräte-Cookie (gespeichert wird nur
+// sein Hash). Anmeldungen mit gültigem Geräte-Cookie des Kontos unterliegen nicht der Konto-Wartezeit, die jemand ohne dieses Cookie
+// durch Dauerbeschuss auslösen kann (siehe docs/platform und README, „Anmeldung“). Je Konto höchstens 10 Geräte.
+model KnownDevice {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  userAgent  String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ───────────── Werkstatt-Profil (Singleton, id = "default") ─────────────
