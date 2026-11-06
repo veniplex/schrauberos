@@ -34,7 +34,7 @@ describe("Touch-Fundament", () => {
     assert.match(globals, /\.input\s*\{[^}]*min-h-\(--tap\)[^}]*font-size:\s*var\(--input-font\)/);
     const ui = (file: string) => readFileSync(path.join(SRC, "components", "ui", file), "utf8");
     assert.match(ui("layout.tsx"), /min-h-\(--tap\) items-center gap-3/); // NavLink
-    assert.match(ui("layout.tsx"), /badge min-h-\(--tap-chip\)/); // ChipLink
+    assert.match(ui("layout.tsx"), /badge[^"]*min-h-\(--tap-chip\)/); // ChipLink
     assert.match(ui("menu.tsx"), /min-h-\(--tap\) w-full/);
     assert.match(ui("segmented.tsx"), /min-h-\(--tap-sm\)/);
     // keine festen 32/36-px-Höhen mehr in den Bausteinen (außer dekorativen Platzhaltern)

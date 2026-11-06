@@ -43,8 +43,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       style={{ "--workshop-accent": accent, "--workshop-accent-contrast": contrastInk(accent) } as CSSProperties}
     >
       <body>
-        <NavProgress />
         <I18nProvider locale={locale} messages={messages}>
+          <NavProgress />
           {children}
         </I18nProvider>
       </body>

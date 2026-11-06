@@ -62,7 +62,7 @@ export const en: Messages = {
   },
   errors: {
     notFoundTitle: "Page not found",
-    notFoundText: "This page does not exist, or you do not have permission to see it. The entry may have been deleted or the address is wrong.",
+    notFoundText: "This page does not exist. The entry may have been deleted, the address may be wrong, or the feature is switched off.",
     errorTitle: "That did not work",
     errorText: "An error occurred while loading the page. Please try again – if it keeps happening, please tell your administrator.",
     errorCode: "Error code: {code}",
@@ -70,6 +70,7 @@ export const en: Messages = {
     reload: "Reload page",
     staleTitle: "New version available",
     staleText: "The application was updated and this page is still from the old version. It is being reloaded …",
+    staleTextManual: "The application was updated and this page is still from the old version. Please reload the page.",
     widgetTitle: "This section could not be loaded.",
     widgetText: "The rest of the overview keeps working.",
     loading: "Loading …",

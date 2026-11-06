@@ -73,7 +73,7 @@ h1, h2, h3, h4 {
 
   /* Buttons: default · hover · focus-visible · active · disabled · loading (aria-busy) */
   .btn {
-    @apply inline-flex min-h-(--tap) min-w-(--tap) items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-3.5 py-1.5 text-sm font-medium;
+    @apply relative inline-flex min-h-(--tap) min-w-(--tap) items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-3.5 py-1.5 text-sm font-medium;
     transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out),
       transform var(--dur-fast) var(--ease-out);
     cursor: pointer;
@@ -211,8 +211,17 @@ dialog.modal::backdrop {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* ohne dies liefe eine Endlos-Animation (Spinner, Fortschrittsbalken) mit 0,01 ms als Flackern weiter */
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .animate-spin {
+    animation: none !important;
+  }
+  .nav-progress::before {
+    animation: none !important;
+    width: 100%;
   }
 }
 

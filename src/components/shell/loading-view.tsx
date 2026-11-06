@@ -1,14 +1,14 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/layout";
-import { useI18n } from "@/i18n/client";
 
-/** Ladeseite (`loading.tsx`): Gerüst aus Kopfzeile und Karten, dazu die Ansage „Wird geladen“ für Screenreader. */
+/**
+ * Ladeseite (`loading.tsx`) im Anwendungsrahmen: Gerüst aus Kopfzeile und Karten. Angesagt wird das Laden nicht hier, sondern von der dauerhaften
+ * Live-Region in `NavProgress` (eine Region, die erst mit der Ladeseite entsteht, bliebe für Screenreader stumm).
+ */
 export function LoadingView() {
-  const { t } = useI18n();
   return (
-    <div role="status" aria-live="polite">
-      <span className="sr-only">{t("errors.loading")}</span>
+    <div aria-busy="true">
       <Skeleton className="mb-6 h-8 w-64 max-w-full" />
       <div className="grid gap-5 lg:grid-cols-2">
         <Skeleton className="h-48" />
@@ -16,5 +16,14 @@ export function LoadingView() {
         <Skeleton className="h-48 lg:col-span-2" />
       </div>
     </div>
+  );
+}
+
+/** Ladeseite für Seiten ohne Anwendungsrahmen (Anmeldung, Einrichtung, „Kein Zugriff“): eine einzelne Karte statt des Übersichts-Gerüsts. */
+export function FullscreenLoadingView() {
+  return (
+    <main aria-busy="true" className="grid min-h-dvh place-items-center px-4">
+      <Skeleton className="h-72 w-full max-w-sm" />
+    </main>
   );
 }

@@ -121,7 +121,7 @@ export function SearchCombobox({
                 key={r.id}
                 role="option"
                 aria-selected={i === active}
-                className={`cursor-pointer rounded-sm px-3 py-1.5 text-sm ${i === active ? "bg-surface-hover" : ""}`}
+                className={`flex min-h-(--tap-row) cursor-pointer flex-wrap items-center rounded-sm px-3 py-1.5 text-sm ${i === active ? "bg-surface-hover" : ""}`}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   choose(r);

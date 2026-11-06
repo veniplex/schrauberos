@@ -82,9 +82,9 @@ export function Badge({ tone = "neutral", children, className }: { tone?: BadgeT
 export function ChipLink({ active, className, ...props }: ComponentProps<typeof Link> & { active?: boolean }) {
   const { children, ...rest } = props;
   return (
-    <Link {...rest} aria-current={active ? "true" : undefined} className={clsx("badge min-h-(--tap-chip) px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)}>
+    <Link {...rest} aria-current={active ? "true" : undefined} className={clsx("badge relative min-h-(--tap-chip) px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)}>
       {children}
-      <LinkPending className="size-3" />
+      <LinkPending className="absolute right-0.5 top-1/2 size-3 -translate-y-1/2" />
     </Link>
   );
 }
@@ -144,9 +144,9 @@ export function Table({
 /** Link im Fließtext/Kartenkopf („Alle anzeigen“, Verweise auf andere Seiten). */
 export function TextLink({ className, children, ...props }: ComponentProps<typeof Link>) {
   return (
-    <Link {...props} className={clsx("inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center text-accent-text hover:underline", className)}>
+    <Link {...props} className={clsx("relative inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center text-accent-text hover:underline", className)}>
       {children}
-      <LinkPending className="ml-1 inline size-3.5 align-[-0.1em]" />
+      <LinkPending className="absolute left-full top-1/2 ml-1 size-3.5 -translate-y-1/2" />
     </Link>
   );
 }
@@ -180,7 +180,7 @@ export function NavLink({
       {...props}
       aria-current={active ? "page" : undefined}
       className={clsx(
-        "flex min-h-(--tap) items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        "relative flex min-h-(--tap) items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
         active ? "bg-accent-subtle text-accent-text" : "text-ink-muted hover:bg-surface-hover hover:text-ink",
         className,
       )}
@@ -198,7 +198,7 @@ export function CardLink({ className, children, ...props }: ComponentProps<typeo
   return (
     <Link {...props} className={clsx("card card-pad relative block transition-colors hover:bg-surface-hover", className)}>
       {children}
-      <LinkPending className="absolute right-3 top-3" />
+      <LinkPending className="absolute right-3 top-3 size-4" />
     </Link>
   );
 }

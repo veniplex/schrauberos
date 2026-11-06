@@ -120,7 +120,7 @@ export function VehicleCombobox({
                 key={r.id}
                 role="option"
                 aria-selected={i === active}
-                className={`flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm ${i === active ? "bg-surface-hover" : ""}`}
+                className={`flex min-h-(--tap-row) cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm ${i === active ? "bg-surface-hover" : ""}`}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   choose(r);

@@ -14,6 +14,7 @@ export default function GlobalError({ retry }: { error: unknown; retry: () => vo
         <StatusPage
           icon={TriangleAlert}
           tone="danger"
+          status="error"
           fullscreen
           title="Das hat nicht geklappt · That did not work"
           actions={

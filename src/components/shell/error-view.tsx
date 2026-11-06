@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { unstable_isUnrecognizedActionError } from "next/navigation";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, LinkButton } from "@/components/ui/buttons";
@@ -20,6 +20,9 @@ function lastReload(): number | null {
   }
 }
 
+/** Darf die Seite sich jetzt selbst neu laden (nicht schon vor Kurzem geschehen)? Als Funktion außerhalb des Komponenten-Rumpfs (Uhr). */
+const reloadAllowed = () => mayAutoReload(lastReload(), Date.now());
+
 /**
  * Inhalt der Fehlergrenzen (`error.tsx`). Ein offener Tab nach einem Web-Update ruft Server Actions auf, die der neue Server nicht
  * mehr kennt („Server Action nicht gefunden“): Das ist kein Fehler des Benutzers – die Seite lädt sich einmal neu (nicht in einer
@@ -28,6 +31,8 @@ function lastReload(): number | null {
 export function ErrorView({ error, retry, fullscreen = false }: { error: unknown; retry: () => void; fullscreen?: boolean }) {
   const { t } = useI18n();
   const stale = isStaleDeploymentError(error) || unstable_isUnrecognizedActionError(error);
+  // Nur dann „wird neu geladen“ ansagen, wenn es auch geschieht (sonst steht dort ein Versprechen ohne Wirkung)
+  const [autoReload] = useState(reloadAllowed);
   const digest = typeof error === "object" && error !== null && "digest" in error ? String((error as { digest?: unknown }).digest ?? "") : "";
 
   useEffect(() => {
@@ -35,7 +40,7 @@ export function ErrorView({ error, retry, fullscreen = false }: { error: unknown
       console.error(error);
       return;
     }
-    if (!mayAutoReload(lastReload(), Date.now())) return;
+    if (!reloadAllowed()) return;
     try {
       window.sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
     } catch {
@@ -47,7 +52,7 @@ export function ErrorView({ error, retry, fullscreen = false }: { error: unknown
   if (stale) {
     return (
       <StatusPage icon={RefreshCw} title={t("errors.staleTitle")} fullscreen={fullscreen} actions={<Button variant="primary" onClick={() => window.location.reload()}>{t("errors.reload")}</Button>}>
-        {t("errors.staleText")}
+        {t(autoReload ? "errors.staleText" : "errors.staleTextManual")}
       </StatusPage>
     );
   }

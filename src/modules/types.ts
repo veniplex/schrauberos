@@ -55,7 +55,7 @@ export type PageDef = {
   /** Route wie im App-Verzeichnis, ohne Routengruppen, z. B. "/customers/[id]/edit" */
   path: string;
   kind: PageKind;
-  /** Recht, ohne das die Seite 404 liefert (muss dem `requirePermission` der Seite entsprechen) */
+  /** Recht, ohne das die Seite nicht zugänglich ist (Weiterleitung auf „Kein Zugriff“, `/forbidden`; bei ausgeschalteter Funktion 404) – muss dem `requirePermission` der Seite entsprechen */
   permission: Permission;
   /** Werte der Platzhalter in `path` (Seed-Verweise) */
   params?: Record<string, PageParam>;

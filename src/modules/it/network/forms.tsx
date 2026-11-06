@@ -163,13 +163,13 @@ export function SubnetForm({
           <Input id="gateway" name="gateway" defaultValue={initial.gateway} invalid={!!err.gateway} className="font-mono" placeholder="192.168.10.1" autoComplete="off" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field label={t("network.fields.dhcpStart")} htmlFor="dhcpStart" error={err.dhcpStart}>
-          <Input id="dhcpStart" name="dhcpStart" defaultValue={initial.dhcpStart} invalid={!!err.dhcpStart} className="font-mono" placeholder="192.168.10.100" autoComplete="off" />
+          <Input id="dhcpStart" name="dhcpStart" defaultValue={initial.dhcpStart} invalid={!!err.dhcpStart} className="font-mono" placeholder="192.168.10.100" autoComplete="off" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field label={t("network.fields.dhcpEnd")} htmlFor="dhcpEnd" error={err.dhcpEnd}>
-          <Input id="dhcpEnd" name="dhcpEnd" defaultValue={initial.dhcpEnd} invalid={!!err.dhcpEnd} className="font-mono" placeholder="192.168.10.200" autoComplete="off" />
+          <Input id="dhcpEnd" name="dhcpEnd" defaultValue={initial.dhcpEnd} invalid={!!err.dhcpEnd} className="font-mono" placeholder="192.168.10.200" autoComplete="off" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field label={t("network.fields.dns")} htmlFor="dnsServers" error={err.dnsServers} hint={t("network.fields.dnsHint")} className="sm:col-span-2">
-          <Input id="dnsServers" name="dnsServers" defaultValue={initial.dnsServers} invalid={!!err.dnsServers} className="font-mono" placeholder="192.168.10.2, 1.1.1.1" autoComplete="off" />
+          <Input id="dnsServers" name="dnsServers" defaultValue={initial.dnsServers} invalid={!!err.dnsServers} className="font-mono" placeholder="192.168.10.2, 1.1.1.1" autoComplete="off" inputMode="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
       </div>
       <Field label={t("network.fields.description")} htmlFor="description">

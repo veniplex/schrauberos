@@ -62,7 +62,7 @@ export const de = {
   },
   errors: {
     notFoundTitle: "Seite nicht gefunden",
-    notFoundText: "Diese Seite gibt es nicht, oder für sie fehlt die Berechtigung. Vielleicht wurde der Eintrag gelöscht oder die Adresse stimmt nicht.",
+    notFoundText: "Diese Seite gibt es nicht. Vielleicht wurde der Eintrag gelöscht, die Adresse stimmt nicht oder die Funktion ist ausgeschaltet.",
     errorTitle: "Das hat nicht geklappt",
     errorText: "Beim Laden der Seite ist ein Fehler aufgetreten. Bitte noch einmal versuchen – bleibt es dabei, bitte die Administration informieren.",
     errorCode: "Fehlerkennung: {code}",
@@ -70,6 +70,7 @@ export const de = {
     reload: "Seite neu laden",
     staleTitle: "Neue Version verfügbar",
     staleText: "Die Anwendung wurde aktualisiert, diese Seite stammt noch von der alten Version. Sie wird neu geladen …",
+    staleTextManual: "Die Anwendung wurde aktualisiert, diese Seite stammt noch von der alten Version. Bitte die Seite neu laden.",
     widgetTitle: "Dieser Bereich konnte nicht geladen werden.",
     widgetText: "Der Rest der Übersicht funktioniert weiter.",
     loading: "Wird geladen …",
