@@ -6,7 +6,8 @@
 # Geprüft wird mit den ausgelieferten Compose-Dateien (docker-compose.yml, docker-compose.hardened.yml), nicht mit eigenen Docker-Aufrufen:
 #   1. Das Image enthält die eingebaute App als root:root (nicht schreibbar für den Betriebsbenutzer); /data gehört dem Betriebsbenutzer.
 #   2. Der Container wird gesund (Starter -> Launcher -> App, Migration, /api/health), die Anmeldeseite wird ausgeliefert, nicht Angemeldete
-#      werden zur Anmeldung geleitet und die Antworten tragen die erzwungene Content-Security-Policy.
+#      werden zur Anmeldung geleitet, die Antworten tragen die erzwungene Content-Security-Policy, die Programmierschnittstelle (/api/v1) antwortet
+#      ohne Token mit 401 und der Upload von Sicherungen erreicht seine Route (401 ohne Sitzung).
 #   3. Dasselbe mit der gehärteten Variante: read_only mit tmpfs, alle Capabilities entfernt, no-new-privileges.
 set -euo pipefail
 
@@ -58,6 +59,16 @@ check_running() {
 
   root_status="$(curl -sS -o /dev/null -w '%{http_code}' "${base_url}/")"
   case "$root_status" in 302|303|307|308) ;; *) fail "$name: / ohne Anmeldung sollte weiterleiten, war $root_status" ;; esac
+
+  # Programmierschnittstelle: ohne Token (und mit falschem) ist alles 401 im Problem-Format – prüft Route, Proxy und Fehlerformat im gebauten Image
+  api_headers="$(curl -sS -D - -o /dev/null "${base_url}/api/v1/customers")" || fail "$name: /api/v1/customers nicht erreichbar"
+  echo "$api_headers" | head -n1 | grep -q " 401" || fail "$name: /api/v1/customers ohne Token sollte 401 liefern: $(echo "$api_headers" | head -n1)"
+  echo "$api_headers" | grep -iq "^content-type: application/problem+json" || fail "$name: /api/v1 antwortet nicht im Problem-Format"
+  api_bad="$(curl -sS -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer sos_ungueltig' "${base_url}/api/v1/customers")"
+  [ "$api_bad" = "401" ] || fail "$name: /api/v1/customers mit ungültigem Token sollte 401 liefern, war $api_bad"
+  # Upload von Sicherungen läuft nicht durch den Proxy (Body-Puffer 10 MiB): ohne Sitzung beantwortet die Route selbst mit 401 (und nicht der Proxy mit einer Weiterleitung)
+  upload_status="$(curl -sS -o /dev/null -w '%{http_code}' -X POST --data-binary 'x' "${base_url}/api/backups/upload")"
+  [ "$upload_status" = "401" ] || fail "$name: POST /api/backups/upload ohne Sitzung sollte 401 liefern, war $upload_status"
 
   # Die App hat in /data geschrieben (Datenbank, Einrichtungs-Token) – auch mit schreibgeschütztem Wurzeldateisystem
   docker compose -p "$project" "$@" logs --no-color app | grep -q "Einrichtungs-Token" || fail "$name: kein Einrichtungs-Token im Log (Einrichtung nicht gestartet?)"

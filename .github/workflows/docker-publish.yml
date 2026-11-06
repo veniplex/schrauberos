@@ -7,6 +7,10 @@ name: Build & publish Docker image
 #
 # Alle Actions sind auf einen Commit-SHA festgelegt (Kommentar = Version); Dependabot (.github/dependabot.yml) schlägt Updates vor.
 #
+# Versions-Tags sind gesichert: Der Job "guard" verlangt, dass der getaggte Commit auf main liegt (Vorfahre von origin/main), und der Job "release" (hält den
+# Signaturschlüssel) läuft in der GitHub-Umgebung "release" – dort muss ein Pflicht-Reviewer eingetragen sein (Repository-Einstellung, siehe README). Das Image wird
+# **einmal** gebaut, genau dieses Image wird gestartet (Smoke-Test) und danach unverändert gepusht; das Release-Paket stammt aus demselben Build.
+#
 # Browser-Tests (Playwright, Job "e2e") kosten viele Minuten: Sie laufen NICHT bei jedem Push auf main, sondern nur bei Versions-Tags (und blockieren
 # dort Image und Release), bei Pull Requests und von Hand ("Run workflow"; optional "update_snapshots" für neue Baseline-Screenshots).
 #
@@ -60,8 +64,9 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-      # Bekannte Schwachstellen in den Laufzeit-Abhängigkeiten (ohne Entwicklungswerkzeuge); neue Funde können einen Lauf ohne Codeänderung brechen
-      - run: npm audit --omit=dev
+      # Bekannte Schwachstellen in den Laufzeit-Abhängigkeiten (ohne Entwicklungswerkzeuge). Nur hohe und kritische Funde brechen den Lauf – sonst blockierte ein
+      # neu gemeldetes Hinweis niedriger Schwere jeden Hotfix; alles darunter zeigt die Ausgabe und Dependabot.
+      - run: npm audit --omit=dev --audit-level=high
       - name: Schema und Migrationen stimmen überein (Drift-Check)
         run: npm run db:check
       # Versions-Tag: Baseline und Migrationen müssen eingefroren sein (npm run db:freeze) und seit dem letzten eingefrorenen Release unverändert bleiben
@@ -70,6 +75,22 @@ jobs:
         run: |
           git fetch --tags --force --unshallow || git fetch --tags --force
           npm run db:release-check -- --tag "$GITHUB_REF_NAME"
+
+  guard:
+    name: Versions-Tag liegt auf main
+    # Nur für Versions-Tags: Wer Schreibrechte hat, kann einen Tag auf einen beliebigen Commit (anderer Branch, Fork-Stand) setzen. Veröffentlicht wird nur, was
+    # auch auf main liegt (also durch dessen Schutzregeln/Review gegangen ist).
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Der Tag-Commit ist ein Vorfahre von origin/main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::Der Commit von $GITHUB_REF_NAME liegt nicht auf main – es wird nichts veröffentlicht."; exit 1; }
 
   e2e:
     name: Browser-Tests (Playwright)
@@ -111,9 +132,9 @@ jobs:
 
   publish:
     name: Image bauen, testen und nach ghcr.io pushen
-    # Nicht bei Pull Requests; bei Tags erst, wenn die Browser-Tests grün sind (auf main sind sie übersprungen)
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') }}
-    needs: [check, e2e]
+    # Nicht bei Pull Requests; bei Tags erst, wenn die Browser-Tests grün sind (auf main sind sie übersprungen) und der Tag auf main liegt
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') && (needs.guard.result == 'success' || needs.guard.result == 'skipped') }}
+    needs: [check, guard, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -150,37 +171,75 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
             type=sha
-      # 1) Bauen und lokal laden (noch nichts veröffentlicht) ...
-      - name: Image bauen (lokal)
+      # 1) Einmal bauen und lokal laden (noch nichts veröffentlicht). Genau dieses Image wird gestartet und – unverändert – gepusht:
+      #    kein zweiter Build, der vom getesteten abweichen könnte.
+      - name: Image bauen (einmal, lokal)
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           load: true
           push: false
           build-args: APP_VERSION=${{ steps.ver.outputs.version }}
-          tags: schrauberos:smoke
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            schrauberos:smoke
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       # 2) ... starten (Standard und gehärtet) ...
       - name: Smoke-Test des Images
         run: bash scripts/smoke-image.sh schrauberos:smoke
-      # 3) ... und erst dann veröffentlichen (aus dem Build-Cache, ohne neu zu bauen)
-      - name: Image veröffentlichen
+      # 3) Das Paket (Stufe "bundle") aus demselben Build-Graphen und demselben Cache wie das Image, und eine Gegenprobe: Die Dateien, an denen die Version hängt,
+      #    sind im Paket und im getesteten Image byte-gleich.
+      - name: Paket bauen (gleicher Build, nur Code)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
-          push: true
+          target: bundle
+          # Als tar exportieren: bewahrt Symlinks (.next/node_modules) unverändert
+          outputs: type=tar,dest=bundle.tar
           build-args: APP_VERSION=${{ steps.ver.outputs.version }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
+      - name: Paket mit dem getesteten Image vergleichen und verpacken
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir release bundle
+          tar -xf bundle.tar -C bundle version.json launcher.mjs server.js
+          cid="$(docker create schrauberos:smoke)"
+          for f in version.json launcher.mjs server.js; do
+            docker cp "$cid:/app/$f" "image-$f"
+            cmp "bundle/$f" "image-$f" || { echo "::error::$f im Paket weicht vom getesteten Image ab."; docker rm "$cid" >/dev/null; exit 1; }
+          done
+          docker rm "$cid" >/dev/null
+          gzip -c bundle.tar > "release/schrauberos-${{ steps.ver.outputs.version }}.tar.gz"
+      - name: Paket als Artefakt ablegen (für den Release-Job)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-package
+          path: |
+            release/
+            bundle/version.json
+          retention-days: 7
+      # 4) Erst jetzt veröffentlichen: dasselbe lokale Image, alle Tags
+      - name: Image veröffentlichen (das getestete Image, unverändert)
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          while read -r tag; do
+            [ -n "$tag" ] || continue
+            docker push "$tag"
+          done <<< "$TAGS"
 
   release:
     name: Release-Paket signieren und veröffentlichen
-    # Erst wenn das Image veröffentlicht ist: Ein Release-Paket ohne passendes Image (oder umgekehrt) gibt es nicht
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.check.result == 'success' && needs.e2e.result == 'success' && needs.publish.result == 'success' }}
-    needs: [check, e2e, publish]
+    # Erst wenn das Image veröffentlicht ist: Ein Release-Paket ohne passendes Image (oder umgekehrt) gibt es nicht. Die Umgebung "release" verlangt einen
+    # Pflicht-Reviewer (Repository-Einstellung, README): ohne Freigabe kommt der Signaturschlüssel nicht in diesen Job – auch nicht, wenn jemand mit Schreibrecht einen Tag pusht.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.check.result == 'success' && needs.guard.result == 'success' && needs.e2e.result == 'success' && needs.publish.result == 'success' }}
+    needs: [check, guard, e2e, publish]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     steps:
@@ -194,19 +253,21 @@ jobs:
           v="${GITHUB_REF_NAME#v}"
           [ "$v" = "$pkg" ] || { echo "Tag v$v passt nicht zur Version in package.json ($pkg)"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-      - name: Paket bauen (nur Code, identisch mit dem Image-Inhalt)
-        run: |
-          # Als tar exportieren: bewahrt Symlinks (.next/node_modules) unverändert
-          docker buildx build --target bundle --build-arg APP_VERSION=${{ steps.ver.outputs.version }} --output type=tar,dest=bundle.tar .
-          mkdir release bundle
-          tar -xf bundle.tar -C bundle version.json
-          gzip -c bundle.tar > "release/schrauberos-${{ steps.ver.outputs.version }}.tar.gz"
+      # Das Paket kommt aus dem Job "publish" (gleicher Build wie das getestete und veröffentlichte Image), nicht aus einem dritten Build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-package
       - name: Manifest erzeugen und signieren
+        # Vorabversionen (Tag mit "-", z. B. v0.2.0-rc1) sind nicht installierbar (nur x.y.z) und werden nicht signiert
+        if: ${{ !contains(github.ref_name, '-') }}
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
         run: node scripts/make-release.mjs --archive "release/schrauberos-${{ steps.ver.outputs.version }}.tar.gz" --bundle bundle --out release
       - name: GitHub-Release anlegen
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release/* --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          # Web-Updates fragen "releases/latest": Vorabversionen (Tag mit "-") sind als Vorabversion markiert und nie "latest"
+          flags=()
+          case "$GITHUB_REF_NAME" in *-*) flags=(--prerelease --latest=false) ;; esac
+          gh release create "$GITHUB_REF_NAME" release/* --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}"

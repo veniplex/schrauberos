@@ -701,10 +701,19 @@ veröffentlichen, Installationen einmal per `docker compose pull && docker compo
 
 1. `version` in `package.json` auf die neue Nummer setzen (z. B. `0.2.0`), committen, pushen.
 2. Tag setzen und pushen: `git tag v0.2.0 && git push origin v0.2.0`.
-3. Die GitHub-Action (`.github/workflows/docker-publish.yml`) prüft Typen/Lint/Tests, den Produktions-Build (`npm run build`) und die Laufzeit-Abhängigkeiten
-   (`npm audit --omit=dev`), baut das Image, **startet es vor dem Veröffentlichen** (`scripts/smoke-image.sh`, siehe unten) und schiebt es erst dann nach `ghcr.io`
-   (`0.2.0`, `0.2`, `latest`). Danach – Job *Release*, hängt am erfolgreichen Veröffentlichen – baut sie das Paket (`docker buildx build --target bundle`), erzeugt
-   `manifest.json` samt Signatur (`scripts/make-release.mjs`) und legt das GitHub-Release mit Paket, Manifest und Signatur an (Änderungen aus den Commits).
+3. Die GitHub-Action (`.github/workflows/docker-publish.yml`) prüft bei einem Tag zuerst, dass der **getaggte Commit auf `main` liegt** (Job *guard*: Vorfahre von `origin/main`), dann
+   Typen/Lint/Tests, den Produktions-Build (`npm run build`) und die Laufzeit-Abhängigkeiten (`npm audit --omit=dev --audit-level=high`: nur hohe und kritische Funde brechen ab, damit ein
+   gemeldeter Fund niedriger Schwere keinen Hotfix blockiert). Das Image wird **einmal gebaut**, genau dieses Image **startet vor dem Veröffentlichen** (`scripts/smoke-image.sh`,
+   siehe unten) und wird erst danach unverändert nach `ghcr.io` gepusht (`0.2.0`, `0.2`, `latest`) – kein zweiter Build, der vom getesteten abweichen könnte. Das Paket (`--target bundle`)
+   entsteht im selben Job aus demselben Build-Cache; eine Gegenprobe vergleicht `version.json`, `launcher.mjs` und `server.js` byte-genau mit dem getesteten Image. Danach – Job *Release*, hängt am
+   erfolgreichen Veröffentlichen – erzeugt sie `manifest.json` samt Signatur (`scripts/make-release.mjs`) und legt das GitHub-Release mit Paket, Manifest und Signatur an (Änderungen aus den Commits).
+   Tags mit `-` (`v0.2.0-rc1`) sind **Vorabversionen**: kein `latest`-Image, keine Signatur (installierbar sind nur `x.y.z`), das Release wird als `--prerelease --latest=false` markiert (Web-Updates fragen `releases/latest`).
+   **Auch ein `-rc`-Tag läuft durch `db:release-check` und erzwingt damit das Einfrieren der Migrationen** (`npm run db:freeze`) – wer nur testen will, baut über `main` (`edge`) oder startet den Workflow von Hand.
+
+**Einstellungen auf GitHub, die der Betreiber selbst vornehmen muss** (im Repository nicht abbildbar, die Pipeline setzt sie voraus):
+
+* **Tag-Schutz für `v*`** (Settings → Rules → Rulesets → Tag: Muster `v*`, Erstellen/Ändern/Löschen nur für wenige Personen): sonst kann jede Person mit Schreibrecht einen Versions-Tag setzen und damit Image und Release anstoßen. Die Prüfung `guard` fängt Tags auf fremden Commits ab, ersetzt den Tag-Schutz aber nicht.
+* **Umgebung `release`** (Settings → Environments → New environment): mit **Pflicht-Reviewer** (Required reviewers) einrichten und das Secret `RELEASE_SIGNING_KEY` dorthin verschieben (als *Environment secret*, nicht mehr als Repository-Secret). Der Job *Release* läuft in dieser Umgebung; ohne Freigabe kommt der Signaturschlüssel nicht in einen Lauf, auch nicht bei einem gepushten Tag. Auch das Veröffentlichen des Images (`latest`) läuft vor dieser Freigabe – der Schutz dafür ist der Tag-Schutz.
 
 Die Pipeline bricht ab, wenn Tag und `package.json` nicht übereinstimmen. Nur Versionen der Form `x.y.z` sind installierbar.
 **Ein Push auf `main` veröffentlicht nur `edge` (und `sha-…`), nie `latest`** – `latest` und die Versions-Tags gibt es erst mit dem Tag (Vorabversionen wie `v0.2.0-rc1`
