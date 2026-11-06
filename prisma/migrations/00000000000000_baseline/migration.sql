@@ -592,7 +592,42 @@ CREATE TABLE "OutboxEvent" (
     "availableAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "lastError" TEXT,
-    "processedAt" DATETIME
+    "processedAt" DATETIME,
+    "failedAt" DATETIME
+);
+
+-- CreateTable
+CREATE TABLE "OutboxDelivery" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "eventId" TEXT NOT NULL,
+    "handler" TEXT NOT NULL,
+    "deliveredAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "OutboxDelivery_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "OutboxEvent" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "JobState" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "nextRunAt" DATETIME,
+    "lastRunAt" DATETIME,
+    "lastStatus" TEXT,
+    "lastMessage" TEXT,
+    "failures" INTEGER NOT NULL DEFAULT 0,
+    "lockedUntil" DATETIME,
+    "lockOwner" TEXT,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "JobRun" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "jobId" TEXT NOT NULL,
+    "startedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" DATETIME,
+    "status" TEXT NOT NULL,
+    "attempt" INTEGER NOT NULL DEFAULT 1,
+    "durationMs" INTEGER,
+    "message" TEXT
 );
 
 -- CreateTable
@@ -827,10 +862,19 @@ CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
 CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
 
 -- CreateIndex
-CREATE INDEX "OutboxEvent_processedAt_availableAt_idx" ON "OutboxEvent"("processedAt", "availableAt");
+CREATE INDEX "OutboxEvent_processedAt_failedAt_availableAt_idx" ON "OutboxEvent"("processedAt", "failedAt", "availableAt");
 
 -- CreateIndex
 CREATE INDEX "OutboxEvent_type_idx" ON "OutboxEvent"("type");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "OutboxDelivery_eventId_handler_key" ON "OutboxDelivery"("eventId", "handler");
+
+-- CreateIndex
+CREATE INDEX "JobRun_jobId_startedAt_idx" ON "JobRun"("jobId", "startedAt");
+
+-- CreateIndex
+CREATE INDEX "JobRun_startedAt_idx" ON "JobRun"("startedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ApiToken_tokenHash_key" ON "ApiToken"("tokenHash");

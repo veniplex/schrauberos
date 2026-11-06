@@ -73,14 +73,30 @@ describe("setEnabled (Module & Funktionen)", () => {
 });
 
 describe("Backup-Plan und Backups", () => {
-  it("speichert den Plan, protokolliert ihn und prüft die Eingaben", async () => {
-    const { getBackupSettings } = await import("@/server/backup/settings");
-    assert.deepEqual(await backup.saveBackupPlan({}, form({ enabled: true, hour: 4, keep: 7 })), { ok: true, message: "Gespeichert." });
-    assert.deepEqual(await getBackupSettings(), { enabled: true, hour: 4, keep: 7 });
+  it("speichert den Plan samt Aufbewahrung je Art, protokolliert ihn und prüft die Eingaben", async () => {
+    const { getBackupSettings, RETENTION_DEFAULTS } = await import("@/server/backup/settings");
+    const { BACKUP_KINDS } = await import("@/server/backup/kinds");
+    const fields = (over: Record<string, unknown> = {}) =>
+      form({
+        enabled: true,
+        hour: 4,
+        ...Object.fromEntries(BACKUP_KINDS.flatMap((k) => [[`keep_${k}`, RETENTION_DEFAULTS[k].keep], [`days_${k}`, RETENTION_DEFAULTS[k].days]])),
+        keep_auto: 7,
+        days_manual: 365,
+        ...over,
+      });
+    assert.deepEqual(await backup.saveBackupPlan({}, fields()), { ok: true, message: "Gespeichert." });
+    const saved = await getBackupSettings();
+    assert.equal(saved.hour, 4);
+    assert.deepEqual(saved.retention.auto, { keep: 7, days: 0 });
+    assert.deepEqual(saved.retention.manual, { keep: 0, days: 365 });
+    assert.deepEqual(saved.retention["pre-update"], RETENTION_DEFAULTS["pre-update"]);
     assert.equal(await env.db.auditLog.count({ where: { action: "settings.backupPlan" } }), 1);
-    assert.ok((await backup.saveBackupPlan({}, form({ enabled: true, hour: 25, keep: 7 }))).fieldErrors?.hour);
-    assert.ok((await backup.saveBackupPlan({}, form({ enabled: true, keep: 7 }))).fieldErrors?.hour, "leeres Feld = Pflichtfeld");
-    assert.deepEqual(await getBackupSettings(), { enabled: true, hour: 4, keep: 7 });
+    assert.ok((await backup.saveBackupPlan({}, fields({ hour: 25 }))).fieldErrors?.hour);
+    assert.ok((await backup.saveBackupPlan({}, fields({ hour: "" }))).fieldErrors?.hour, "leeres Feld = Pflichtfeld");
+    assert.ok((await backup.saveBackupPlan({}, fields({ keep_manual: -1 }))).fieldErrors?.keep_manual, "negative Anzahl");
+    assert.ok((await backup.saveBackupPlan({}, fields({ days_auto: 99999 }))).fieldErrors?.days_auto, "Frist über dem Höchstwert");
+    assert.deepEqual(await getBackupSettings(), saved, "fehlerhafte Eingaben ändern nichts");
   });
 
   it("legt ein Backup an und löscht es wieder – beides im Audit", async () => {

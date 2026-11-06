@@ -1,10 +1,10 @@
 import "server-only";
 import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
-import { startScheduler } from "@/server/backup/scheduler";
 import { writeAudit } from "@/server/audit";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
+import { startJobRunner } from "@/server/jobs";
 import { appliedMigrations, MigrationError, runMigrations } from "@/server/migrate";
 import { ensureBaseData } from "@/server/seed/base";
 import { ensureSetupToken } from "@/server/setup-token";
@@ -48,7 +48,7 @@ export async function revokeApiTokensAfterRestore(dataRoot?: string): Promise<nu
 }
 
 /**
- * Bereitet die Datenbank vor: Sicherungskopie vor Migrationen, Migrationen, Basisdaten, Zeitzone, Zeitplan der Backups.
+ * Bereitet die Datenbank vor: Sicherungskopie vor Migrationen, Migrationen, Basisdaten, Zeitzone, Job-Runner (Backups, Aufräumen, Outbox).
  * Scheitert etwas, beendet sich der Prozess – der Launcher erkennt das und fällt bei einem frischen Update zurück.
  */
 export async function startApp(): Promise<void> {
@@ -75,7 +75,7 @@ export async function startApp(): Promise<void> {
     // Frische Installation: Einrichtungs-Token erzeugen und ins Container-Log schreiben (nach der Einrichtung entfernt)
     ensureSetupToken((await db.user.count()) === 0, { logExisting: true });
 
-    startScheduler();
+    startJobRunner();
     state.status = "ready";
   } catch (error) {
     if (error instanceof MigrationError && error.code === "foreignHistory") {

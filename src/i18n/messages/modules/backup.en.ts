@@ -12,7 +12,7 @@ export const backupEn: typeof backupDe = {
   restoreTimeout: "The application is not reachable yet. Please reload the page in a minute. If it does not start with the restored data, it returns to the previous state automatically.",
   create: { title: "Create backup", button: "Create backup now" },
   schedule: {
-    on: "Automatically every night from {hour}:00, the latest {keep} automatic backups are kept (Settings → Backups).",
+    on: "Automatically every night from {hour}:00. How long backups are kept is set per kind under Settings → Backups.",
     off: "Automatic backups are switched off (Settings → Backups).",
   },
   list: {
@@ -34,6 +34,14 @@ export const backupEn: typeof backupDe = {
     "pre-update": "Before update",
     "pre-restore": "Before restore",
     "pre-migration": "Before database change",
+  },
+  failed: "The automatic backup failed ({count} attempts in a row, last {date}: {reason}). Next attempt: {next}. Please check the free disk space on the server; until a backup succeeds, there is no current protection.",
+  retention: {
+    title: "Retention",
+    intro: "Backups contain personal data (customers, employees, invoices). Set how long they are kept: at most the newest backups of the kind AND none older than the day limit. 0 means unlimited. The newest backup overall is always kept.",
+    keep: "Keep newest (count)",
+    days: "At most this old (days)",
+    note: "Cleanup runs after every automatic backup and nightly. Copies you downloaded cannot be deleted by the application – take them into account in your retention too.",
   },
   upload: {
     title: "Upload backup",
@@ -62,7 +70,5 @@ export const backupEn: typeof backupDe = {
     enabled: "Create a backup automatically every night",
     hour: "Not before (hour)",
     hourHint: "The backup is created as soon as this time has been reached (and the application is running).",
-    keep: "Automatic backups to keep",
-    keepHint: "Older automatic backups are deleted. Manual and uploaded ones are always kept.",
   },
 };

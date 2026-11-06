@@ -5,10 +5,13 @@ import { type ActionState, Checkbox, Field, FormMessage, Input } from "@/compone
 import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
+import { BACKUP_KINDS, type BackupKind } from "@/server/backup/kinds";
 import { saveBackupPlan } from "./actions";
 
-export function BackupPlanForm({ initial }: { initial: { enabled: boolean; hour: number; keep: number } }) {
-  const { t } = useI18n();
+type Retention = Record<BackupKind, { keep: number; days: number }>;
+
+export function BackupPlanForm({ initial, limits }: { initial: { enabled: boolean; hour: number; retention: Retention }; limits: { keep: number; days: number } }) {
+  const { t, td } = useI18n();
   const [state, action] = useActionState<ActionState, FormData>(saveBackupPlan, {});
   const err = state.fieldErrors ?? {};
   return (
@@ -16,15 +19,27 @@ export function BackupPlanForm({ initial }: { initial: { enabled: boolean; hour:
       <Card title={t("backup.settings.title")}>
         <div className="flex flex-col gap-4">
           <Checkbox name="enabled" defaultChecked={initial.enabled} label={t("backup.settings.enabled")} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t("backup.settings.hour")} htmlFor="hour" error={err.hour} hint={t("backup.settings.hourHint")}>
-              <Input id="hour" name="hour" type="number" min={0} max={23} defaultValue={initial.hour} invalid={!!err.hour} />
-            </Field>
-            <Field label={t("backup.settings.keep")} htmlFor="keep" error={err.keep} hint={t("backup.settings.keepHint")}>
-              <Input id="keep" name="keep" type="number" min={1} max={365} defaultValue={initial.keep} invalid={!!err.keep} />
-            </Field>
-          </div>
+          <Field label={t("backup.settings.hour")} htmlFor="hour" error={err.hour} hint={t("backup.settings.hourHint")} className="sm:max-w-xs">
+            <Input id="hour" name="hour" type="number" min={0} max={23} defaultValue={initial.hour} invalid={!!err.hour} />
+          </Field>
         </div>
+      </Card>
+      <Card title={t("backup.retention.title")}>
+        <p className="mb-4 text-sm text-ink-muted">{t("backup.retention.intro")}</p>
+        <div className="flex flex-col gap-5">
+          {BACKUP_KINDS.map((kind) => (
+            <div key={kind} className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr_1fr] sm:items-start">
+              <p className="pt-2 text-sm font-medium">{td(`backup.kinds.${kind}`, kind)}</p>
+              <Field label={t("backup.retention.keep")} htmlFor={`keep_${kind}`} error={err[`keep_${kind}`]}>
+                <Input id={`keep_${kind}`} name={`keep_${kind}`} type="number" min={0} max={limits.keep} defaultValue={initial.retention[kind].keep} invalid={!!err[`keep_${kind}`]} />
+              </Field>
+              <Field label={t("backup.retention.days")} htmlFor={`days_${kind}`} error={err[`days_${kind}`]}>
+                <Input id={`days_${kind}`} name={`days_${kind}`} type="number" min={0} max={limits.days} defaultValue={initial.retention[kind].days} invalid={!!err[`days_${kind}`]} />
+              </Field>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-ink-muted">{t("backup.retention.note")}</p>
       </Card>
       <FormMessage state={state} />
       <div className="flex justify-end">

@@ -10,7 +10,7 @@ export const backupDe = {
   restoreTimeout: "Die Anwendung ist noch nicht wieder erreichbar. Bitte in einer Minute die Seite neu laden. Startet sie mit den wiederhergestellten Daten nicht, kehrt sie automatisch zum vorherigen Stand zurück.",
   create: { title: "Backup erstellen", button: "Jetzt Backup erstellen" },
   schedule: {
-    on: "Automatisch jede Nacht ab {hour}:00 Uhr, die neuesten {keep} automatischen Backups werden behalten (Einstellungen → Backups).",
+    on: "Automatisch jede Nacht ab {hour}:00 Uhr. Wie lange Backups aufbewahrt werden, stellen Sie je Art unter Einstellungen → Backups ein.",
     off: "Automatische Backups sind ausgeschaltet (Einstellungen → Backups).",
   },
   list: {
@@ -32,6 +32,14 @@ export const backupDe = {
     "pre-update": "Vor Update",
     "pre-restore": "Vor Wiederherstellung",
     "pre-migration": "Vor Datenbank-Änderung",
+  },
+  failed: "Das automatische Backup ist fehlgeschlagen ({count} Versuche in Folge, zuletzt {date}: {reason}). Nächster Versuch: {next}. Bitte freien Speicherplatz auf dem Server prüfen; bis ein Backup gelingt, besteht kein aktueller Schutz.",
+  retention: {
+    title: "Aufbewahrung",
+    intro: "Backups enthalten personenbezogene Daten (Kunden, Mitarbeiter, Rechnungen). Legen Sie fest, wie lange sie aufbewahrt werden: Es bleiben höchstens die neuesten Backups der Art UND keines, das älter ist als die Tagesgrenze. 0 bedeutet unbegrenzt. Das neueste Backup überhaupt bleibt immer erhalten.",
+    keep: "Neueste behalten (Anzahl)",
+    days: "Höchstens so alt (Tage)",
+    note: "Aufgeräumt wird nach jedem automatischen Backup und täglich nachts. Kopien, die Sie heruntergeladen haben, kann die Anwendung nicht löschen – sie gehören bei der Aufbewahrung mit bedacht.",
   },
   upload: {
     title: "Backup hochladen",
@@ -60,7 +68,5 @@ export const backupDe = {
     enabled: "Jede Nacht automatisch ein Backup anlegen",
     hour: "Frühestens ab (Uhr)",
     hourHint: "Das Backup entsteht, sobald diese Uhrzeit erreicht ist (und die Anwendung läuft).",
-    keep: "Automatische Backups behalten",
-    keepHint: "Ältere automatische Backups werden gelöscht. Manuelle und hochgeladene bleiben immer erhalten.",
   },
 };

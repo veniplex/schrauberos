@@ -9,7 +9,7 @@ import { gzipSync } from "node:zlib";
 import { applyPendingRestore, readPending } from "@/lib/updates/restore";
 import { runMigrations } from "@/server/migrate";
 import { filesDir, resolveRel, storeFile } from "@/server/files";
-import { backupPath, backupsDir, createBackup, deleteBackup, isBackupName, listBackups, pruneAutomaticBackups } from "./core";
+import { BACKUP_KINDS, backupPath, backupsDir, createBackup, deleteBackup, isBackupName, linkTree, listBackups, pruneBackups } from "./core";
 import { importBackupFile, readDatabaseArchive, RestoreError, stageRestore, validateDatabase } from "./restore";
 
 const data = mkdtempSync(path.join(tmpdir(), "so-backup-"));
@@ -26,6 +26,7 @@ const codeOf = async (fn: () => unknown) => {
   }
   return null;
 };
+const UNLIMITED = Object.fromEntries(BACKUP_KINDS.map((k) => [k, { keep: 0, days: 0 }])) as Record<(typeof BACKUP_KINDS)[number], { keep: number; days: number }>;
 const bytes = (s: string) => new TextEncoder().encode(s);
 let manual = "";
 
@@ -74,9 +75,54 @@ describe("Backups", () => {
 
   it("behält von den automatischen Sicherungen nur die neuesten", async () => {
     for (let i = 1; i <= 4; i++) await createBackup("auto", dbFile, new Date(Date.UTC(2026, 0, i, 2, 0, 0)));
-    assert.equal(pruneAutomaticBackups(2).length, 2);
+    assert.equal(pruneBackups({ ...UNLIMITED, auto: { keep: 2, days: 0 } }, new Date("2026-01-05T00:00:00Z")).length, 2);
     assert.deepEqual(listBackups().filter((b) => b.kind === "auto").map((b) => b.createdAt.getUTCDate()), [4, 3]);
     assert.ok(listBackups().some((b) => b.kind === "manual"));
+  });
+
+  it("Aufbewahrung je Art: Anzahl und Alter gelten getrennt; 0 = unbegrenzt; das neueste Backup überhaupt bleibt immer", async () => {
+    // eigenes Datenverzeichnis: die übrigen Tests dieser Datei brauchen ihre Sicherungen
+    const isolated = mkdtempSync(path.join(tmpdir(), "so-retention-"));
+    const previous = process.env.DATA_DIR;
+    process.env.DATA_DIR = isolated;
+    after(() => rmSync(isolated, { recursive: true, force: true }));
+    const at = (day: number) => new Date(Date.UTC(2026, 2, day, 2, 0, 0));
+    for (const day of [1, 2, 3]) await createBackup("pre-update", dbFile, at(day));
+    for (const day of [1, 2]) await createBackup("manual", dbFile, at(day));
+    await createBackup("auto", dbFile, at(2));
+    const now = new Date("2026-03-20T00:00:00Z");
+    const kept = () => listBackups().map((b) => `${b.kind}:${b.createdAt.getUTCDate()}`).sort();
+
+    // nur Anzahl: von „vor Update“ die zwei neuesten
+    pruneBackups({ ...UNLIMITED, "pre-update": { keep: 2, days: 0 } }, now);
+    assert.deepEqual(kept(), ["auto:2", "manual:1", "manual:2", "pre-update:2", "pre-update:3"]);
+    // nur Alter: manuelle höchstens 18 Tage (am 20.3.: der vom 1.3. ist 19 Tage alt, der vom 2.3. 18)
+    pruneBackups({ ...UNLIMITED, manual: { keep: 0, days: 18 } }, now);
+    assert.deepEqual(kept(), ["auto:2", "manual:2", "pre-update:2", "pre-update:3"]);
+    // alles zu alt: das neueste Backup überhaupt (pre-update vom 3.3.) bleibt trotzdem
+    const doomed = pruneBackups({ ...Object.fromEntries(BACKUP_KINDS.map((k) => [k, { keep: 0, days: 1 }])) } as typeof UNLIMITED, now);
+    assert.equal(doomed.length, 3);
+    assert.deepEqual(kept(), ["pre-update:3"]);
+    process.env.DATA_DIR = previous;
+  });
+
+  it("linkTree ist asynchron: der Event-Loop läuft während des Verlinkens weiter, auch bei vielen Dateien", async () => {
+    const src = path.join(data, "viele");
+    for (let d = 0; d < 20; d++) {
+      mkdirSync(path.join(src, `d${d}`), { recursive: true });
+      for (let i = 0; i < 100; i++) writeFileSync(path.join(src, `d${d}`, `f${i}.txt`), `${d}-${i}`);
+    }
+    writeFileSync(path.join(src, ".versteckt"), "x");
+    let ticks = 0;
+    const timer = setInterval(() => ticks++, 1);
+    const result = await linkTree(src, path.join(data, "viele-link"));
+    clearInterval(timer);
+    assert.deepEqual({ count: result.count }, { count: 2000 });
+    assert.ok(ticks > 0, "zwischendurch kam der Event-Loop zum Zug");
+    assert.equal(existsSync(path.join(data, "viele-link", ".versteckt")), false);
+    assert.equal(readFileSync(path.join(data, "viele-link", "d3", "f7.txt"), "utf8"), "3-7");
+    rmSync(src, { recursive: true, force: true });
+    rmSync(path.join(data, "viele-link"), { recursive: true, force: true });
   });
 
   it("prüft Sicherungen vor der Wiederherstellung", async () => {

@@ -1,11 +1,14 @@
 import Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
-import { copyFileSync, createReadStream, createWriteStream, existsSync, linkSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFile, link, lstat, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 import { dataDir } from "@/lib/updates/store";
 import { databaseFile } from "@/server/db-client";
+import { BACKUP_KINDS, type BackupKind } from "./kinds";
+import type { BackupRetention } from "./settings";
 import { filesDir } from "@/server/files";
 
 /**
@@ -17,8 +20,7 @@ import { filesDir } from "@/server/files";
  * für Dateien, die es später nicht mehr im Live-Bestand gibt. Löscht man ein Backup, verschwinden nur seine Verweise.
  */
 
-export const BACKUP_KINDS = ["auto", "manual", "pre-update", "pre-restore", "pre-migration", "upload"] as const;
-export type BackupKind = (typeof BACKUP_KINDS)[number];
+export { BACKUP_KINDS, type BackupKind };
 
 export type BackupInfo = {
   name: string;
@@ -78,64 +80,72 @@ export async function gzipFile(source: string, target: string): Promise<void> {
   renameSync(partial, target);
 }
 
+/** Wie viele Dateien gleichzeitig verlinkt bzw. geprüft werden (die Arbeit läuft im Threadpool, der Event-Loop bleibt frei). */
+const BATCH = 64;
+
+async function inBatches<T>(items: readonly T[], work: (item: T) => Promise<void>): Promise<void> {
+  for (let i = 0; i < items.length; i += BATCH) await Promise.all(items.slice(i, i + BATCH).map(work));
+}
+
 /**
  * Bildet den Dateibaum `src` unter `dst` mit Hardlinks nach (Kopie, falls das Dateisystem keine Hardlinks erlaubt). Nur normale
- * Dateien; Symlinks, Sonderdateien und versteckte Einträge (z. B. `.tmp`) werden übersprungen.
+ * Dateien; Symlinks, Sonderdateien und versteckte Einträge (z. B. `.tmp`) werden übersprungen. **Asynchron**: Auch bei sehr vielen Dateien blockiert das den
+ * Event-Loop der Anwendung nicht (jeder Dateizugriff ist ein asynchroner Aufruf, in Stapeln).
  */
-export function linkTree(src: string, dst: string): { count: number; bytes: number } {
-  mkdirSync(dst, { recursive: true });
+export async function linkTree(src: string, dst: string): Promise<{ count: number; bytes: number }> {
+  await mkdir(dst, { recursive: true });
   let count = 0;
   let bytes = 0;
   if (!existsSync(src)) return { count, bytes };
-  for (const entry of readdirSync(src, { withFileTypes: true })) {
-    if (entry.name.startsWith(".")) continue;
+  const entries = (await readdir(src, { withFileTypes: true })).filter((entry) => !entry.name.startsWith("."));
+  await inBatches(entries, async (entry) => {
     const from = path.join(src, entry.name);
     const to = path.join(dst, entry.name);
-    const stat = lstatSync(from);
+    const stat = await lstat(from);
     if (stat.isDirectory()) {
-      const sub = linkTree(from, to);
+      const sub = await linkTree(from, to);
       count += sub.count;
       bytes += sub.bytes;
     } else if (stat.isFile()) {
       try {
-        linkSync(from, to);
+        await link(from, to);
       } catch {
-        copyFileSync(from, to);
+        await copyFile(from, to);
       }
       count += 1;
       bytes += stat.size;
     }
-  }
+  });
   return { count, bytes };
 }
 
 /** Alle regulären Dateien eines Baums zählen (für importierte Backups). */
-export function countTree(dir: string): { count: number; bytes: number } {
+export async function countTree(dir: string): Promise<{ count: number; bytes: number }> {
   let count = 0;
   let bytes = 0;
   if (!existsSync(dir)) return { count, bytes };
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  await inBatches(await readdir(dir, { withFileTypes: true }), async (entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      const sub = countTree(full);
+      const sub = await countTree(full);
       count += sub.count;
       bytes += sub.bytes;
     } else if (entry.isFile()) {
       count += 1;
-      bytes += statSync(full).size;
+      bytes += (await lstat(full)).size;
     }
-  }
+  });
   return { count, bytes };
 }
 
 /** Wirft, wenn ein ausgepackter Baum etwas anderes als Ordner und normale Dateien enthält (Symlinks, Geräte …). */
-export function assertPlainTree(dir: string): void {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+export async function assertPlainTree(dir: string): Promise<void> {
+  await inBatches(await readdir(dir, { withFileTypes: true }), async (entry) => {
     const full = path.join(dir, entry.name);
-    const stat = lstatSync(full);
-    if (stat.isDirectory()) assertPlainTree(full);
+    const stat = await lstat(full);
+    if (stat.isDirectory()) await assertPlainTree(full);
     else if (!stat.isFile()) throw new Error(`Unzulässiger Eintrag im Backup: ${entry.name}`);
-  }
+  });
 }
 
 export function writeInfo(dir: string, info: { files: number; bytes: number }): void {
@@ -171,7 +181,7 @@ export async function createBackup(kind: BackupKind, dbFile = databaseFile(), at
     await gzipFile(rawDb, path.join(tmp, DB_ARCHIVE));
     for (const f of [rawDb, `${rawDb}-wal`, `${rawDb}-shm`]) rmSync(f, { force: true });
 
-    const linked = linkTree(filesDir(), path.join(tmp, "files"));
+    const linked = await linkTree(filesDir(), path.join(tmp, "files"));
     writeInfo(tmp, { files: linked.count, bytes: linked.bytes });
     renameSync(tmp, path.join(root, name));
   } catch (error) {
@@ -208,13 +218,28 @@ export function deleteBackup(name: string): boolean {
   return true;
 }
 
-/** Behält von den automatischen Sicherungen nur die neuesten `keep`; liefert die gelöschten Namen. */
-export function pruneAutomaticBackups(keep: number): string[] {
-  const old = listBackups()
-    .filter((b) => b.kind === "auto")
-    .slice(Math.max(1, keep));
-  for (const b of old) deleteBackup(b.name);
-  return old.map((b) => b.name);
+const DAY_MS = 86_400_000;
+
+/**
+ * Wendet die Aufbewahrung je Art an (Einstellungen → Backups): Von jeder Art bleiben höchstens die neuesten `keep` und keines, das älter als `days` Tage ist
+ * (0 = unbegrenzt). Das neueste Backup überhaupt bleibt immer – es gibt nie „kein Backup“ durch die Aufbewahrung. Liefert die gelöschten Namen.
+ */
+export function pruneBackups(retention: BackupRetention, now = new Date()): string[] {
+  const all = listBackups(); // neueste zuerst
+  const newest = all[0]?.name;
+  const doomed: string[] = [];
+  for (const kind of BACKUP_KINDS) {
+    const rule = retention[kind];
+    all
+      .filter((b) => b.kind === kind)
+      .forEach((b, index) => {
+        const tooMany = rule.keep > 0 && index >= rule.keep;
+        const tooOld = rule.days > 0 && now.getTime() - b.createdAt.getTime() > rule.days * DAY_MS;
+        if ((tooMany || tooOld) && b.name !== newest) doomed.push(b.name);
+      });
+  }
+  for (const name of doomed) deleteBackup(name);
+  return doomed;
 }
 
 /** Räumt liegengebliebene Zwischenordner (abgebrochene Backups/Importe) auf, die älter als eine Stunde sind. */

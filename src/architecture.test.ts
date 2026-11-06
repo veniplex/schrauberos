@@ -14,9 +14,9 @@ import { featureKey } from "@/modules/catalog-logic";
 
 const SRC = path.resolve(process.cwd(), "src");
 /** Kompositionswurzeln: dürfen die Beschreibungen und Beiträge aller Funktionen einsammeln. */
-const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts", "modules/pages.ts", "modules/operation-hooks.ts", "modules/api.ts"]);
+const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts", "modules/pages.ts", "modules/operation-hooks.ts", "modules/api.ts", "modules/jobs.ts"]);
 /** Dateien im Modul-Wurzelordner, die Plattform-Code importieren darf (Katalog, Aktivierung, Registry …). */
-const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "pages", "registry", "types", "default-roles", "operation-hooks", "api"]);
+const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "pages", "registry", "types", "default-roles", "operation-hooks", "api", "jobs"]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -170,6 +170,35 @@ function actionViolations(source: string): string[] {
   if (/^[ \t]+["']use server["']/m.test(source)) found.push("Inline-Aktion (use server im Funktionsrumpf)");
   return found;
 }
+
+describe("Job-Runner", () => {
+  it("Jobs und Outbox-Abnehmer einer Funktion (jobs.ts) nennen nur diese Funktion als `feature` – sie laufen nur, solange sie aktiv ist", () => {
+    const wrong: string[] = [];
+    let found = 0;
+    for (const file of files) {
+      const rel = path.relative(SRC, file).split(path.sep).join("/");
+      const m = /^modules\/([a-z]+)\/([a-z]+)\/jobs\.ts$/.exec(rel);
+      if (!m) continue;
+      found++;
+      const source = readFileSync(file, "utf8");
+      for (const f of source.matchAll(/\bfeature:\s*"([^"]+)"/g)) if (f[1] !== `${m[1]}.${m[2]}`) wrong.push(`${rel}: feature "${f[1]}" statt "${m[1]}.${m[2]}"`);
+      if (!/\bfeature:\s*"/.test(source)) wrong.push(`${rel}: kein Job nennt eine Funktion`);
+    }
+    assert.ok(found >= 2, "jobs.ts der Funktionen gefunden");
+    assert.deepEqual(wrong, []);
+  });
+
+  it("jede jobs.ts einer Funktion ist in src/modules/jobs.ts eingetragen (sonst läuft sie nie)", () => {
+    const root = readFileSync(path.join(SRC, "modules/jobs.ts"), "utf8");
+    const missing: string[] = [];
+    for (const file of files) {
+      const rel = path.relative(SRC, file).split(path.sep).join("/");
+      const m = /^modules\/([a-z]+)\/([a-z]+)\/jobs\.ts$/.exec(rel);
+      if (m && !root.includes(`./${m[1]}/${m[2]}/jobs`)) missing.push(rel);
+    }
+    assert.deepEqual(missing, []);
+  });
+});
 
 describe("Aktions-Rahmen", () => {
   const hasDirective = (source: string) => /^[ \t]*["']use server["'];?[ \t]*$/m.test(source);

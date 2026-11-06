@@ -7,7 +7,8 @@ import { logError } from "@/lib/log-safe";
 import { audit } from "@/server/audit";
 import { createBackup, deleteBackup, isBackupName } from "@/server/backup/core";
 import { RestoreError, stageRestore } from "@/server/backup/restore";
-import { saveBackupSettings } from "@/server/backup/settings";
+import { BACKUP_KINDS } from "@/server/backup/kinds";
+import { RETENTION_MAX_DAYS, RETENTION_MAX_KEEP, saveBackupSettings, type BackupRetention } from "@/server/backup/settings";
 import { defineAction, defineOperation, fail } from "@/server/operations";
 import { scheduleRestart } from "@/server/restart";
 
@@ -75,10 +76,19 @@ const restoreBackupOperation = defineOperation({
 
 export const restoreBackup = defineAction(restoreBackupOperation, { message: "backup.restoring" });
 
+const retentionField = (max: number) => z.coerce.number().int().min(0).max(max);
+/** Aufbewahrung je Art als flache Formularfelder `keep_<art>` und `days_<art>` (0 = unbegrenzt). */
+const retentionShape: Record<string, ReturnType<typeof retentionField>> = Object.fromEntries(
+  BACKUP_KINDS.flatMap((kind) => [
+    [`keep_${kind}`, retentionField(RETENTION_MAX_KEEP)],
+    [`days_${kind}`, retentionField(RETENTION_MAX_DAYS)],
+  ]),
+);
+
 const planInput = z.object({
   enabled: z.boolean(),
   hour: z.coerce.number().int().min(0).max(23),
-  keep: z.coerce.number().int().min(1).max(365),
+  ...retentionShape,
 });
 
 const saveBackupPlanOperation = defineOperation({
@@ -87,8 +97,10 @@ const saveBackupPlanOperation = defineOperation({
   input: planInput,
   audit: "settings.backupPlan",
   run: async ({ input, tx, audit: setAudit }) => {
-    await saveBackupSettings({ enabled: input.enabled, hour: input.hour, keep: input.keep }, tx);
-    setAudit({ target: `enabled=${input.enabled} hour=${input.hour} keep=${input.keep}` });
+    const fields = input as Record<string, unknown>;
+    const retention = Object.fromEntries(BACKUP_KINDS.map((kind) => [kind, { keep: Number(fields[`keep_${kind}`]), days: Number(fields[`days_${kind}`]) }])) as BackupRetention;
+    await saveBackupSettings({ enabled: input.enabled, hour: input.hour, retention }, tx);
+    setAudit({ target: `enabled=${input.enabled} hour=${input.hour} ${BACKUP_KINDS.map((k) => `${k}=${retention[k].keep}/${retention[k].days}d`).join(" ")}` });
     return { saved: true };
   },
 });

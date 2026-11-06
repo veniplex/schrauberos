@@ -80,7 +80,7 @@ export async function stageRestore(name: string): Promise<void> {
   await unpackAndValidate(path.join(dir, DB_ARCHIVE), pendingDbFile(), "keep");
   const hasFiles = existsSync(path.join(dir, "files"));
   try {
-    if (hasFiles) linkTree(path.join(dir, "files"), pendingFilesDir());
+    if (hasFiles) await linkTree(path.join(dir, "files"), pendingFilesDir());
     await createBackup("pre-restore");
   } catch (error) {
     cancelPending();
@@ -155,7 +155,7 @@ export async function importBackupFile(uploaded: string): Promise<string> {
         throw new RestoreError("corrupt");
       }
       if (unsupported) throw new RestoreError("notBackup");
-      assertPlainTree(work);
+      await assertPlainTree(work);
       if (!existsSync(path.join(work, DB_ARCHIVE))) throw new RestoreError("notBackup");
     } else {
       const raw = path.join(work, "database.db");
@@ -168,7 +168,7 @@ export async function importBackupFile(uploaded: string): Promise<string> {
     // Die Datenbank im Archiv muss gültig sein
     const probe = path.join(work, "probe.db");
     await unpackAndValidate(path.join(work, DB_ARCHIVE), probe, "check");
-    const files = countTree(path.join(work, "files"));
+    const files = await countTree(path.join(work, "files"));
     writeInfo(work, { files: files.count, bytes: files.bytes });
     const name = uniqueBackupName("upload");
     renameSync(work, path.join(root, name));

@@ -797,24 +797,75 @@ model AppSetting {
 
 // ───────────── Ereignisse (Outbox) ─────────────
 // Ereignisse für Webhooks, E-Mail u. a. entstehen nur im Aktions-Rahmen (src/server/operations): sie werden in derselben Transaktion wie die
-// Änderung geschrieben und sind damit erst nach dem Commit sichtbar. Der Runner (Job-Runner, P1b-0) verarbeitet sie später.
+// Änderung geschrieben und sind damit erst nach dem Commit sichtbar. Der Job-Runner (src/server/jobs) stellt sie zu: mindestens einmal, je
+// Abnehmer genau einmal erfolgreich (OutboxDelivery); nach zu vielen Fehlversuchen gilt das Ereignis als fehlgeschlagen (failedAt).
 model OutboxEvent {
-  id          String    @id @default(cuid())
+  id          String           @id @default(cuid())
   // z. B. "invoice.paid"
   type        String
   entityId    String?
   // JSON als Text (bewusst kein Json-Feld)
-  payload     String    @default("{}")
+  payload     String           @default("{}")
   actorId     String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime         @default(now())
   // frühester Zeitpunkt der nächsten Zustellung (Wiederholung mit Wartezeit)
-  availableAt DateTime  @default(now())
-  attempts    Int       @default(0)
+  availableAt DateTime         @default(now())
+  attempts    Int              @default(0)
   lastError   String?
   processedAt DateTime?
+  // endgültig aufgegeben (zu viele Fehlversuche); bleibt zur Ansicht und zum Aufräumen erhalten
+  failedAt    DateTime?
+  deliveries  OutboxDelivery[]
 
-  @@index([processedAt, availableAt])
+  @@index([processedAt, failedAt, availableAt])
   @@index([type])
+}
+
+// Ein erfolgreich zugestellter Abnehmer eines Ereignisses (Idempotenz bei Wiederholung: ein bereits bedienter Abnehmer wird übersprungen).
+model OutboxDelivery {
+  id          String      @id @default(cuid())
+  eventId     String
+  event       OutboxEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  handler     String
+  deliveredAt DateTime    @default(now())
+
+  @@unique([eventId, handler])
+}
+
+// ───────────── Job-Runner (src/server/jobs) ─────────────
+// Geplante Jobs der Plattform und der Funktionen. Der Zustand liegt in der Datenbank, damit er einen Neustart überlebt: nächster Lauf, Fehlerserie
+// (Wiederholung mit Wartezeit), Sperre gegen Doppelläufe. Die Definitionen (Zeitplan, Code) stehen im Code, nicht hier.
+model JobState {
+  // Job-ID, z. B. "backup.auto"
+  id          String    @id
+  nextRunAt   DateTime?
+  lastRunAt   DateTime?
+  // ok | error | interrupted | skipped
+  lastStatus  String?
+  lastMessage String?
+  // Fehlversuche in Folge (0 nach einem Erfolg)
+  failures    Int       @default(0)
+  // Sperre: bis dahin läuft der Job (oder lief, als der Prozess endete); wird beim Start freigegeben
+  lockedUntil DateTime?
+  lockOwner   String?
+  updatedAt   DateTime  @updatedAt
+}
+
+// Ergebnis jedes Laufs (Aufbewahrung: Jobs „platform.jobs-prune“).
+model JobRun {
+  id         String    @id @default(cuid())
+  jobId      String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  // running | ok | error | interrupted
+  status     String
+  attempt    Int       @default(1)
+  durationMs Int?
+  // Ergebnis in Worten bzw. Fehlerart (ohne Nutzdaten)
+  message    String?
+
+  @@index([jobId, startedAt])
+  @@index([startedAt])
 }
 
 // ───────────── Programmierschnittstelle (API-Kern, /api/v1) ─────────────

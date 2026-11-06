@@ -7,6 +7,7 @@ import { readPending, readRestoreResult } from "@/lib/updates/restore";
 import { requirePermission } from "@/server/auth/session";
 import { listBackups } from "@/server/backup/core";
 import { getBackupSettings } from "@/server/backup/settings";
+import { jobStateOf } from "@/server/jobs/status";
 import { removeBackup } from "@/modules/admin/backup/actions";
 import { CreateBackupForm, RestoreForm, RestoreWatcher, UploadForm } from "@/modules/admin/backup/panels";
 
@@ -24,7 +25,7 @@ function size(bytes: number) {
 export default async function BackupPage() {
   await requirePermission("backup.manage");
   const { t, td, date } = await getI18n();
-  const [settings, backups] = [await getBackupSettings(), listBackups()];
+  const [settings, backups, autoJob] = [await getBackupSettings(), listBackups(), await jobStateOf("backup.auto")];
   const pending = readPending();
   const result = readRestoreResult();
   const when = (d: Date | string) => date(d, { dateStyle: "medium", timeStyle: "short" });
@@ -43,9 +44,20 @@ export default async function BackupPage() {
           </Alert>
         ) : null}
 
+        {autoJob && autoJob.failures > 0 ? (
+          <Alert tone="danger">
+            {t("backup.failed", {
+              count: autoJob.failures,
+              date: autoJob.lastRunAt ? when(autoJob.lastRunAt) : "–",
+              reason: autoJob.lastMessage ?? "–",
+              next: autoJob.nextRunAt ? when(autoJob.nextRunAt) : "–",
+            })}
+          </Alert>
+        ) : null}
+
         <Card title={t("backup.create.title")}>
           <p className="mb-4 text-sm text-ink-muted">
-            {settings.enabled ? t("backup.schedule.on", { hour: String(settings.hour).padStart(2, "0"), keep: settings.keep }) : t("backup.schedule.off")}
+            {settings.enabled ? t("backup.schedule.on", { hour: String(settings.hour).padStart(2, "0") }) : t("backup.schedule.off")}
           </p>
           <CreateBackupForm label={t("backup.create.button")} />
         </Card>
