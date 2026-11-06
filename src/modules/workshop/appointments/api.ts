@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Appointment, AppointmentType, Bay } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
 import { parseLocalDateTime, toDateInput, toTimeInput } from "@/lib/dates";
-import { dateOnly, iso } from "@/server/api/format";
+import { dateOnly, iso, nullableString, optionalRef } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { apiProblem } from "@/server/operations";
@@ -17,7 +17,7 @@ import { createAppointmentOperation, deleteAppointmentOperation, updateAppointme
  *
  * Zeiten: `date` + `time` + `durationMinutes` in der Zeitzone der Werkstatt (wie im Formular); `startsAt`/`endsAt` sind dieselben Zeitpunkte in ISO 8601 (UTC).
  */
-const ref = z.string().max(64).nullable().optional();
+const ref = optionalRef;
 
 const body = z.strictObject({
   title: z.string().trim().min(1).max(120),
@@ -33,7 +33,6 @@ const body = z.strictObject({
   notes: z.string().max(2000).nullable().optional(),
 });
 
-const nullableString = z.string().nullable();
 const item = z.object({
   id: z.string(),
   version: z.string(),

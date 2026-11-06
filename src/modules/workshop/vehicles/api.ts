@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Vehicle } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
 import { normalizePlate } from "@/lib/plate";
-import { dateOnly, iso } from "@/server/api/format";
+import { dateOnly, iso, nullableString, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
@@ -11,7 +11,6 @@ import { deleteVehicleOperation, saveVehicleOperation, transferVehicleOperation 
 /**
  * API-Ressource „Fahrzeuge“ (`/api/v1/vehicles`). Der Halter wird nur beim Anlegen gesetzt; später wechselt er über die Aktion `transfer` (Halter-Historie).
  */
-const text = (max: number) => z.string().max(max).nullable().optional();
 
 const body = z.strictObject({
   /** Halter (nur beim Anlegen); später: `POST /vehicles/{id}/transfer` */
@@ -24,7 +23,6 @@ const body = z.strictObject({
   notes: text(2000),
 });
 
-const nullableString = z.string().nullable();
 const item = z.object({
   id: z.string(),
   version: z.string(),

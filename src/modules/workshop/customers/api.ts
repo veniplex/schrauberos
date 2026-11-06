@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Customer } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
-import { iso } from "@/server/api/format";
+import { iso, nullableString, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
@@ -11,7 +11,6 @@ import { deleteCustomerOperation, saveCustomerOperation } from "./operations";
  * API-Ressource „Kunden“ (`/api/v1/customers`). Schreiben läuft über dieselben Operationen wie die Oberfläche (Prüfung der Sache, Audit); Kunden mit
  * Fahrzeugen, Halter-Historie oder Rechnungen bleiben unlöschbar (409).
  */
-const text = (max: number) => z.string().max(max).nullable().optional();
 
 const body = z.strictObject({
   customerNumber: text(40),
@@ -26,7 +25,6 @@ const body = z.strictObject({
   notes: text(2000),
 });
 
-const nullableString = z.string().nullable();
 const item = z.object({
   id: z.string(),
   version: z.string(),

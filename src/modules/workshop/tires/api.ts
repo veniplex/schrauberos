@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Tire, TireSet } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
-import { day, dateOnly, iso } from "@/server/api/format";
+import { dateOnly, day, iso, nullableString, oneOf, requiredRef } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "./constants";
@@ -13,7 +13,7 @@ import { createTireSetOperation, deleteTireSetOperation, setStatusOperation, upd
  */
 type Row = TireSet & { tires: Tire[] };
 
-const ref = z.string().max(64);
+const ref = requiredRef;
 const tireRow = z.strictObject({
   /** DOT-Kürzel „WWYY“ (Produktionswoche und -jahr), z. B. „2321“ */
   dot: z.string().max(10).nullable().optional(),
@@ -45,7 +45,6 @@ const body = z.strictObject({
 });
 
 const nullableNumber = z.number().nullable();
-const nullableString = z.string().nullable();
 const item = z.object({
   id: z.string(),
   version: z.string(),
@@ -77,7 +76,6 @@ const item = z.object({
   updatedAt: z.string(),
 });
 
-const oneOf = <T extends string>(list: readonly T[], value: string, fallback: T): T => ((list as readonly string[]).includes(value) ? (value as T) : fallback);
 
 /** API-Körper → Eingabe der Operation: Einzelreifen als Text (Profiltiefe wie im Formular), Ersatzrad-Schalter, Standardwerte. */
 function toInput(b: Record<string, unknown>): Record<string, unknown> {

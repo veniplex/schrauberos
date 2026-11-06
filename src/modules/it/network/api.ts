@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { NetConnection, NetDevice, NetIp, NetLocation, NetSubnet, NetVlan } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
-import { dayOrNull, iso, optionalDate } from "@/server/api/format";
+import { dayOrNull, iso, nullableString, oneOf, optionalDate, optionalRef, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
@@ -26,10 +26,7 @@ import {
  * wie in der Oberfläche (IP im Subnetz, Adresse eindeutig, MAC normalisiert, Port nicht doppelt belegt). Standorte, VLANs, Subnetze und Verbindungen haben keine
  * Version (kein `If-Match`).
  */
-const text = (max: number) => z.string().max(max).nullable().optional();
-const nullableString = z.string().nullable();
-const ref = z.string().max(64).nullable().optional();
-const oneOf = <T extends string>(list: readonly T[], value: string, fallback: T): T => ((list as readonly string[]).includes(value) ? (value as T) : fallback);
+const ref = optionalRef;
 
 /* ───────────── Geräte ───────────── */
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Invoice, InvoiceFile } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
-import { centsText, dateOnly, day, dayOrNull, iso } from "@/server/api/format";
+import { centsText, dateOnly, day, dayOrNull, iso, nullableString, oneOf } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
@@ -34,7 +34,6 @@ const body = z.strictObject({
   notes: z.string().max(2000).nullable().optional(),
 });
 
-const nullableString = z.string().nullable();
 const nullableCents = z.number().int().nullable();
 const item = z.object({
   id: z.string(),
@@ -59,7 +58,6 @@ const item = z.object({
   updatedAt: z.string(),
 });
 
-const oneOf = <T extends string>(list: readonly T[], value: string, fallback: T): T => ((list as readonly string[]).includes(value) ? (value as T) : fallback);
 
 /** API-Körper → Eingabe der Operation: Beträge als Text, Beleg unverändert lassen. */
 function toInput(b: Record<string, unknown>): Record<string, unknown> {

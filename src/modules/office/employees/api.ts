@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Absence, Employee, Qualification } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
-import { dateOnly, dayOrNull, iso, optionalDate } from "@/server/api/format";
+import { dateOnly, dayOrNull, iso, nullableString, oneOf, optionalDate, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
@@ -20,8 +20,6 @@ import {
  * kein Notfallkontakt, keine Krankheit (Abwesenheiten der Art „Krankheit“ gibt es in der API nicht: nicht lesbar, nicht anlegbar, nicht löschbar),
  * keine Verknüpfung zum Benutzerkonto. Das Recht `employees.sensitive` kann kein Token tragen (`isApiForbidden`).
  */
-const text = (max: number) => z.string().max(max).nullable().optional();
-const nullableString = z.string().nullable();
 
 /* ───────────── Mitarbeiter ───────────── */
 
@@ -61,7 +59,6 @@ const item = z.object({
   updatedAt: z.string(),
 });
 
-const oneOf = <T extends string>(list: readonly T[], value: string, fallback: T): T => ((list as readonly string[]).includes(value) ? (value as T) : fallback);
 
 export const employeeEndpoints = defineResource({
   feature: "office.employees",

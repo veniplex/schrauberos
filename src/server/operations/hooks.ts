@@ -5,7 +5,7 @@ import type { FeatureId } from "@/modules/catalog";
 import { operationHooks as registered } from "@/modules/operation-hooks";
 
 /**
- * Transaktionale Hooks: Eine Funktion meldet sich über die Registry (`src/modules/registry.ts` → `operationHooks`) für eine Operation
+ * Transaktionale Hooks: Eine Funktion meldet sich in `src/modules/operation-hooks.ts` (`operationHooks`) für eine Operation
  * einer anderen Funktion an (z. B. „Auftrag abschließen“) und läuft **synchron in derselben Transaktion**. Die auslösende Funktion kennt
  * ihre Abonnenten nicht. Wirft ein Hook, wird die gesamte Operation zurückgerollt (er kann sie also auch verhindern, mit einem
  * `OperationError`). Asynchrone Wirkungen (Webhooks, Mail) gehören nicht hierher, sondern in die Outbox (`ctx.emit`).

@@ -319,7 +319,7 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
 * **Outbox** (`OutboxEvent`, `src/server/outbox.ts`): `ctx.emit(type, payload, entityId)` schreibt ein Ereignis **in derselben Transaktion** – nach einem Rollback gibt es keines, nach dem
   Commit genau eines. Der Runner (Job-Runner P1b-0) stellt zu; bis dahin emittiert noch keine Operation Ereignisse (sonst würde die Tabelle unbegrenzt wachsen).
 * **Transaktionale Hooks:** Eine Funktion meldet sich in ihrer `hooks.ts` für eine Operation einer anderen an (`OperationHookDef`), eingesammelt in `src/modules/operation-hooks.ts`
-  (von `registry.ts` wieder ausgegeben). Der Hook läuft **synchron in derselben Transaktion** (nur wenn seine Funktion aktiv ist) und kann mit einem Fehler die Operation verhindern; die
+  (nur von `src/server/operations/hooks.ts` importiert). Der Hook läuft **synchron in derselben Transaktion** (nur wenn seine Funktion aktiv ist) und kann mit einem Fehler die Operation verhindern; die
   auslösende Funktion kennt ihre Abonnenten nicht. Asynchrone Wirkungen (Webhooks, Mail) gehören in die Outbox.
 * **Berechtigungs-Matrix** (`src/server/operations/matrix.test.ts`, generiert aus dem Quelltext): jede Action und jeder Route Handler wird ohne Sitzung, mit `mustChangePassword`, mit falschem Recht
   (alle Rechte außer dem erforderlichen) und mit ausgeschalteter Funktion aufgerufen und muss ablehnen, ohne etwas zu verändern. Neue Aktionen/Routen sind automatisch dabei; öffentliche Routen
@@ -341,7 +341,7 @@ und `src/lib/api`; **jede fachliche Funktion bringt ihre Ressourcen in einer `ap
 Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen – bis dahin gibt es dafür weder Hilfe-Kapitel noch Bedienung in der App.
 
 * **Ein Eintrittspunkt:** `src/app/api/v1/[...path]/route.ts` → `handleApiRequest` (`src/server/api/router.ts`). Die Funktionen tragen ihre Endpunkte in `src/modules/api.ts` ein (Composition Root,
-  von `registry.ts` wieder ausgegeben). Reihenfolge der Pipeline: Token → Rate-Limit → Route → **Funktion aktiv (sonst 404)** → Methode (405) → **Recht (403)** → Filter/Körper prüfen
+  nur vom Router importiert – nicht über `registry.ts`, das in jeden Seiten-Bundle gelangt und sonst alle `api.ts` mitzöge). Reihenfolge der Pipeline: Token → Rate-Limit → Route → **Funktion aktiv (sonst 404)** → Methode (405) → **Recht (403)** → Filter/Körper prüfen
   (1 MiB, `application/json`, strenge Schemas) → Idempotenz → Endpunkt. Ohne gültiges Token ist **alles** 401, auch unbekannte Pfade.
 * **Tokens** (`ApiToken`, `ApiTokenScope`): `sos_` + 32 Zufallsbytes; gespeichert wird **nur der SHA-256-Hash** (hochentropisch, ein langsamer Hash wäre sinnlos). Das Klartext-Token steht
   einmalig im Ergebnis von `createApiTokenOperation` (`src/server/api/tokens.ts`), nie in Log, Audit, URL oder Datenbank. Besitzer, Ablauf (Pflicht, höchstens 365 Tage), `lastUsedAt`

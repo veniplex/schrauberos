@@ -9,7 +9,7 @@ import { endpoints as tires } from "./workshop/tires/api";
 import { endpoints as vehicles } from "./workshop/vehicles/api";
 
 /**
- * Composition Root der API-Ressourcen (wird von `registry.ts` wieder ausgegeben): Jede Funktion bringt ihre Endpunkte in einer `api.ts` mit
+ * Composition Root der API-Ressourcen (wird nur von der API-Pipeline `src/server/api/router.ts` importiert – nicht über `registry.ts`, das jede Seite lädt): Jede Funktion bringt ihre Endpunkte in einer `api.ts` mit
  * (`export const endpoints`, gebaut mit `defineResource` aus `@/server/api/resource`) und trägt sie hier ein. Nur Endpunkte **aktiver** Funktionen mit
  * Recht sind erreichbar (ausgeschaltet = 404). Plattform-/Verwaltungsfunktionen (Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit,
  * API selbst) sind nie API-Ressourcen – `src/modules/api.test.ts` erzwingt das.

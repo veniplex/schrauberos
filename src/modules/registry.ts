@@ -18,9 +18,6 @@ import { settingsTabs as workshopProfileSettings } from "./admin/settings/settin
 import { settingsTabs as backupSettings } from "./admin/backup/settings-tab";
 import { settingsTabs as updatesSettings } from "./admin/updates/settings-tab";
 
-export { operationHooks } from "./operation-hooks";
-export { apiEndpoints } from "./api";
-
 /**
  * Composition Root: hier – und nur hier – werden die Beiträge der Funktionen (Dashboard-Bausteine,
  * Einstellungs-Reiter) eingesammelt. Neue Funktion mit Widget/Einstellungen: Zeile ergänzen.

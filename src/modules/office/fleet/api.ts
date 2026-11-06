@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { FleetCost, FleetLicenseCheck, FleetMileage, FleetVehicle } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
-import { centsText, dateOnly, day, dayOrNull, iso, optionalDate } from "@/server/api/format";
+import { centsText, dateOnly, day, dayOrNull, iso, nullableString, oneOf, optionalDate, requiredRef, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
@@ -21,10 +21,7 @@ import {
  * API-Ressourcen „Fuhrpark“: Firmenfahrzeuge (`/api/v1/fleet-vehicles`), Kilometerstände (`/fleet-mileage`), Kosten (`/fleet-costs`) und Führerscheinkontrollen
  * (`/fleet-license-checks`). Beträge sind ganze Cent. Ein neuer Kilometerstand darf nicht unter dem letzten liegen – wie in der Oberfläche.
  */
-const text = (max: number) => z.string().max(max).nullable().optional();
-const nullableString = z.string().nullable();
-const ref = z.string().min(1).max(64);
-const oneOf = <T extends string>(list: readonly T[], value: string, fallback: T): T => ((list as readonly string[]).includes(value) ? (value as T) : fallback);
+const ref = requiredRef;
 
 /* ───────────── Fahrzeuge ───────────── */
 
