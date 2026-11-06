@@ -182,6 +182,8 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       handler: async (call) => {
         const raw = create.toInput(compact(call.body as Record<string, unknown>) as z.output<B>, { params: call.params, call });
         const { id } = await runApiOperation(create.operation, call.principal, raw, create.rename);
+        // Festgeschrieben: scheitert das Nachlesen, bleibt dies die Antwort (und die Wiederholung legt nichts doppelt an)
+        call.committed({ status: 201, body: { data: { id } }, headers: { location: `/api/v1${cfg.path}/${id}` } });
         const row = await find(id);
         if (!row) throw apiProblem("internal_error");
         return itemResult(row, 201, { location: `/api/v1${cfg.path}/${id}` });
@@ -220,6 +222,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
         if (!row) throw notFound();
         const merged = compact({ ...update.current(row), ...patch });
         await runApiOperation(update.operation, call.principal, update.toInput(merged, { params: call.params, call, row, id, version }), update.rename);
+        call.committed({ status: 200, body: { data: { id } } });
         const fresh = await find(id);
         if (!fresh) throw notFound();
         return itemResult(fresh, 200);
@@ -263,6 +266,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
         if (!row) throw notFound();
         const raw = action.toInput(call.params.id, compact((call.body ?? {}) as Record<string, unknown>), { params: call.params, call, row });
         await runApiOperation(action.operation, call.principal, raw, action.rename);
+        call.committed({ status: 200, body: { data: { id: call.params.id } } });
         const fresh = await find(call.params.id);
         if (!fresh) throw notFound();
         return itemResult(fresh, 200);

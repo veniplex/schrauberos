@@ -49,6 +49,20 @@ describe("defineOperation – Rahmen", () => {
     assert.throws(() => ops.defineOperation({ name: "t.noReason", permission: "customers.edit", input: nameSchema, audit: false, auditReason: " ", run: async () => null }), /Begründung/);
   });
 
+  it("\"authenticated\" (Konto-Operationen) gilt nur für Sitzungen: ein API-Principal wird abgelehnt, ohne etwas auszuführen (ZP2-A-F2)", async () => {
+    let ran = 0;
+    const op = ops.defineOperation({ name: "t.authenticated", permission: "authenticated", input: nameSchema, audit: "user.update", run: async () => void (ran += 1) });
+    const viaToken: AppSession = { ...admin, apiToken: { id: "tok", name: "Importer", hint: "sos_abcd…" } };
+    const denied = await op.execute(viaToken, { name: "x" });
+    assert.equal(!denied.ok && denied.failure.code, "forbidden");
+    assert.equal(ran, 0);
+    assert.equal((await op.execute(admin, { name: "x" })).ok, true, "die Sitzung derselben Person darf");
+    assert.equal(ran, 1);
+    // gilt auch für die echten Konto-Operationen (Passwort ändern, Notzugang erzeugen …)
+    const change = ops.listOperations().get("account.changePassword");
+    if (change) assert.equal((await change.execute(viaToken, { current: "a", next: "bbbbbbbbbb", confirm: "bbbbbbbbbb" })).ok, false);
+  });
+
   it("lehnt ohne Recht ab, ohne etwas auszuführen", async () => {
     let ran = false;
     const op = ops.defineOperation({ name: "t.guard", permission: "customers.edit", input: nameSchema, audit: "customer.delete", run: async () => void (ran = true) });

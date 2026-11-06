@@ -324,7 +324,7 @@ describe("Kunden: Audit der API-Schreibzugriffe", () => {
     await api("POST", "/network-vlans", { body: { number: 20, name: "Audit" } });
     const entries = await env.db.auditLog.findMany();
     assert.equal(entries.length, 3);
-    for (const entry of entries) assert.match(entry.actorName, /\[API: Token \d+\]$/);
+    for (const entry of entries) assert.match(entry.actorName, /\[API: Token \d+ · sos_\S{4}…\]$/);
     assert.ok(!JSON.stringify(entries).includes(token));
   });
 });

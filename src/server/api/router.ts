@@ -222,28 +222,47 @@ async function dispatch(request: Request, principal: Principal, tokenId: string,
     body,
     ifMatch: request.headers.get("if-match"),
     ifNoneMatch: request.headers.get("if-none-match"),
+    committed: () => undefined,
   };
 
   const key = endpoint.method === "GET" ? null : request.headers.get("idempotency-key");
-  if (key === null) return toResponse(render(await endpoint.handler(call)));
+  if (key === null) return toResponse(render(await runHandler(endpoint, call)));
 
   if (!IDEMPOTENCY_KEY_SHAPE.test(key)) throw apiProblem("validation_failed", { fields: { "Idempotency-Key": { code: "validation.invalid" } } });
-  const reservation = await reserveIdempotency({ tokenId, scope: `${endpoint.method} ${pathname}`, key, bodyHash: hashBody(text) });
+  const reservation = await reserveIdempotency({ tokenId, scope: `${endpoint.method} ${pathname}`, key, bodyHash: hashBody(text, call.ifMatch) });
   if (reservation.kind === "mismatch") throw apiProblem("idempotency_key_reuse");
+  if (reservation.kind === "full") throw apiProblem("rate_limited", undefined, { "retry-after": "3600" });
   if (reservation.kind === "busy") throw apiProblem("idempotency_in_progress", undefined, { "retry-after": "1" });
   if (reservation.kind === "replay") return toResponse({ status: reservation.stored.status, body: reservation.stored.body, headers: reservation.stored.headers }, { "idempotent-replayed": "true" });
 
   let rendered: Rendered;
   try {
-    rendered = render(await endpoint.handler(call));
+    rendered = render(await runHandler(endpoint, call));
   } catch (error) {
-    if (error instanceof ApiProblemError) rendered = { status: error.problem.status, body: JSON.stringify(error.problem), headers: { ...error.headers, "content-type": "application/problem+json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } };
-    else {
-      await releaseIdempotency(reservation.id).catch(() => undefined);
-      throw error;
-    }
+    // Eine Fehlerantwort gibt den Schlüssel frei (die Operation hat nichts verändert); die Antwort selbst geht unverändert zurück
+    await releaseIdempotency(reservation.id).catch(() => undefined);
+    throw error;
   }
-  if (rendered.status >= 500 || rendered.status === 429) await releaseIdempotency(reservation.id).catch(() => undefined);
-  else await completeIdempotency(reservation.id, { status: rendered.status, body: rendered.body, headers: keepHeaders(rendered.headers) }).catch((error) => logError("api:idempotency", error));
+  // nur Erfolge festhalten (2xx); alles andere gibt frei
+  if (rendered.status >= 200 && rendered.status < 300) await completeIdempotency(reservation.id, { status: rendered.status, body: rendered.body, headers: keepHeaders(rendered.headers) }).catch((error) => logError("api:idempotency", error));
+  else await releaseIdempotency(reservation.id).catch(() => undefined);
   return toResponse(rendered);
+}
+
+/**
+ * Ruft den Endpunkt auf. Hat er den Commit der Operation gemeldet (`call.committed`) und scheitert danach (Nachlesen …), gilt die gemeldete Mindestantwort: Die Wirkung
+ * ist da, ein Fehler an dieser Stelle würde nur zu einer doppelten Ausführung durch die Wiederholung verleiten. Der Fehler wird protokolliert.
+ */
+async function runHandler(endpoint: ApiEndpoint, call: ApiCall): Promise<ApiResult> {
+  let committed: ApiResult | undefined;
+  call.committed = (result) => {
+    committed = result;
+  };
+  try {
+    return await endpoint.handler(call);
+  } catch (error) {
+    if (!committed) throw error;
+    logError("api:afterCommit", error);
+    return committed;
+  }
 }

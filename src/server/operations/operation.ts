@@ -33,8 +33,12 @@ import { runOperationHooks } from "./hooks";
 export type Tx = Prisma.TransactionClient;
 export type Principal = AppSession;
 
-/** Name im Audit-Log: bei Anfragen über die API mit der Kennung des Tokens (nie das Token selbst). */
-export const auditActorName = (principal: Principal): string => (principal.apiToken ? `${principal.user.name.slice(0, 50)} [API: ${principal.apiToken.name}]` : principal.user.name);
+/**
+ * Name im Audit-Log: bei Anfragen über die API mit der Kennung des Tokens – Name **und** Anfang des Tokens (`sos_ab12…`), denn Namen sind nicht eindeutig; nie das ganze Token.
+ * Beispiel: `Anna Beispiel [API: Importer · sos_ab12…]` (höchstens etwa 100 Zeichen, das Audit-Log kürzt bei 120).
+ */
+export const auditActorName = (principal: Principal): string =>
+  principal.apiToken ? `${principal.user.name.slice(0, 40)} [API: ${principal.apiToken.name.slice(0, 40)} · ${principal.apiToken.hint}]` : principal.user.name;
 
 /** Erforderliches Recht; `"authenticated"`: jede angemeldete Person (z. B. Konto, Einstellungen der eigenen Person). */
 export type PermissionRequirement = Permission | "authenticated";
@@ -144,6 +148,8 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
 
     async execute(principal, raw) {
       const needed = operation.permissionFor(raw);
+      // „Jede angemeldete Person“ meint eine Sitzung (Konto: Passwort, Notzugang, Anzeigeeinstellungen) – ein API-Token ist keine Person und gehört nie dazu
+      if (needed === "authenticated" && principal.apiToken) return { ok: false, failure: { code: "forbidden" } };
       if (needed !== "authenticated" && !principal.can(needed)) return { ok: false, failure: { code: "forbidden" } };
 
       const parsed = def.input.safeParse(raw);

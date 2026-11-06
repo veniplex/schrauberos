@@ -23,6 +23,12 @@ export type ApiCall = {
   body: unknown;
   ifMatch: string | null;
   ifNoneMatch: string | null;
+  /**
+   * Meldet, dass die Operation **festgeschrieben** ist, samt der kleinsten Antwort, die den Erfolg ausreichend beschreibt (z. B. 201 mit `id` und `Location`).
+   * Scheitert der Endpunkt danach (Nachlesen der Zeile …), liefert die Pipeline diese Antwort statt eines Fehlers und hält sie für die Idempotenz fest – eine Wiederholung
+   * darf nichts ein zweites Mal anlegen. Wer eine Operation mit Wirkung aufruft, ruft das direkt nach ihrem Erfolg auf.
+   */
+  committed: (result: ApiResult) => void;
 };
 
 export type ApiResult = { status: number; body?: unknown; headers?: Record<string, string> };

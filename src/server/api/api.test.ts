@@ -229,7 +229,7 @@ describe("Schreiben über dieselben Operationen wie die Oberfläche", () => {
 
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.create" } });
     assert.equal(entry.actorId, userId);
-    assert.match(entry.actorName, /\[API: Importer\]$/);
+    assert.match(entry.actorName, /\[API: Importer · sos_\S{4}…\]$/);
     assert.equal(entry.target, "Anna Müller");
     assert.ok(!JSON.stringify(entry).includes(token));
   });
@@ -346,17 +346,20 @@ describe("Idempotenz", () => {
     assert.equal((await call(apiRequest("DELETE", `/customers/${id}`, { token: a.token, headers: { "idempotency-key": key } }))).status, 204);
   });
 
-  it("auch fachliche Fehler werden festgehalten und wiederholt (mit Problem-Format); der Schlüssel auf GET wird ignoriert", async () => {
+  it("Fehlerantworten (422 …) werden nicht festgehalten: der Schlüssel ist frei, die Wiederholung entscheidet neu; der Schlüssel auf GET wird ignoriert", async () => {
     const { token } = await makeToken(env, { ownerPermissions: ["vehicles.view", "vehicles.edit"], scope: ["vehicles.view", "vehicles.edit"] });
-    await env.db.vehicle.create({ data: { plate: "B-AB 1", plateNorm: "BAB1" } });
+    const existing = await env.db.vehicle.create({ data: { plate: "B-AB 1", plateNorm: "BAB1" } });
     const send = (k: string) => call(apiRequest("POST", "/vehicles", { token, body: { plate: "B-AB 1" }, headers: { "idempotency-key": k } }));
     const first = await send("fehler-1");
     assert.equal(first.status, 422);
-    const replay = await send("fehler-1");
-    assert.equal(replay.status, 422);
-    assert.equal(replay.headers.get("idempotent-replayed"), "true");
-    assert.match(replay.headers.get("content-type") ?? "", /application\/problem\+json/);
-    assert.deepEqual(await replay.json(), await first.json());
+    assert.match(first.headers.get("content-type") ?? "", /application\/problem\+json/);
+    assert.equal(await env.db.apiIdempotencyKey.count({ where: { key: "fehler-1" } }), 0, "nichts festgehalten");
+    // das Kennzeichen wird frei -> dieselbe Anfrage mit demselben Schlüssel gelingt jetzt (sie bekäme sonst bis zum Ablauf den alten Fehler)
+    await env.db.vehicle.delete({ where: { id: existing.id } });
+    const retry = await send("fehler-1");
+    assert.equal(retry.status, 201);
+    assert.equal(retry.headers.get("idempotent-replayed"), null);
+    assert.equal((await send("fehler-1")).headers.get("idempotent-replayed"), "true", "der Erfolg wird festgehalten");
     const get = await call(apiRequest("GET", "/vehicles", { token, headers: { "idempotency-key": "nur-fuer-get" } }));
     assert.equal(get.status, 200);
     assert.equal(await env.db.apiIdempotencyKey.count({ where: { key: "nur-fuer-get" } }), 0);
@@ -386,6 +389,78 @@ describe("Idempotenz", () => {
     assert.equal(await env.db.auditLog.count({ where: { action: "customer.create" } }), 1);
     // danach liefert die Wiederholung die Antwort
     assert.equal((await create(token, { lastName: "Parallel" })).headers.get("idempotent-replayed"), "true");
+  });
+
+  it("404, 409, 412 und 428 geben den Schlüssel frei; eine Wiederholung mit aktueller Version gelingt", async () => {
+    const { token } = await makeToken(env, owner());
+    const created = await call(apiRequest("POST", "/customers", { token, body: { lastName: "Version" } }));
+    const item = (await json(created)).data as Record<string, string>;
+    const patch = (headers: Record<string, string>, k = "patch-1") => call(apiRequest("PATCH", `/customers/${item.id}`, { token, body: { city: "Köln" }, headers: { "idempotency-key": k, ...headers } }));
+    // jemand anderes ändert zwischendurch (ohne Schlüssel): die Version `item.version` ist veraltet
+    const bump = await call(apiRequest("PATCH", `/customers/${item.id}`, { token, body: { phone: "1" }, headers: { "if-match": `"${item.version}"` } }));
+    assert.equal(bump.status, 200);
+    const current = bump.headers.get("etag")!;
+    assert.equal((await patch({})).status, 428);
+    assert.equal((await patch({ "if-match": `"${item.version}"` })).status, 412);
+    assert.equal(await env.db.apiIdempotencyKey.count({ where: { key: "patch-1" } }), 0, "weder 428 noch 412 festgehalten");
+    // dieselbe Anfrage mit der aktuellen Version gelingt unter demselben Schlüssel
+    const ok = await patch({ "if-match": current });
+    assert.equal(ok.status, 200);
+    // gleiche Anfrage (Körper und If-Match) = Wiederholung -> gespeicherte Antwort statt 412 wegen inzwischen neuer Version
+    const replay = await patch({ "if-match": current });
+    assert.equal(replay.status, 200);
+    assert.equal(replay.headers.get("idempotent-replayed"), "true");
+    // gleicher Schlüssel, aber anderes If-Match = andere Anfrage
+    const other = await patch({ "if-match": `"${item.version}"` });
+    assert.equal(other.status, 422);
+    assert.equal((await json(other)).code, "idempotency_key_reuse");
+    // 404 und 409 (Löschstopp) ebenfalls frei
+    assert.equal((await call(apiRequest("DELETE", "/customers/gibtsnicht", { token, headers: { "idempotency-key": "del-1" } }))).status, 404);
+    assert.equal(await env.db.apiIdempotencyKey.count({ where: { key: "del-1" } }), 0);
+    await env.db.vehicle.create({ data: { plate: "B-CU 1", plateNorm: "BCU1", customerId: item.id } });
+    assert.equal((await call(apiRequest("DELETE", `/customers/${item.id}`, { token, headers: { "idempotency-key": "del-2" } }))).status, 409);
+    assert.equal(await env.db.apiIdempotencyKey.count({ where: { key: "del-2" } }), 0);
+  });
+
+  it("scheitert das Nachlesen nach dem Commit, antwortet die Pipeline mit der Mindestantwort (id + Location) und hält sie fest: die Wiederholung legt nichts doppelt an", async () => {
+    const { token } = await makeToken(env, owner());
+    const model = env.db.customer as unknown as { findUnique: (...args: unknown[]) => unknown };
+    const original = model.findUnique.bind(model);
+    let failures = 1;
+    model.findUnique = (...args: unknown[]) => {
+      if (failures-- > 0) throw new Error("Nachlesen kaputt");
+      return original(...args);
+    };
+    try {
+      const first = await create(token, { lastName: "Nachgelesen" }, "nachlesen-1");
+      assert.equal(first.status, 201, "nicht 500: die Wirkung ist festgeschrieben");
+      const id = (await json(first)).data.id as string;
+      assert.equal(first.headers.get("location"), `/api/v1/customers/${id}`);
+      assert.equal(await env.db.customer.count(), 1);
+      const replay = await create(token, { lastName: "Nachgelesen" }, "nachlesen-1");
+      assert.equal(replay.status, 201);
+      assert.equal(replay.headers.get("idempotent-replayed"), "true");
+      assert.equal((await json(replay)).data.id, id);
+      assert.equal(await env.db.customer.count(), 1, "nichts doppelt angelegt");
+    } finally {
+      model.findUnique = original;
+    }
+  });
+
+  it("je Token höchstens IDEMPOTENCY_MAX_PER_TOKEN Schlüssel: darüber 429 mit Retry-After, abgelaufene zählen nicht, andere Tokens sind frei", async () => {
+    const a = await makeToken(env, owner());
+    const b = await makeToken(env, owner());
+    const expiresAt = new Date(Date.now() + 3_600_000);
+    await env.db.apiIdempotencyKey.createMany({ data: Array.from({ length: idem.IDEMPOTENCY_MAX_PER_TOKEN }, (_, i) => ({ tokenId: a.id, scope: "POST /customers", key: `k-${i}`, bodyHash: "x", status: 201, response: "{}", expiresAt })) });
+    const full = await create(a.token, { lastName: "Zuviel" }, "neu-1");
+    assert.equal(full.status, 429);
+    assert.ok(full.headers.get("retry-after"));
+    assert.equal(await env.db.customer.count(), 0);
+    assert.equal((await create(b.token, { lastName: "Anderes Token" }, "neu-1")).status, 201);
+    // abgelaufene Zeilen werden vorher entfernt
+    await env.db.apiIdempotencyKey.updateMany({ where: { tokenId: a.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    assert.equal((await create(a.token, { lastName: "Wieder frei" }, "neu-2")).status, 201);
+    assert.equal(await env.db.apiIdempotencyKey.count({ where: { tokenId: a.id } }), 1);
   });
 
   it("Serverfehler werden nicht festgehalten; verwaiste Zeilen werden nach einer Minute übernommen", async () => {
