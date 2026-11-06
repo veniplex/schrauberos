@@ -7,9 +7,9 @@ import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
-import { requireDocArea } from "@/modules/docs/access";
-import { deleteDocCategory } from "@/modules/docs/actions";
-import { CategoryForm } from "@/modules/docs/category-form";
+import { requireDocArea } from "@/capabilities/docs/access";
+import { deleteDocCategory } from "@/capabilities/docs/actions";
+import { CategoryForm } from "@/capabilities/docs/category-form";
 
 export async function generateMetadata({ params }: { params: Promise<{ area: string }> }): Promise<Metadata> {
   const { area } = await params;

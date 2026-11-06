@@ -3,7 +3,7 @@ import { Alert, Card, PageHeader } from "@/components/ui/layout";
 import { LocaleSwitch, ThemeSwitch } from "@/components/shell/switches";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { requireSession } from "@/server/auth/session";
-import { PasswordForm, ProfileForm } from "@/modules/core/forms";
+import { PasswordForm, ProfileForm } from "@/platform/account/forms";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();

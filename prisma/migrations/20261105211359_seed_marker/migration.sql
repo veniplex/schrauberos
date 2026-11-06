@@ -1,5 +1,0 @@
--- CreateTable
-CREATE TABLE "SeedMarker" (
-    "key" TEXT NOT NULL PRIMARY KEY,
-    "appliedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);

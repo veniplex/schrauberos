@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BookOpen,
+  Blocks,
+  ScrollText,
   Cable,
   CalendarDays,
   CalendarOff,
@@ -27,8 +29,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { IconName } from "@/modules/types";
-import type { Area } from "@/modules/permissions";
+import type { IconName } from "@/modules/define";
 import { useI18n } from "@/i18n/client";
 
 const ICONS: Record<IconName, LucideIcon> = {
@@ -49,9 +50,13 @@ const ICONS: Record<IconName, LucideIcon> = {
   absences: CalendarOff,
   fleet: Truck,
   docs: BookOpen,
+  modules: Blocks,
+  audit: ScrollText,
 };
 
-export type SidebarItem = { href: string; label: string; icon: IconName; section: "top" | Area };
+export type SidebarItem = { href: string; label: string; icon: IconName };
+/** Eine Navigationsgruppe (Dashboard ohne Titel, sonst ein Modul). */
+export type SidebarGroup = { id: string; label: string | null; items: SidebarItem[] };
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -60,12 +65,12 @@ function isActive(pathname: string, href: string) {
 export function Sidebar({
   workshopName,
   logoDataUrl,
-  items,
+  groups,
   children,
 }: {
   workshopName: string;
   logoDataUrl: string | null;
-  items: SidebarItem[];
+  groups: SidebarGroup[];
   /** Topbar + Inhalt */
   children: React.ReactNode;
 }) {
@@ -79,14 +84,6 @@ export function Sidebar({
     setLastPath(pathname);
     setOpen(false);
   }
-
-  const groups: Array<{ id: string; label: string | null; items: SidebarItem[] }> = [
-    { id: "top", label: null, items: items.filter((i) => i.section === "top") },
-    { id: "workshop", label: t("nav.workshop"), items: items.filter((i) => i.section === "workshop") },
-    { id: "office", label: t("nav.office"), items: items.filter((i) => i.section === "office") },
-    { id: "it", label: t("nav.it"), items: items.filter((i) => i.section === "it") },
-    { id: "admin", label: t("nav.administration"), items: items.filter((i) => i.section === "admin") },
-  ].filter((g) => g.items.length > 0);
 
   const nav = (
     <nav aria-label={t("nav.main")} className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">

@@ -1,57 +1,27 @@
 import type { ReactNode } from "react";
 import type { MessageKey } from "@/i18n/translate";
-import type { Area, Permission } from "./permissions";
+import type { FeatureId, Permission } from "./catalog";
 
-export type IconName =
-  | "dashboard"
-  | "calendar"
-  | "tires"
-  | "customers"
-  | "vehicles"
-  | "users"
-  | "roles"
-  | "settings"
-  | "network"
-  | "server"
-  | "ip"
-  | "cabling"
-  | "invoices"
-  | "employees"
-  | "absences"
-  | "fleet"
-  | "docs";
+type ServerComponent = () => ReactNode | Promise<ReactNode>;
 
-export type NavItem = {
-  id: string;
-  href: string;
-  labelKey: MessageKey;
-  icon: IconName;
-  /** Ohne Angabe: für alle eingeloggten Benutzer sichtbar */
-  permission?: Permission;
-  /** Bereich der Navigation: Werkstatt, Büro, IT, Verwaltung */
-  section: Area;
-  order: number;
-};
-
+/** Dashboard-Baustein einer Funktion. Erscheint nur, wenn die Funktion aktiv ist und das Recht vorliegt. */
 export type WidgetDef = {
   id: string;
-  /** Widget wird nur Benutzern mit dieser Berechtigung angezeigt */
+  feature: FeatureId;
   permission: Permission;
-  /** Bereich, unter dem das Widget auf der Übersicht erscheint */
-  area: Exclude<Area, "admin">;
   /** Breite im Dashboard-Raster (1 = halb, 2 = voll) */
   span?: 1 | 2;
   order: number;
   /** Server Component (darf async sein und selbst Daten laden) */
-  Component: () => ReactNode | Promise<ReactNode>;
+  Component: ServerComponent;
 };
 
-/**
- * Ein Modul bündelt ein Feature: Navigation, Dashboard-Widgets und (in permissions.ts) Rechte.
- * Neues Feature = neuer Ordner in src/modules/<name>/ + Eintrag in registry.ts.
- */
-export type ModuleManifest = {
+/** Reiter auf der Einstellungsseite: jede Funktion bringt ihre eigenen Einstellungen selbst mit. */
+export type SettingsTabDef = {
   id: string;
-  nav: NavItem[];
-  widgets: WidgetDef[];
+  feature: FeatureId;
+  labelKey: MessageKey;
+  permission: Permission;
+  order: number;
+  Component: ServerComponent;
 };

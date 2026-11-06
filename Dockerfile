@@ -44,6 +44,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -r
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
+# Handbuch (Markdown) wird zur Laufzeit aus ./docs gelesen
+COPY --from=builder --chown=node:node /app/docs ./docs
 # Migration + Seed beim Start: Prisma-CLI/tsx (prod-deps) sowie Schema, Migrationen, Seed und dessen Quellen
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/prisma ./prisma

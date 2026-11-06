@@ -1,0 +1,16 @@
+import { defineFeature } from "@/modules/define";
+
+export const tiresFeature = defineFeature({
+  id: "tires",
+  module: "workshop",
+  nameKey: "tires.feature.name",
+  descriptionKey: "tires.feature.description",
+  order: 20,
+  requires: ["workshop.vehicles"],
+  uses: ["workshop.appointments", "workshop.customers"],
+  permissions: { group: "tires", keys: ["tires.view", "tires.create", "tires.edit", "tires.delete"] },
+  nav: [
+    { id: "tires", href: "/tires", labelKey: "nav.tires", icon: "tires", permission: "tires.view", order: 20 },
+  ],
+  routes: ["tires"],
+});

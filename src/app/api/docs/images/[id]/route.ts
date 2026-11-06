@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
-import { DOC_PERMISSIONS, isDocArea } from "@/modules/docs/areas";
+import { DOC_PERMISSIONS, isDocArea } from "@/capabilities/docs/areas";
 
 /** Liefert ein Doku-Bild aus – nur mit Leserecht auf den Bereich, zu dem das Bild gehört. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

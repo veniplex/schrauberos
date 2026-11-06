@@ -1,4 +1,8 @@
 export const employeesDe = {
+  feature: {
+    name: "Mitarbeiter",
+    description: "Stammdaten, Abwesenheiten und Qualifikationen – sensible Daten nur mit Sonderrecht.",
+  },
   title: "Mitarbeiter",
   description: "Stammdaten, Abwesenheiten und Qualifikationen – mit Zuordnung zum Benutzerkonto.",
   new: "Mitarbeiter anlegen",

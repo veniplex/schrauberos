@@ -1,6 +1,10 @@
 import type { employeesDe } from "./employees.de";
 
 export const employeesEn: typeof employeesDe = {
+  feature: {
+    name: "Employees",
+    description: "Master data, absences and qualifications – sensitive data needs a special permission.",
+  },
   title: "Employees",
   description: "Master data, absences and qualifications – linked to user accounts.",
   new: "Add employee",

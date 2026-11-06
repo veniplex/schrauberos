@@ -4,9 +4,9 @@ import { PageHeader } from "@/components/ui/layout";
 import { ConfirmSubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
-import { requireDocEdit } from "@/modules/docs/access";
-import { deleteDocPage } from "@/modules/docs/actions";
-import { DocEditor } from "@/modules/docs/doc-editor";
+import { requireDocEdit } from "@/capabilities/docs/access";
+import { deleteDocPage } from "@/capabilities/docs/actions";
+import { DocEditor } from "@/capabilities/docs/doc-editor";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();

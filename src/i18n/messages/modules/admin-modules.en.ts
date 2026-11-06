@@ -1,0 +1,38 @@
+import type { modulesDe } from "./admin-modules.de";
+
+export const modulesEn: typeof modulesDe = {
+  feature: {
+    name: "Modules & features",
+    description: "Switch modules and individual features of the application on or off.",
+  },
+  descriptions: {
+    workshop: "Appointments, tyre storage, customers and vehicles of the workshop.",
+    office: "Invoice archive, employees and fleet.",
+    it: "Network documentation for IT administrators.",
+    admin: "Users, roles, settings as well as modules and handbook of the platform.",
+  },
+  title: "Modules & features",
+  description: "Switch whole modules or single features on or off. Switching off keeps all data – only access is blocked (pages, navigation, dashboard, permissions).",
+  moduleSwitch: "Module {name}",
+  featureSwitch: "Feature {name}",
+  turnOn: "Switch on",
+  turnOff: "Switch off",
+  required: "Required",
+  requiredHint: "Cannot be switched off, otherwise administration would lock itself out.",
+  featureCount_one: "{count} feature",
+  featureCount_other: "{count} features",
+  status: {
+    on: "Active",
+    off: "Switched off",
+    moduleOff: "Module switched off",
+    blocked: "Not usable",
+  },
+  requires: "Requires: {names}",
+  blockedBy: "Switched on but not usable – requires: {names}",
+  uses: "Works together with: {names}",
+  dependents: "Depending on it: {names}",
+  confirmOffModule: "Switch off module “{name}”? All its features become unreachable; the data is kept.",
+  confirmOffFeature: "Switch off feature “{name}”? Dependent features become unusable as well; the data is kept.",
+  saved: "Saved.",
+  errors: { unknown: "Unknown module or feature.", required: "This module or feature is a required part of the platform." },
+};

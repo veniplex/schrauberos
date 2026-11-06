@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
-import { formatPlate, normalizePlate } from "@/lib/domain/vehicles";
+import { formatPlate, normalizePlate } from "@/lib/plate";
 import type { SyncStats, WerbasClient } from "./types";
 
 const SOURCE = "werbas";

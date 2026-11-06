@@ -1,0 +1,22 @@
+export const rolesDe = {
+  featureInactive: "Diese Funktion ist ausgeschaltet – die Rechte gelten erst nach dem Einschalten.",
+  feature: {
+    name: "Rollen & Rechte",
+    description: "Rollen mit fein granularen Berechtigungen anlegen und zuweisen.",
+  },
+  title: "Rollen & Rechte",
+  description: "Rollen bündeln Berechtigungen. Benutzer können mehrere Rollen haben.",
+  new: "Rolle anlegen",
+  edit: "Rolle bearbeiten",
+  delete: "Rolle löschen",
+  confirmDelete: "Rolle wirklich löschen? Benutzer verlieren damit diese Berechtigungen.",
+  adminBadge: "Voller Zugriff",
+  adminNotice: "Administrator-Rollen haben immer alle Berechtigungen – auch für künftige Funktionen. Einzelrechte lassen sich hier nicht einschränken.",
+  allPermissions: "alle Rechte",
+  permissionCount: "{count} von {total} Rechten",
+  userCount_one: "{count} Benutzer",
+  userCount_other: "{count} Benutzer",
+  fields: { name: "Name", description: "Beschreibung" },
+  selectAll: "Alle",
+  selectNone: "Keine",
+};

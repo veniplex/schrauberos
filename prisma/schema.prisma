@@ -106,11 +106,22 @@ model Workshop {
   accentColor         String   @default("#2459c9")
   // JSON: { "mon": ["07:30","17:00"], "sun": null }
   openingHours        String   @default("{}")
+  updatedAt           DateTime @updatedAt
+}
+
+// Einstellungen gehören der jeweiligen Funktion (Singleton-Zeilen, bei Bedarf mit Standardwerten angelegt)
+
+model AppointmentSettings {
+  id           String   @id @default("default")
   // Kalender-Raster
-  dayStartHour        Int      @default(7)
-  dayEndHour          Int      @default(18)
-  slotMinutes         Int      @default(30)
-  // Reifenlager-Regeln
+  dayStartHour Int      @default(7)
+  dayEndHour   Int      @default(18)
+  slotMinutes  Int      @default(30)
+  updatedAt    DateTime @updatedAt
+}
+
+model TireSettings {
+  id                  String   @id @default("default")
   treadWarnMm         Float    @default(4.0)
   treadReplaceMm      Float    @default(3.0)
   tireAgeWarnYears    Int      @default(6)
@@ -666,8 +677,29 @@ model DocImage {
   @@index([area])
 }
 
-// Merker für einmalige Daten-Migrationen beim Seeden (z. B. neue Standard-Rechte für bestehende Rollen)
-model SeedMarker {
-  key       String   @id
-  appliedAt DateTime @default(now())
+// Ein-/Ausschalter für Module und Funktionen. Schlüssel: Modul-ID ("office") oder Funktions-ID ("office.fleet").
+// Kein Eintrag = aktiv. Daten bleiben beim Ausschalten erhalten; es wird nur der Zugriff gesperrt.
+model FeatureSetting {
+  key           String   @id
+  enabled       Boolean
+  updatedAt     DateTime @updatedAt
+  updatedByName String?
+}
+
+// Audit-Log: wer hat wann was getan. Bewusst ohne Relation zu User, damit der Verlauf auch nach dem Löschen eines Benutzers erhalten bleibt.
+model AuditLog {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  actorId    String?
+  // Anzeigename zum Zeitpunkt der Aktion (oder der eingegebene Benutzername bei fehlgeschlagener Anmeldung)
+  actorName  String
+  // Maschinenlesbare Aktion, z. B. "user.create" (Beschriftung über i18n: audit.actions.*)
+  action     String
+  // Betroffenes Objekt: lesbare Bezeichnung (z. B. Benutzername, Kennzeichen, Rechnungsnummer)
+  target     String?
+  entityId   String?
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
 }

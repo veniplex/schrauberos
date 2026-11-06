@@ -2,8 +2,8 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { addDays, setHours, setMinutes, startOfDay, startOfWeek } from "date-fns";
 import { createPrismaClient } from "../src/server/db-client";
-import { DEFAULT_ROLES } from "../src/modules/permissions";
-import { normalizePlate } from "../src/lib/domain/vehicles";
+import { DEFAULT_ROLES } from "../src/modules/default-roles";
+import { normalizePlate } from "../src/lib/plate";
 import { slugify } from "../src/lib/slug";
 
 const db = createPrismaClient();
@@ -26,32 +26,6 @@ async function seedRoles() {
   }
 }
 
-/**
- * Einmalige Rechte-Erweiterungen für bereits bestehende Standardrollen: seedRoles() legt nur fehlende Rollen an
- * und überschreibt nie Anpassungen. Neue Funktionen sollen aber auch bestehenden Rollen zugutekommen –
- * einmalig (SeedMarker), damit später bewusst entzogene Rechte nicht wieder auftauchen.
- */
-const DEFAULT_GRANTS: Array<{ marker: string; role: string; permissions: string[] }> = [
-  { marker: "grants-docs-2026-11:advisor", role: "advisor", permissions: ["docsWorkshop.view"] },
-  { marker: "grants-docs-2026-11:mechanic", role: "mechanic", permissions: ["docsWorkshop.view"] },
-  { marker: "grants-docs-2026-11:warehouse", role: "warehouse", permissions: ["docsWorkshop.view"] },
-  { marker: "grants-docs-2026-11:it_admin", role: "it_admin", permissions: ["docsIt.view", "docsIt.edit"] },
-];
-
-async function applyDefaultGrants() {
-  for (const g of DEFAULT_GRANTS) {
-    if (await db.seedMarker.findUnique({ where: { key: g.marker } })) continue;
-    const role = await db.role.findUnique({ where: { key: g.role } });
-    if (role && !role.isAdmin) {
-      for (const permission of g.permissions) {
-        await db.rolePermission.upsert({ where: { roleId_permission: { roleId: role.id, permission } }, update: {}, create: { roleId: role.id, permission } });
-      }
-      console.log(`Rechte ergänzt: ${role.name} (+${g.permissions.join(", ")})`);
-    }
-    await db.seedMarker.create({ data: { key: g.marker } });
-  }
-}
-
 async function seedAdmin() {
   if ((await db.user.count()) > 0) return;
   const username = (process.env.SEED_ADMIN_USER ?? "admin").toLowerCase();
@@ -71,6 +45,8 @@ async function seedAdmin() {
 
 async function seedWorkshopBasics() {
   await db.workshop.upsert({ where: { id: "default" }, update: {}, create: { id: "default" } });
+  await db.appointmentSettings.upsert({ where: { id: "default" }, update: {}, create: { id: "default" } });
+  await db.tireSettings.upsert({ where: { id: "default" }, update: {}, create: { id: "default" } });
 
   if ((await db.bay.count()) === 0) {
     await db.bay.createMany({
@@ -294,18 +270,6 @@ async function seedNetworkDemo() {
   await link(swW, "3", cam, "eth0", "K-013");
 }
 
-/** Für Fahrzeuge aus der Zeit vor der Halter-Historie: aktuellen Halter als Eintrag nachtragen (idempotent). */
-async function backfillOwnerships() {
-  const vehicles = await db.vehicle.findMany({
-    where: { customerId: { not: null }, ownerships: { none: {} } },
-    select: { id: true, customerId: true, createdAt: true },
-  });
-  for (const v of vehicles) {
-    await db.vehicleOwnership.create({ data: { vehicleId: v.id, customerId: v.customerId!, fromDate: v.createdAt } });
-  }
-  if (vehicles.length) console.log(`Halter-Historie nachgetragen: ${vehicles.length}`);
-}
-
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const at = (offsetDays: number) => addDays(startOfDay(new Date()), offsetDays);
 const noonOf = (d: Date) => new Date(`${iso(d)}T12:00:00`);
@@ -468,10 +432,8 @@ async function seedDocsDemo() {
 
 async function main() {
   await seedRoles();
-  await applyDefaultGrants();
   await seedAdmin();
   await seedWorkshopBasics();
-  await backfillOwnerships();
   if (process.env.SEED_DEMO === "true") {
     await seedDemo();
     await seedNetworkDemo();

@@ -1,4 +1,8 @@
 export const fleetDe = {
+  feature: {
+    name: "Fuhrpark",
+    description: "Firmenfahrzeuge mit Fälligkeiten (HU, Versicherung, Führerscheinkontrolle) und Zuordnung.",
+  },
   title: "Fuhrpark",
   description: "Firmenfahrzeuge mit Fahrer, Fälligkeiten, Kilometerstand und Kosten.",
   new: "Fahrzeug anlegen",

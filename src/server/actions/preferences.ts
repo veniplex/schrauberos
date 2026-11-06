@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
 import { isLocale, LOCALE_COOKIE, THEME_COOKIE } from "@/i18n/config";
-import { THEMES, type Theme } from "@/lib/domain/constants";
+import { THEMES, type Theme } from "@/lib/constants";
 
 const cookieOpts = { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" as const };
 

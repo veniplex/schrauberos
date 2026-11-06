@@ -2,14 +2,14 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/server/db";
 import { getAuthProvider } from "./providers";
 import { verifyPassword } from "./password";
 import { isLocale, LOCALE_COOKIE, THEME_COOKIE, type Locale } from "@/i18n/config";
-import { THEMES, type Theme } from "@/lib/domain/constants";
-import type { Permission } from "@/modules/permissions";
-import { ALL_PERMISSIONS } from "@/modules/permissions";
+import { THEMES, type Theme } from "@/lib/constants";
+import { ALL_PERMISSIONS, featureOfPermission, type Permission } from "@/modules/catalog";
+import { getActiveFeatureIds } from "@/modules/features";
 
 export const SESSION_COOKIE = "so_session";
 const SESSION_DAYS = 14;
@@ -40,6 +40,9 @@ export type SessionUser = {
 
 export type AppSession = {
   user: SessionUser;
+  /** Aktive (nicht ausgeschaltete) Funktionen, z. B. "workshop.tires" */
+  features: ReadonlySet<string>;
+  /** Effektive Rechte: die Rollen des Benutzers, eingeschränkt auf aktive Funktionen */
   permissions: ReadonlySet<string>;
   can: (permission: Permission) => boolean;
 };
@@ -152,9 +155,11 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
 
   const roles = row.user.roles.map((r) => r.role);
   const isAdmin = roles.some((r) => r.isAdmin);
-  const permissions = new Set<string>(
-    isAdmin ? ALL_PERMISSIONS : roles.flatMap((r) => r.permissions.map((p) => p.permission)),
-  );
+  // Ausgeschaltete Funktionen: ihre Rechte fallen für alle weg (auch für Administratoren).
+  // Da jede Seite, Action und API-Route über Rechte schützt, sperrt das die Funktion überall.
+  const features = await getActiveFeatureIds();
+  const granted: string[] = isAdmin ? ALL_PERMISSIONS : roles.flatMap((r) => r.permissions.map((p) => p.permission));
+  const permissions = new Set(granted.filter((p) => features.has(featureOfPermission(p) ?? "")));
   const u = row.user;
   return {
     user: {
@@ -169,6 +174,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
       isAdmin,
       roleNames: roles.map((r) => r.name),
     },
+    features,
     permissions,
     can: (p) => permissions.has(p),
   };
@@ -185,9 +191,13 @@ export async function requireSession(opts: { allowPasswordChange?: boolean } = {
   return session;
 }
 
-/** Login + Berechtigung erzwingen. Ohne Recht -> /forbidden. */
+/**
+ * Login + Berechtigung erzwingen. Gehört das Recht zu einer ausgeschalteten Funktion, gibt es die Seite
+ * schlicht nicht (404); sonst ohne Recht -> /forbidden.
+ */
 export async function requirePermission(permission: Permission): Promise<AppSession> {
   const session = await requireSession();
+  if (!session.features.has(featureOfPermission(permission) ?? "")) notFound();
   if (!session.can(permission)) redirect("/forbidden");
   return session;
 }

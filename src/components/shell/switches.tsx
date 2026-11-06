@@ -5,7 +5,7 @@ import { useTransition } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { setLocale, setTheme } from "@/server/actions/preferences";
 import { LOCALES, type Locale } from "@/i18n/config";
-import type { Theme } from "@/lib/domain/constants";
+import type { Theme } from "@/lib/constants";
 import { useI18n } from "@/i18n/client";
 
 const THEME_ICONS = { system: Monitor, light: Sun, dark: Moon } as const;

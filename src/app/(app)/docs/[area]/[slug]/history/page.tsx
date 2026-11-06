@@ -5,9 +5,9 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
 import { ConfirmSubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
-import { requireDocArea } from "@/modules/docs/access";
-import { restoreDocVersion } from "@/modules/docs/actions";
-import { Markdown } from "@/modules/docs/markdown";
+import { requireDocArea } from "@/capabilities/docs/access";
+import { restoreDocVersion } from "@/capabilities/docs/actions";
+import { Markdown } from "@/components/ui/markdown";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();

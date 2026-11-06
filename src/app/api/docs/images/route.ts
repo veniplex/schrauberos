@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
-import { DOC_IMAGE_MAX_BYTES, DOC_IMAGE_TYPES, DOC_PERMISSIONS, isDocArea } from "@/modules/docs/areas";
+import { DOC_IMAGE_MAX_BYTES, DOC_IMAGE_TYPES, DOC_PERMISSIONS, isDocArea } from "@/capabilities/docs/areas";
 
 /** Bild für eine Dokumentationsseite hochladen (Recht: Bearbeiten im jeweiligen Bereich). Antwort: { url, id }. */
 export async function POST(request: NextRequest) {

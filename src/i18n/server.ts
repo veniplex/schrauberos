@@ -5,7 +5,7 @@ import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, THEME_COOKIE, type Locale } fr
 import { de, type Messages } from "./messages/de";
 import { en } from "./messages/en";
 import { createTranslator, type Translator } from "./translate";
-import { THEMES, type Theme } from "@/lib/domain/constants";
+import { THEMES, type Theme } from "@/lib/constants";
 
 const dictionaries: Record<Locale, Messages> = { de, en };
 

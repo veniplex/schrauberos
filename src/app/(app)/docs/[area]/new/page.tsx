@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
-import { requireDocEdit } from "@/modules/docs/access";
-import { DocEditor } from "@/modules/docs/doc-editor";
+import { requireDocEdit } from "@/capabilities/docs/access";
+import { DocEditor } from "@/capabilities/docs/doc-editor";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();

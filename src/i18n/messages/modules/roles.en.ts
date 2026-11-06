@@ -1,0 +1,24 @@
+import type { rolesDe } from "./roles.de";
+
+export const rolesEn: typeof rolesDe = {
+  featureInactive: "This feature is switched off – the permissions only apply once it is switched on.",
+  feature: {
+    name: "Roles & permissions",
+    description: "Create roles with fine-grained permissions and assign them.",
+  },
+  title: "Roles & permissions",
+  description: "Roles bundle permissions. Users can have several roles.",
+  new: "Add role",
+  edit: "Edit role",
+  delete: "Delete role",
+  confirmDelete: "Really delete this role? Users lose these permissions.",
+  adminBadge: "Full access",
+  adminNotice: "Administrator roles always have every permission – including those of future features. They cannot be restricted here.",
+  allPermissions: "all permissions",
+  permissionCount: "{count} of {total} permissions",
+  userCount_one: "{count} user",
+  userCount_other: "{count} users",
+  fields: { name: "Name", description: "Description" },
+  selectAll: "All",
+  selectNone: "None",
+};

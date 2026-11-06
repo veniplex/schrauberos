@@ -1,0 +1,38 @@
+import type { customersDe } from "./customers.de";
+
+export const customersEn: typeof customersDe = {
+  feature: {
+    name: "Customers",
+    description: "Customer master data (to be synced via the Werbas connector later).",
+  },
+  title: "Customers & vehicles",
+  description: "Customer master data with their vehicles.",
+  new: "Add customer",
+  edit: "Edit customer",
+  delete: "Delete customer",
+  confirmDelete: "Really delete the customer? Their vehicles are kept without an owner.",
+  searchPlaceholder: "Name, customer no., city, phone or plate …",
+  empty: "No customers found.",
+  emptyHint: "Add the first customer. Data can later be imported from Werbas.",
+  count_one: "{count} customer",
+  count_other: "{count} customers",
+  cols: { name: "Customer", contact: "Contact", vehicles: "Vehicles" },
+  vehicles: "Vehicles",
+  appointments: "Recent appointments",
+  noAppointments: "No appointments yet.",
+  contact: "Contact",
+  externalNotice: "This record comes from {source}. Local changes may be overwritten by the next synchronisation.",
+  fields: {
+    firstName: "First name",
+    lastName: "Last name",
+    company: "Company",
+    customerNumber: "Customer no.",
+    phone: "Phone",
+    email: "Email",
+    street: "Street",
+    zip: "ZIP",
+    city: "City",
+    address: "Address",
+  },
+  errors: { nameRequired: "Enter a last name or a company." },
+};

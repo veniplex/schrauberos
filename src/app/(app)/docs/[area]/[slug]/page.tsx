@@ -7,9 +7,9 @@ import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { markdownHeadings } from "@/lib/slug";
 import { db } from "@/server/db";
-import { requireDocArea } from "@/modules/docs/access";
-import { togglePin } from "@/modules/docs/actions";
-import { Markdown } from "@/modules/docs/markdown";
+import { requireDocArea } from "@/capabilities/docs/access";
+import { togglePin } from "@/capabilities/docs/actions";
+import { Markdown } from "@/components/ui/markdown";
 
 export async function generateMetadata({ params }: { params: Promise<{ area: string; slug: string }> }): Promise<Metadata> {
   const { area, slug } = await params;

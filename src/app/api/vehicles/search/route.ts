@@ -2,15 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
 import { contains } from "@/server/search";
-import { customerDisplayName, normalizePlate } from "@/lib/domain/vehicles";
+import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { normalizePlate } from "@/lib/plate";
 
-const ALLOWED = ["appointments.create", "appointments.edit", "tires.create", "tires.edit", "customers.view"] as const;
+const ALLOWED = ["appointments.create", "appointments.edit", "tires.create", "tires.edit", "vehicles.view"] as const;
 
 /** Fahrzeugsuche für die Auswahlfelder (Kennzeichen, Kundenname, Hersteller/Modell). */
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!ALLOWED.some((p) => session.can(p))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!session.features.has("workshop.vehicles") || !ALLOWED.some((p) => session.can(p))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 60);
   if (q.length < 1) return NextResponse.json({ results: [] });

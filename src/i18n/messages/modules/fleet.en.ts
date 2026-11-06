@@ -1,6 +1,10 @@
 import type { fleetDe } from "./fleet.de";
 
 export const fleetEn: typeof fleetDe = {
+  feature: {
+    name: "Fleet",
+    description: "Company vehicles with due dates (inspection, insurance, licence checks) and assignment.",
+  },
   title: "Fleet",
   description: "Company vehicles with driver, due dates, mileage and costs.",
   new: "Add vehicle",

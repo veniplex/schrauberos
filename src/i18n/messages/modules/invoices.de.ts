@@ -1,4 +1,8 @@
 export const invoicesDe = {
+  feature: {
+    name: "Rechnungsarchiv",
+    description: "Eingangs- und Ausgangsrechnungen mit Beleg ablegen, Zahlungsstatus verfolgen.",
+  },
   title: "Rechnungsarchiv",
   description: "Eingegangene und ausgestellte Rechnungen mit Zahlungsstatus und Beleg.",
   new: "Rechnung erfassen",
