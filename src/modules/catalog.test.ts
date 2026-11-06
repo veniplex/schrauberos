@@ -91,9 +91,12 @@ describe("Katalog", () => {
     }
   });
 
-  it("Standardrollen enthalten nur gültige Rechte", () => {
+  it("Standardrollen enthalten nur gültige Rechte, jedes höchstens einmal", () => {
     const valid = new Set<string>(ALL_PERMISSIONS);
-    for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(valid.has(p), `${role.key}: ${p}`);
+    for (const role of DEFAULT_ROLES) {
+      for (const p of role.permissions) assert.ok(valid.has(p), `${role.key}: ${p}`);
+      assert.equal(new Set(role.permissions).size, role.permissions.length, `${role.key}: Recht doppelt (die Basisdaten würden an der Eindeutigkeit scheitern)`);
+    }
   });
 
   it("adminOnly-Rechte gibt es, gehören zur eigenen Funktion und stecken in keiner Standardrolle (Regel 9)", () => {

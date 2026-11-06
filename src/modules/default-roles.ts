@@ -27,7 +27,7 @@ export const DEFAULT_ROLES: Array<{
       "employees.view", "employees.edit", "employees.delete", "employees.sensitive",
       "fleet.view", "fleet.edit", "fleet.delete",
       "handbook.view", "handbook.edit",
-      "appointments.view", "tires.view", "customers.view", "vehicles.view", "handbook.view",
+      "appointments.view", "tires.view", "customers.view", "vehicles.view",
     ],
   },
   {
