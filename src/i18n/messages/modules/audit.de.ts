@@ -51,6 +51,9 @@ export const auditDe = {
       login: "Angemeldet",
       loginFailed: "Anmeldung fehlgeschlagen",
       loginThrottled: "Anmeldung gedrosselt (zu viele Fehlversuche)",
+      recoveryCreated: "Wiederherstellungs-Code erzeugt",
+      recoveryUsed: "Notzugang verwendet (Wiederherstellungs-Code eingelöst)",
+      recoveryFailed: "Notzugang: Einlösen fehlgeschlagen",
       logout: "Abgemeldet",
     },
     account: {

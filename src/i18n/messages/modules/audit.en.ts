@@ -52,6 +52,9 @@ export const auditEn: typeof auditDe = {
     auth: {
       login: "Signed in",
       loginFailed: "Sign-in failed",
+      recoveryCreated: "Recovery code created",
+      recoveryUsed: "Emergency access used (recovery code redeemed)",
+      recoveryFailed: "Emergency access: redeeming failed",
       loginThrottled: "Sign-in throttled (too many failed attempts)",
       logout: "Signed out",
     },

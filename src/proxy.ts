@@ -4,7 +4,7 @@ import { SESSION_COOKIE_NAMES } from "@/lib/session-cookie";
 // Nur eine schnelle, optimistische Prüfung (Cookie vorhanden?). Die echte Prüfung der Sitzung und der Berechtigungen passiert
 // serverseitig in getSession()/requirePermission(). Deshalb leitet der Proxy nie „von /login weg“: Ein totes Cookie führte sonst zu
 // einer Schleife (Seite → /login → /). Ob jemand wirklich angemeldet ist, entscheidet die Anmeldeseite selbst.
-const OPEN_PAGES = new Set(["/login", "/setup"]);
+const OPEN_PAGES = new Set(["/login", "/login/recover", "/setup"]);
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;

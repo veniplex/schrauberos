@@ -1,0 +1,65 @@
+/** Notzugang: Wiederherstellungs-Code (Einrichtung, Konto, Einlösen, Hinweise). */
+export const recoveryDe = {
+  setupDoneReload: "Die Einrichtung ist abgeschlossen. Der Wiederherstellungs-Code wird nur einmal angezeigt; unter „Mein Konto“ lässt sich jederzeit ein neuer erzeugen.",
+  title: "Notzugang",
+  heading: "Wiederherstellungs-Code",
+  keepLikePassword:
+    "Bewahre den Code wie ein Passwort auf – er umgeht Passwort und Zwei-Faktor-Anmeldung. Wer ihn besitzt, kann ein Administrator-Konto übernehmen.",
+  shownOnce:
+    "Der Code wird nur jetzt angezeigt und lässt sich später nicht mehr abrufen. Drucke ihn aus oder schreibe ihn ab und lege ihn an einen sicheren Ort, zum Beispiel in einen Tresor. Wer alle Administrator-Passwörter verliert, kommt damit wieder ins System.",
+  yourCode: "Dein Wiederherstellungs-Code",
+  print: "Drucken",
+  saved: "Ich habe den Code gesichert.",
+  continue: "Weiter",
+  confirmFailed: "Die Bestätigung konnte nicht gespeichert werden. Bitte versuche es noch einmal.",
+  printTitle: "Wiederherstellungs-Code",
+  printFor: "Konto: {name} ({username})",
+  printWorkshop: "Werkstatt: {workshop}",
+  printIssued: "Ausgestellt am {date}",
+  printWarning:
+    "Wie ein Passwort aufbewahren – der Code umgeht Passwort und Zwei-Faktor-Anmeldung. Er gilt nur für dieses Konto und wird ungültig, sobald er benutzt oder ein neuer erzeugt wird. Nach der Wiederherstellung eines älteren Backups kann dieser Ausdruck veraltet sein.",
+  link: "Zugang verloren? Wiederherstellungs-Code verwenden",
+  recover: {
+    title: "Zugang wiederherstellen",
+    intro: "Gib den Wiederherstellungs-Code eines Administrator-Kontos und ein neues Passwort ein. Danach meldest du dich mit dem neuen Passwort an.",
+    code: "Wiederherstellungs-Code",
+    codeHint: "8 Gruppen zu je 5 Zeichen. Groß-/Kleinschreibung und Bindestriche sind egal.",
+    codePlaceholder: "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
+    checksumOk: "Die Prüfzeichen stimmen.",
+    badGroup: "In Gruppe {group} stimmt das Prüfzeichen nicht – vermutlich ein Tippfehler.",
+    badChars: "Der Code enthält ein Zeichen, das nicht vorkommen kann.",
+    newPassword: "Neues Passwort",
+    submit: "Zugang wiederherstellen",
+    back: "Zurück zur Anmeldung",
+    doneTitle: "Passwort geändert",
+    doneIntro:
+      "Das neue Passwort gilt, alle bisherigen Anmeldungen dieses Kontos wurden beendet. Der benutzte Code ist ungültig – hier ist dein neuer Code. Du wirst nicht automatisch angemeldet.",
+    toLogin: "Zur Anmeldung",
+    errors: {
+      invalid: "Der Code ist ungültig oder nicht mehr gültig.",
+      throttled: "Zu viele Versuche von dieser Adresse. Bitte in etwa {seconds} Sekunden erneut versuchen.",
+    },
+  },
+  account: {
+    intro:
+      "Der Wiederherstellungs-Code ist dein Notzugang: Wenn alle Administrator-Passwörter verloren sind, kommst du über „Zugang verloren?“ auf der Anmeldeseite damit wieder ins System. Pro Administrator-Konto gibt es genau einen gültigen Code.",
+    created: "Aktueller Code erstellt am {date}.",
+    confirmed: "Als gesichert bestätigt.",
+    notConfirmed: "Noch nicht als gesichert bestätigt.",
+    none: "Für dieses Konto gibt es noch keinen Code.",
+    regenerate: "Neuen Code erzeugen",
+    generate: "Code erzeugen",
+    regenerateHint: "Der bisherige Code wird dabei ungültig. Zur Sicherheit wird dein aktuelles Passwort abgefragt.",
+    password: "Aktuelles Passwort",
+    restoreHint: "Nach der Wiederherstellung eines älteren Backups kann ein gedruckter Code veraltet sein – dann hier einen neuen erzeugen.",
+    errors: { adminOnly: "Den Notzugang gibt es nur für Administrator-Konten.", external: "Dieses Konto wird extern verwaltet." },
+  },
+  banner: {
+    used: "Der Notzugang wurde verwendet ({date}): Mit dem Wiederherstellungs-Code wurde das Passwort des Kontos „{name}“ neu gesetzt.",
+    usedOwn: "Dein Notzugang wurde verwendet ({date}): Mit deinem Wiederherstellungs-Code wurde dein Passwort neu gesetzt. Warst du das nicht, ändere dein Passwort und erzeuge einen neuen Code.",
+    ack: "Gesehen",
+    unconfirmed: "Du hast noch nicht bestätigt, dass dein Wiederherstellungs-Code gesichert ist.",
+    confirm: "Ich habe ihn gesichert",
+    toAccount: "Neuen Code erzeugen",
+  },
+};

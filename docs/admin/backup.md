@@ -12,7 +12,7 @@ Unter **Backups** sichert und stellt die Anwendung ihre Daten wieder her – ohn
   verschlüsselt: sicher aufbewahren.
 * **Hochladen:** Eine heruntergeladene Sicherung lässt sich wieder hochladen, z. B. beim Umzug auf einen neuen Server.
 * **Wiederherstellen:** Wählen Sie ein Backup und „Wiederherstellen“. Die Anwendung legt vorher automatisch ein Backup des aktuellen
-  Stands an („Vor Wiederherstellung“) und startet kurz neu. **Alle Änderungen seit dem gewählten Backup gehen dabei verloren.**
+  Stands an („Vor Wiederherstellung“) und startet kurz neu. **Alle Änderungen seit dem gewählten Backup gehen dabei verloren.** Auch der Notzugang gehört zu den Daten: Nach der Wiederherstellung eines älteren Backups kann ein gedruckter Wiederherstellungs-Code veraltet sein (er gilt nur, solange er zum Stand der Datenbank passt). Erzeugen Sie dann unter **Mein Konto → Notzugang** einen neuen.
   Gegebenenfalls müssen Sie sich danach neu anmelden.
 * **Sicherheitsnetz:** Startet die Anwendung mit den wiederhergestellten Daten nicht, wird automatisch der vorherige Stand
   zurückgesetzt; das Ergebnis steht auf der Backup-Seite.

@@ -5,6 +5,7 @@ Unter **Benutzer** werden Konten angelegt, geändert und deaktiviert.
 * **Anlegen:** Benutzername (Kleinbuchstaben, Ziffern, Punkt, Binde- und Unterstrich; später nicht änderbar), Anzeigename, Rollen
   und ein Startpasswort. Mit „Passwort beim nächsten Login ändern“ muss die Person ein eigenes wählen.
 * **Passwort zurücksetzen:** Neues Passwort eintragen (8 bis 128 Zeichen) – bestehende Anmeldungen der Person werden beendet.
+* **Notzugang:** Haben alle Administratoren ihr Passwort verloren, hilft der **Wiederherstellungs-Code** (siehe „Erste Schritte“): Auf der Anmeldeseite „Zugang verloren? Wiederherstellungs-Code verwenden“ wählen. Nach jeder Verwendung sehen das Konto und alle Administratoren einen Hinweis.
 * **Wartezeit nach Fehlversuchen:** Nach mehreren falschen Passwörtern muss ein Konto vor dem nächsten Versuch warten (höchstens 90
   Sekunden, keine Sperre). Die Liste zeigt „Anmeldung gedrosselt“; auf der Seite des Kontos hebt **Wartezeit aufheben** sie sofort auf.
 * **Schutzregeln:** Der letzte aktive Administrator kann weder gelöscht noch deaktiviert werden, das eigene Konto lässt sich nicht

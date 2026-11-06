@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Wrench } from "lucide-react";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
@@ -40,6 +41,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <Card as="div">
           <h2 className="mb-4 text-base font-semibold">{t("auth.signIn")}</h2>
           <LoginForm next={safeNext(next)} />
+          <p className="mt-4 text-center text-sm">
+            <Link href="/login/recover" className="text-accent-text underline-offset-2 hover:underline">
+              {t("recovery.link")}
+            </Link>
+          </p>
         </Card>
       </div>
     </main>

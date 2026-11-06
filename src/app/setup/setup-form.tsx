@@ -1,9 +1,15 @@
 "use client";
 
 import { useActionState, useState, useSyncExternalStore } from "react";
-import { type ActionState, Checkbox, Field, FormMessage, Input, Select } from "@/components/ui/form";
+import { useRouter } from "next/navigation";
+import { Checkbox, Field, FormMessage, Input, Select } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { useI18n } from "@/i18n/client";
+import { RecoveryCodeView } from "@/platform/account/recovery-code-view";
+import { confirmRecoveryCode } from "@/platform/account/recovery-actions";
+import type { RecoveryActionState } from "@/lib/recovery-code";
+import { Alert } from "@/components/ui/layout";
+import { LinkButton } from "@/components/ui/buttons";
 import { completeSetup } from "./actions";
 
 const noopSubscribe = () => () => {};
@@ -18,13 +24,37 @@ function useBrowserTimezone(): string {
   );
 }
 
-export function SetupForm({ timezones }: { timezones: string[] }) {
+export function SetupForm({ timezones, done = false }: { timezones: string[]; done?: boolean }) {
   const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(completeSetup, {});
+  const router = useRouter();
+  const [state, action] = useActionState<RecoveryActionState, FormData>(completeSetup, {});
   const browserZone = useBrowserTimezone();
   const [chosen, setChosen] = useState<string | null>(null);
   const zone = chosen ?? (timezones.includes(browserZone) ? browserZone : DEFAULT_ZONE);
   const err = state.fieldErrors ?? {};
+
+  // Nach der Einrichtung: eigene Seite für den Wiederherstellungs-Code mit Pflicht-Bestätigung (der Code steht nur in dieser Antwort)
+  if (state.recoveryCode) {
+    return (
+      <RecoveryCodeView
+        code={state.recoveryCode}
+        issuedOn={state.issuedOn}
+        onConfirm={confirmRecoveryCode}
+        onContinue={() => router.push("/")}
+      />
+    );
+  }
+  // Die Einrichtung ist abgeschlossen (Seite neu geladen): der Code wird nur einmal angezeigt
+  if (done) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Alert tone="info">{t("recovery.setupDoneReload")}</Alert>
+        <LinkButton href="/" variant="primary">
+          {t("recovery.continue")}
+        </LinkButton>
+      </div>
+    );
+  }
 
   return (
     <form action={action} className="flex flex-col gap-4">

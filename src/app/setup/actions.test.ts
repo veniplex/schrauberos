@@ -24,6 +24,7 @@ after(() => env.cleanup());
 
 beforeEach(async () => {
   await env.db.session.deleteMany();
+  await env.db.recoveryCode.deleteMany();
   await env.db.user.deleteMany();
   browser.reset();
   clock = Date.now();
@@ -67,8 +68,9 @@ describe("Einrichtungs-Token", () => {
 describe("completeSetup", () => {
   it("legt mit dem richtigen Token den Administrator an, wendet die Zeitzone an und löscht das Token", async () => {
     const token = tokenMod.ensureSetupToken(true, { log: () => {} })!;
-    const to = await redirectOf(() => actions.completeSetup({}, setupForm(token)));
-    assert.equal(to, "/");
+    const state = await actions.completeSetup({}, setupForm(token));
+    assert.equal(state.ok, true);
+    assert.ok(state.recoveryCode, "der Wiederherstellungs-Code wird in der Antwort gezeigt (eigene Seite, kein Redirect)");
     assert.equal(await env.db.user.count(), 1);
     assert.equal(process.env.TZ, "America/New_York");
     assert.equal(existsSync(tokenMod.setupTokenFile()), false);
@@ -101,7 +103,7 @@ describe("completeSetup", () => {
     assert.match(throttled.fieldErrors?.token ?? "", /Sekunden/);
     assert.equal(await env.db.user.count(), 0);
     clock += 120_000;
-    assert.equal(await redirectOf(() => actions.completeSetup({}, setupForm(token))), "/");
+    assert.equal((await actions.completeSetup({}, setupForm(token))).ok, true);
   });
 
   it("Zeitzone: ungültig → Feldfehler ohne Wirkung; vorhandener Benutzer → Weiterleitung ohne Änderung der Zeitzone", async () => {
@@ -124,10 +126,12 @@ describe("completeSetup", () => {
     );
     assert.equal(await env.db.user.count(), 1);
     // alle sind Weiterleitungen (Erfolg oder „schon eingerichtet“) oder Token-Fehler, nie ein Absturz
+    assert.equal(results.filter((r) => r.status === "fulfilled" && r.value.ok).length, 1);
     for (const r of results) {
-      if (r.status === "fulfilled") assert.ok(r.value.fieldErrors?.token);
-      else assert.match(String(r.reason?.message ?? r.reason), /NEXT_REDIRECT/);
+      if (r.status === "fulfilled" && !r.value.ok) assert.ok(r.value.fieldErrors?.token);
+      if (r.status === "rejected") assert.match(String(r.reason?.message ?? r.reason), /NEXT_REDIRECT/);
     }
+    assert.equal(await env.db.recoveryCode.count(), 1, "genau ein Code");
   });
 
   it("isValidTimezone ändert die Zeitzone nie, applyTimezone nur bei gültigem Namen", () => {

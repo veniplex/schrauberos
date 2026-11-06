@@ -57,3 +57,9 @@ describe("Proxy: Matcher", () => {
     }
   });
 });
+
+describe("Notzugang", () => {
+  it("/login/recover ist ohne Sitzung erreichbar (öffentlich wie /login)", () => {
+    assert.ok(passes(proxy(request("/login/recover"))));
+  });
+});

@@ -39,8 +39,46 @@ model User {
   createdAppts Appointment[] @relation("AppointmentCreator")
   // verknüpfter Mitarbeiter (optional, 1:1)
   employee     Employee?
+  // Notzugang (nur Administrator-Konten)
+  recoveryCode    RecoveryCode?
+  recoveryNotices RecoveryNotice[]
+  recoveryAcks    RecoveryNoticeAck[]
 
   @@unique([authSource, externalId])
+}
+
+// Notzugang: Wiederherstellungs-Code eines Administrator-Kontos. Gespeichert wird nur der SHA-256-Hash, nie der Code selbst.
+// Je Konto höchstens einer; beim Einlösen und beim Neuerzeugen wird die Zeile ersetzt (der alte Code ist dann ungültig).
+model RecoveryCode {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  codeHash    String    @unique
+  createdAt   DateTime  @default(now())
+  // Der Benutzer hat bestätigt, den Code gesichert zu haben (null = noch nicht)
+  confirmedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Hinweis „Notzugang wurde verwendet“: sichtbar für das Konto und alle Administratoren, bis sie ihn bestätigt haben
+model RecoveryNotice {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acks RecoveryNoticeAck[]
+}
+
+model RecoveryNoticeAck {
+  noticeId String
+  userId   String
+  at       DateTime @default(now())
+
+  notice RecoveryNotice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([noticeId, userId])
 }
 
 model Role {

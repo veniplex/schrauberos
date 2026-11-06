@@ -21,6 +21,17 @@ function create() {
     passwordChange: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
     /** Alle Fehlversuche zusammen: ab 30 pro Minute wird jede Anmeldung bis zu 3 s langsamer, aber nie abgewiesen. */
     budget: new FailureBudget({ limit: 30, windowMs: 60_000, stepMs: 50, maxDelayMs: 3_000, maxStamps: 5_000, now }),
+    /**
+     * Notzugang (Wiederherstellungs-Code): **nur global**, nie pro Konto – sonst könnte jemand den Notweg für alle sperren. Das Budget
+     * verlangsamt (ab 10 Versuchen pro Minute je 200 ms mehr, höchstens 5 s), weist aber nie ab. Pro Client-Adresse (nur hinter dem
+     * Reverse-Proxy) gibt es zusätzlich ein Limit. Versuche werden synchron belegt und bei Erfolg zurückgenommen.
+     */
+    recovery: {
+      budget: new FailureBudget({ limit: 10, windowMs: 60_000, stepMs: 200, maxDelayMs: 5_000, maxStamps: 5_000, now }),
+      ips: new Gate({ free: 10, baseMs: 2_000, capMs: CAP_MS, decayMs: 10 * 60_000, maxEntries: 5_000, now }),
+      /** Audit für Fehlversuche: insgesamt höchstens einer alle 10 s und 6 pro Minute */
+      audit: new RateWindow({ perKeyMs: 10_000, globalLimit: 6, globalWindowMs: 60_000, maxKeys: 4, now }),
+    },
     /** Audit-Einträge für Fehlversuche: je Konto höchstens einer pro Minute, insgesamt höchstens 30 pro Minute. */
     audit: new RateWindow({ perKeyMs: 60_000, globalLimit: 30, globalWindowMs: 60_000, maxKeys: 2_000, now }),
   };

@@ -24,7 +24,7 @@ export const backupEn: typeof backupDe = {
     files: "Files",
     download: "Download",
     restore: "Restore",
-    confirmRestore: "Restore the state of {date}? All changes since then are lost (a backup of the current state is created first). The application restarts.",
+    confirmRestore: "Restore the state of {date}? All changes since then are lost (a backup of the current state is created first). The application restarts. A printed recovery code (emergency access) may be out of date afterwards – create a new one under “My account” if needed.",
     confirmDelete: "Delete this backup permanently?",
   },
   kinds: {

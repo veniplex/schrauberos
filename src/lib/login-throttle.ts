@@ -135,6 +135,11 @@ export class FailureBudget {
     return this.stamps.length;
   }
 
+  /** Nimmt den zuletzt gezählten Versuch zurück (ein Versuch war doch erfolgreich). */
+  release(): void {
+    this.stamps.pop();
+  }
+
   /** Zusätzliche Wartezeit in ms (0, solange das Budget nicht überschritten ist). */
   delayMs(): number {
     const over = this.recent() - this.options.limit;

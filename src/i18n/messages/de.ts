@@ -7,6 +7,7 @@ import { appointmentsDe } from "./modules/appointments.de";
 import { tiresDe } from "./modules/tires.de";
 import { customersDe } from "./modules/customers.de";
 import { usersDe } from "./modules/users.de";
+import { recoveryDe } from "./modules/recovery.de";
 import { rolesDe } from "./modules/roles.de";
 import { networkDe } from "./modules/network.de";
 import { modulesDe } from "./modules/admin-modules.de";
@@ -159,6 +160,7 @@ export const de = {
   tires: tiresDe,
   customers: customersDe,
   users: usersDe,
+  recovery: recoveryDe,
   roles: rolesDe,
   permissionGroups: {
     appointments: "Termine",

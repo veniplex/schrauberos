@@ -10,7 +10,8 @@ import { seedAllDemo } from "@/server/seed/demo";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
 import { checkSetupToken, removeSetupToken } from "@/server/setup-token";
 import { getI18n } from "@/i18n/server";
-import type { ActionState } from "@/components/ui/form";
+import type { RecoveryActionState } from "@/lib/recovery-code";
+import { replaceRecoveryCode } from "@/server/auth/recovery";
 import { fieldErrors, formObject } from "@/lib/forms";
 
 const schema = z.object({
@@ -28,8 +29,8 @@ const schema = z.object({
 });
 
 /** Ersteinrichtung: legt den ersten Administrator an, solange es noch keinen Benutzer gibt. */
-export async function completeSetup(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { t } = await getI18n();
+export async function completeSetup(_prev: RecoveryActionState, formData: FormData): Promise<RecoveryActionState> {
+  const { t, date } = await getI18n();
   // Gibt es schon einen Benutzer, ist die Einrichtung vorbei – vor allem anderen (kein Token-Test, keine Zeitzone)
   if ((await db.user.count()) > 0) redirect("/login");
   const parsed = schema.safeParse(formObject(formData));
@@ -51,10 +52,11 @@ export async function completeSetup(_prev: ActionState, formData: FormData): Pro
 
   // In einer Transaktion: Zwei gleichzeitige Aufrufe können nicht beide einen Administrator anlegen
   const created = await db.$transaction(async (tx) => {
-    if ((await tx.user.count()) > 0) return false;
-    await tx.user.create({ data: { username: d.username, name: d.name, passwordHash, roles: { create: [{ roleId: adminRole.id }] } } });
+    if ((await tx.user.count()) > 0) return null;
+    const admin = await tx.user.create({ data: { username: d.username, name: d.name, passwordHash, roles: { create: [{ roleId: adminRole.id }] } } });
     await tx.workshop.upsert({ where: { id: "default" }, update: { name: d.workshopName, timezone: d.timezone }, create: { id: "default", name: d.workshopName, timezone: d.timezone } });
-    return true;
+    // Notzugang: Wiederherstellungs-Code des ersten Administrators (Klartext nur in der Antwort dieser Aktion)
+    return replaceRecoveryCode(tx, admin.id);
   });
   if (!created) redirect("/login");
   // Erst jetzt, nach dem erfolgreichen Anlegen: Zeitzone anwenden, Token verbrauchen
@@ -64,6 +66,8 @@ export async function completeSetup(_prev: ActionState, formData: FormData): Pro
   if (formData.get("demo") === "on" && (await db.customer.count()) === 0) await seedAllDemo(db);
   await audit("setup.complete", { actor: { id: null, name: d.name }, target: d.workshopName });
 
-  const result = await login(d.username, d.password);
-  redirect(result.ok ? "/" : "/login");
+  // Angemeldet wird sofort; danach zeigt die Einrichtung den Wiederherstellungs-Code auf einer eigenen Seite mit Pflicht-Bestätigung
+  // (kein Redirect, der sie überspringen könnte)
+  await login(d.username, d.password);
+  return { ok: true, recoveryCode: created, issuedOn: date(new Date(), { dateStyle: "medium" }) };
 }

@@ -22,7 +22,7 @@ export const backupDe = {
     files: "Dateien",
     download: "Herunterladen",
     restore: "Wiederherstellen",
-    confirmRestore: "Den Stand vom {date} wiederherstellen? Alle Änderungen seitdem gehen verloren (vorher wird automatisch eine Sicherung des aktuellen Stands angelegt). Die Anwendung startet dabei neu.",
+    confirmRestore: "Den Stand vom {date} wiederherstellen? Alle Änderungen seitdem gehen verloren (vorher wird automatisch eine Sicherung des aktuellen Stands angelegt). Die Anwendung startet dabei neu. Ein gedruckter Wiederherstellungs-Code (Notzugang) kann danach veraltet sein – bei Bedarf unter „Mein Konto“ einen neuen erzeugen.",
     confirmDelete: "Dieses Backup endgültig löschen?",
   },
   kinds: {

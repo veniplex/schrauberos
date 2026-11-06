@@ -4,6 +4,8 @@ import { LocaleSwitch, ThemeSwitch } from "@/components/shell/switches";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { requireSession } from "@/server/auth/session";
 import { PasswordForm, ProfileForm } from "@/platform/account/forms";
+import { RecoveryCard } from "@/platform/account/recovery-card";
+import { db } from "@/server/db";
 import { FieldHint, FieldLabel } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -13,7 +15,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AccountPage() {
   const session = await requireSession({ allowPasswordChange: true });
-  const [{ t }, locale, theme] = await Promise.all([getI18n(), getLocale(), getTheme()]);
+  const [{ t, date }, locale, theme] = await Promise.all([getI18n(), getLocale(), getTheme()]);
+  const recovery = session.user.isAdmin && session.user.authSource === "local" && !session.user.mustChangePassword ? await db.recoveryCode.findUnique({ where: { userId: session.user.id } }) : null;
+  const showRecovery = session.user.isAdmin && session.user.authSource === "local" && !session.user.mustChangePassword;
   const forced = session.user.mustChangePassword;
 
   return (
@@ -54,6 +58,14 @@ export default async function AccountPage() {
             <p className="text-sm text-ink-muted">{t("account.errors.externalPassword")}</p>
           </Card>
         )}
+        {showRecovery ? (
+          <Card title={t("recovery.title")}>
+            <RecoveryCard
+              status={{ createdOn: recovery ? date(recovery.createdAt, { dateStyle: "medium" }) : null, confirmed: !!recovery?.confirmedAt }}
+              account={{ name: session.user.name, username: session.user.username }}
+            />
+          </Card>
+        ) : null}
       </div>
     </>
   );

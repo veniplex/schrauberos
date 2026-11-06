@@ -6,6 +6,7 @@ import { MODULES } from "@/modules/catalog";
 import { navFor } from "@/modules/registry";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { requireSession } from "@/server/auth/session";
+import { RecoveryBanner } from "@/platform/account/recovery-banner";
 import { getWorkshop } from "@/server/workshop";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -39,7 +40,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       groups={groups}
       footer={<UserMenu name={session.user.name} roles={session.user.roleNames.join(", ") || "–"} locale={locale} theme={theme} logoutAction={logoutAction} />}
     >
-      <main className="mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 lg:py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 lg:py-8">
+        <RecoveryBanner user={{ id: session.user.id, isAdmin: session.user.isAdmin }} />
+        {children}
+      </main>
     </Sidebar>
   );
 }

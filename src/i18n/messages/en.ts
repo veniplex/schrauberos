@@ -8,6 +8,7 @@ import { appointmentsEn } from "./modules/appointments.en";
 import { tiresEn } from "./modules/tires.en";
 import { customersEn } from "./modules/customers.en";
 import { usersEn } from "./modules/users.en";
+import { recoveryEn } from "./modules/recovery.en";
 import { rolesEn } from "./modules/roles.en";
 import { networkEn } from "./modules/network.en";
 import { modulesEn } from "./modules/admin-modules.en";
@@ -159,6 +160,7 @@ export const en: Messages = {
   tires: tiresEn,
   customers: customersEn,
   users: usersEn,
+  recovery: recoveryEn,
   roles: rolesEn,
   permissionGroups: {
     appointments: "Appointments",
