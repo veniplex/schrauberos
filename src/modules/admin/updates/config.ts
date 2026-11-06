@@ -3,7 +3,7 @@ import path from "node:path";
 import { readMeta, versionsDir } from "@/lib/updates/store";
 import type { VersionMeta } from "@/lib/updates/state";
 import { getSecret } from "@/server/settings";
-import { RELEASE_PUBLIC_KEY } from "./release-key";
+import { RELEASE_PUBLIC_KEY, ROOT_PUBLIC_KEY } from "./release-key";
 
 export const UPDATE_TOKEN_KEY = "update.token";
 
@@ -16,7 +16,9 @@ export async function updateConfig() {
     token: (await getSecret(UPDATE_TOKEN_KEY)) || process.env.UPDATE_GITHUB_TOKEN || null,
     // Nur für Tests/Spiegel: Basis-URL der GitHub-API
     apiUrl: (process.env.UPDATE_API_URL ?? "https://api.github.com").replace(/\/$/, ""),
-    publicKey: process.env.UPDATE_PUBLIC_KEY || RELEASE_PUBLIC_KEY,
+    /** Eingebauter Release-Schlüssel und Wurzelschlüssel der Schlüsselkette (Forks: Umgebungsvariablen, siehe release-key.ts) */
+    builtInKey: process.env.UPDATE_PUBLIC_KEY || RELEASE_PUBLIC_KEY,
+    rootKey: process.env.UPDATE_ROOT_PUBLIC_KEY || process.env.UPDATE_PUBLIC_KEY || ROOT_PUBLIC_KEY,
   };
 }
 

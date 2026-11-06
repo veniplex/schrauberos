@@ -379,7 +379,32 @@ abweicht.
 | **privat** | GitHub-Repository-Secret **`RELEASE_SIGNING_KEY`** (nie im Repo, nie im Image) | signiert in der Pipeline das Manifest |
 | **öffentlich** | `src/modules/admin/updates/release-key.ts` (`RELEASE_PUBLIC_KEY`, im Code und damit im Image) | die App prüft damit jedes Release |
 
-Forks können einen eigenen öffentlichen Schlüssel über die Umgebungsvariable `UPDATE_PUBLIC_KEY` (PEM) setzen.
+Forks können einen eigenen öffentlichen Schlüssel über die Umgebungsvariable `UPDATE_PUBLIC_KEY` (PEM) setzen (zugleich Wurzel, siehe unten;
+getrennt: `UPDATE_ROOT_PUBLIC_KEY`).
+
+### Schlüsselkette: Wurzelschlüssel → Release-Schlüssel
+
+Damit der Release-Schlüssel getauscht werden kann, ohne dass jede Installation ein neues Image braucht, gibt es zwei Ebenen
+(`src/lib/updates/keychain.ts`, getestet):
+
+| Schlüssel | Wo er liegt | Wofür |
+| --- | --- | --- |
+| **Wurzelschlüssel** (`ROOT_PUBLIC_KEY` in `release-key.ts`) | öffentlich im Code/Image; der **private Teil bleibt offline** (Passwortmanager/Datenträger, nie GitHub-Secret, nie Server) | beglaubigt Release-Schlüssel, signiert nie Pakete |
+| **Release-Schlüssel** (`RELEASE_PUBLIC_KEY`, privat: Secret `RELEASE_SIGNING_KEY`) | siehe oben | signiert das Manifest jedes Releases |
+
+Die App vertraut dem eingebauten Release-Schlüssel **und** jedem Schlüssel mit einer gültigen Beglaubigung des Wurzelschlüssels
+(`release-keys.json`, wird dem Release beigelegt und unter `<DATA_DIR>/app/release-keys.json` gemerkt; bei jeder Verwendung erneut
+gegen die Wurzel geprüft, optional befristet mit `--valid-until`). Nicht beglaubigte Schlüssel werden abgelehnt.
+
+* **Ausgangslage:** `ROOT_PUBLIC_KEY` ist noch `= RELEASE_PUBLIC_KEY` – die Kette funktioniert, schützt aber erst, wenn der Besitzer
+  einen eigenen Wurzelschlüssel erzeugt (Befehle oben, andere Dateinamen), den öffentlichen Teil als `ROOT_PUBLIC_KEY` einträgt (vor
+  der Veröffentlichung, Wurzel steht im Image) und den privaten Teil offline verwahrt.
+* **Release-Schlüssel tauschen:** neues Paar erzeugen, Secret `RELEASE_SIGNING_KEY` ersetzen, offline beglaubigen:
+  `ROOT_SIGNING_KEY_FILE=wurzel-privat.pem node scripts/endorse-release-key.mjs --public release-public-key.pem [--valid-until 2031-12-31]`,
+  `release-keys.json` committen, Release veröffentlichen – Installationen nehmen den neuen Schlüssel über die Beglaubigung an.
+  `scripts/make-release.mjs` prüft die Signatur gegen die Kette und legt `release-keys.json` bei.
+* **Wurzelschlüssel tauschen** (Verlust/Kompromittierung) geht nur über ein neues Image.
+* Private Schlüssel gehören **nie** ins Repository.
 
 ### Schlüsselpaar erzeugen
 
@@ -418,8 +443,9 @@ Die private Datei beginnt mit `-----BEGIN PRIVATE KEY-----`, die öffentliche mi
 ### Schlüssel ersetzen oder verloren
 
 Weil der öffentliche Schlüssel **im Image** steht, erkennen bereits laufende Installationen Releases, die mit einem neuen Schlüssel
-signiert sind, nicht mehr an (die Update-Seite meldet „Signatur ungültig“). Nach einem Schlüsselwechsel muss also **jede
-Installation einmal ein neues Image ziehen**; danach laufen Web-Updates wieder. Den Schlüssel nur bei Verlust oder Kompromittierung
+signiert sind, nicht mehr an (die Update-Seite meldet „Signatur ungültig“) – **es sei denn, der neue Release-Schlüssel ist vom
+Wurzelschlüssel beglaubigt** (siehe Schlüsselkette). Ohne Beglaubigung muss **jede Installation einmal ein neues Image ziehen**;
+danach laufen Web-Updates wieder. Den Schlüssel nur bei Verlust oder Kompromittierung
 wechseln: neues Paar erzeugen, Secret ersetzen (`gh secret set …` überschreibt), öffentlichen Schlüssel eintragen, Release
 veröffentlichen, Installationen einmal per `docker compose pull && docker compose up -d` aktualisieren.
 
@@ -493,6 +519,8 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
   Sicherheit** „Hinter Reverse-Proxy“ einschalten, damit die Anmeldung die Client-Adresse auswertet (Proxy muss sie als letzten `X-Forwarded-For`-Eintrag anhängen). Erscheint beim Speichern „Invalid Server Actions
   request“, leitet der Proxy den öffentlichen Host nicht per `x-forwarded-host` weiter – dann die Domain in `next.config.ts` unter
   `experimental.serverActions.allowedOrigins` eintragen.
+* **Sicherheits-Header:** `next.config.ts` setzt auf allen Antworten `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` und eine
+  CSP, die vorerst nur `frame-ancestors 'self'` enthält (Test `src/next-config.test.ts`); die vollständige CSP folgt später.
 * **Zeitzone:** Einstellungen → Werkstatt; wird bei jedem Start angewendet.
 * **Image neu ziehen** ist nur nötig, wenn ein Release den Vertrag des Starters ändert (die Update-Seite sagt es) oder bei einem
   Schlüsselwechsel: `docker compose pull && docker compose up -d` (die Daten bleiben).

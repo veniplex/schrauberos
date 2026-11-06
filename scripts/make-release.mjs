@@ -1,12 +1,14 @@
 // Erzeugt manifest.json und manifest.json.sig für ein Release-Paket (aufgerufen von der Release-Pipeline).
 //   RELEASE_SIGNING_KEY="<PEM>" node scripts/make-release.mjs --archive <paket.tar.gz> --bundle <entpacktes-verzeichnis> --out <ordner>
 // Das Manifest nennt Version, Image-Unterbau (base), Dateiname, SHA-256 und Größe des Pakets.
-// Die Signatur (Ed25519) wird zur Sicherheit gleich gegen den in der App eingebauten öffentlichen Schlüssel geprüft –
-// so fällt ein falsches Secret in der Pipeline auf und nicht erst bei den Anwendern.
+// Die Signatur (Ed25519) wird zur Sicherheit gleich gegen die Schlüsselkette der App geprüft (eingebauter Release-Schlüssel oder ein
+// vom Wurzelschlüssel beglaubigter aus release-keys.json) – so fällt ein falsches Secret in der Pipeline auf und nicht erst bei den
+// Anwendern. Liegt release-keys.json im Repository, wird sie dem Release beigelegt (die App merkt sich die Beglaubigungen).
 import { createHash, createPublicKey, sign, verify } from "node:crypto";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseEndorsements, trustedReleaseKeys } from "../src/lib/updates/keychain.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -38,9 +40,18 @@ const bytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
 const signature = sign(null, bytes, privateKey);
 
 const source = readFileSync(resolve(root, "src/modules/admin/updates/release-key.ts"), "utf8");
-const publicPem = /`(-----BEGIN PUBLIC KEY-----[\s\S]*?-----END PUBLIC KEY-----\n?)`/.exec(source)?.[1];
+const keyOf = (name) => new RegExp(`${name}\\s*=\\s*\`(-----BEGIN PUBLIC KEY-----[\\s\\S]*?-----END PUBLIC KEY-----\\n?)\``).exec(source)?.[1];
+const publicPem = keyOf("RELEASE_PUBLIC_KEY");
 if (!publicPem) throw new Error("Öffentlicher Schlüssel in release-key.ts nicht gefunden.");
-if (!verify(null, bytes, createPublicKey(publicPem), signature)) throw new Error("Die Signatur passt nicht zum eingebauten öffentlichen Schlüssel – falsches RELEASE_SIGNING_KEY?");
+// Steht ROOT_PUBLIC_KEY noch als Zuweisung `= RELEASE_PUBLIC_KEY` da, gilt der Release-Schlüssel zugleich als Wurzel
+const rootPem = keyOf("ROOT_PUBLIC_KEY") ?? publicPem;
+const keysFile = resolve(root, "release-keys.json");
+const endorsements = existsSync(keysFile) ? parseEndorsements(JSON.parse(readFileSync(keysFile, "utf8"))) : [];
+const trusted = trustedReleaseKeys({ root: rootPem, builtIn: [publicPem], endorsements });
+if (!trusted.some((pem) => verify(null, bytes, createPublicKey(pem), signature))) {
+  throw new Error("Die Signatur passt weder zum eingebauten Release-Schlüssel noch zu einem beglaubigten – falsches RELEASE_SIGNING_KEY oder fehlende Beglaubigung (release-keys.json)?");
+}
+if (endorsements.length) copyFileSync(keysFile, resolve(out, "release-keys.json"));
 
 writeFileSync(resolve(out, "manifest.json"), bytes);
 writeFileSync(resolve(out, "manifest.json.sig"), signature);

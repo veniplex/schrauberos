@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { parseEndorsements, type Endorsement } from "./keychain";
 import { emptyState, parseState, type UpdateState, type VersionMeta } from "./state";
 
 /** Dateizugriff auf das Update-Verzeichnis (`<DATA_DIR>/app`) und auf version.json. Von App und Launcher genutzt. */
@@ -12,6 +13,8 @@ export const versionDir = (version: string, data = dataDir()) => path.join(versi
 const stateFile = (data = dataDir()) => path.join(updatesDir(data), "state.json");
 /** Einzeiliger Zeiger auf das Verzeichnis der aktiven Version (leer = eingebaute); liest der Starter im Image (docker/bootstrap.c). */
 export const activeFile = (data = dataDir()) => path.join(updatesDir(data), "active");
+/** Vom Wurzelschlüssel beglaubigte Release-Schlüssel (Schlüsselkette, siehe keychain.ts). */
+const endorsementsFile = (data = dataDir()) => path.join(updatesDir(data), "release-keys.json");
 /** Marker des Starters: der Launcher dieser Version ist wiederholt abgestürzt. */
 export const launcherCrashFile = (data = dataDir()) => path.join(updatesDir(data), "launcher-crash");
 
@@ -65,4 +68,21 @@ export function pruneVersions(keep: readonly string[], data = dataDir()): void {
   for (const name of readdirSync(dir)) {
     if (!keep.includes(name)) rmSync(path.join(dir, name), { recursive: true, force: true });
   }
+}
+
+/** Gemerkte, vom Wurzelschlüssel beglaubigte Release-Schlüssel; die Datei wird bei jeder Verwendung neu geprüft (nie blind vertraut). */
+export function readEndorsements(data = dataDir()): Endorsement[] {
+  try {
+    return parseEndorsements(JSON.parse(readFileSync(endorsementsFile(data), "utf8")));
+  } catch {
+    return [];
+  }
+}
+
+export function writeEndorsements(endorsements: readonly Endorsement[], data = dataDir()): void {
+  mkdirSync(updatesDir(data), { recursive: true });
+  const file = endorsementsFile(data);
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ keys: endorsements }, null, 2));
+  renameSync(tmp, file);
 }

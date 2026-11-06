@@ -1,5 +1,7 @@
 import "server-only";
 import { updateConfig } from "./config";
+import { parseEndorsements, trustedReleaseKeys, validEndorsements } from "@/lib/updates/keychain";
+import { readEndorsements, writeEndorsements } from "@/lib/updates/store";
 import { UpdateError, verifyManifest, type Manifest } from "./manifest";
 
 type GithubAsset = { name: string; url: string; size: number };
@@ -43,7 +45,7 @@ async function smallAsset(asset: GithubAsset): Promise<Buffer> {
 
 /** Lädt das neueste Release, prüft die Signatur des Manifests und liefert die verifizierten Angaben. */
 async function loadLatestRelease(): Promise<Release> {
-  const { repo, apiUrl, publicKey, token } = await updateConfig();
+  const { repo, apiUrl, builtInKey, rootKey, token } = await updateConfig();
   const res = await request(`${apiUrl}/repos/${repo}/releases/latest`, "application/vnd.github+json");
   if (res.status === 401 || res.status === 403) throw new UpdateError("unauthorized");
   // Bei privaten Repos antwortet GitHub ohne gültiges Token mit 404
@@ -56,7 +58,22 @@ async function loadLatestRelease(): Promise<Release> {
   const signatureAsset = find("manifest.json.sig");
   if (!manifestAsset || !signatureAsset) throw new UpdateError("badRelease", "Manifest oder Signatur fehlt");
 
-  const manifest = verifyManifest(await smallAsset(manifestAsset), await smallAsset(signatureAsset), publicKey);
+  // Vertraut wird dem eingebauten Release-Schlüssel und Schlüsseln, die der Wurzelschlüssel beglaubigt hat (gemerkte und die des Releases)
+  let offered: ReturnType<typeof parseEndorsements> = [];
+  const keysAsset = find("release-keys.json");
+  if (keysAsset) {
+    try {
+      offered = parseEndorsements(JSON.parse((await smallAsset(keysAsset)).toString("utf8")));
+    } catch {
+      offered = []; // eine kaputte Schlüsselliste macht das Release nicht unlesbar – es zählt nur der Schlüssel, der passt
+    }
+  }
+  const stored = readEndorsements();
+  const keys = trustedReleaseKeys({ root: rootKey, builtIn: [builtInKey], endorsements: [...stored, ...offered] });
+  const manifest = verifyManifest(await smallAsset(manifestAsset), await smallAsset(signatureAsset), keys);
+  // Erst nach erfolgreicher Prüfung merken (nur Beglaubigungen, die die Kette bestehen)
+  const remember = validEndorsements([...stored, ...offered], rootKey);
+  if (remember.length !== stored.length || remember.some((e, i) => e.statement !== stored[i]?.statement)) writeEndorsements(remember);
   if (release.tag_name !== `v${manifest.version}`) throw new UpdateError("badRelease", "Tag passt nicht zum Manifest");
   const bundle = find(manifest.asset);
   if (!bundle) throw new UpdateError("badRelease", "Paket fehlt");

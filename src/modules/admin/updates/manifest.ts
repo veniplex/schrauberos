@@ -44,14 +44,18 @@ export const manifestSchema = z.object({
 });
 export type Manifest = z.infer<typeof manifestSchema>;
 
-/** Prüft die Ed25519-Signatur über die exakten Bytes des Manifests und liest es dann. */
-export function verifyManifest(manifestBytes: Buffer, signature: Buffer, publicKeyPem: string): Manifest {
-  let valid = false;
-  try {
-    valid = verify(null, manifestBytes, createPublicKey(publicKeyPem), signature);
-  } catch {
-    valid = false;
-  }
+/**
+ * Prüft die Ed25519-Signatur über die exakten Bytes des Manifests und liest es dann. Es genügt ein passender Schlüssel aus der
+ * Liste der vertrauten Release-Schlüssel (siehe `trustedReleaseKeys`: eingebaute plus vom Wurzelschlüssel beglaubigte).
+ */
+export function verifyManifest(manifestBytes: Buffer, signature: Buffer, publicKeys: string | readonly string[]): Manifest {
+  const valid = (typeof publicKeys === "string" ? [publicKeys] : publicKeys).some((pem) => {
+    try {
+      return verify(null, manifestBytes, createPublicKey(pem), signature);
+    } catch {
+      return false;
+    }
+  });
   if (!valid) throw new UpdateError("badSignature");
   try {
     return manifestSchema.parse(JSON.parse(manifestBytes.toString("utf8")));
