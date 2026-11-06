@@ -78,6 +78,32 @@ describe("Gate (Drosselung je Konto)", () => {
     assert.equal(g.attemptsOf("name-19999"), 1);
   });
 
+  it("verdrängt bei Überlauf nie einen Eintrag mit laufender Wartezeit: eine Flut erfundener Namen entsperrt kein Konto", () => {
+    clock = 1_000_000;
+    const g = gate({ maxEntries: 200 });
+    for (let i = 0; i < 4; i++) g.take("admin"); // Wartezeit läuft
+    const wait = g.check("admin");
+    assert.ok(wait > 0);
+    for (let i = 0; i < 20_000; i++) g.take(`flut-${i}`); // nur freie Versuche, keine Wartezeit
+    assert.equal(g.check("admin"), wait, "die Wartezeit des Kontos besteht weiter");
+    assert.ok(g.size <= 200);
+  });
+
+  it("auch eine Flut von Namen MIT Wartezeit sprengt die Grenze nicht: höchstens das Doppelte, zuerst fällt, was am frühesten abläuft", () => {
+    clock = 1_000_000;
+    const g = gate({ maxEntries: 100 });
+    for (let i = 0; i < 4; i++) g.take("admin"); // 2 s Wartezeit
+    for (let i = 0; i < 6; i++) g.take("admin"); // weiter hochgezählt: lange Wartezeit
+    const wait = g.check("admin");
+    assert.ok(wait >= 16_000, `Wartezeit ${wait}`);
+    for (let i = 0; i < 2_000; i++) {
+      const key = `flut-${i}`;
+      for (let n = 0; n < 4; n++) g.take(key); // jeder Name bekommt 2 s Wartezeit
+      assert.ok(g.size <= 200, `Größe ${g.size}`);
+    }
+    assert.equal(g.check("admin"), wait, "der Eintrag mit der längsten Restzeit wird zuletzt verdrängt");
+  });
+
   it("unbekannte und bekannte Namen verhalten sich gleich (der Speicher kennt nur Schlüssel)", () => {
     clock = 1_000_000;
     const g = gate();

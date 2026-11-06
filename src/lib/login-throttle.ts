@@ -9,7 +9,8 @@
  *    warten auf, kann ein Schwung paralleler Versuche die Drosselung nicht unterlaufen (JavaScript ist einfädig).
  *  - **Abgewiesene Versuche verlängern nichts.** Nur ein Versuch, der tatsächlich zur Passwortprüfung durchkommt, setzt die nächste
  *    Wartezeit. Sonst könnte jemand ein fremdes Konto mit Dauerbeschuss für immer sperren; so ist die Wartezeit höchstens die Obergrenze.
- *  - **Begrenzter Speicher.** Pro Gate höchstens `maxEntries` Schlüssel; abgelaufene werden zuerst entfernt, danach die ältesten.
+ *  - **Begrenzter Speicher.** Pro Gate höchstens `maxEntries` Schlüssel (mit lauter laufenden Wartezeiten höchstens das Doppelte); es fallen
+ *    zuerst Einträge ohne Wartezeit, nie eine laufende Wartezeit zugunsten eines neuen Namens (siehe `makeRoom`).
  */
 
 export type GateOptions = {
@@ -93,21 +94,36 @@ export class Gate {
     return this.entries.get(key)?.attempts ?? 0;
   }
 
-  /** Platz schaffen: erst Abgelaufenes, dann die ältesten Einträge. */
+  /**
+   * Platz schaffen. **Einträge mit laufender Wartezeit werden nie verdrängt**, solange es nicht anders geht – sonst könnte eine Flut
+   * erfundener Namen eine Wartezeit (und damit auch die Antwort „gedrosselt“ für genau diesen Namen) löschen. Reihenfolge:
+   *  1. Einträge ohne laufende Wartezeit, die ältesten zuerst (etwa 10 % der Grenze auf einmal);
+   *  2. sind nur noch Einträge mit Wartezeit übrig, darf die Tabelle bis zum Doppelten der Grenze wachsen (jeder davon kostet einen
+   *     Angreifer mehrere Anfragen innerhalb weniger Sekunden);
+   *  3. darüber hinaus fällt der Eintrag, dessen Wartezeit am frühesten abläuft (er schützt am wenigsten).
+   */
   private makeRoom(): void {
-    const { maxEntries, decayMs } = this.options;
+    const { maxEntries } = this.options;
     if (this.entries.size < maxEntries) return;
     const now = this.options.now();
-    for (const [key, entry] of this.entries) if (now - entry.lastAt > decayMs) this.entries.delete(key);
-    // Immer noch voll: die ältesten ~10 % verwerfen (Map hält die Einfügereihenfolge, „zuletzt benutzt“ steht hinten)
-    const drop = this.entries.size - maxEntries + Math.ceil(maxEntries / 10);
-    if (drop > 0) {
-      let n = 0;
-      for (const key of this.entries.keys()) {
-        if (n++ >= drop) break;
+    let drop = this.entries.size - maxEntries + Math.ceil(maxEntries / 10);
+    for (const [key, entry] of this.entries) {
+      if (drop <= 0) break;
+      if (entry.until <= now) {
         this.entries.delete(key);
+        drop--;
       }
     }
+    if (this.entries.size < maxEntries * 2) return;
+    let soonest: string | undefined;
+    let soonestUntil = Infinity;
+    for (const [key, entry] of this.entries) {
+      if (entry.until < soonestUntil) {
+        soonestUntil = entry.until;
+        soonest = key;
+      }
+    }
+    if (soonest !== undefined) this.entries.delete(soonest);
   }
 }
 
