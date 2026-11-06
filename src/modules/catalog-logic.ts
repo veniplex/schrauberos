@@ -1,14 +1,25 @@
 // Reine Logik zur Aktivierung von Modulen und Funktionen – ohne DB, ohne React (getestet).
 
-export type ModuleLike = { id: string; required?: boolean };
-export type FeatureLike = { id: string; module: string; required?: boolean; requires?: readonly string[] };
+export type ModuleLike = { id: string; required?: boolean; defaultEnabled?: boolean };
+export type FeatureLike = { id: string; module: string; required?: boolean; requires?: readonly string[]; defaultEnabled?: boolean };
 
-/** Gespeicherte Schalter: Schlüssel = Modul-ID ("office") oder Funktions-ID ("office.fleet"). Fehlend = an. */
+/**
+ * Gespeicherte Schalter: Schlüssel = Modul-ID ("office") oder Funktions-ID ("office.fleet"). Gespeichert werden nur Abweichungen vom
+ * Standard des Eintrags (`defaultEnabled`): Fehlt ein Schalter, gilt der Standard – bei Bestandsfunktionen "an", bei neuen Funktionen
+ * mit `defaultEnabled: false` "aus" (sie werden über Presets bei der Einrichtung bzw. die Module-Seite eingeschaltet).
+ */
 export type Overrides = Readonly<Record<string, boolean>>;
 
 export const featureKey = (f: { module: string; id: string }) => `${f.module}.${f.id}`;
 
-const moduleOn = (m: ModuleLike, o: Overrides) => !!m.required || o[m.id] !== false;
+/** Standardzustand eines Moduls oder einer Funktion ohne gespeicherten Schalter (Vorgabe: an). */
+export const defaultOn = (x: { defaultEnabled?: boolean }): boolean => x.defaultEnabled !== false;
+
+/** Ist das Modul eingeschaltet (Pflichtmodule immer)? */
+export const moduleOn = (m: ModuleLike, o: Overrides): boolean => !!m.required || (o[m.id] ?? defaultOn(m));
+
+/** Ist die Funktion selbst eingeschaltet (ohne Modul und Abhängigkeiten zu prüfen; Pflichtfunktionen immer)? */
+export const featureSwitchOn = (f: FeatureLike, o: Overrides): boolean => !!f.required || (o[featureKey(f)] ?? defaultOn(f));
 
 /**
  * Welche Funktionen sind wirklich nutzbar?
@@ -19,7 +30,7 @@ export function effectiveFeatureIds(modules: readonly ModuleLike[], features: re
   const mods = new Map(modules.map((m) => [m.id, moduleOn(m, overrides)]));
   const on = new Set<string>();
   for (const f of features) {
-    if (f.required || (mods.get(f.module) !== false && overrides[featureKey(f)] !== false)) on.add(featureKey(f));
+    if (f.required || (mods.get(f.module) !== false && featureSwitchOn(f, overrides))) on.add(featureKey(f));
   }
   // Abhängigkeiten auflösen, bis sich nichts mehr ändert
   for (let changed = true; changed; ) {
@@ -53,7 +64,7 @@ export function featureStatus(
   const mod = modules.find((m) => m.id === f.module);
   if (!f.required) {
     if (mod && !moduleOn(mod, overrides)) return { state: "module-off" };
-    if (overrides[featureKey(f)] === false) return { state: "off" };
+    if (!featureSwitchOn(f, overrides)) return { state: "off" };
   }
   const active = effectiveFeatureIds(modules, features, overrides);
   if (active.has(featureKey(f))) return { state: "on" };

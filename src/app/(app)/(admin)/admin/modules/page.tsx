@@ -4,7 +4,7 @@ import { ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { FEATURES, MODULES, featureById, featuresOfModule } from "@/modules/catalog";
-import { dependentsOf, featureKey, featureStatus, type FeatureStatus } from "@/modules/catalog-logic";
+import { dependentsOf, featureKey, featureStatus, moduleOn as isModuleOn, type FeatureStatus } from "@/modules/catalog-logic";
 import { getOverrides } from "@/modules/features";
 import { setEnabled } from "@/modules/admin/modules/actions";
 
@@ -52,7 +52,7 @@ export default async function ModulesPage() {
         {MODULES.filter((m) => !("required" in m && m.required)).map((m) => {
           const features = featuresOfModule(m.id);
           const moduleRequired = "required" in m && m.required;
-          const moduleOn = moduleRequired || overrides[m.id] !== false;
+          const moduleOn = isModuleOn(m, overrides);
           return (
             <Card key={m.id} padded={false}>
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">

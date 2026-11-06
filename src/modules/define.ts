@@ -40,6 +40,8 @@ export type ModuleDef = {
   descriptionKey: MessageKey;
   /** Reihenfolge in Navigation, Dashboard und Admin-Seite */
   order: number;
+  /** Standard ohne gespeicherten Schalter: true (Vorgabe, Bestand) oder false (neues Modul, wird erst eingeschaltet) */
+  defaultEnabled?: boolean;
   /** Pflichtmodul: kann nicht ausgeschaltet werden (z. B. Verwaltung – sonst sperrt man sich aus) */
   required?: boolean;
 };
@@ -63,6 +65,12 @@ export type FeatureDef = {
   order: number;
   /** Pflichtfunktion: kann nicht ausgeschaltet werden */
   required?: boolean;
+  /**
+   * Standard ohne gespeicherten Schalter: true (Vorgabe – gilt für den Bestand: Termine, Kunden, Fahrzeuge, Reifen, Rechnungsarchiv,
+   * Mitarbeiter, Handbuch) oder false (neue Funktionen: aus, bis ein Administrator sie auf der Seite „Module & Funktionen“ oder per
+   * Einrichtungs-Preset einschaltet). Pflichtfunktionen sind immer an. Daten bleiben beim Ausschalten erhalten.
+   */
+  defaultEnabled?: boolean;
   /** Harte Abhängigkeiten (vollständige IDs): ohne sie ist die Funktion nicht nutzbar und wird automatisch inaktiv. */
   requires?: readonly string[];
   /** Weiche Abhängigkeiten (vollständige IDs): optionale Verknüpfung, läuft auch ohne. */

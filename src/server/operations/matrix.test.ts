@@ -38,7 +38,7 @@ async function outcomeOf(fn: () => Promise<unknown>): Promise<Outcome> {
 }
 
 let env: TestEnv;
-let actions: Action[] = [];
+const actions: Action[] = [];
 let routes: Array<{ file: string; url: string; methods: Array<[string, (request: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>]> }> = [];
 let seq = 0;
 

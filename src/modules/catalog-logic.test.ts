@@ -56,3 +56,38 @@ describe("dependentsOf", () => {
     assert.deepEqual(dependentsOf("b.p", features), []);
   });
 });
+
+describe("defaultEnabled (Standard aus für neue Funktionen)", () => {
+  const mods: ModuleLike[] = [{ id: "old" }, { id: "fresh", defaultEnabled: false }, { id: "core", required: true }];
+  const feats: FeatureLike[] = [
+    { id: "kept", module: "old" },
+    { id: "added", module: "old", defaultEnabled: false },
+    { id: "dep", module: "old", requires: ["old.added"] },
+    { id: "all", module: "fresh" },
+    { id: "pf", module: "core", required: true, defaultEnabled: false },
+  ];
+  const active = (o: Record<string, boolean> = {}) => [...effectiveFeatureIds(mods, feats, o)].sort();
+  const status = (id: string, o: Record<string, boolean> = {}) => featureStatus(feats.find((f) => `${f.module}.${f.id}` === id)!, mods, feats, o);
+
+  test("ohne Einstellung gilt der Standard: Bestand an, neue Funktionen und Module aus", () => {
+    assert.deepEqual(active(), ["core.pf", "old.kept"]);
+    assert.deepEqual(status("old.added"), { state: "off" });
+    assert.deepEqual(status("fresh.all"), { state: "module-off" });
+  });
+  test("Einschalten ist eine gespeicherte Abweichung; Abhängige folgen, sobald alles Benötigte an ist", () => {
+    assert.deepEqual(active({ "old.added": true }), ["core.pf", "old.added", "old.dep", "old.kept"]);
+    assert.deepEqual(active({ "old.dep": false, "old.added": true }), ["core.pf", "old.added", "old.kept"]);
+  });
+  test("ein neues Modul einzuschalten genügt, wenn seine Funktionen Standard an haben; Bestand lässt sich ausschalten", () => {
+    assert.deepEqual(active({ fresh: true }), ["core.pf", "fresh.all", "old.kept"]);
+    assert.deepEqual(active({ fresh: true, "fresh.all": false }), ["core.pf", "old.kept"]);
+    assert.deepEqual(active({ "old.kept": false }), ["core.pf"]);
+  });
+  test("Pflichtfunktionen sind immer an, auch mit defaultEnabled: false oder gespeichertem Aus", () => {
+    assert.ok(active({ core: false, "core.pf": false }).includes("core.pf"));
+    assert.deepEqual(status("core.pf", { core: false }), { state: "on" });
+  });
+  test("blocked: eine eingeschaltete Funktion, deren Voraussetzung noch aus ist", () => {
+    assert.deepEqual(status("old.dep"), { state: "blocked", missing: ["old.added"] });
+  });
+});
