@@ -5,6 +5,7 @@ import {
   MAIL_MAX_ATTACHMENT_BYTES,
   MAIL_MAX_ATTACHMENTS,
   MAIL_MAX_BODY,
+  normalizeContentType,
   parseRecipients,
   sanitizeSubject,
   serializeAttachments,
@@ -74,6 +75,8 @@ export async function queueMail(ctx: Pick<RunContext<unknown, unknown>, "tx" | "
   if (attachments.length > MAIL_MAX_ATTACHMENTS) fail("invalid", "mail.errors.tooManyAttachments");
   let bytes = 0;
   for (const attachment of attachments) {
+    // ein Inhaltstyp, den die Zustellung nicht lesen könnte, würde den Anhang stillschweigend entfallen lassen: lieber jetzt ablehnen
+    if (!normalizeContentType(attachment.contentType)) fail("invalid", "mail.errors.attachmentInvalid");
     // `fileExists`/`fileSize` lehnen jeden Pfad ab, der nicht dem festen Muster unter `files/` entspricht (wirft)
     try {
       if (!fileExists(attachment.path)) fail("notFound", "mail.errors.attachmentMissing");

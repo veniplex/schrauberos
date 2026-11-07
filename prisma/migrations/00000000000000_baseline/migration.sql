@@ -785,6 +785,7 @@ CREATE TABLE "MailMessage" (
     "status" TEXT NOT NULL DEFAULT 'queued',
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "errorCode" TEXT,
+    "deliveredTo" TEXT,
     "sentAt" DATETIME,
     "purpose" TEXT,
     "entityId" TEXT,

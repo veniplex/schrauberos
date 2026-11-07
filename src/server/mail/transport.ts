@@ -1,6 +1,6 @@
 import "server-only";
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import net, { isIP } from "node:net";
 import nodemailer, { type Transporter } from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { canonicalHost, isAllowedAddress, isForbiddenHost, isPrivateAddress } from "@/lib/offsite/host-policy";
@@ -33,6 +33,9 @@ export type MailConnection = {
   allowPrivate: boolean;
   plainConfirmed: boolean;
 };
+
+/** Ergebnis eines Versands: wer die Nachricht angenommen hat und wer nicht (nur Adressen); `permanent`: Absage des Servers mit 5xx (Wiederholung sinnlos). */
+export type MailSendResult = { accepted: string[]; rejected: Array<{ address: string; permanent: boolean }> };
 
 export type PinnedMailTarget = { address: string; family: 4 | 6; private: boolean; servername: string | null };
 
@@ -123,29 +126,72 @@ function wrap(error: unknown): MailError {
   return new MailError(code, permanent);
 }
 
-/** Baut den Transport (löst das Ziel auf, prüft Richtlinie) und führt `work` aus; schließt danach. Fehler werden zu `MailError` mit Code. */
-async function withTransport<T>(connection: MailConnection, fromAddress: string, deps: { lookup?: Lookup; tls?: TlsOverride }, work: (transport: Transporter<SMTPTransport.SentMessageInfo>) => Promise<T>): Promise<T> {
+type Deps = { lookup?: Lookup; tls?: TlsOverride; signal?: AbortSignal };
+
+/**
+ * Öffnet die TCP-Verbindung selbst (zur geprüften Adresse) und gibt sie nodemailer als fertigen Socket (`getSocket`/`connection`, derselbe Weg wie bei Proxys; STARTTLS/SMTPS setzt nodemailer
+ * danach wie gewohnt auf). So bleibt die Verbindung in unserer Hand: Wird der Versand abgebrochen (Zeitlimit der Outbox), **zerstören wir den Socket** – nodemailer bricht dann ab, statt im Hintergrund
+ * weiterzusenden, während die Outbox schon wiederholt.
+ */
+function ownSocketProvider(target: PinnedMailTarget, port: number, sockets: Set<net.Socket>, connectMs: number): NonNullable<SMTPTransport.Options["getSocket"]> {
+  return (_options, callback) => {
+    const socket = net.connect({ host: target.address, port, family: target.family });
+    sockets.add(socket);
+    socket.once("close", () => sockets.delete(socket));
+    const timer = setTimeout(() => socket.destroy(Object.assign(new Error("connect timeout"), { code: "ETIMEDOUT" })), connectMs);
+    const failed = (error: Error) => {
+      clearTimeout(timer);
+      socket.destroy();
+      callback(error);
+    };
+    socket.once("error", failed);
+    socket.once("connect", () => {
+      clearTimeout(timer);
+      socket.off("error", failed);
+      callback(null, { connection: socket });
+    });
+  };
+}
+
+/** Baut den Transport (löst das Ziel auf, prüft Richtlinie) und führt `work` aus; schließt danach. Fehler werden zu `MailError` mit Code. `deps.signal`: bricht ab (Sockets zerstört, `MailError("timeout")`). */
+async function withTransport<T>(connection: MailConnection, fromAddress: string, deps: Deps, work: (transport: Transporter<SMTPTransport.SentMessageInfo>) => Promise<T>): Promise<T> {
+  if (deps.signal?.aborted) throw new MailError("timeout");
   const target = await resolveMailTarget(connection.host, { allowPrivate: connection.allowPrivate }, deps.lookup ?? mailTestHooks.lookup);
-  const transport = nodemailer.createTransport(transportOptions(connection, target, heloNameFor(fromAddress), deps.tls ?? mailTestHooks.tls));
+  const sockets = new Set<net.Socket>();
+  const options = transportOptions(connection, target, heloNameFor(fromAddress), deps.tls ?? mailTestHooks.tls);
+  const transport = nodemailer.createTransport({ ...options, getSocket: ownSocketProvider(target, connection.port, sockets, options.connectionTimeout ?? 15_000) });
+  let aborted = false;
+  const onAbort = () => {
+    aborted = true;
+    for (const socket of sockets) socket.destroy();
+  };
+  deps.signal?.addEventListener("abort", onAbort, { once: true });
+  if (deps.signal?.aborted) onAbort();
   try {
     return await work(transport);
   } catch (error) {
-    throw wrap(error);
+    throw aborted ? new MailError("timeout") : wrap(error);
   } finally {
+    deps.signal?.removeEventListener("abort", onAbort);
+    for (const socket of sockets) socket.destroy();
     transport.close();
   }
 }
 
 /** Nur Handshake und Anmeldung (EHLO, STARTTLS, AUTH) – es wird nichts gesendet. */
-export async function verifyMailConnection(connection: MailConnection, fromAddress: string, deps: { lookup?: Lookup; tls?: TlsOverride } = {}): Promise<void> {
+export async function verifyMailConnection(connection: MailConnection, fromAddress: string, deps: Deps = {}): Promise<void> {
   await withTransport(connection, fromAddress, deps, async (transport) => {
     await transport.verify();
   });
 }
 
-/** Sendet eine Nachricht. Alle Kopfzeilenwerte sind bereits bereinigt (`lib/mail.ts`); Adressen gehen als Objekte an nodemailer, nie als zusammengesetzter Text. */
-export async function sendMailNow(connection: MailConnection, mail: MailPayload, deps: { lookup?: Lookup; tls?: TlsOverride } = {}): Promise<void> {
-  await withTransport(connection, mail.from.address, deps, async (transport) => {
+/**
+ * Sendet eine Nachricht. Alle Kopfzeilenwerte sind bereits bereinigt (`lib/mail.ts`); Adressen gehen als Objekte an nodemailer, nie als zusammengesetzter Text.
+ * Nimmt der Server nur einen Teil der Empfänger an, ist das **kein Fehler**: Die Nachricht ist dann hinaus, das Ergebnis nennt, wer sie hat und wer nicht (und ob die Absage endgültig ist) – der Aufrufer
+ * behält die Angenommenen und wiederholt nur für die übrigen. Lehnt der Server **alle** ab, wirft es (`recipient` endgültig bei 5xx, `rejected` wiederholbar bei 4xx).
+ */
+export async function sendMailNow(connection: MailConnection, mail: MailPayload, deps: Deps = {}): Promise<MailSendResult> {
+  return withTransport(connection, mail.from.address, deps, async (transport) => {
     const result = await transport.sendMail({
       from: { name: sanitizeDisplayName(mail.from.name), address: mail.from.address },
       ...(mail.replyTo ? { replyTo: mail.replyTo } : {}),
@@ -155,7 +201,14 @@ export async function sendMailNow(connection: MailConnection, mail: MailPayload,
       attachments: mail.attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType, contentDisposition: "attachment" as const })),
       ...(mail.messageId ? { messageId: `<${mail.messageId}@${heloNameFor(mail.from.address)}>` } : {}),
     });
-    // alle Empfänger müssen angenommen sein: eine teilweise Annahme würde sonst als Erfolg gelten
-    if (result.rejected.length > 0) throw Object.assign(new Error("rejected"), { code: "EENVELOPE", command: "RCPT TO", responseCode: 550 });
+    const text = (value: unknown) => (typeof value === "string" ? value : typeof value === "object" && value && typeof (value as { address?: unknown }).address === "string" ? (value as { address: string }).address : "");
+    const errors = ((result as { rejectedErrors?: Array<{ recipient?: unknown; responseCode?: unknown }> }).rejectedErrors ?? []);
+    const rejected = result.rejected.map(text).filter(Boolean).map((address) => {
+      const error = errors.find((e) => text(e.recipient).toLowerCase() === address.toLowerCase());
+      // ohne erkennbaren Code gilt die Absage als endgültig (nicht endlos wiederholen)
+      const code = typeof error?.responseCode === "number" ? error.responseCode : 550;
+      return { address, permanent: code >= 500 };
+    });
+    return { accepted: result.accepted.map(text).filter(Boolean), rejected };
   });
 }

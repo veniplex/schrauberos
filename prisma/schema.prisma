@@ -1109,6 +1109,8 @@ model MailMessage {
   attempts    Int       @default(0)
   // Fehlercode des letzten Versuchs (z. B. "auth", "tls", "recipient"), nie ein Text des Servers
   errorCode   String?
+  // Empfänger, die die Nachricht schon angenommen hat (Teilmenge von toAddresses, durch Komma getrennt); Wiederholung und „Erneut senden“ gehen nur an die übrigen. Nur Adressen, kein Inhalt
+  deliveredTo String?
   sentAt      DateTime?
   // Fachlicher Bezug (z. B. "invoice") und ID – nur zur Zuordnung, ohne Inhalt
   purpose     String?

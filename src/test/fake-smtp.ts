@@ -20,6 +20,8 @@ export type FakeSmtpOptions = {
   rejectRcpt?: (address: string) => string | null;
   /** Antwort auf das Ende der Daten (Standard `250 OK queued`) */
   dataReply?: string;
+  /** Nach den Daten nie antworten (hängender Server: der Versand bleibt in der Übertragung stehen) */
+  hangData?: boolean;
   /** Verzögerung vor dem Gruß in Millisekunden (für Zeitüberschreitungen) */
   greetingDelayMs?: number;
 };
@@ -33,6 +35,8 @@ export type FakeSmtp = {
   /** alle empfangenen Befehle (ohne Daten), AUTH-Zeilen geschwärzt */
   commands: string[];
   connections: number;
+  /** Anzahl der Verbindungen, die schon wieder geschlossen sind */
+  closedConnections: number;
   /** Anzahl der Verbindungen, die TLS ausgehandelt haben */
   tlsConnections: number;
   close(): Promise<void>;
@@ -44,7 +48,7 @@ export async function startFakeSmtp(options: FakeSmtpOptions = {}): Promise<Fake
     keySize: 2048,
     extensions: [{ name: "subjectAltName", altNames: [{ type: 7, ip: "127.0.0.1" }, { type: 2, value: "localhost" }] }],
   });
-  const state: FakeSmtp = { port: 0, host: "127.0.0.1", cert: pems.cert, messages: [], commands: [], connections: 0, tlsConnections: 0, close: async () => {} };
+  const state: FakeSmtp = { port: 0, host: "127.0.0.1", cert: pems.cert, messages: [], commands: [], connections: 0, closedConnections: 0, tlsConnections: 0, close: async () => {} };
   const sockets = new Set<net.Socket>();
 
   function serve(initial: net.Socket) {
@@ -78,6 +82,7 @@ export async function startFakeSmtp(options: FakeSmtpOptions = {}): Promise<Fake
       from = "";
       to = [];
       mode = "command";
+      if (options.hangData) return;
       send(options.dataReply ?? "250 OK queued");
       drainLines();
     }
@@ -176,6 +181,7 @@ export async function startFakeSmtp(options: FakeSmtpOptions = {}): Promise<Fake
     const greet = () => send("220 localhost ESMTP fake");
     if (options.greetingDelayMs) setTimeout(greet, options.greetingDelayMs);
     else greet();
+    initial.on("close", () => void state.closedConnections++);
     socket.on("close", () => sockets.delete(socket));
   }
 

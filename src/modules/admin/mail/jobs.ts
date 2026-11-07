@@ -13,11 +13,12 @@ export const outboxHandlers: OutboxHandlerDef[] = [
     feature: "admin.mail",
     types: ["mail.send"],
     maxAttempts: MAIL_MAX_ATTEMPTS,
-    // Verbindung (15 s) + Gruß (15 s) + Leerlauf (30 s) + Übertragung: darüber hinaus gilt die Zustellung als gescheitert
-    timeoutMs: 90_000,
-    handle: async (message) => {
+    // Verbindung (15 s) + Gruß (15 s) + Übertragung (15 MB Anhänge ≈ 20 MB Base64 brauchen bei 1 Mbit/s Upload rund 160 s): darüber hinaus gilt die Zustellung als gescheitert. Der Abnehmer bricht dann den
+    // Versand ab (`signal` zerstört die Verbindungen), bevor die Wiederholung neu sendet. Unter dem Zeitlimit des Outbox-Jobs (5 min).
+    timeoutMs: 200_000,
+    handle: async (message, { signal }) => {
       const id = typeof message.payload.mailId === "string" ? message.payload.mailId : message.entityId;
-      if (id) await deliverQueuedMail(id, { attempt: message.attempt });
+      if (id) await deliverQueuedMail(id, { attempt: message.attempt, signal });
     },
   },
 ];

@@ -60,6 +60,8 @@ export function normalizeMailAddress(input: string): string | null {
   return address.length <= 254 ? address : null;
 }
 
+/** Adressen aus dem Datenbanktext (durch Komma getrennt); Reihenfolge bleibt. */
+export const splitAddresses = (text: string | null | undefined): string[] => (text ? text.split(", ").filter(Boolean) : []);
 export const isValidMailAddress = (input: string): boolean => normalizeMailAddress(input) !== null;
 
 /** Empfängerliste prüfen: jede Adresse gültig, keine doppelt (ohne Rücksicht auf Groß-/Kleinschreibung der Domain), 1 … `MAIL_MAX_RECIPIENTS`. */
@@ -77,14 +79,25 @@ export function parseRecipients(list: readonly string[]): { ok: true; addresses:
 
 /** Anhänge im Datenbanktext: eine Zeile je Anhang `relativer Pfad|Dateiname|Typ` (Pfade und Typen enthalten nie `|` oder Zeilenumbrüche, Namen werden bereinigt). */
 export type MailAttachmentRef = { path: string; filename: string; contentType: string };
-export const serializeAttachments = (list: readonly MailAttachmentRef[]): string | null => (list.length ? list.map((a) => `${a.path}|${sanitizeAttachmentName(a.filename).replace(/\|/g, "_")}|${a.contentType}`).join("\n") : null);
+/** Inhaltstyp eines Anhangs: nur `typ/untertyp` (Parameter wie `; charset=binary` entfallen, klein geschrieben) oder `null`, wenn er so nicht verwendbar ist. */
+export function normalizeContentType(value: string): string | null {
+  const base = value.split(";")[0].trim().toLowerCase();
+  return /^[\w.+-]+\/[\w.+-]+$/.test(base) ? base : null;
+}
+export const serializeAttachments = (list: readonly MailAttachmentRef[]): string | null =>
+  list.length ? list.map((a) => `${a.path}|${sanitizeAttachmentName(a.filename).replace(/\|/g, "_")}|${normalizeContentType(a.contentType) ?? a.contentType}`).join("\n") : null;
+/** Zahl der gespeicherten Anhangzeilen (um zu erkennen, ob `parseAttachments` eine verworfen hat). */
+export const countAttachmentLines = (text: string | null): number => (text ? text.split("\n").filter(Boolean).length : 0);
 export function parseAttachments(text: string | null): MailAttachmentRef[] {
   if (!text) return [];
-  return text
-    .split("\n")
-    .map((line) => line.split("|"))
-    .filter((parts) => parts.length === 3 && parts[0] && parts[1] && /^[\w.+-]+\/[\w.+-]+$/.test(parts[2]))
-    .map(([path, filename, contentType]) => ({ path, filename, contentType }));
+  const out: MailAttachmentRef[] = [];
+  for (const line of text.split("\n")) {
+    const parts = line.split("|");
+    if (parts.length !== 3 || !parts[0] || !parts[1]) continue;
+    const contentType = normalizeContentType(parts[2]);
+    if (contentType) out.push({ path: parts[0], filename: parts[1], contentType });
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------ Fehlerarten */

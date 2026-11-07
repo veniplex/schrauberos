@@ -2,7 +2,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Alert, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
-import { normalizeMailAddress, type MailStatus } from "@/lib/mail";
+import { normalizeMailAddress, splitAddresses, type MailStatus } from "@/lib/mail";
 import type { SettingsTabDef } from "@/modules/types";
 import { requireSession } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -23,7 +23,7 @@ async function MailSettingsTab() {
     getMailSettings(),
     hasSecret(MAIL_PASSWORD_SECRET),
     // ohne Inhalt: `body` und `attachments` werden nie gelesen
-    db.mailMessage.findMany({ orderBy: { createdAt: "desc" }, take: LOG_ROWS, select: { id: true, createdAt: true, userName: true, userId: true, toAddresses: true, subject: true, status: true, attempts: true, errorCode: true, purpose: true } }),
+    db.mailMessage.findMany({ orderBy: { createdAt: "desc" }, take: LOG_ROWS, select: { id: true, createdAt: true, userName: true, userId: true, toAddresses: true, subject: true, status: true, attempts: true, errorCode: true, deliveredTo: true, purpose: true } }),
   ]);
   const resendable = new Set((await db.mailMessage.findMany({ where: { id: { in: rows.filter((row) => row.status === "failed").map((row) => row.id) }, body: { not: null } }, select: { id: true } })).map((row) => row.id));
   const configured = isMailConfigured(settings);
@@ -59,6 +59,7 @@ async function MailSettingsTab() {
                 <span className="flex flex-col gap-1">
                   <StatusBadge tone={MAIL_STATUS_TONE[row.status as MailStatus] ?? "neutral"}>{td(`mail.log.status_${row.status}`, row.status)}</StatusBadge>
                   {row.errorCode ? <span className="text-xs text-ink-muted">{t("mail.log.errorCode", { reason: td(`mail.errors.code.${row.errorCode}`, row.errorCode) })}</span> : null}
+                  {row.deliveredTo && row.status !== "sent" ? <span className="text-xs text-ink-muted">{t("mail.log.deliveredPartly", { done: splitAddresses(row.deliveredTo).length, total: splitAddresses(row.toAddresses).length })}</span> : null}
                   {row.attempts > 1 ? <span className="text-xs text-ink-muted">{tp("mail.log.attempts", row.attempts)}</span> : null}
                 </span>
               ),

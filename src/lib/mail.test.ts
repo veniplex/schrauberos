@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 import {
   checkMailLimits,
   classifyMailError,
+  countAttachmentLines,
   DEFAULT_MAIL_LIMITS,
   MAIL_MAX_RECIPIENTS,
+  normalizeContentType,
   normalizeMailAddress,
   parseAttachments,
   parseRecipients,
@@ -12,6 +14,7 @@ import {
   sanitizeDisplayName,
   sanitizeSubject,
   serializeAttachments,
+  splitAddresses,
 } from "./mail";
 
 describe("Adressen", () => {
@@ -67,6 +70,29 @@ describe("Kopfzeilen ohne Einschleusen (CRLF-Schutz)", () => {
     assert.equal(serializeAttachments([]), null);
     assert.deepEqual(parseAttachments(null), []);
     assert.deepEqual(parseAttachments("kaputt\nnur|zwei\na|b|kein-typ"), []);
+  });
+
+  it("Inhaltstyp mit Parametern wird auf den Typ vor dem Semikolon gekürzt (kein stilles Verwerfen); Unbrauchbares ist null", () => {
+    assert.equal(normalizeContentType("application/pdf; charset=binary"), "application/pdf");
+    assert.equal(normalizeContentType("Text/XML;x"), "text/xml");
+    assert.equal(normalizeContentType(" image/png "), "image/png");
+    for (const bad of ["", "pdf", "application/", "a b/c", "application/pdf/x", ";charset=x"]) assert.equal(normalizeContentType(bad), null, bad);
+    const parsed = parseAttachments("rechnungen/2026/a.pdf|a.pdf|application/pdf; charset=binary");
+    assert.deepEqual(parsed, [{ path: "rechnungen/2026/a.pdf", filename: "a.pdf", contentType: "application/pdf" }]);
+    assert.equal(serializeAttachments([{ path: "rechnungen/2026/a.pdf", filename: "a.pdf", contentType: "Application/PDF;x" }]), "rechnungen/2026/a.pdf|a.pdf|application/pdf");
+  });
+
+  it("die Zahl gespeicherter Zeilen zeigt, ob eine verworfen wurde", () => {
+    const text = "rechnungen/2026/a.pdf|a.pdf|application/pdf\nkaputt";
+    assert.equal(countAttachmentLines(text), 2);
+    assert.equal(parseAttachments(text).length, 1);
+    assert.equal(countAttachmentLines(null), 0);
+  });
+
+  it("Empfängerliste aus dem Datenbanktext", () => {
+    assert.deepEqual(splitAddresses("a@b.de, c@d.de"), ["a@b.de", "c@d.de"]);
+    assert.deepEqual(splitAddresses(null), []);
+    assert.deepEqual(splitAddresses(""), []);
   });
 });
 

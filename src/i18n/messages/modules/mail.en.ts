@@ -66,6 +66,7 @@ export const mailEn: typeof mailDe = {
     badBody: "The text is missing or too long.",
     tooManyAttachments: "Too many attachments (at most 5).",
     attachmentMissing: "An attachment no longer exists.",
+    attachmentInvalid: "An attachment has no valid file type.",
     attachmentsTooLarge: "The attachments are too large together (at most 15 MB).",
     limitHour: "The sending limit per hour has been reached. Please try again later.",
     limitDay: "The sending limit per day has been reached. Please try again tomorrow.",
@@ -116,6 +117,7 @@ export const mailEn: typeof mailDe = {
     resend: "Send again",
     resent: "The message will be sent again.",
     errorCode: "Reason: {reason}",
+    deliveredPartly: "Delivered to {done} of {total} recipients",
     failedHint: "Given up. The reason is shown here; after fixing it the message can be sent again.",
   },
 };

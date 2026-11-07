@@ -596,6 +596,140 @@ describe("Zustellung", () => {
   });
 });
 
+describe("Zustellung: teilweise Annahme, Abbruch, Anhänge", () => {
+  const start = async (options: FakeSmtpOptions = {}) => (fake = await startFakeSmtp(options));
+  const MANY = ["a@example.com", "b@example.com", "c@example.com"];
+
+  it("vorübergehende Absage (451) nur eines Empfängers: die anderen haben die Nachricht, die Wiederholung geht nur an den offenen – nie doppelt", async () => {
+    let greylist = true;
+    const server = await start({ rejectRcpt: (address) => (address === "b@example.com" && greylist ? "451 4.7.1 greylisted" : null) });
+    await configureFor(server);
+    const session = await admin();
+    const { id } = await queue(session, { to: MANY });
+    await assert.rejects(m.deliver.deliverQueuedMail(id, { attempt: 1 }), (e: unknown) => e instanceof m.transport.MailError && e.code === "rejected" && !e.permanent);
+    let row = await env.db.mailMessage.findUniqueOrThrow({ where: { id } });
+    assert.deepEqual([row.status, row.errorCode, row.deliveredTo], ["queued", "rejected", "a@example.com, c@example.com"]);
+    assert.ok(row.body !== null, "der Inhalt bleibt für die Wiederholung");
+    assert.equal(server.messages.length, 1);
+    assert.deepEqual(server.messages[0].to, ["a@example.com", "c@example.com"]);
+
+    greylist = false;
+    assert.equal(await m.deliver.deliverQueuedMail(id, { attempt: 2 }), "sent");
+    assert.equal(server.messages.length, 2);
+    assert.deepEqual(server.messages[1].to, ["b@example.com"], "nur der noch offene Empfänger");
+    row = await env.db.mailMessage.findUniqueOrThrow({ where: { id } });
+    assert.deepEqual([row.status, row.errorCode, row.body, row.deliveredTo], ["sent", null, null, "a@example.com, c@example.com, b@example.com"]);
+  });
+
+  it("endgültige Absage (550) eines Empfängers: „fehlgeschlagen“ mit den Angenommenen im Protokoll; „Erneut senden“ geht nur an die nicht Zugestellten", async () => {
+    let reject = true;
+    const server = await start({ rejectRcpt: (address) => (address === "b@example.com" && reject ? "550 5.1.1 unknown" : null) });
+    await configureFor(server);
+    const session = await admin();
+    const { id } = await queue(session, { to: MANY });
+    assert.equal(await m.deliver.deliverQueuedMail(id, { attempt: 1 }), "failed");
+    let row = await env.db.mailMessage.findUniqueOrThrow({ where: { id } });
+    assert.deepEqual([row.status, row.errorCode, row.deliveredTo], ["failed", "recipient", "a@example.com, c@example.com"]);
+    assert.match((await env.db.auditLog.findFirstOrThrow({ where: { action: "mail.sendFailed" } })).target ?? "", /\(recipient, 2\/3\)/);
+
+    reject = false;
+    const resent = await m.ops.resendMail.execute(await admin(), { id });
+    assert.equal(resent.ok, true, JSON.stringify(resent));
+    assert.equal(await m.deliver.deliverQueuedMail(id, { attempt: 1 }), "sent");
+    assert.equal(server.messages.length, 2);
+    assert.deepEqual(server.messages[1].to, ["b@example.com"], "die schon Zugestellten bekommen die Nachricht nicht noch einmal");
+    row = await env.db.mailMessage.findUniqueOrThrow({ where: { id } });
+    assert.equal(row.status, "sent");
+  });
+
+  it("nach dem letzten Versuch bleibt eine vorübergehende Teilabsage „fehlgeschlagen“ (mit den Angenommenen)", async () => {
+    const server = await start({ rejectRcpt: (address) => (address === "b@example.com" ? "451 4.7.1 later" : null) });
+    await configureFor(server);
+    const { id } = await queue(await admin(), { to: MANY });
+    assert.equal(await m.deliver.deliverQueuedMail(id, { attempt: m.queue.MAIL_MAX_ATTEMPTS }), "failed");
+    const row = await env.db.mailMessage.findUniqueOrThrow({ where: { id } });
+    assert.deepEqual([row.status, row.errorCode, row.deliveredTo], ["failed", "rejected", "a@example.com, c@example.com"]);
+  });
+
+  it("hängender Server: das Abbruchsignal zerstört die Verbindung, der Versand endet mit „timeout“ und die Zeile bleibt „wartet“", async () => {
+    const server = await start({ hangData: true });
+    await configureFor(server);
+    const { id } = await queue(await admin());
+    const controller = new AbortController();
+    const started = Date.now();
+    const run = m.deliver.deliverQueuedMail(id, { attempt: 1, signal: controller.signal });
+    const settled = run.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    for (let i = 0; i < 100 && server.messages.length === 0; i++) await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(server.messages.length, 1, "die Daten sind beim Server, eine Antwort kommt nie");
+
+    // ein zweiter Versuch (Wiederholung der Outbox) sendet nicht daneben
+    await assert.rejects(m.deliver.deliverQueuedMail(id, { attempt: 2 }), (e: unknown) => e instanceof m.transport.MailError && e.code === "timeout");
+    assert.equal(server.connections, 1, "kein zweiter Versand, solange der erste läuft");
+
+    controller.abort();
+    const error = await settled;
+    assert.ok(error instanceof m.transport.MailError && error.code === "timeout" && !error.permanent, String(error));
+    assert.ok(Date.now() - started < 10_000, "der Abbruch wartet nicht auf das Leerlauf-Zeitlimit von 30 Sekunden");
+    for (let i = 0; i < 100 && server.closedConnections === 0; i++) await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(server.closedConnections, 1, "die Verbindung ist geschlossen");
+    const row = await env.db.mailMessage.findUniqueOrThrow({ where: { id } });
+    assert.deepEqual([row.status, row.attempts, row.errorCode], ["queued", 1, "timeout"]);
+    // danach ist der Weg für die Wiederholung frei
+    assert.equal(server.connections, 1);
+  });
+
+  it("schon abgebrochen: es wird gar nicht erst verbunden", async () => {
+    const server = await start();
+    await configureFor(server);
+    const { id } = await queue(await admin());
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(m.deliver.deliverQueuedMail(id, { attempt: 1, signal: controller.signal }), (e: unknown) => e instanceof m.transport.MailError && e.code === "timeout");
+    assert.equal(server.connections, 0);
+  });
+
+  it("Anhang mit Parametern im Inhaltstyp: wird normalisiert und mitgesendet; ein unbrauchbarer Typ wird beim Vormerken abgelehnt", async () => {
+    const server = await start();
+    await configureFor(server);
+    const session = await admin();
+    const stored = await m.files.storeFile("rechnungen/2026", "RE-2.pdf", Buffer.from("%PDF-1.4 inhalt"));
+    const bad = await failureOf(queue(session, { attachments: [{ path: stored, filename: "x.pdf", contentType: "kein typ" }] }));
+    assert.equal(bad.key, "mail.errors.attachmentInvalid");
+    assert.equal(await env.db.mailMessage.count(), 0);
+    const { id } = await queue(session, { attachments: [{ path: stored, filename: "RE.pdf", contentType: "Application/PDF; charset=binary" }] });
+    assert.equal((await env.db.mailMessage.findUniqueOrThrow({ where: { id } })).attachments?.endsWith("|application/pdf"), true);
+    assert.equal(await m.deliver.deliverQueuedMail(id, { attempt: 1 }), "sent");
+    assert.match(server.messages[0].data, /name=RE\.pdf/);
+  });
+
+  it("eine gespeicherte Anhangzeile, die nicht gelesen werden kann, lässt die Nachricht scheitern – nie ohne Anhang als „gesendet“", async () => {
+    const server = await start();
+    await configureFor(server);
+    const session = await admin();
+    const row = await env.db.mailMessage.create({ data: { userId: session.user.id, userName: "x", toAddresses: "kunde@example.com", subject: "s", body: "Text", attachments: "rechnungen/2026/a.pdf|a.pdf|ohne typ" } });
+    assert.equal(await m.deliver.deliverQueuedMail(row.id, { attempt: 1 }), "failed");
+    assert.equal(server.messages.length, 0);
+    assert.deepEqual((await env.db.mailMessage.findUniqueOrThrow({ where: { id: row.id } })).status, "failed");
+  });
+
+  it("Schlüssel nicht lesbar: eigener Code „keyUnavailable“, endgültig", async () => {
+    const { SecretKeyUnavailableError } = await import("@/server/secrets");
+    const failure = m.deliver.asMailError(new SecretKeyUnavailableError("unreadable"));
+    assert.deepEqual([failure.code, failure.permanent], ["keyUnavailable", true]);
+  });
+
+  it("Aufräumen löscht den Inhalt wartender Nachrichten nicht (sonst ginge später ein leerer Text hinaus)", async () => {
+    const session = await admin();
+    const old = new Date(Date.now() - 40 * 86_400_000);
+    const waiting = await env.db.mailMessage.create({ data: { userId: session.user.id, userName: "x", toAddresses: "a@b.de", subject: "s", status: "queued", body: "Inhalt", createdAt: old } });
+    await m.deliver.pruneMail();
+    assert.equal((await env.db.mailMessage.findUniqueOrThrow({ where: { id: waiting.id } })).body, "Inhalt");
+  });
+});
+
 /* ================================================================= Verbindungstest und Test-Mail */
 
 describe("Verbindungstest und Test-Mail", () => {

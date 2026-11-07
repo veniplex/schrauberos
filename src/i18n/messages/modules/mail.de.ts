@@ -65,6 +65,7 @@ export const mailDe = {
     badBody: "Der Text fehlt oder ist zu lang.",
     tooManyAttachments: "Zu viele Anhänge (höchstens 5).",
     attachmentMissing: "Ein Anhang existiert nicht mehr.",
+    attachmentInvalid: "Ein Anhang hat keinen gültigen Dateityp.",
     attachmentsTooLarge: "Die Anhänge sind zusammen zu groß (höchstens 15 MB).",
     limitHour: "Das Versandlimit je Stunde ist erreicht. Bitte später noch einmal versuchen.",
     limitDay: "Das Versandlimit je Tag ist erreicht. Bitte morgen noch einmal versuchen.",
@@ -115,6 +116,7 @@ export const mailDe = {
     resend: "Erneut senden",
     resent: "Die Nachricht wird erneut gesendet.",
     errorCode: "Grund: {reason}",
+    deliveredPartly: "{done} von {total} Empfängern zugestellt",
     failedHint: "Aufgegeben. Der Grund steht hier; nach der Behebung lässt sich die Nachricht erneut senden.",
   },
 };
