@@ -1,6 +1,8 @@
 // Erzeugt den C-Header mit den Vertrauensankern des Starters aus src/modules/admin/updates/release-key.ts (die einzige Quelle der Schlüssel – App und Starter
 // können nicht auseinanderlaufen):
 //   node scripts/gen-trust-header.mjs [--out docker/trust-keys.h] [--version <eingebaute Version>] [--arch x64] [--tag-build] [--release-key-file <datei>]
+//   node scripts/gen-trust-header.mjs --print-fingerprints        gibt nur die erwarteten Fingerabdrücke aus ("root <16 Hex>" / "release <16 Hex>"), schreibt nichts (Echtprobe)
+//   node scripts/gen-trust-header.mjs --print-test-fingerprints   dasselbe für die Testschlüssel (Negativprobe: das Produktions-Image darf sie nicht tragen)
 // Der Header ist ein Bau-Artefakt (nicht eingecheckt, .gitignore). Inhalt: Wurzel- und Release-Schlüssel roh (32 Bytes), die Untergrenze als Tripel + Vorabflag
 // (aus der eingebauten Version; der Vergleich in C ist nur `exceedsFloor` in Zahlen, die einzige SemVer-Logik bleibt `src/lib/updates/semver.ts`), `SOS_BASE`
 // (docker/BASE_VERSION) und die Architektur.
@@ -18,6 +20,11 @@ import { TEST_RELEASE, TEST_ROGUE, TEST_ROOT, TEST_OTHER_ROOT, TEST_SECOND } fro
 import { argOf, readTrustAnchors, repoRoot } from "./lib/trust.mjs";
 
 const args = process.argv.slice(2);
+const fingerprint = (buffer) => createHash("sha256").update(buffer).digest("hex").slice(0, 16);
+if (args.includes("--print-test-fingerprints")) {
+  for (const key of [TEST_ROOT, TEST_RELEASE, TEST_SECOND, TEST_ROGUE, TEST_OTHER_ROOT]) console.log(`test ${fingerprint(Buffer.from(key.publicHex, "hex"))}`);
+  process.exit(0);
+}
 const out = resolve(argOf(args, "--out", false) ?? resolve(repoRoot, "docker/trust-keys.h"));
 const tagBuild = args.includes("--tag-build") || process.env.SOS_TAG_BUILD === "1";
 const pkg = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
@@ -53,7 +60,12 @@ const bytes = (buffer) => {
   for (let i = 0; i < buffer.length; i += 8) rows.push("  " + [...buffer.subarray(i, i + 8)].map((b) => "0x" + b.toString(16).padStart(2, "0")).join(", "));
   return rows.join(",\n");
 };
-const fingerprint = (buffer) => createHash("sha256").update(buffer).digest("hex").slice(0, 16);
+
+if (args.includes("--print-fingerprints")) {
+  console.log(`root ${fingerprint(root)}
+release ${fingerprint(release)}`);
+  process.exit(0);
+}
 
 writeFileSync(
   out,

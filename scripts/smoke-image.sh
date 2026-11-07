@@ -4,7 +4,8 @@
 #   bash scripts/smoke-image.sh <lokales-image>   z. B. schrauberos:smoke
 #
 # Geprüft wird mit den ausgelieferten Compose-Dateien (docker-compose.yml, docker-compose.hardened.yml), nicht mit eigenen Docker-Aufrufen:
-#   1. Das Image enthält die eingebaute App als root:root (nicht schreibbar für den Betriebsbenutzer); /data gehört dem Betriebsbenutzer.
+#   1. Das Image enthält die eingebaute App als root:root (nicht schreibbar für den Betriebsbenutzer, keine Gruppen-/Welt-Schreibrechte, kein Setuid/Setgid/Sticky) samt
+#      Dateiliste SOS-TREE, die zum Baum passt (Referenzprüfer, wenn Node vorhanden ist); /data gehört dem Betriebsbenutzer.
 #   2. Der Container wird gesund (Starter -> Launcher -> App, Migration, /api/health), die Anmeldeseite wird ausgeliefert, nicht Angemeldete
 #      werden zur Anmeldung geleitet, die Antworten tragen die erzwungene Content-Security-Policy, die Programmierschnittstelle (/api/v1) antwortet
 #      ohne Token mit 401 und der Upload von Sicherungen erreicht seine Route (401 ohne Sitzung).
@@ -37,10 +38,22 @@ listing="$(docker export "$cid" | tar --numeric-owner -tvf -)"
 # Alles unter app/ muss root gehören (Besitzer 0/…), nichts darf Betriebsbenutzer 1000 gehören
 foreign="$(echo "$listing" | awk '$2 !~ /^0\// && $6 ~ /^app(\/|$)/ {print}' | head -n5)"
 [ -z "$foreign" ] || fail "Dateien unter /app gehören nicht root:"$'\n'"$foreign"
-echo "$listing" | awk '$6 == "app/server.js" || $6 == "app/version.json" || $6 == "app/launcher.mjs" {n++} END {exit n == 3 ? 0 : 1}' || fail "server.js, version.json oder launcher.mjs fehlen unter /app"
+echo "$listing" | awk '$6 == "app/server.js" || $6 == "app/version.json" || $6 == "app/launcher.mjs" || $6 == "app/SOS-TREE" {n++} END {exit n == 4 ? 0 : 1}' || fail "server.js, version.json, launcher.mjs oder SOS-TREE fehlen unter /app"
+# Modus-Bits: nichts unter /app darf für Gruppe oder Andere schreibbar sein (g+w / o+w), und Setuid, Setgid und Sticky sind verboten (Symlinks haben keine eigenen Modi)
+loose="$(echo "$listing" | awk '$6 ~ /^app(\/|$)/ && substr($1,1,1) != "l" && (substr($1,6,1) == "w" || substr($1,9,1) == "w" || substr($1,4,1) ~ /[sS]/ || substr($1,7,1) ~ /[sS]/ || substr($1,10,1) ~ /[tT]/) {print}' | head -n5)"
+[ -z "$loose" ] || fail "Dateien unter /app sind für Gruppe/Andere schreibbar oder tragen Setuid/Setgid/Sticky:"$'\n'"$loose"
+# Die Dateiliste gegen den echten Baum des Images (Mengengleichheit, wie der Starter sie prüft); setzt Node >= 24 voraus
+if command -v node >/dev/null 2>&1 && node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)'; then
+  tree_dir="$(mktemp -d)"
+  docker cp "$cid:/app/." "$tree_dir"
+  node --no-warnings scripts/verify-tree.mjs "$tree_dir" >/dev/null || { rm -rf "$tree_dir"; fail "SOS-TREE passt nicht zum Baum unter /app"; }
+  rm -rf "$tree_dir"
+else
+  echo "Hinweis: Node >= 24 fehlt, die Dateiliste wird nicht gegen den Baum geprüft."
+fi
 echo "$listing" | awk '$6 ~ /^data\/?$/ && $2 == "1000/1000" {ok = 1} END {exit ok ? 0 : 1}' || fail "/data gehört nicht dem Betriebsbenutzer 1000"
 docker rm -f "$cid" >/dev/null && cid=""
-echo "ok: /app ist root:root, /data gehört 1000:1000"
+echo "ok: /app ist root:root und nicht schreibbar, SOS-TREE passt, /data gehört 1000:1000"
 
 check_running() {
   local name="$1"; shift

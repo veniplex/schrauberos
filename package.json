@@ -21,6 +21,9 @@
     "db:check": "node scripts/db-check.mjs",
     "db:freeze": "tsx scripts/db-freeze.ts freeze",
     "db:release-check": "tsx scripts/db-freeze.ts check-release",
+    "anchor:corpus": "node --no-warnings scripts/gen-anchor-corpus.mjs",
+    "anchor:corpus:check": "node --no-warnings scripts/gen-anchor-corpus.mjs --check",
+    "anchor:rehearse": "node --no-warnings scripts/rehearse-release.mjs",
     "e2e": "playwright test",
     "e2e:build": "npm run build && playwright test"
   },

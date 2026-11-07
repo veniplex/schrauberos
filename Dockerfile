@@ -12,7 +12,9 @@
 #     eingebaute Version zurück, wenn ein neuer Launcher nicht startet.
 #   • Datenbank (SQLite), Dateien, Backups und installierte Versionen liegen unter /data. Migrationen und Basisdaten erledigt die
 #     App beim Start selbst, eine Prisma-CLI gibt es nicht.
-#   • Stufe "bundle" = das Paket: daraus entsteht auch das signierte Release-Paket für Web-Updates.
+#   • Stufe "bundle" = das Paket: daraus entsteht auch das signierte Release-Paket für Web-Updates. Es enthält die Dateiliste SOS-TREE (scripts/gen-tree.mjs, schlüsselfrei):
+#     Sie ist die Grundlage des Starter-Vertrauensankers (README „Starter-Vertrauensanker“) – das Siegel dazu signiert erst der Release-Job.
+#     Das Release-Paket wird aus dem getesteten Image gezogen (docker cp /app), nicht aus einem zweiten Build.
 
 # Basisimage per Digest festgelegt (Lieferkette): ein verschobenes Tag ändert den Build nicht. Dependabot (docker) schlägt neue Digests als Pull
 # Request vor. Von Hand erneuern: Digest von `node:24-slim` (Index über alle Architekturen) aus dem Docker-Hub-Register lesen und hier ersetzen.
@@ -52,21 +54,42 @@ RUN set -eux; \
     loader="$(ls /runtime/lib | grep -E '^ld-linux' | head -n1)"; \
     echo "lib/$loader" > /runtime/loader
 
+# Das Paket zusammenstellen und seine Dateiliste (SOS-TREE) erzeugen – im selben Stage, kein weiterer 250-MB-Kopierschritt. Der Generator bricht laut ab bei Sonderdateien,
+# Setuid/Setgid/Sticky, unzulässigen Namen und Symlinks, die den Baum verlassen: Ein Paket, das der Starter später ablehnen würde, soll gar nicht erst entstehen.
+RUN set -eux; \
+    mkdir -p /bundle/.next /bundle/prisma; \
+    cp -a .next/standalone/. /bundle/; \
+    cp -a .next/static /bundle/.next/static; \
+    cp -a public /bundle/public; \
+    cp -a docs /bundle/docs; \
+    cp -a prisma/migrations /bundle/prisma/migrations; \
+    cp -a version.json launcher.mjs /bundle/; \
+    cp -a /runtime /bundle/runtime; \
+    node scripts/gen-tree.mjs /bundle
+
+# ───────── Vertrauensanker des Starters: Schlüssel und Untergrenze aus dem Code (nur aus release-key.ts, keine Umgebungsvariable) ─────────
+# Bei Tag-Builds bricht dieser Schritt ab, wenn der Wurzelschlüssel fehlt, gleich dem Release-Schlüssel ist oder ein Testschlüssel wäre: Die Wurzel steht im Image, das vor dem
+# Release-Job veröffentlicht wird, und lässt sich danach nicht mehr ändern.
+FROM deps AS trust
+ARG APP_VERSION
+ARG SOS_TAG_BUILD=0
+COPY package.json ./
+COPY docker/BASE_VERSION docker/BASE_VERSION
+COPY scripts/gen-trust-header.mjs scripts/gen-trust-header.mjs
+COPY scripts/lib scripts/lib
+COPY src/lib/updates src/lib/updates
+COPY src/modules/admin/updates/release-key.ts src/modules/admin/updates/release-key.ts
+RUN SOS_TAG_BUILD="${SOS_TAG_BUILD}" node scripts/gen-trust-header.mjs --out /trust-keys.h
+
 # ───────── Der Starter: statisch gelinkt, braucht nichts außer dem Kernel ─────────
 FROM deps AS bootstrap
 COPY docker/bootstrap.c /src/bootstrap.c
+COPY --from=trust /trust-keys.h /src/trust-keys.h
 RUN gcc -static -Os -s -Wall -o /bootstrap /src/bootstrap.c
 
-# ───────── Das Paket: Anwendung + Abhängigkeiten + Laufzeit + Launcher ─────────
+# ───────── Das Paket: Anwendung + Abhängigkeiten + Laufzeit + Launcher + Dateiliste ─────────
 FROM scratch AS bundle
-COPY --from=builder /app/.next/standalone/ ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/docs ./docs
-COPY --from=builder /app/prisma/migrations ./prisma/migrations
-COPY --from=builder /app/version.json ./version.json
-COPY --from=builder /app/launcher.mjs ./launcher.mjs
-COPY --from=builder /runtime ./runtime
+COPY --from=builder /bundle/ ./
 
 # ───────── Verzeichnisse, die es im leeren Image sonst nicht gäbe ─────────
 FROM base AS skeleton
@@ -90,5 +113,6 @@ USER 1000:1000
 WORKDIR /app
 EXPOSE 3000
 VOLUME ["/data"]
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD ["/bootstrap", "--healthcheck"]
+# start-period/retries: Die Prüfung der installierten Version beim Start (ein Web-Update, danach jeder Neustart) und die Migration verlängern den Start; "unhealthy" während eines App-Neustarts ist kosmetisch
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=5 CMD ["/bootstrap", "--healthcheck"]
 ENTRYPOINT ["/bootstrap"]

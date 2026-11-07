@@ -205,3 +205,21 @@ describe("endorse-release-key.mjs", () => {
     }
   });
 });
+
+describe("Generalprobe und Baumprüfung", () => {
+  it("scripts/rehearse-release.mjs besteht mit den Testschlüsseln und weist die Manipulation ab", () => {
+    const result = run("rehearse-release.mjs", []);
+    assert.equal(result.ok, true, result.output);
+    assert.match(result.output, /zusätzliche Datei wird abgewiesen \(Code 15\)/);
+  });
+
+  it("scripts/verify-tree.mjs: Liste ↔ Verzeichnis mit Exit-Codes des Prüfers", () => {
+    const dir = bundleDir("verify-tree");
+    run("gen-tree.mjs", [dir]);
+    assert.equal(run("verify-tree.mjs", [dir]).ok, true);
+    writeFileSync(path.join(dir, "zusaetzlich"), "x");
+    const extra = spawnSync(process.execPath, ["--no-warnings", path.join("scripts", "verify-tree.mjs"), dir], { cwd: repo, encoding: "utf8" });
+    assert.equal(extra.status, 15);
+    assert.match(extra.stdout, /"reason":"extra"/);
+  });
+});
