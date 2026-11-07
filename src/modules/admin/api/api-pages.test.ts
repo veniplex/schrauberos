@@ -284,7 +284,7 @@ describe("Seiten", () => {
 });
 
 describe("JSON der Beschreibung (/admin/api/openapi.json)", () => {
-  it("nur mit Sitzung und api.manage; derselbe Inhalt wie /api/v1/openapi.json; ein Token gilt hier nie", async () => {
+  it("nur mit Sitzung und api.manage; ein Token sieht über /api/v1/openapi.json nur die Endpunkte seiner Rechte (Teilmenge der Beschreibung der Verwaltung); ein Token gilt hier nie", async () => {
     const { GET } = await import("@/app/(app)/(admin)/admin/api/openapi.json/route");
     env.signOut();
     assert.equal((await GET()).status, 401);
@@ -303,7 +303,8 @@ describe("JSON der Beschreibung (/admin/api/openapi.json)", () => {
     const { handleApiRequest } = await import("@/server/api/router");
     const { token } = await makeToken(env, { admin: true, scope: ["customers.view"] });
     const viaToken = (await (await handleApiRequest(apiRequest("GET", "/openapi.json", { token }))).json()) as { paths: Record<string, unknown> };
-    assert.deepEqual(Object.keys(viaToken.paths), Object.keys(doc.paths));
+    assert.deepEqual(Object.keys(viaToken.paths).sort(), ["/customers", "/customers/{id}"], "nur die Endpunkte, deren Recht das Token trägt");
+    assert.ok(Object.keys(viaToken.paths).every((path) => path in doc.paths));
 
     // ein Token ohne Sitzung erreicht die Seite und das JSON der Verwaltung nicht
     env.signOut();

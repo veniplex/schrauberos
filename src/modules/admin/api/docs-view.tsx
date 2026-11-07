@@ -51,6 +51,7 @@ async function Operation({ op }: { op: DocOperation }) {
           {op.download ? ` · ${t("api.docs.endpoint.download")}` : ""}
           {op.bodyKind === "multipart" ? ` · ${t("api.docs.endpoint.upload")}` : ""}
         </p>
+        {op.downloadNote ? <p className="text-xs text-ink-muted">{op.downloadNote}</p> : null}
         {op.params.length > 0 ? (
           <div>
             <p className="mb-1 text-xs font-semibold">{t("api.docs.endpoint.parameters")}</p>

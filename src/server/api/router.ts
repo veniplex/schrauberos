@@ -234,7 +234,8 @@ async function dispatch(request: Request, principal: Principal, tokenId: string,
 
   if (pathname === OPEN_API_PATH) {
     if (method !== "GET") throw apiProblem("method_not_allowed", undefined, { allow: "GET" });
-    return toResponse(render({ status: 200, body: buildOpenApi(endpoints, principal.features) }));
+    // Ein Token sieht nur die Endpunkte, deren Recht es trägt (Scope ∩ Rechte des Besitzers) – nicht die ganze Struktur der Schnittstelle
+    return toResponse(render({ status: 200, body: buildOpenApi(endpoints.filter((endpoint) => principal.can(endpoint.permission)), principal.features) }));
   }
 
   const matches = compile(endpoints)

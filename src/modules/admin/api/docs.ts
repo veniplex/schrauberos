@@ -19,6 +19,8 @@ export type DocOperation = {
   list: boolean;
   success: string;
   download: boolean;
+  /** Beschreibung eines Downloads (Typ, Schutz-Kopfzeilen) aus der OpenAPI-Beschreibung */
+  downloadNote: string;
   curl: string;
 };
 export type DocGroup = { tag: string; operations: DocOperation[] };
@@ -135,6 +137,7 @@ export function docModel(doc: Json, base: string): DocGroup[] {
         list,
         success,
         download,
+        downloadNote: download && typeof operation.description === "string" ? operation.description : "",
         curl: curlOf(method.toUpperCase(), path, base, bodySchema, bodyKind, ifMatch),
       };
       groups.set(tag, [...(groups.get(tag) ?? []), entry]);

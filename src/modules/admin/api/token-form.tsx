@@ -20,9 +20,9 @@ const EXPIRY_DAYS = [30, 90, 180, 365] as const;
 /**
  * Neues API-Token anlegen: Name, Beschreibung, Ablauf, Rechte je Ressource (nichts ist vorgewählt; „Lesen“ und „Schreiben/Löschen“ sind getrennte Rechte), optional Adressbereiche, **erneute
  * Passwortabfrage**. Rechte mit Kennzeichnung (Versand, Festschreiben …) sind markiert und verlangen eine ausdrückliche Bestätigung. Der Klartext des Tokens steht **einmal** in der Antwort der Aktion und nur im
- * Zustand dieser Komponente (`SecretField once`); der Formularzustand trägt ihn nicht weiter. `origin`: Adresse der Anwendung für das Beispiel (ohne sie die geöffnete Adresse).
+ * Zustand dieser Komponente (`SecretField once`); der Formularzustand trägt ihn nicht weiter. `base`: eingestellte Adresse der Anwendung für das Beispiel (sonst ein Platzhalter; nie aus dem Browser abgeleitet).
  */
-export function TokenForm({ groups, markLabels, behindProxy, accounts }: { groups: ScopeGroup[]; markLabels: Record<string, string>; behindProxy: boolean; accounts: Array<{ id: string; name: string }> }) {
+export function TokenForm({ groups, markLabels, behindProxy, accounts, base }: { groups: ScopeGroup[]; markLabels: Record<string, string>; behindProxy: boolean; accounts: Array<{ id: string; name: string }>; base: string }) {
   const { t } = useI18n();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [created, setCreated] = useState<{ value: string; hint: string; expiresOn: string } | null>(null);
@@ -50,15 +50,18 @@ export function TokenForm({ groups, markLabels, behindProxy, accounts }: { group
   }, []);
 
   if (created) {
-    const origin = typeof window === "undefined" ? "" : window.location.origin;
     return (
       <Card title={t("api.tokens.created")}>
         <div className="flex flex-col gap-4">
           <Alert tone="success">{t("api.tokens.createdHint", { date: created.expiresOn })}</Alert>
-          <SecretField value={created.value} label={t("api.tokens.secretLabel")} once autoHideSeconds={300} onDismiss={() => setCreated(null)} />
+          <SecretField value={created.value} label={t("api.tokens.secretLabel")} once autoHideSeconds={300} onDismiss={() => {
+              setCreated(null);
+              setSelected(new Set());
+            }}
+          />
           <div className="flex flex-col gap-2">
             <p className="text-sm text-ink-muted">{t("api.tokens.example")}</p>
-            <CodeBlock language="curl" label={t("api.tokens.exampleLabel")} code={`curl -H "Authorization: Bearer <TOKEN>" \\\n  ${origin}/api/v1/customers`} />
+            <CodeBlock language="curl" label={t("api.tokens.exampleLabel")} code={`curl -H "Authorization: Bearer <TOKEN>" \\\n  ${base}/api/v1/customers`} />
             <p className="text-xs text-ink-muted">{t("api.tokens.exampleNote")}</p>
           </div>
           <div>
