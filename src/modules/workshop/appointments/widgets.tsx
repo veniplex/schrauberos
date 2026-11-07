@@ -72,5 +72,5 @@ export async function TodayAppointmentsWidget() {
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
 export const widgets: WidgetDef[] = [
-  { id: "today-appointments", feature: "workshop.appointments", permission: "appointments.view", span: 2, order: 10, Component: TodayAppointmentsWidget },
+  { id: "today-appointments", titleKey: "appointments.widgets.todayTitle", priority: 10, feature: "workshop.appointments", permission: "appointments.view", span: 2, order: 10, Component: TodayAppointmentsWidget },
 ];

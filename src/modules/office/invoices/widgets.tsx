@@ -69,5 +69,5 @@ export async function InvoicesWidget() {
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
 export const widgets: WidgetDef[] = [
-  { id: "invoices-open", feature: "office.invoices", permission: "invoices.view", span: 1, order: 39, Component: InvoicesWidget },
+  { id: "invoices-open", titleKey: "invoices.widgets.title", priority: 25, feature: "office.invoices", permission: "invoices.view", span: 1, order: 39, Component: InvoicesWidget },
 ];

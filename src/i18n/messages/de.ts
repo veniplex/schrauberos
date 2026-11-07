@@ -11,6 +11,7 @@ import { usersDe } from "./modules/users.de";
 import { recoveryDe } from "./modules/recovery.de";
 import { securityDe } from "./modules/security.de";
 import { rolesDe } from "./modules/roles.de";
+import { permissionHintsDe } from "./modules/permission-hints.de";
 import { networkDe } from "./modules/network.de";
 import { modulesDe } from "./modules/admin-modules.de";
 import { auditDe } from "./modules/audit.de";
@@ -292,6 +293,7 @@ export const de = {
     modules: "Module & Funktionen",
     system: "Systemstatus",
   },
+  permissionHints: permissionHintsDe,
   permissions: {
     appointments: {
       view: "Termine ansehen",

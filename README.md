@@ -262,6 +262,16 @@ Seiten, Dashboard-Bausteine, Suche, API und Austausch lesen Daten mit sensiblen 
 * **Neue Funktion mit sensiblen Daten:** `queries.ts` anlegen (Spaltenmengen als Konstanten, Funktion mit Betrachter, sensible Spalten in eigener Abfrage oder bedingtem `select`), Seiten/Bausteine/Suche/API darauf umstellen, Test mit SQL-Protokoll nach dem Muster oben, Modell in die Liste des Architekturtests aufnehmen.
   Noch nicht umgestellt (kein sensibles Feld, nur `include`s mit Fachdaten): Listen und Details von Rechnungen, Reifen, Termin-Modal; sie bekommen ihr `queries.ts` mit dem nächsten Eingriff.
 
+### Rollenmaske und Module-Seite (P2b-3)
+
+* **Rollenmaske** (`admin/roles`): `forms.tsx` (Name/Beschreibung, `RoleForm`) und `role-mask.tsx` (`RoleMask`: Auswahl, Suche, Vorlagen, Vorschau; Test `role-mask.test.ts`). Die reine Logik steht in `src/lib/role-mask.ts` (`togglePermission`, `filterMask`, `rolePreview`).
+  **Alle Kontrollkästchen bleiben im Dokument** (zugeklappt oder weggefiltert wird mit `hidden` ausgeblendet): Sonst ginge beim Speichern verloren, was gerade nicht sichtbar ist. `sections.ts` liefert Gruppen mit Name, **Kurzbeschreibung**
+  (`permissionHints.<gruppe>.<aktion>`, `i18n/messages/modules/permission-hints.*.ts`; `catalog.test.ts` verlangt eine je Recht in beiden Sprachen) und Kennzeichnung (`adminOnly`/`permissions.marked`), dazu die Daten der Vorschau (`rolePreviewData`: Navigation aus
+  den `feature.ts`, Bausteine aus `widgetCatalog()`, Schnellaktionen aus `quickActionCatalog()` – **ohne Seiten zu rendern**). **Vorlagen** (`src/modules/role-templates.ts`) leiten sich aus `default-roles.ts` ab und lassen alles nach Regel 9 weg (`isRuleNinePermission`:
+  `adminOnly`, `marked`, `employees.sensitive`); Test `role-templates.test.ts`. Rechte-Hierarchie unverändert (Rohrechte, `lockedPermissions`): Eine Vorlage übernimmt nie ein gesperrtes Recht und lässt vorhandene gesperrte unberührt.
+* **Neue Rechte** brauchen also: Namen (`permissions.*`), Kurzbeschreibung (`permissionHints.*`), bei Regel 9 die Kennzeichnung in der `feature.ts`.
+* **Module & Funktionen:** Je Modul eine einklappbare Karte (`Disclosure variant="card"`, neu im UI-Kit: `description`, `actions`, `headingLevel`), Abhängigkeiten als Marken (`deps`), ausgeschaltete Module starten zugeklappt.
+
 ### Abwesenheit: Überschneidungswarnung (P2b-2)
 
 `office/employees/absence-overlap.ts` (rein, getestet): aus dem geplanten Zeitraum und den Abwesenheiten **derselben Person** folgen `overlaps` (Hinweise) und `duplicate` (gleiche Art, gleicher Zeitraum). Nur die Dublette blockiert – die Operation `employees.saveAbsence`

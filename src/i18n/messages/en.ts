@@ -12,6 +12,7 @@ import { usersEn } from "./modules/users.en";
 import { recoveryEn } from "./modules/recovery.en";
 import { securityEn } from "./modules/security.en";
 import { rolesEn } from "./modules/roles.en";
+import { permissionHintsEn } from "./modules/permission-hints.en";
 import { networkEn } from "./modules/network.en";
 import { modulesEn } from "./modules/admin-modules.en";
 import { auditEn } from "./modules/audit.en";
@@ -292,6 +293,7 @@ export const en: Messages = {
     modules: "Modules & features",
     system: "System status",
   },
+  permissionHints: permissionHintsEn,
   permissions: {
     appointments: {
       view: "View appointments",

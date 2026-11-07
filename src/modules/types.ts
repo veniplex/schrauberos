@@ -19,7 +19,17 @@ export type WidgetDef = {
   permission: Permission;
   /** Breite im Dashboard-Raster (1 = halb, 2 = voll) */
   span?: 1 | 2;
+  /** Reihenfolge im Dashboard (Anzeige) */
   order: number;
+  /** Überschrift des Bausteins: Vorschau „Was sieht diese Rolle?“ der Rollenmaske und Liste der zugeklappten Bausteine (die Karte selbst zeigt ihren Titel weiterhin selbst) */
+  titleKey: MessageKey;
+  /**
+   * Wichtigkeit, **kleiner = wichtiger**. Das Dashboard zeigt je Person die `DASHBOARD_VISIBLE` (4) wichtigsten Bausteine offen, den Rest zugeklappt (`pickWidgets` in `dashboard-logic.ts`);
+   * dort erscheint nur, was Funktion und Recht der Person ergeben – so bekommt jede Rolle ihre eigene Auswahl.
+   */
+  priority: number;
+  /** Weiche Abhängigkeiten (vollständige IDs): Der Baustein erscheint nur, wenn auch diese Funktionen aktiv sind (er ergibt sonst keinen Sinn). */
+  uses?: readonly FeatureId[];
   /** Server Component (darf async sein und selbst Daten laden) */
   Component: ServerComponent;
 };

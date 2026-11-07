@@ -163,7 +163,8 @@ describe("FilterBar", () => {
     assert.equal(toggle.getAttribute("aria-expanded"), "false");
     const extras = document.getElementById(toggle.getAttribute("aria-controls") ?? "");
     assert.ok(extras?.querySelector("select[name='status']"));
-    assert.equal([...root.querySelectorAll("a")].find((a) => a.textContent === "Zurücksetzen")?.getAttribute("href"), "/liste");
+    assert.ok([...root.querySelectorAll("button")].some((b) => b.textContent === "Zurücksetzen"), "Zurücksetzen (Knopf: lädt die Liste ohne Filter und leert die Felder)");
+    assert.ok(root.querySelector("form [role='status']"), "Live-Filter: Statusbereich für den Wartezustand");
   });
   it("keep: die gewählte Sortierung bleibt beim Filtern erhalten (versteckte Felder), leere Werte entfallen", async () => {
     const root = await bar({ keep: { sort: "city", dir: "desc", order: undefined } });
@@ -174,7 +175,7 @@ describe("FilterBar", () => {
   });
   it("ohne gesetzten Filter kein „Zurücksetzen“, ohne Zusatzfilter kein Einklapp-Knopf", async () => {
     const root = await bar({});
-    assert.equal(root.querySelector("a"), null);
+    assert.equal([...root.querySelectorAll("button")].some((b) => b.textContent === "Zurücksetzen"), false);
     assert.equal([...root.querySelectorAll("button")].some((b) => /Weitere Filter/.test(b.textContent ?? "")), false);
   });
 });

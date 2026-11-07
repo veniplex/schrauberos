@@ -73,4 +73,4 @@ export async function InspectionDueWidget() {
 }
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
-export const widgets: WidgetDef[] = [{ id: "inspection-due", feature: "workshop.vehicles", permission: "vehicles.view", span: 1, order: 19, Component: InspectionDueWidget }];
+export const widgets: WidgetDef[] = [{ id: "inspection-due", titleKey: "vehicles.widgets.title", priority: 20, feature: "workshop.vehicles", permission: "vehicles.view", span: 1, order: 19, Component: InspectionDueWidget }];

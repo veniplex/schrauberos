@@ -118,6 +118,24 @@ describe("Katalog", () => {
     for (const p of ALL_PERMISSIONS) if (/\.(export|import)$/.test(p)) assert.ok(MARKED_PERMISSIONS.has(p), `${p} fehlt unter permissions.marked`);
   });
 
+  it("jedes Recht hat Namen und Kurzbeschreibung (Rollenmaske) in beiden Sprachen – und es gibt keine Beschreibung ohne Recht", () => {
+    for (const [lang, tree] of [["de", de], ["en", en]] as const) {
+      for (const p of ALL_PERMISSIONS) {
+        const [group, action] = p.split(".");
+        assert.equal(typeof lookup(tree, `permissions.${group}.${action}`), "string", `${lang}: permissions.${p}`);
+        const hint = lookup(tree, `permissionHints.${group}.${action}`);
+        assert.ok(typeof hint === "string" && hint.trim().length >= 10, `${lang}: permissionHints.${p} fehlt oder ist zu kurz`);
+      }
+      const known = new Set<string>(ALL_PERMISSIONS);
+      const hints = (tree as unknown as { permissionHints: Record<string, Record<string, string>> }).permissionHints;
+      for (const [group, actions] of Object.entries(hints)) for (const action of Object.keys(actions)) assert.ok(known.has(`${group}.${action}`), `${lang}: permissionHints.${group}.${action} gehört zu keinem Recht`);
+    }
+  });
+
+  it("jede Rechte-Gruppe hat einen Namen für die Rollenmaske", () => {
+    for (const f of FEATURES) assert.equal(typeof lookup(de, `permissionGroups.${f.permissions.group}`), "string", f.permissions.group);
+  });
+
   it("jede Audit-Aktion hat eine Beschriftung", () => {
     for (const action of AUDIT_ACTIONS) {
       for (const [lang, tree] of [["de", de], ["en", en]] as const) assert.equal(typeof lookup(tree, `audit.actions.${action}`), "string", `${lang}: audit.actions.${action}`);

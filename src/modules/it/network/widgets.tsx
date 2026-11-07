@@ -74,5 +74,5 @@ export async function NetworkStatusWidget() {
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
 export const widgets: WidgetDef[] = [
-  { id: "network-status", feature: "it.network", permission: "network.view", span: 1, order: 30, Component: NetworkStatusWidget },
+  { id: "network-status", titleKey: "network.widgets.statusTitle", priority: 60, feature: "it.network", permission: "network.view", span: 1, order: 30, Component: NetworkStatusWidget },
 ];

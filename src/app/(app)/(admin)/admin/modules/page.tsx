@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Alert, Badge, Card, StatusBadge } from "@/components/ui/layout";
+import { Alert, Badge, StatusBadge } from "@/components/ui/layout";
+import { Disclosure } from "@/components/ui/disclosure";
 import { PageHeader } from "@/components/ui/page-header";
 import { SubmitSwitch } from "@/components/ui/switch";
 import { getI18n } from "@/i18n/server";
@@ -26,6 +27,16 @@ export default async function ModulesPage() {
     return f ? t(f.nameKey) : id;
   };
   const names = (ids: readonly string[]) => ids.map(nameOf).join(", ");
+  /** Abhängigkeiten in Kompaktdarstellung: eine Zeile je Art, die Funktionen als Marken – lesbar statt Fließtext. */
+  const deps = (label: string, ids: readonly string[]) =>
+    ids.length === 0 ? null : (
+      <p className="flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{label}:</span>
+        {ids.map((id) => (
+          <Badge key={id}>{nameOf(id)}</Badge>
+        ))}
+      </p>
+    );
 
   /**
    * Ein-/Ausschalter als Formular: Der Schalter trägt den neuen Zustand, das Ausschalten fragt vorher nach (Folgen für abhängige Funktionen), danach meldet ein Toast „Ein-/Ausgeschaltet“.
@@ -50,22 +61,28 @@ export default async function ModulesPage() {
           const moduleRequired = "required" in m && m.required;
           const moduleOn = isModuleOn(m, overrides);
           return (
-            <Card key={m.id} padded={false}>
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
-                <div className="min-w-0">
-                  <h2 className="text-base font-semibold">{t(m.nameKey)}</h2>
-                  <p className="mt-0.5 text-sm text-ink-muted">{t(m.descriptionKey)}</p>
-                  <p className="mt-1 text-xs text-ink-muted">{tp("modules.featureCount", features.length)}</p>
-                </div>
-                {moduleRequired ? (
+            <Disclosure
+              key={m.id}
+              variant="card"
+              headingLevel={2}
+              defaultOpen={moduleOn}
+              title={t(m.nameKey)}
+              description={
+                <>
+                  {t(m.descriptionKey)} <span className="text-xs">· {tp("modules.featureCount", features.length)}</span>
+                </>
+              }
+              actions={
+                moduleRequired ? (
                   <Badge>{t("modules.required")}</Badge>
                 ) : (
-                  <div className="flex items-center gap-3">
+                  <>
                     <StatusBadge tone={moduleOn ? "success" : "neutral"}>{moduleOn ? t("modules.status.on") : t("modules.status.off")}</StatusBadge>
                     {toggle(m.id, moduleOn, t("modules.moduleSwitch", { name: t(m.nameKey) }), t("modules.confirmOffModule", { name: t(m.nameKey) }))}
-                  </div>
-                )}
-              </div>
+                  </>
+                )
+              }
+            >
               <ul className="divide-y divide-line">
                 {features.map((f) => {
                   const id = featureKey(f);
@@ -84,11 +101,11 @@ export default async function ModulesPage() {
                           {required ? <Badge>{t("modules.required")}</Badge> : null}
                         </div>
                         <p className="mt-0.5 text-sm text-ink-muted">{t(f.descriptionKey)}</p>
-                        <div className="mt-1.5 flex flex-col gap-0.5 text-xs text-ink-muted">
+                        <div className="mt-1.5 flex flex-col gap-1 text-xs text-ink-muted">
                           {status.state === "blocked" ? <p className="text-warning-ink">{t("modules.blockedBy", { names: names(status.missing) })}</p> : null}
-                          {requires.length ? <p>{t("modules.requires", { names: names(requires) })}</p> : null}
-                          {uses.length ? <p>{t("modules.uses", { names: names(uses) })}</p> : null}
-                          {dependents.length && !required ? <p>{t("modules.dependents", { names: names(dependents) })}</p> : null}
+                          {deps(t("modules.deps.requires"), requires)}
+                          {deps(t("modules.deps.uses"), uses)}
+                          {required ? null : deps(t("modules.deps.dependents"), dependents)}
                           {required ? <p>{t("modules.requiredHint")}</p> : null}
                           {status.state === "off" && !required ? <p>{t("modules.rightsInactive")}</p> : null}
                         </div>
@@ -98,7 +115,7 @@ export default async function ModulesPage() {
                   );
                 })}
               </ul>
-            </Card>
+            </Disclosure>
           );
         })}
       </div>

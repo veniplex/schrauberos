@@ -5,7 +5,15 @@ Rechte nach Bereich und Funktion gegliedert (ansehen, anlegen, bearbeiten, lösc
 Geschäftsführung, Büro / Verwaltung, Serviceberater, Mechaniker, Lager und IT-Administrator – sie lassen sich anpassen.
 
 * **Administrator-Rollen** haben immer alle Rechte, auch für künftige Funktionen.
-* Rechte ausgeschalteter Funktionen sind markiert und wirken erst nach dem Wiedereinschalten.
+* **Die Maske ist für viele Rechte gebaut:** Jedes Recht trägt eine **Kurzbeschreibung** (was die Person damit tun kann) und, wo nötig, eine Kennzeichnung – „Nur Administratoren“,
+  „Sensibel“, „Export“, „Import“. Die Rechte sind in **einklappbaren Gruppen** nach Funktion geordnet; offen sind die Gruppen, in denen die Rolle schon Rechte hat
+  (**Alle aufklappen** / **Alle zuklappen** öffnen oder schließen alles). Die **Suche** über der Liste findet Rechte nach Name, Beschreibung und Kennzeichnung („Export“, „Rechnung“, „löschen“) und blendet
+  alles andere aus – abgewählt wird dadurch nichts, gespeichert wird immer die ganze Auswahl.
+* **Rollenvorlagen:** „Mechaniker“, „Büro“ und „Leitung“ füllen die Auswahl vor und ersetzen die bisherige; erst **Speichern** übernimmt sie. Name und Beschreibung werden nur gefüllt, wenn sie noch leer sind.
+  Keine Vorlage enthält Rechte der Verwaltung, sensible Mitarbeiterdaten, Export oder Import – die vergeben Sie bewusst einzeln.
+* **Was sieht diese Rolle?** Rechts neben der Auswahl (auf schmalen Bildschirmen darunter) zeigt eine Vorschau, welche Navigationseinträge, Übersichts-Bausteine und Schnellaktionen („Neu“) die gewählten Rechte
+  freischalten – berechnet aus den Rechten und den eingeschalteten Funktionen, sie ändert sich mit jedem Häkchen. Einträge ausgeschalteter Funktionen sind nicht dabei, die Vorschau zählt sie aber als „erscheinen, sobald die Funktion eingeschaltet wird“.
+* Rechte **ausgeschalteter Funktionen** stehen je Bereich eingeklappt unter „Ausgeschaltete Funktionen“ mit einem Hinweis, statt als lange Liste; sie wirken erst nach dem Wiedereinschalten.
 * **Rechte der Verwaltung** („Benutzer verwalten“, „Rollen & Rechte verwalten“, „Werkstatt-Einstellungen verwalten“, „Module und
   Funktionen ein-/ausschalten“, „Backups verwalten und wiederherstellen“, „Updates installieren“, „Systemstatus und geplante Jobs einsehen“) sind faktisch Administratorrechte. Sie vergeben **nur Administratoren**; die Standardrollen
   enthalten sie nicht. Rollen, die sie enthalten, kennzeichnet die Liste mit „Verwaltungsrechte“.

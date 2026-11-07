@@ -66,5 +66,5 @@ export async function FleetWidget() {
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
 export const widgets: WidgetDef[] = [
-  { id: "fleet-dues", feature: "office.fleet", permission: "fleet.view", span: 1, order: 41, Component: FleetWidget },
+  { id: "fleet-dues", titleKey: "fleet.widgets.title", priority: 45, feature: "office.fleet", permission: "fleet.view", span: 1, order: 41, Component: FleetWidget },
 ];

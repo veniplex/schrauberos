@@ -73,5 +73,5 @@ export async function EmployeesWidget() {
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
 export const widgets: WidgetDef[] = [
-  { id: "employees-overview", feature: "office.employees", permission: "employees.view", span: 1, order: 40, Component: EmployeesWidget },
+  { id: "employees-overview", titleKey: "employees.widgets.title", priority: 40, feature: "office.employees", permission: "employees.view", span: 1, order: 40, Component: EmployeesWidget },
 ];

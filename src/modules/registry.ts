@@ -1,6 +1,6 @@
 import type { MessageKey } from "@/i18n/translate";
 import type { AppSession } from "@/server/auth/session";
-import { FEATURES, MODULES, fullFeatureId, isPermission, type FeatureId, type ModuleId } from "./catalog";
+import { FEATURES, MODULES, fullFeatureId, isPermission, type FeatureId, type ModuleId, type Permission } from "./catalog";
 import { withTimeout } from "@/lib/with-timeout";
 import type { IconName } from "./define";
 import type { SearchHit, SearchProviderDef, SettingsTabDef, WidgetDef } from "./types";
@@ -86,6 +86,11 @@ export function widgetsFor(session: AppSession): WidgetEntry[] {
     .sort((a, b) => a.order - b.order);
 }
 
+/** Alle Bausteine mit Funktion, Recht und Titel – ohne Rücksicht auf eine Sitzung (Vorschau „Was sieht diese Rolle?“ in der Rollenmaske). */
+export function widgetCatalog(): Array<{ id: string; feature: FeatureId; permission: Permission; titleKey: MessageKey; module: ModuleId }> {
+  return ALL_WIDGETS.map((w) => ({ id: w.id, feature: w.feature, permission: w.permission, titleKey: w.titleKey, module: moduleOfFeature(w.feature) }));
+}
+
 export function settingsTabsFor(session: AppSession): SettingsTabDef[] {
   return ALL_SETTINGS_TABS.filter((tab) => session.features.has(tab.feature) && session.can(tab.permission)).sort((a, b) => a.order - b.order);
 }
@@ -124,6 +129,17 @@ export async function searchFor(session: AppSession, query: string, limit = 5, t
 }
 
 export type QuickActionEntry = { id: string; href: string; labelKey: MessageKey; icon: IconName; module: ModuleId; order: number };
+
+/** Alle Schnellaktionen der Funktionen mit Funktion und Recht – ohne Rücksicht auf eine Sitzung (Vorschau der Rollenmaske). */
+export function quickActionCatalog(): Array<QuickActionEntry & { feature: FeatureId; permission: string }> {
+  return FEATURES.flatMap((f) =>
+    ((f as { quickActions?: readonly { id: string; href: string; labelKey: MessageKey; icon: IconName; permission: string; order: number }[] }).quickActions ?? []).map((a) => ({
+      ...a,
+      module: f.module as ModuleId,
+      feature: fullFeatureId(f),
+    })),
+  );
+}
 
 /** Einträge des globalen „Neu“-Menüs: aktive Funktionen, für die die Person das Recht hat – sortiert nach Modul und Reihenfolge. */
 export function quickActionsFor(session: AppSession): QuickActionEntry[] {

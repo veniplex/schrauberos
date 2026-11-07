@@ -30,4 +30,4 @@ export async function BackupWidget() {
 }
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
-export const widgets: WidgetDef[] = [{ id: "backup-status", feature: "admin.backup", permission: "backup.manage", span: 1, order: 90, Component: BackupWidget }];
+export const widgets: WidgetDef[] = [{ id: "backup-status", titleKey: "backup.widget.title", priority: 70, feature: "admin.backup", permission: "backup.manage", span: 1, order: 90, Component: BackupWidget }];

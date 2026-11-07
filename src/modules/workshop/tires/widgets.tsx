@@ -149,7 +149,7 @@ export async function TireWrongSeasonWidget() {
 
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
 export const widgets: WidgetDef[] = [
-  { id: "tire-attention", feature: "workshop.tires", permission: "tires.view", span: 1, order: 20, Component: TireAttentionWidget },
-  { id: "tire-swap", feature: "workshop.tires", permission: "tires.view", span: 1, order: 21, Component: TireSwapWidget },
-  { id: "tire-wrong-season", feature: "workshop.tires", permission: "tires.view", span: 1, order: 22, Component: TireWrongSeasonWidget },
+  { id: "tire-attention", titleKey: "tires.widgets.attentionTitle", priority: 30, feature: "workshop.tires", permission: "tires.view", span: 1, order: 20, Component: TireAttentionWidget },
+  { id: "tire-swap", titleKey: "tires.widgets.swapTitle", priority: 22, feature: "workshop.tires", permission: "tires.view", span: 1, order: 21, Component: TireSwapWidget },
+  { id: "tire-wrong-season", titleKey: "tires.widgets.wrongTitle", priority: 35, feature: "workshop.tires", permission: "tires.view", span: 1, order: 22, Component: TireWrongSeasonWidget },
 ];

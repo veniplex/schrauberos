@@ -8,7 +8,7 @@ import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { RoleForm } from "@/modules/admin/roles/forms";
-import { permissionSections } from "@/modules/admin/roles/sections";
+import { permissionSections, rolePreviewData, roleTemplates } from "@/modules/admin/roles/sections";
 import { deleteRole } from "@/modules/admin/roles/actions";
 import { versionOf } from "@/lib/concurrency";
 import { checkRoleChange, checkRoleDelete, lockedPermissions } from "@/lib/rbac";
@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function EditRolePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission("roles.manage");
-  const [{ t, tp }, { id }, sections] = await Promise.all([getI18n(), params, permissionSections()]);
+  const [{ t, tp }, { id }, sections, templates, preview] = await Promise.all([getI18n(), params, permissionSections(), roleTemplates(), rolePreviewData()]);
   const role = await db.role.findUnique({
     where: { id },
     include: { permissions: true, _count: { select: { users: true } } },
@@ -51,6 +51,8 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
         {!readOnly ? <RoleForm
           key={role.id}
           sections={sections}
+          templates={templates}
+          preview={preview}
           lockedPermissions={lockedPermissions(actor, ALL_PERMISSIONS)}
           initial={{
             id: role.id,
