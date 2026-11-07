@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
-import { dayKey, parseZoned } from "@/lib/zone";
+import { dayKey, parseZoned, timeKey } from "@/lib/zone";
 import { dateText } from "@/lib/zod-fields";
 import { employeeForUser, employeeSummary } from "@/modules/office/employees/public";
 import { appendOrderItems, orderRef, type AppendedLine } from "@/modules/workshop/orders/public";
@@ -112,6 +112,8 @@ export const stopTimeOperation = defineOperation({
     const endedAt = new Date(Math.max(Date.now(), running.startedAt.getTime()));
     // Ein Eintrag, der seit über 24 Stunden läuft, wurde vergessen: Ende und Pause setzt man bewusst per Korrektur (mit Begründung), nicht mit einem Antippen
     if (endedAt.getTime() - running.startedAt.getTime() > MAX_ENTRY_MINUTES * 60_000) fail("invalid", "time.errors.tooLong");
+    // Pause nie länger als die Dauer (wie bei Korrektur und Nachtrag)
+    if (d.breakMinutes > entryMinutes({ startedAt: running.startedAt, endedAt, breakMinutes: 0 }, endedAt)) failField("breakMinutes", "time.errors.breakTooLong");
     const done = await tx.timeEntry.updateMany({ where: { id: running.id, runningKey: employee.id, endedAt: null }, data: { endedAt, runningKey: null, stopKey: d.key ?? null, breakMinutes: d.breakMinutes } });
     if (done.count === 0) fail("invalid", "time.errors.notRunning");
     audit({ target: label(dayKey(endedAt), `${employee.firstName} ${employee.lastName}`), entityId: running.id });
@@ -128,13 +130,17 @@ const whenFields = {
   endTime: timeText.optional(),
 };
 
-/** Beginn und (optional) Ende aus den Formularfeldern; beides oder nichts für das Ende. */
-function readTimes(d: { startDate: string; startTime: string; endDate?: string; endTime?: string }): { start: Date; end: Date | null } {
-  const start = parseZoned(d.startDate, d.startTime);
+/**
+ * Beginn und (optional) Ende aus den Formularfeldern; beides oder nichts für das Ende. Mit `original` (Korrektur): Zeigt ein Feld dieselbe Ortszeit wie der gespeicherte Zeitpunkt, bleibt dieser unverändert –
+ * so verschiebt eine Korrektur der Pause oder Tätigkeit nichts, auch nicht in der doppelten Stunde der Zeitumstellung (dieselbe Ortszeit, zwei Zeitpunkte) oder bei gespeicherten Sekunden.
+ */
+function readTimes(d: { startDate: string; startTime: string; endDate?: string; endTime?: string }, original?: { startedAt: Date; endedAt: Date | null }): { start: Date; end: Date | null } {
+  const unchanged = (at: Date | null | undefined, date: string, time: string) => (at && dayKey(at) === date && timeKey(at) === time ? at : null);
+  const start = unchanged(original?.startedAt, d.startDate, d.startTime) ?? parseZoned(d.startDate, d.startTime);
   if (!start) failField("startTime", "validation.invalid");
   if (!d.endDate && !d.endTime) return { start, end: null };
   if (!d.endDate || !d.endTime) failField(d.endDate ? "endTime" : "endDate", "validation.required");
-  const end = parseZoned(d.endDate, d.endTime);
+  const end = unchanged(original?.endedAt, d.endDate, d.endTime) ?? parseZoned(d.endDate, d.endTime);
   if (!end) failField("endTime", "validation.invalid");
   return { start, end };
 }
@@ -178,7 +184,7 @@ export const correctTimeOperation = defineOperation({
     if (!own && !principal.can("time.correctAll")) fail("notFound");
     if (entry.voidedAt) fail("invalid", "time.errors.voided");
     if (entry.transferredAt) fail("invalid", "time.errors.transferred");
-    const { start, end } = readTimes(d);
+    const { start, end } = readTimes(d, entry);
     validateTimes(start, end, d.breakMinutes);
     if (!end && d.breakMinutes > 0) failField("breakMinutes", "time.errors.breakTooLong");
     if (!end && entry.endedAt) failField("endTime", "validation.required");

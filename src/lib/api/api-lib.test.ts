@@ -34,6 +34,8 @@ describe("Scope und wirksame Rechte", () => {
     for (const p of ["settings.manage", "users.manage", "roles.manage", "backup.manage", "updates.manage", "modules.manage", "audit.view", "employees.sensitive"]) assert.ok(isApiForbidden(p), p);
     for (const p of ["customers.view", "customers.delete", "invoices.edit", "network.edit", "appointments.configure"]) assert.ok(!isApiForbidden(p), p);
     assert.ok(API_NEVER.has("employees.sensitive"));
+    for (const p of ["time.viewAll", "time.correctAll"]) assert.ok(isApiForbidden(p) && API_NEVER.has(p) && !grantablePermissions().includes(p), p);
+    assert.ok(!isApiForbidden("time.view") && !isApiForbidden("time.correct"));
     assert.ok(isPlatformFeature("admin.users") && !isPlatformFeature("workshop.customers"));
   });
 

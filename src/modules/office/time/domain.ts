@@ -40,20 +40,22 @@ export function billableUnitCents(hourlyRateCents: number, unit: "h" | "aw", wor
 
 export type Segment = { day: string; start: Date; end: Date; minutes: number };
 
-/** Teilt einen Eintrag an den Mitternächten der Werkstatt-Zone in Tagesstücke. Die erfasste Pause wird dem ersten Stück abgezogen. Ein Eintrag ohne Ende zählt bis `now`. */
+/** Teilt einen Eintrag an den Mitternächten der Werkstatt-Zone in Tagesstücke. Die erfasste Pause wird vom ersten Stück abgezogen und, reicht es nicht, vom nächsten (die Summe stimmt mit `entryMinutes` überein). Ein Eintrag ohne Ende zählt bis `now`. */
 export function splitByDay(span: Span, now: Date, timeZone?: string): Segment[] {
   const end = span.endedAt ?? now;
   if (end <= span.startedAt) return [];
   const out: Segment[] = [];
   let cursor = span.startedAt;
-  let first = true;
+  let pause = span.breakMinutes;
   while (cursor < end && out.length < 40) {
     const day = dayKey(cursor, timeZone);
     const boundary = startOfDay(addDaysToKey(day, 1), timeZone);
     const stop = boundary < end ? boundary : end;
-    out.push({ day, start: cursor, end: stop, minutes: Math.max(0, minutesBetween(cursor, stop) - (first ? span.breakMinutes : 0)) });
+    const raw = minutesBetween(cursor, stop);
+    const taken = Math.min(raw, pause);
+    pause -= taken;
+    out.push({ day, start: cursor, end: stop, minutes: raw - taken });
     cursor = stop;
-    first = false;
   }
   return out;
 }

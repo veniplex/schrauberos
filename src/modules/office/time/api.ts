@@ -11,8 +11,8 @@ import { addManualTimeOperation, startTimeOperation, stopTimeOperation } from ".
 import { getEntry, pageEntries, type EntryRow } from "./queries";
 
 /**
- * API-Ressource `/time-entries` (Zeiterfassung): eigene Zeiten lesen, stempeln (`POST /time-entries/start` und `/stop`) und nachtragen (`POST /time-entries`). Mit dem Recht `time.viewAll`
- * lesen Token auch die Zeiten aller Mitarbeiter (`employeeId`-Filter). Alle schreibenden Wege laufen über dieselben Operationen wie die Oberfläche (genau ein laufender Eintrag, Idempotenz).
+ * API-Ressource `/time-entries` (Zeiterfassung): **eigene** Zeiten lesen, stempeln (`POST /time-entries/start` und `/stop`) und nachtragen (`POST /time-entries`). `time.viewAll` und `time.correctAll` kann kein Token tragen
+ * (`API_NEVER`): die Zeiten aller Mitarbeiter gibt es nur in der Oberfläche. Alle schreibenden Wege laufen über dieselben Operationen wie die Oberfläche (genau ein laufender Eintrag, Idempotenz).
  *
  *  - **Idempotenz:** `Idempotency-Key` wirkt wie überall (gleiche Antwort bei Wiederholung) und wird zusätzlich als Schlüssel der Buchung an die Operation gereicht – auch ein Token-Wechsel bucht nicht doppelt.
  *  - Zeiten sind Zeitpunkte (ISO 8601, UTC) und – wie im Formular – Tag und Uhrzeit in der Zeitzone der Werkstatt (`date`, `startTime`, `endTime`). Beim Nachtragen: `startDate`/`startTime`/`endDate`/`endTime`.
@@ -72,12 +72,11 @@ export const endpoints: ApiEndpoint[] = [
     path: "/time-entries",
     permission: "time.view",
     operationId: "time-entries.list",
-    summary: "List time entries (your own; with time.viewAll those of all employees, filter employeeId)",
+    summary: "List your own time entries",
     operations: [],
     query: z.strictObject({
       from: dateOnly.optional(),
       to: dateOnly.optional(),
-      employeeId: z.string().max(64).optional(),
       orderId: z.string().max(64).optional(),
       running: z.enum(["true", "false"]).optional(),
       voided: z.enum(["true", "false"]).optional(),
@@ -90,10 +89,10 @@ export const endpoints: ApiEndpoint[] = [
       const sort = parseSort(call.searchParams.get("sort"), SORTS, [{ key: "startedAt", dir: "desc" }]);
       for (const bad of [paging, sort]) if (isParamError(bad)) throw apiProblem("validation_failed", { fields: { [bad.field]: { code: bad.code } } });
       const { page, limit } = paging as { page: number; limit: number };
-      const q = call.query as { from?: string; to?: string; employeeId?: string; orderId?: string; running?: "true" | "false"; voided?: "true" | "false" };
+      const q = call.query as { from?: string; to?: string; orderId?: string; running?: "true" | "false"; voided?: "true" | "false" };
       const { rows, total } = await pageEntries(
         call.principal,
-        { from: q.from, to: q.to, employeeId: q.employeeId, orderId: q.orderId, running: q.running === undefined ? undefined : q.running === "true", includeVoided: q.voided === "true" },
+        { from: q.from, to: q.to, orderId: q.orderId, running: q.running === undefined ? undefined : q.running === "true", includeVoided: q.voided === "true" },
         { skip: (page - 1) * limit, take: limit },
       );
       const now = new Date();
@@ -107,7 +106,7 @@ export const endpoints: ApiEndpoint[] = [
     path: "/time-entries/{id}",
     permission: "time.view",
     operationId: "time-entries.get",
-    summary: "Get a time entry (your own; with time.viewAll any)",
+    summary: "Get one of your own time entries",
     operations: [],
     response: itemShape,
     etag: true,
@@ -169,10 +168,9 @@ export const endpoints: ApiEndpoint[] = [
     path: "/time-entries",
     permission: "time.correct",
     operationId: "time-entries.create",
-    summary: "Add a missed time entry (a reason is mandatory; for other employees time.correctAll is needed)",
+    summary: "Add a missed time entry for yourself (a reason is mandatory)",
     operations: [addManualTimeOperation.name],
     body: z.strictObject({
-      employeeId: optionalRef,
       startDate: dateOnly,
       startTime: timeText,
       endDate: dateOnly,

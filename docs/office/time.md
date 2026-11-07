@@ -70,7 +70,8 @@ Auf der Auftragsseite zeigt der Abschnitt **Zeiten** die Summe der Zeiten auf di
 * **Zeiten als Positionen übernehmen** (nur mit den Rechten *Aufträge bearbeiten* und *Preise und Summen der Aufträge*, am offenen Auftrag): Jede beendete, noch nicht übernommene Zeit wird als
   **Arbeitsposition** in den Auftrag übernommen – wahlweise in Stunden zum **Stundensatz** oder in **Arbeitswerten** (Satz je AW aus dem Stundensatz des Werkstattprofils). Der Stundensatz muss im
   Werkstattprofil stehen.
-* **Nur einmal:** Jede Zeit wird als übernommen markiert und nie ein zweites Mal übernommen, auch nicht bei gleichzeitigem Klicken. Laufende Einträge bleiben unberührt.
+* **Nur einmal:** Jede Zeit wird als übernommen markiert und nie ein zweites Mal übernommen, auch nicht bei gleichzeitigem Klicken. Laufende Einträge bleiben unberührt. Löschen Sie eine solche Position im Positionen-Editor des Auftrags wieder, wird die Zeit **wieder übernehmbar** (und korrigierbar); Positionen mit Verweis auf eine Zeit lassen sich nicht frei erfinden.
+* **Vor dem Abschließen:** Laufen auf dem Auftrag noch Zeiten oder sind Zeiten nicht übernommen, weist ein Hinweis im Statusbereich der Auftragsseite darauf hin – der Abschluss bleibt trotzdem möglich. Nach dem Abschluss lassen sich Zeiten nur noch über *Wieder öffnen* übernehmen.
 * Die Positionen nennen Tätigkeit und Tag, nie den Namen des Mitarbeiters.
 
 ## Handy und Tablet

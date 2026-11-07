@@ -4,7 +4,7 @@ import { addDaysToKey, dayKey } from "@/lib/zone";
 import { apiRequest, makeToken } from "@/test/api-helpers";
 import { createTestEnv, type TestEnv } from "@/test/harness";
 
-/** Zeiterfassung über die API: nur eigene Zeiten (mit time.viewAll alle), Stempeln mit `Idempotency-Key`, Nachtragen mit Begründung; Korrigieren gibt es nicht. */
+/** Zeiterfassung über die API: nur eigene Zeiten (time.viewAll und time.correctAll trägt kein Token), Stempeln mit `Idempotency-Key`, Nachtragen mit Begründung; Korrigieren gibt es nicht. */
 let env: TestEnv;
 let router: typeof import("@/server/api/router");
 let own: string;
@@ -59,6 +59,7 @@ describe("Zeiterfassung: API", () => {
     assert.equal(await env.db.timeEntry.count(), 1);
 
     assert.equal((await call("POST", "/time-entries/start", own, { body: {} })).status, 409, "es läuft schon einer");
+    await env.db.timeEntry.updateMany({ where: { id: first.json.data.id }, data: { startedAt: new Date(Date.now() - 3_600_000) } }); // die Pause muss in die Dauer passen
     const stopped = await call("POST", "/time-entries/stop", own, { body: { breakMinutes: 5 }, headers: { "idempotency-key": "k-stop-1" } });
     assert.equal(stopped.status, 200);
     assert.equal(stopped.json.data.running, false);
@@ -67,7 +68,7 @@ describe("Zeiterfassung: API", () => {
     assert.equal((await call("POST", "/time-entries/stop", own, { body: {} })).status, 422, "nichts läuft mehr");
   });
 
-  it("Lesen: eigene Zeiten; fremde sind 404; mit time.viewAll alle; 304 bei If-None-Match", async () => {
+  it("Lesen: nur eigene Zeiten, fremde sind 404 – auch mit time.viewAll im Scope (das Recht trägt kein Token); 304 bei If-None-Match", async () => {
     const mine = await call("POST", "/time-entries/start", own, { body: {} });
     await call("POST", "/time-entries/start", other, { body: {} });
     const list = await call("GET", "/time-entries", own);
@@ -76,15 +77,14 @@ describe("Zeiterfassung: API", () => {
     assert.equal(list.json.data[0].id, mine.json.data.id);
     const foreign = await env.db.timeEntry.findFirstOrThrow({ where: { employeeId: otherEmployee } });
     assert.equal((await call("GET", `/time-entries/${foreign.id}`, own)).status, 404);
-    assert.equal((await call("GET", `/time-entries/${foreign.id}`, viewAll)).status, 200);
-    assert.equal((await call("GET", "/time-entries", viewAll)).json.data.length, 2);
-    assert.equal((await call("GET", `/time-entries?employeeId=${otherEmployee}`, own)).json.data.length, 1, "der Filter schaltet fremde Zeiten für Eigene nicht frei");
-    assert.equal((await call("GET", `/time-entries?employeeId=${otherEmployee}`, own)).json.data[0].id, mine.json.data.id);
+    assert.equal((await call("GET", `/time-entries/${foreign.id}`, viewAll)).status, 404, "time.viewAll im Scope wirkt nicht: gesperrte Rechte fallen weg");
+    assert.equal((await call("GET", "/time-entries", viewAll)).json.data.length, 0, "der Chef hat selbst keinen Eintrag");
+    assert.equal((await call("GET", `/time-entries?employeeId=${otherEmployee}`, own)).status, 422, "den Filter nach Mitarbeitern gibt es nicht");
     const item = await call("GET", `/time-entries/${mine.json.data.id}`, own);
     assert.equal((await call("GET", `/time-entries/${mine.json.data.id}`, own, { headers: { "if-none-match": item.headers.get("etag")! } })).status, 304);
   });
 
-  it("Nachtragen: mit Begründung (422 ohne), für andere nur mit time.correctAll; Rechte: Lesen allein stempelt nicht", async () => {
+  it("Nachtragen: nur für sich selbst, mit Begründung (422 ohne); ein Feld employeeId gibt es nicht; Rechte: Lesen allein stempelt nicht", async () => {
     const day = addDaysToKey(dayKey(new Date()), -1);
     const body = { startDate: day, startTime: "08:00", endDate: day, endTime: "12:00", reason: "Stempeln vergessen" };
     const created = await call("POST", "/time-entries", own, { body });
@@ -92,7 +92,7 @@ describe("Zeiterfassung: API", () => {
     assert.equal(created.json.data.source, "manual");
     assert.equal(created.json.data.minutes, 240);
     assert.equal((await call("POST", "/time-entries", own, { body: { ...body, reason: "" } })).status, 422);
-    assert.equal((await call("POST", "/time-entries", own, { body: { ...body, startTime: "09:00", employeeId: otherEmployee } })).status, 403);
+    assert.equal((await call("POST", "/time-entries", own, { body: { ...body, startTime: "09:00", employeeId: otherEmployee } })).status, 422, "kein Nachtrag für andere über die API");
     assert.equal((await call("POST", "/time-entries", own, { body })).status, 422, "Überschneidung");
     assert.equal((await call("POST", "/time-entries/start", readOnly, { body: {} })).status, 403);
     assert.equal((await call("GET", "/time-entries", readOnly)).json.data.length, 0, "ohne Mitarbeiterprofil gibt es nichts zu sehen");

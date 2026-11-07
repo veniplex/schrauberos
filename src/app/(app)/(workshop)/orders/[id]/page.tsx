@@ -144,6 +144,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </form>
             ) : null}
           </div>
+          {canClose && (status === "in_progress" || status === "ready") ? <PageSections session={session} host="orders/close" entityId={order.id} wrap={(children) => <div className="mt-3 flex flex-col gap-2">{children}</div>} /> : null}
           {status === "picked_up" ? <p className="mt-3 text-sm text-ink-muted">{t("orders.closedNote")}</p> : null}
         </Card>
       ) : null}

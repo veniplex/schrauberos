@@ -174,4 +174,31 @@ describe("Abschnitt „Zeiten“ am Auftrag", () => {
     assert.doesNotMatch(plain(root.textContent), /Zeiten als Positionen übernehmen/);
     assert.match(plain(root.textContent), /keine eigenen/, "fremde Zeilen sind verborgen, die Summe nicht");
   });
+
+  it("Hinweis vor dem Abschließen (orders/close): nennt laufende und nicht übernommene Zeiten, sperrt nichts, schweigt ohne offene Zeiten", async () => {
+    await login(ALL);
+    const { sections } = await import("./sections");
+    const hint = sections.find((section) => section.host === "orders/close")!;
+    const session = (await (await import("@/server/auth/session")).getSession())!;
+    let root = await render(await hint.Component({ entityId: orderId, session }));
+    assert.match(plain(root.textContent), /4:00 Stunden Arbeitszeit sind noch nicht als Positionen übernommen/);
+    assert.match(plain(root.textContent), /Wieder öffnen/);
+    await view!.unmount();
+    const vehicle = await env.db.vehicle.create({ data: { plate: "B-ZT 2", plateNorm: "BZT2" } });
+    const quiet = await env.db.order.create({ data: { number: "A-2026-0002", status: "in_progress", vehicleId: vehicle.id } });
+    root = await render(await hint.Component({ entityId: quiet.id, session }));
+    assert.equal(plain(root.textContent), "");
+  });
+
+  it("Korrekturformular ohne Auftragsauswahl (Aufträge aus oder ohne Recht) behält den Auftrag über ein verstecktes Feld", async () => {
+    const { CorrectForm } = await import("./entry-forms");
+    const initial = { startDate: "2026-01-02", startTime: "08:00", endDate: "2026-01-02", endTime: "09:00", breakMinutes: "0", orderId: "order-1", activity: "", note: "" };
+    let root = await render(createElement(CorrectForm, { id: "e1", version: "v", initial, orders: [], running: false, cancelHref: "/time" }));
+    assert.equal((root.querySelector("input[name=\"orderId\"]") as HTMLInputElement | null)?.value, "order-1");
+    assert.equal(root.querySelector("select[name=\"orderId\"]"), null);
+    await view!.unmount();
+    root = await render(createElement(CorrectForm, { id: "e1", version: "v", initial, orders: [{ id: "order-1", label: "A-1" }], running: false, cancelHref: "/time" }));
+    assert.ok(root.querySelector("select[name=\"orderId\"]"));
+    assert.equal(root.querySelector("input[name=\"orderId\"]"), null);
+  });
 });

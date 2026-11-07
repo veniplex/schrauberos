@@ -48,6 +48,14 @@ describe("Aufteilung auf Tage", () => {
     assert.deepEqual(parts.map((p) => [p.day, p.minutes]), [["2026-11-10", 90], ["2026-11-11", 360]]);
   });
 
+  it("eine Pause, die das erste Stück übersteigt, geht auf das nächste: die Summe der Stücke entspricht entryMinutes", () => {
+    const s = span("2026-11-10", "23:50", "00:30", 30, "2026-11-11");
+    assert.equal(entryMinutes(s, NOW), 10);
+    const parts = splitByDay(s, NOW, Z);
+    assert.deepEqual(parts.map((p) => [p.day, p.minutes]), [["2026-11-10", 0], ["2026-11-11", 10]]);
+    assert.equal(parts.reduce((sum, p) => sum + p.minutes, 0), entryMinutes(s, NOW));
+  });
+
   it("summiert je Tag Arbeitszeit, Lücken als Pause und erfasste Pausen", () => {
     const days = summarizeDays([span("2026-11-10", "07:00", "11:00"), span("2026-11-10", "11:45", "16:00", 10)], NOW, Z);
     const day = days.get("2026-11-10")!;

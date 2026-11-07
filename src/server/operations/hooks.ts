@@ -25,7 +25,7 @@ export type OperationHookDef = {
   /** Funktion, der der Hook gehört: läuft nur, wenn sie aktiv ist (außer `always`) */
   feature: FeatureId;
   /**
-   * Läuft auch bei **ausgeschalteter** Funktion. Nur für Hooks, die Bestandsdaten der Funktion bereinigen (Anonymisierung `customers.anonymize`): Die Daten bleiben bei
+   * Läuft auch bei **ausgeschalteter** Funktion. Nur für Hooks, die Bestandsdaten der Funktion bereinigen oder abgleichen (Anonymisierung `customers.anonymize`, Markierungen übernommener Zeiten): Die Daten bleiben bei
    * ausgeschalteter Funktion in der Datenbank und kämen beim Wiedereinschalten zurück. Fachliche Folgehooks (Status, Lager …) gehören nie hierher.
    */
   always?: boolean;

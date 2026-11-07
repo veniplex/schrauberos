@@ -39,6 +39,10 @@ function EntryFields({ initial, orders, running }: { initial: EntryFormValues; o
       <Field label={t("time.fields.break")} htmlFor="breakMinutes" name="breakMinutes" hint={t("time.fields.breakHint")}>
         <Input id="breakMinutes" name="breakMinutes" type="number" inputMode="numeric" min={0} max={600} defaultValue={initial.breakMinutes} />
       </Field>
+      {orders.length === 0 && initial.orderId ? (
+        // Auswahl nicht angeboten (Aufträge aus oder kein Recht zum Ansehen): der Auftrag bleibt unverändert, statt still gelöst zu werden
+        <input type="hidden" name="orderId" value={initial.orderId} />
+      ) : null}
       {orders.length > 0 ? (
         <Field label={t("time.fields.order")} htmlFor="orderId" name="orderId">
           <Select id="orderId" name="orderId" defaultValue={initial.orderId}>

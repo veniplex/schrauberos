@@ -1,7 +1,7 @@
 import { Clock } from "lucide-react";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Field, Select } from "@/components/ui/form";
-import { Card, StatusBadge, TextLink } from "@/components/ui/layout";
+import { Alert, Card, StatusBadge, TextLink } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import type { SectionDef, SectionProps } from "@/modules/types";
 import { orderRef } from "@/modules/workshop/orders/public";
@@ -74,6 +74,23 @@ async function OrderTimesSection({ entityId, session }: SectionProps) {
   );
 }
 
+/**
+ * Beitrag zum Statusbereich der Auftragsseite (Erweiterungspunkt `orders/close`): ein ruhiger Hinweis vor dem Abschließen, wenn noch Zeiten laufen oder nicht als Positionen übernommen sind (nur Zahlen, keine Namen).
+ * **Keine Sperre:** Der Abschluss bleibt möglich; nach dem Abschluss lassen sich Zeiten nur über „Wieder öffnen“ übernehmen.
+ */
+async function CloseHintSection({ entityId, session }: SectionProps) {
+  const [{ t, tp }, times] = await Promise.all([getI18n(), orderTimes(session, entityId)]);
+  if (times.running === 0 && times.openMinutes === 0) return null;
+  return (
+    <Alert tone="warning">
+      {times.running > 0 ? <>{tp("time.section.closeHintRunning", times.running)} </> : null}
+      {times.openMinutes > 0 ? <>{t("time.section.closeHintOpen", { duration: formatDuration(times.openMinutes) })} </> : null}
+      {t("time.section.closeHintAfter")}
+    </Alert>
+  );
+}
+
 export const sections: SectionDef[] = [
   { id: "time-order", feature: "office.time", host: "orders/detail", permission: "time.view", order: 30, uses: ["workshop.orders"], Component: OrderTimesSection },
+  { id: "time-order-close", feature: "office.time", host: "orders/close", permission: "time.view", order: 30, uses: ["workshop.orders"], Component: CloseHintSection },
 ];

@@ -133,7 +133,7 @@ export async function getEntry(viewer: TimeViewer, id: string): Promise<EntryDet
   });
   if (!row || (row.employeeId !== mine?.id && !viewer.can("time.viewAll"))) return null;
   const [entry] = await decorate(viewer, [row], mine?.id ?? null);
-  const prevOrders = viewer.features.has("workshop.orders") ? await orderLabels(row.corrections.flatMap((c) => (c.prevOrderId ? [c.prevOrderId] : []))) : new Map();
+  const prevOrders = viewer.features.has("workshop.orders") && viewer.can("orders.view") ? await orderLabels(row.corrections.flatMap((c) => (c.prevOrderId ? [c.prevOrderId] : []))) : new Map();
   return { ...entry, corrections: row.corrections.map(({ prevOrderId, ...c }) => ({ ...c, prevOrderNumber: prevOrderId ? (prevOrders.get(prevOrderId)?.number ?? null) : null })) };
 }
 
@@ -226,18 +226,17 @@ export type OrderTimes = {
 export async function orderTimes(viewer: TimeViewer, orderId: string, now = new Date()): Promise<OrderTimes> {
   const mine = await myEmployee(viewer);
   const all = viewer.can("time.viewAll");
-  const rows = await db.timeEntry.findMany({
-    where: { orderId, voidedAt: null },
-    orderBy: { startedAt: "desc" },
-    select: { ...ENTRY_SELECT },
-  });
-  const done = rows.filter((r) => r.endedAt !== null);
-  const sum = (list: typeof rows) => list.reduce((total, r) => total + entryMinutes(r, now), 0);
-  const visible = rows.filter((r) => all || r.employeeId === mine?.id);
+  // Summen über alle Mitarbeiter: nur die Zeiten (kein Freitext, keine Kennung); Einzelzeilen nur die sichtbaren – fremde Zeilen werden ohne time.viewAll nie aus der Datenbank gelesen
+  const [sums, visible] = await Promise.all([
+    db.timeEntry.findMany({ where: { orderId, voidedAt: null }, select: { startedAt: true, endedAt: true, breakMinutes: true, transferredAt: true } }),
+    all || mine ? db.timeEntry.findMany({ where: { orderId, voidedAt: null, ...(all ? {} : { employeeId: mine!.id }) }, orderBy: { startedAt: "desc" }, select: { ...ENTRY_SELECT } }) : Promise.resolve([]),
+  ]);
+  const done = sums.filter((r) => r.endedAt !== null);
+  const sum = (list: typeof sums) => list.reduce((total, r) => total + entryMinutes(r, now), 0);
   return {
     totalMinutes: sum(done),
     openMinutes: sum(done.filter((r) => r.transferredAt === null)),
-    running: rows.length - done.length,
+    running: sums.length - done.length,
     entries: await decorate(viewer, visible, mine?.id ?? null),
   };
 }

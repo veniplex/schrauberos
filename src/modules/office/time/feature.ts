@@ -12,7 +12,7 @@ export const timeFeature = defineFeature({
   order: 45,
   defaultEnabled: false,
   requires: ["office.employees"],
-  uses: ["workshop.orders"],
+  uses: ["workshop.orders", "workshop.customers"], // customers: nur der Hook der Anonymisierung (Notiz/Tätigkeit der Zeiten auf Aufträgen des Kunden)
   permissions: {
     group: "time",
     keys: ["time.view", "time.stamp", "time.correct", "time.viewAll", "time.correctAll"],

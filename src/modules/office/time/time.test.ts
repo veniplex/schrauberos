@@ -5,6 +5,7 @@ import { addDaysToKey, dayKey, parseZoned, timeKey } from "@/lib/zone";
 import type { AppSession } from "@/server/auth/session";
 import type { Outcome } from "@/server/operations/operation";
 import { createTestEnv, type TestEnv } from "@/test/harness";
+import { withWorkshopZone } from "@/test/zone";
 
 /**
  * Zeiterfassung gegen eine echte temporäre SQLite: Stempeln (genau ein laufender Eintrag, auch bei gleichzeitigem Start; Idempotenz-Schlüssel), Korrigieren/Stornieren/Nachtragen mit Pflicht-Begründung
@@ -89,6 +90,7 @@ describe("Stempeln", () => {
     assert.equal(running.endedAt, null);
     assert.equal(running.activity, "Bremsen");
     assert.equal(failure(await ops.startTimeOperation.execute(staff, {})).code, "duplicate");
+    await env.db.timeEntry.update({ where: { id: started.id }, data: { startedAt: new Date(Date.now() - 3_600_000) } });
     out(await ops.stopTimeOperation.execute(staff, { breakMinutes: "10" }));
     const stopped = await entry(started.id);
     assert.ok(stopped.endedAt);
@@ -96,6 +98,14 @@ describe("Stempeln", () => {
     assert.equal(stopped.breakMinutes, 10);
     assert.equal(failure(await ops.stopTimeOperation.execute(staff, {})).key, "time.errors.notRunning", "es läuft nichts mehr");
     assert.ok((await env.db.auditLog.count({ where: { action: { in: ["time.start", "time.stop"] } } })) === 2);
+  });
+
+  it("Beenden mit einer Pause, die länger als die Dauer ist, wird abgelehnt – der Eintrag läuft weiter", async () => {
+    const { session } = await sessionFor(STAFF, { employee: { firstName: "Pia", lastName: "Pause" } });
+    const started = out(await ops.startTimeOperation.execute(session, {}));
+    assert.equal(failure(await ops.stopTimeOperation.execute(session, { breakMinutes: "600" })).fields?.breakMinutes?.key, "time.errors.breakTooLong");
+    assert.equal((await entry(started.id)).endedAt, null);
+    out(await ops.stopTimeOperation.execute(session, {}));
   });
 
   it("gleichzeitiger Start (zwei Geräte, verschiedene Schlüssel): genau einer gelingt", async () => {
@@ -182,6 +192,22 @@ describe("Korrigieren, stornieren, nachtragen", () => {
     assert.equal(failure(await ops.addManualTimeOperation.execute(staff, times(yesterday(), "12:00", "08:00"))).fields?.endTime?.key, "time.errors.endBeforeStart");
     assert.equal(failure(await ops.addManualTimeOperation.execute(staff, times(yesterday(), "08:00", "09:00", { breakMinutes: 90 }))).fields?.breakMinutes?.key, "time.errors.breakTooLong");
     assert.equal(failure(await ops.addManualTimeOperation.execute(staff, { startDate: yesterday(), startTime: "08:00", reason: "Stempeln vergessen" })).fields?.endDate?.key, "validation.required");
+  });
+
+  it("Korrektur ändert unveränderte Zeitpunkte nicht – auch nicht in der doppelten Stunde der Zeitumstellung (02:30 gibt es zweimal)", async () => {
+    await withWorkshopZone("Europe/Berlin", async () => {
+      const second = new Date(Date.UTC(2026, 9, 25, 1, 30)); // 02:30 MEZ, die zweite 02:30
+      const row = await env.db.timeEntry.create({ data: { employeeId: staffEmployee, startedAt: second, endedAt: new Date(Date.UTC(2026, 9, 25, 3, 30)), breakMinutes: 0, source: "manual" } });
+      out(await ops.correctTimeOperation.execute(staff, { id: row.id, version: versionOf(row), startDate: "2026-10-25", startTime: "02:30", endDate: "2026-10-25", endTime: "04:30", breakMinutes: "15", reason: "Pause nachgetragen" }));
+      const after = await entry(row.id);
+      assert.equal(after.startedAt.getTime(), second.getTime());
+      assert.equal(after.endedAt!.getTime(), Date.UTC(2026, 9, 25, 3, 30));
+      assert.equal(after.breakMinutes, 15);
+      // ein geänderter Wert wird dagegen neu gelesen
+      out(await ops.correctTimeOperation.execute(staff, { id: row.id, version: await versionNow(row.id), startDate: "2026-10-25", startTime: "03:00", endDate: "2026-10-25", endTime: "04:30", breakMinutes: "0", reason: "Beginn geändert" }));
+      assert.equal(timeKey((await entry(row.id)).startedAt), "03:00");
+      await env.db.timeEntry.delete({ where: { id: row.id } }).catch(() => undefined);
+    });
   });
 
   it("Überschneidungen werden abgelehnt (auch gegen den laufenden Eintrag), Anschluss ohne Lücke ist erlaubt", async () => {
@@ -328,6 +354,39 @@ describe("Zeiten als Positionen übernehmen", () => {
     assert.equal(failure(await ops.correctTimeOperation.execute(staff, { id: a.id, version: versionOf(rowA), ...times(yesterday(), "08:00", "10:00", { reason: "nachträglich" }) })).key, "time.errors.transferred");
     assert.equal(failure(await ops.voidTimeOperation.execute(staff, { id: a.id, version: versionOf(rowA), reason: "nachträglich" })).key, "time.errors.transferred");
     assert.equal(await env.db.auditLog.count({ where: { action: "time.transfer" } }), 1);
+  });
+
+  it("Position im Auftrag gelöscht: die Zeit ist wieder übernehmbar; behaltene Positionen führen die Kennung nach; Verweise auf fremde oder nicht übernommene Zeiten werden abgelehnt", async () => {
+    const order = await newOrder();
+    const a = await done(order, staff, yesterday(), "08:00", "09:00", { activity: "Bremsen" });
+    const b = await done(order, staff2, yesterday(), "10:00", "11:00");
+    out(await ops.transferTimeOperation.execute(advisor, { orderId: order, unit: "h", label: "Arbeitszeit" }));
+    const save = async (items: unknown[]) => orderOps.saveItemsOperation.execute(advisor, { id: order, version: versionOf(await env.db.order.findUniqueOrThrow({ where: { id: order } })), items: JSON.stringify(items) });
+    const line = (refId: string) => ({ description: "Arbeitszeit", unit: "h", quantityMilli: 1000, unitCents: 9000, taxBp: 1900, kind: "labor", refType: "time", refId });
+    // eine Position bleibt (neue Kennung), die andere entfällt
+    out(await save([line(a.id)]));
+    const kept = await env.db.orderItem.findFirstOrThrow({ where: { orderId: order, refId: a.id } });
+    assert.equal((await entry(a.id)).transferredItemId, kept.id);
+    assert.ok((await entry(a.id)).transferredAt);
+    const freed = await entry(b.id);
+    assert.equal(freed.transferredAt, null);
+    assert.equal(freed.transferredItemId, null);
+    // die freigewordene Zeit lässt sich erneut übernehmen, und sie ist wieder korrigierbar
+    assert.equal(failure(await ops.correctTimeOperation.execute(staff, { id: a.id, version: await versionNow(a.id), ...times(yesterday(), "08:00", "10:00", { reason: "x1234" }) })).key, "time.errors.transferred");
+    out(await ops.correctTimeOperation.execute(staff2, { id: b.id, version: versionOf(freed), ...times(yesterday(), "10:00", "11:30", { reason: "länger gearbeitet", orderId: order }) }));
+    const again = out(await ops.transferTimeOperation.execute(advisor, { orderId: order, unit: "h", label: "Arbeitszeit" }));
+    assert.deepEqual([again.entries, again.positions, again.minutes], [1, 1, 90]);
+    // alle Positionen weg: beide Zeiten frei
+    out(await save([]));
+    assert.equal(await env.db.timeEntry.count({ where: { orderId: order, transferredAt: { not: null } } }), 0);
+    // Verweise: nicht übernommen, fremder Auftrag, doppelt, erfunden
+    const other = await newOrder();
+    const foreign = await done(other, staff, yesterday(), "12:00", "13:00");
+    out(await ops.transferTimeOperation.execute(advisor, { orderId: other }));
+    for (const refId of [a.id, foreign.id, "erfunden"]) assert.ok(failure(await save([line(refId)])).fields?.["items.0.refId"], refId);
+    out(await ops.transferTimeOperation.execute(advisor, { orderId: order, unit: "h" }));
+    assert.ok(failure(await save([line(a.id), line(a.id)])).fields?.["items.1.refId"], "doppelt");
+    assert.equal(await env.db.orderItem.count({ where: { orderId: order, refType: "time" } }), 2, "abgelehnte Speicherung ändert nichts");
   });
 
   it("Arbeitswerte: Menge in AW (Minuten aus dem Profil), Satz je AW", async () => {

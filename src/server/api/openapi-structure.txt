@@ -141,8 +141,8 @@ POST /orders/{id}/status orders.status orders.edit body=status
 GET /stock-movements stock-movements.list parts.view query=articleId,kind,orderId sort=createdAt
 POST /stock-movements stock-movements.create parts.stock body=articleId,quantityMilli,reference,note
 GET /stock-movements/{id} stock-movements.get parts.view
-GET /time-entries time-entries.list time.view query=from,to,employeeId,orderId,running,voided sort=startedAt
-POST /time-entries time-entries.create time.correct body=employeeId,startDate,startTime,endDate,endTime,breakMinutes,orderId,activity,note,reason
+GET /time-entries time-entries.list time.view query=from,to,orderId,running,voided sort=startedAt
+POST /time-entries time-entries.create time.correct body=startDate,startTime,endDate,endTime,breakMinutes,orderId,activity,note,reason
 GET /time-entries/{id} time-entries.get time.view
 POST /time-entries/start time-entries.start time.stamp body=orderId,activity
 POST /time-entries/stop time-entries.stop time.stamp body=breakMinutes
