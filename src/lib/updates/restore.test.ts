@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, beforeEach, describe, it } from "node:test";
-import { applyPendingRestore, cancelPending, confirmRestore, pendingDbFile, pendingFilesDir, readApplied, readPending, readRestoreResult, restoreDir, rollbackRestore, writePending } from "./restore";
+import { applyPendingRestore, cancelPending, confirmRestore, pendingDbFile, pendingFilesDir, pendingSecretKeyFile, readApplied, readPending, readRestoreResult, restoreDir, rollbackRestore, writePending, writePendingSecretKey } from "./restore";
 
 const data = mkdtempSync(path.join(tmpdir(), "so-restore-"));
 const dbFile = path.join(data, "schrauberos.db");
@@ -113,5 +113,60 @@ describe("Wiederherstellung", () => {
     writeFileSync(pendingDbFile(data), "X");
     writeFileSync(path.join(restoreDir(data), "pending.json"), "kaputt");
     assert.equal(readPending(data), null);
+  });
+
+  describe("mit Geheimnisschlüssel (Wiederherstellung mit Wiederherstellungsschlüssel)", () => {
+    const secretFile = path.join(data, "secret.key");
+    const withKey = { ...info, secretKey: true };
+    const stageKey = () => {
+      stage("NEU", withKey);
+      writePendingSecretKey("n".repeat(64), data);
+    };
+
+    it("setzt secret.key im selben Schritt ein; der bisherige wandert zur Seite und wird mit der Bestätigung gelöscht", () => {
+      writeFileSync(secretFile, "a".repeat(64));
+      stageKey();
+      assert.deepEqual(readPending(data), withKey);
+      applyPendingRestore(dbFile, data);
+      assert.equal(readFileSync(secretFile, "utf8"), "n".repeat(64));
+      assert.equal(readFileSync(path.join(restoreDir(data), "replaced-secret.key"), "utf8"), "a".repeat(64));
+      assert.equal(existsSync(pendingSecretKeyFile(data)), false);
+      confirmRestore(readApplied(data)!, "t", data);
+      assert.equal(existsSync(path.join(restoreDir(data), "replaced-secret.key")), false);
+      assert.equal(readFileSync(secretFile, "utf8"), "n".repeat(64));
+    });
+
+    it("Rückfall bringt den bisherigen Schlüssel zurück", () => {
+      writeFileSync(secretFile, "a".repeat(64));
+      stageKey();
+      const applied = applyPendingRestore(dbFile, data)!;
+      rollbackRestore(dbFile, applied, "x", "t", data);
+      assert.equal(readFileSync(secretFile, "utf8"), "a".repeat(64));
+      assert.equal(readFileSync(dbFile, "utf8"), "ALT");
+    });
+
+    it("Rückfall ohne bisherigen Schlüssel (frisches Volume) entfernt den eingesetzten", () => {
+      rmSync(secretFile, { force: true });
+      stageKey();
+      const applied = applyPendingRestore(dbFile, data)!;
+      assert.equal(existsSync(secretFile), true);
+      rollbackRestore(dbFile, applied, "x", "t", data);
+      assert.equal(existsSync(secretFile), false);
+    });
+
+    it("ohne Vermerk bleibt secret.key unberührt; Abbrechen verwirft den bereitgelegten Schlüssel", () => {
+      writeFileSync(secretFile, "a".repeat(64));
+      stage("NEU");
+      applyPendingRestore(dbFile, data);
+      assert.equal(readFileSync(secretFile, "utf8"), "a".repeat(64));
+      stageKey();
+      cancelPending(data);
+      assert.equal(existsSync(pendingSecretKeyFile(data)), false);
+    });
+
+    it("legt den bereitgelegten Schlüssel nur für den Besitzer lesbar ab", () => {
+      stageKey();
+      if (process.platform !== "win32") assert.equal(statSync(pendingSecretKeyFile(data)).mode & 0o777, 0o600);
+    });
   });
 });

@@ -46,6 +46,11 @@ function create() {
       /** Audit für Fehlversuche: insgesamt höchstens einer alle 10 s und 6 pro Minute */
       audit: new RateWindow({ perKeyMs: 10_000, globalLimit: 6, globalWindowMs: 60_000, maxKeys: 4, now }),
     },
+    /**
+     * Eingabe des Wiederherstellungsschlüssels beim Restore (Verwaltung und Einrichtung): **nur global**, nie pro Konto. Das Budget verlangsamt (ab 5 Versuchen pro Minute je 500 ms mehr, höchstens
+     * 8 s), weist aber nie ab. Der Schlüssel hat 256 Bit – Raten ist aussichtslos; die Drosselung hält Dauerbeschuss klein. Eigener Pfad, nicht die scrypt-Semaphoren der Anmeldung.
+     */
+    recoveryKey: new FailureBudget({ limit: 5, windowMs: 60_000, stepMs: 500, maxDelayMs: 8_000, maxStamps: 2_000, now }),
     /** Audit-Einträge für Fehlversuche beim zweiten Faktor: je Konto höchstens einer pro Minute, insgesamt höchstens 30 pro Minute. */
     audit2fa: new RateWindow({ perKeyMs: 60_000, globalLimit: 30, globalWindowMs: 60_000, maxKeys: 2_000, now }),
     /** Audit-Einträge für Fehlversuche: je Konto höchstens einer pro Minute, insgesamt höchstens 30 pro Minute. */

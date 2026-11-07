@@ -9,15 +9,21 @@ import { dataDir } from "@/lib/updates/store";
  * Nach einem Restore auf einem anderen System müssen sie neu eingegeben werden.
  */
 
-const keyFile = () => path.join(dataDir(), "secret.key");
+export const secretKeyFile = (data = dataDir()) => path.join(data, "secret.key");
+const keyFile = () => secretKeyFile();
 
 function key(): Buffer {
+  return Buffer.from(secretKeyHex(), "hex");
+}
+
+/** Der Geheimnisschlüssel als Hex-Text (64 Zeichen); fehlt die Datei, wird ein neuer erzeugt. Nur für die Umhüllung mit dem Wiederherstellungsschlüssel (`recovery-key.ts`) – sonst nie weitergeben. */
+export function secretKeyHex(): string {
   const file = keyFile();
   if (!existsSync(file)) {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, randomBytes(32).toString("hex"), { mode: 0o600, flag: "wx" });
   }
-  return Buffer.from(readFileSync(file, "utf8").trim(), "hex");
+  return readFileSync(file, "utf8").trim();
 }
 
 export function encryptSecret(plain: string): string {
