@@ -65,7 +65,7 @@ describe("Proxy: Matcher", () => {
 
   it("/api/backups/upload läuft nicht durch den Proxy (Next puffert und kappt dort den Body bei 10 MiB), ähnliche Pfade schon", () => {
     assert.equal(matched("/api/backups/upload"), false);
-    for (const path of ["/api/backups/upload/x", "/api/backups/uploads", "/api/backups/status", "/api/backups/schrauberos-1", "/api/docs/images"]) {
+    for (const path of ["/api/backups/upload/x", "/api/backups/uploads", "/api/setup/restore/x", "/api/setup", "/api/backups/status", "/api/backups/schrauberos-1", "/api/docs/images"]) {
       assert.equal(matched(path), true, `${path} muss durch den Proxy laufen`);
     }
   });

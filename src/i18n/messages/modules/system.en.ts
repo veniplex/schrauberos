@@ -67,7 +67,7 @@ export const systemEn: typeof systemDe = {
     cron: "{cron} (workshop local time)",
   },
   names: {
-    backup: { auto: "Automatic backup", retention: "Clean up backups (retention)" },
+    backup: { auto: "Automatic backup", offsite: "Transfer off-site backup", retention: "Clean up backups (retention)" },
     audit: { retention: "Clean up audit log (retention)" },
     platform: {
       outbox: "Deliver events (outbox)",

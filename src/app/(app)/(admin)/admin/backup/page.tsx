@@ -11,8 +11,10 @@ import { requirePermission } from "@/server/auth/session";
 import { listBackups } from "@/server/backup/core";
 import { autoBackupFailing } from "@/server/backup/status";
 import { getBackupSettings } from "@/server/backup/settings";
+import { getOffsiteSettings } from "@/server/backup/offsite/settings";
 import { jobStateOf } from "@/server/jobs/status";
 import { removeBackup } from "@/modules/admin/backup/actions";
+import { BackupTabs } from "@/modules/admin/backup/backup-tabs";
 import { BACKUP_KIND_TONE } from "@/modules/admin/backup/status-tone";
 import { CreateBackupForm, RestoreForm, RestoreWatcher, RetryAutoBackupForm, UploadForm } from "@/modules/admin/backup/panels";
 
@@ -26,9 +28,9 @@ function size(bytes: number) {
 }
 
 export default async function BackupPage() {
-  await requirePermission("backup.manage");
+  const session = await requirePermission("backup.manage");
   const { t, td, tp, date } = await getI18n();
-  const [settings, backups, autoJob] = [await getBackupSettings(), await listBackups(), await jobStateOf("backup.auto")];
+  const [settings, backups, autoJob, offsite, offsiteJob] = [await getBackupSettings(), await listBackups(), await jobStateOf("backup.auto"), await getOffsiteSettings(), await jobStateOf("backup.offsite")];
   const pending = readPending();
   const result = readRestoreResult();
   const when = (d: Date | string) => date(d, { dateStyle: "medium", timeStyle: "short" });
@@ -36,6 +38,7 @@ export default async function BackupPage() {
   return (
     <>
       <PageHeader title={t("backup.title")} description={t("backup.description")} help="admin.backup" />
+      <BackupTabs active="backups" session={session} />
       <div className="flex max-w-4xl flex-col gap-5">
         {pending ? (
           <RestoreWatcher labels={{ restarting: t("backup.restoring"), timeout: t("backup.restoreTimeout") }} />
@@ -55,6 +58,21 @@ export default async function BackupPage() {
               next: autoJob.nextRunAt ? when(autoJob.nextRunAt) : "–",
             })}
             <RetryAutoBackupForm label={t("backup.retry.button")} />
+          </Alert>
+        ) : null}
+
+        {offsite.enabled && offsiteJob && offsiteJob.failures > 0 ? (
+          <Alert tone="danger">
+            {tp("backup.offsite.failed", offsiteJob.failures, {
+              date: offsiteJob.lastRunAt ? when(offsiteJob.lastRunAt) : "–",
+              reason: offsiteJob.lastMessage ?? "–",
+              next: offsiteJob.nextRunAt ? when(offsiteJob.nextRunAt) : "–",
+            })}
+            <span className="mt-2 block">
+              <LinkButton size="sm" href="/admin/backup/offsite">
+                {t("backup.tabs.offsite")}
+              </LinkButton>
+            </span>
           </Alert>
         ) : null}
 
@@ -111,7 +129,12 @@ export default async function BackupPage() {
               hint: t("backup.upload.hint"),
               uploading: t("backup.upload.uploading"),
               done: t("backup.upload.done"),
+              keyLabel: t("backup.upload.keyLabel"),
+              keyHint: t("backup.upload.keyHint"),
               errors: {
+                keyRequired: t("backup.errors.keyRequired"),
+                keyFormat: t("backup.errors.keyFormat"),
+                wrongKey: t("backup.errors.wrongKey"),
                 notBackup: t("backup.errors.notBackup"),
                 corrupt: t("backup.errors.corrupt"),
                 newer: t("backup.errors.newer"),

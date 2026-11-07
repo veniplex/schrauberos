@@ -3,13 +3,13 @@ import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
 import { logError } from "@/lib/log-safe";
 import { writeAudit } from "@/server/audit";
-import { resetUnreadableSecondFactors } from "@/server/auth/second-factor";
 import { loadCspMode } from "@/server/csp-setting";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
 import { startJobRunner } from "@/server/jobs";
 import { appliedMigrations, MigrationError, runMigrations } from "@/server/migrate";
 import { ensureBaseData } from "@/server/seed/base";
+import { resetUnreadableSecrets } from "@/server/secret-reset";
 import { ensureSetupToken } from "@/server/setup-token";
 import { startupState, type StartupState } from "@/server/startup-state";
 
@@ -74,9 +74,10 @@ export async function startApp(): Promise<void> {
     await loadCspMode();
     const revoked = await revokeApiTokensAfterRestore();
     if (revoked > 0) console.log(`[start] Nach der Wiederherstellung: ${revoked} API-Token(s) widerrufen.`);
-    // Backup ohne passenden Schlüssel (secret.key): Die Geheimnisse der Zwei-Faktor-Anmeldung sind unlesbar – für alle Konten zurücksetzen (Hinweis beim ersten Login, Audit)
-    const twoFactorReset = await resetUnreadableSecondFactors().catch((error) => (logError("start:twoFactor", error), 0));
-    if (twoFactorReset > 0) console.log(`[start] Zwei-Faktor-Anmeldung für ${twoFactorReset} Konto/Konten zurückgesetzt (Schlüssel passt nicht zum Backup).`);
+    // Backup ohne passenden Schlüssel (secret.key) und ohne Wiederherstellungsschlüssel: Alle Geheimnisse, die nicht mehr lesbar sind (Zwei-Faktor-Anmeldung, Update-Token, Zugangsdaten …),
+    // werden über das Register der Geheimnis-Verbraucher zurückgesetzt – mit Audit-Eintrag und Hinweis für Administratoren
+    const secretsReset = await resetUnreadableSecrets().catch((error) => (logError("start:secrets", error), []));
+    if (secretsReset.length > 0) console.log(`[start] Nicht lesbare Geheimnisse zurückgesetzt (Schlüssel passt nicht zum Backup): ${secretsReset.map((i) => `${i.id}=${i.count}`).join(", ")}`);
     const workshop = await db.workshop.findUnique({ where: { id: "default" }, select: { timezone: true } });
     if (workshop && !applyTimezone(workshop.timezone)) console.error(`[start] Unbekannte Zeitzone ${workshop.timezone}`);
 

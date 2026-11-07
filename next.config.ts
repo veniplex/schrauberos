@@ -17,7 +17,7 @@ export const SECURITY_HEADERS = [
  * Content-Security-Policy ohne Nonce (`script-src 'self'`); alles, was durch den Proxy läuft, bekommt sie vom Proxy mit Nonce – **nie beides**, denn Next hängt die Kopfzeile
  * einer Route nur an, wenn der Name noch fehlt, und zwei CSP-Köpfe verschärfen sich im Browser gegenseitig. `src/lib/csp.test.ts` prüft, dass sich beide Seiten ergänzen.
  */
-export const PROXY_FREE_PATHS = ["/_next/static/:path*", "/_next/image", "/favicon.ico", "/manifest.webmanifest", "/sw.js", "/icon.:ext", "/apple-icon.:ext", "/icons/:path*", "/api/health", "/api/backups/upload"];
+export const PROXY_FREE_PATHS = ["/_next/static/:path*", "/_next/image", "/favicon.ico", "/manifest.webmanifest", "/sw.js", "/icon.:ext", "/apple-icon.:ext", "/icons/:path*", "/api/health", "/api/backups/upload", "/api/setup/restore"];
 export const CSP_FALLBACK_HEADERS = [{ key: "Content-Security-Policy", value: contentSecurityPolicy({ dev: process.env.NODE_ENV !== "production" }) }];
 
 /** Grenzen für Anfrage-Bodies in Byte-Schreibweise von Next; der Proxy-Puffer muss größer sein als das Limit der Server Actions. */

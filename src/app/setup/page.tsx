@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
 import { ensureSetupToken } from "@/server/setup-token";
 import { SetupForm } from "./setup-form";
+import { SetupRestore } from "./setup-restore";
 import { Card } from "@/components/ui/layout";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,6 +44,7 @@ export default async function SetupPage() {
         <Card as="div">
           <SetupForm timezones={timezones.includes("Europe/Berlin") ? timezones : ["Europe/Berlin", ...timezones]} done={finished} />
         </Card>
+        {finished ? null : <SetupRestore />}
         <p className="mt-4 text-center text-xs text-ink-muted print:hidden">{t("setup.warning")}</p>
       </div>
     </main>

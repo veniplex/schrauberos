@@ -65,7 +65,7 @@ export const systemDe = {
     cron: "Zeitplan {cron} (Ortszeit der Werkstatt)",
   },
   names: {
-    backup: { auto: "Automatisches Backup", retention: "Backups aufräumen (Aufbewahrung)" },
+    backup: { auto: "Automatisches Backup", offsite: "Off-Site-Backup übertragen", retention: "Backups aufräumen (Aufbewahrung)" },
     audit: { retention: "Audit-Log aufräumen (Aufbewahrung)" },
     platform: {
       outbox: "Ereignisse zustellen",

@@ -12,6 +12,7 @@ import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { NAV_COOKIE, parseCollapsed } from "@/lib/nav-state";
 import type { AppSession } from "@/server/auth/session";
 import { RecoveryBanner } from "@/platform/account/recovery-banner";
+import { SecretsBanner } from "@/platform/account/secrets-banner";
 import { SecurityBanner } from "@/platform/account/security-banner";
 import { deviceCookieName } from "@/lib/session-cookie";
 import { FlashNotice } from "@/components/shell/flash-notice";
@@ -72,6 +73,7 @@ export async function AppShell({ session, children }: { session: AppSession; chi
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[88rem] px-4 py-6 outline-none sm:px-6 lg:py-8">
         <FlashNotice />
         <RecoveryBanner user={{ id: session.user.id, isAdmin: session.user.isAdmin }} />
+        <SecretsBanner user={{ isAdmin: session.user.isAdmin }} />
         <SecurityBanner userId={session.user.id} />
         {children}
       </main>

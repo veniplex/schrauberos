@@ -14,9 +14,9 @@ import { featureKey } from "@/modules/catalog-logic";
 
 const SRC = path.resolve(process.cwd(), "src");
 /** Kompositionswurzeln: dürfen die Beschreibungen und Beiträge aller Funktionen einsammeln. */
-const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts", "modules/pages.ts", "modules/operation-hooks.ts", "modules/api.ts", "modules/jobs.ts"]);
+const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts", "modules/pages.ts", "modules/operation-hooks.ts", "modules/api.ts", "modules/jobs.ts", "modules/secrets.ts"]);
 /** Dateien im Modul-Wurzelordner, die Plattform-Code importieren darf (Katalog, Aktivierung, Registry …). */
-const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "pages", "registry", "types", "default-roles", "operation-hooks", "api", "jobs"]);
+const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "pages", "registry", "types", "default-roles", "operation-hooks", "api", "jobs", "secrets"]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -200,6 +200,34 @@ describe("Job-Runner", () => {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
       const m = /^modules\/([a-z]+)\/([a-z]+)\/jobs\.ts$/.exec(rel);
       if (m && !root.includes(`./${m[1]}/${m[2]}/jobs`)) missing.push(rel);
+    }
+    assert.deepEqual(missing, []);
+  });
+});
+
+describe("Geheimnis-Verbraucher", () => {
+  it("jede secrets.ts einer Funktion ist in src/modules/secrets.ts eingetragen (sonst werden ihre Geheimnisse nach einem Restore ohne Schlüssel nie zurückgesetzt)", () => {
+    const root = readFileSync(path.join(SRC, "modules/secrets.ts"), "utf8");
+    const missing: string[] = [];
+    let found = 0;
+    for (const file of files) {
+      const rel = path.relative(SRC, file).split(path.sep).join("/");
+      const m = /^modules\/([a-z]+)\/([a-z]+)\/secrets\.ts$/.exec(rel);
+      if (!m) continue;
+      found++;
+      if (!root.includes(`./${m[1]}/${m[2]}/secrets`)) missing.push(rel);
+    }
+    assert.ok(found >= 2, "secrets.ts der Funktionen gefunden");
+    assert.deepEqual(missing, []);
+  });
+
+  it("jede Funktion, die setSecret benutzt, meldet einen Verbraucher an (secrets.ts) – sonst bliebe ihr Geheimnis nach einem Restore ohne Schlüssel unlesbar liegen", () => {
+    const missing: string[] = [];
+    for (const file of files) {
+      const rel = path.relative(SRC, file).split(path.sep).join("/");
+      const m = /^modules\/([a-z]+)\/([a-z]+)\//.exec(rel);
+      if (!m || /\/secrets\.ts$/.test(rel) || !/\bsetSecret\(|\bsaveOffsiteCredentials\(/.test(readFileSync(file, "utf8"))) continue;
+      if (!files.some((f) => path.relative(SRC, f).split(path.sep).join("/") === `modules/${m[1]}/${m[2]}/secrets.ts`)) missing.push(rel);
     }
     assert.deepEqual(missing, []);
   });

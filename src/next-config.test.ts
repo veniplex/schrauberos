@@ -43,7 +43,7 @@ describe("next.config: Basis-Header", () => {
   it("die Rückfall-CSP gilt genau für die Pfade außerhalb des Proxys – und für keinen Pfad, den der Proxy bedient", async () => {
     const rules = await nextConfig.headers!();
     const withCsp = (path: string) => rules.filter((rule) => pathToRegexp(rule.source).test(path) && rule.headers.some((h) => h.key === "Content-Security-Policy"));
-    for (const path of ["/_next/static/chunks/a.js", "/_next/image", "/sw.js", "/manifest.webmanifest", "/favicon.ico", "/icons/192.png", "/icon.png", "/apple-icon.png", "/api/health", "/api/backups/upload"]) {
+    for (const path of ["/_next/static/chunks/a.js", "/_next/image", "/sw.js", "/manifest.webmanifest", "/favicon.ico", "/icons/192.png", "/icon.png", "/apple-icon.png", "/api/health", "/api/backups/upload", "/api/setup/restore"]) {
       assert.equal(withCsp(path).length, 1, `${path}: genau eine Rückfall-Regel erwartet`);
     }
     for (const path of ["/", "/login", "/appointments", "/api/v1/customers", "/api/ical/abc.ics", "/api/invoices/xyz/file", "/api/docs/images/abc", "/api/backups/status", "/api/healthz", "/icons-secret"]) {

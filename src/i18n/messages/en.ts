@@ -364,6 +364,7 @@ export const en: Messages = {
     },
     backup: {
       manage: "Manage and restore backups",
+      keys: "Create and confirm the recovery key",
     },
     modules: {
       manage: "Switch modules and features on/off",

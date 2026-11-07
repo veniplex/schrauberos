@@ -9,9 +9,6 @@ import { loginThrottle } from "@/server/auth/throttle";
  * dem sechsten Versuch pro Minute, weist aber nie ab; es gibt keine Sperre pro Konto und keine scrypt-Semaphore (eigener Pfad, nichts hinter einer Flut von Anmeldungen).
  * Ohne Datenbankzugriff, damit der Restore-Code sie ohne den Datenbankclient laden kann.
  */
-/** Einstellung in der Datenbank, die den mit dem Wiederherstellungsschlüssel umhüllten Geheimnisschlüssel enthält (gelesen auch aus fremden Datenbankdateien beim Restore). */
-export const WRAPPED_SETTING_KEY = "secrets.wrapped";
-
 export type KeyInput = { ok: true; key: Buffer; accept: () => void } | { ok: false; reason: "format" };
 
 /** Belegt einen Versuch (synchron, vor dem ersten `await`), wartet ggf. die Verlangsamung ab und liest die Eingabe. `accept()` gibt den Versuch zurück, wenn der Schlüssel gepasst hat. */

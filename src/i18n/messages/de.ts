@@ -364,6 +364,7 @@ export const de = {
     },
     backup: {
       manage: "Backups verwalten und wiederherstellen",
+      keys: "Wiederherstellungsschlüssel erzeugen und bestätigen",
     },
     modules: {
       manage: "Module und Funktionen ein-/ausschalten",

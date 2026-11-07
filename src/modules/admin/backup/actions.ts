@@ -10,7 +10,7 @@ import { RestoreError, stageRestore } from "@/server/backup/restore";
 import { BACKUP_KINDS } from "@/server/backup/kinds";
 import { RETENTION_MAX_DAYS, RETENTION_MAX_KEEP, saveBackupSettings, type BackupRetention } from "@/server/backup/settings";
 import { jobRunner } from "@/server/jobs";
-import { defineAction, defineOperation, fail } from "@/server/operations";
+import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { scheduleRestart } from "@/server/restart";
 
 const none = z.object({});
@@ -71,26 +71,37 @@ const removeBackupOperation = defineOperation({
 
 export const removeBackup = defineAction(removeBackupOperation, { revalidate: ["/admin/backup"], message: "common.deleted" });
 
-/** Stellt eine Sicherung wieder her: prüfen, aktuellen Stand sichern, vormerken – dann übernimmt der Launcher nach dem Neustart. */
+/**
+ * Stellt eine Sicherung wieder her: prüfen, aktuellen Stand sichern, vormerken – dann übernimmt der Launcher nach dem Neustart. Optional mit dem Wiederherstellungsschlüssel:
+ * Er öffnet die im Backup mitgelieferte Kopie von secret.key, die dann im selben Schritt eingesetzt wird (alle Geheimnisse bleiben lesbar). Ohne Schlüssel werden nicht lesbare
+ * Geheimnisse (Zwei-Faktor-Anmeldung, Update-Token, Zugangsdaten …) beim Start zurückgesetzt. Der Schlüssel steht nie im Audit-Log.
+ */
 const restoreBackupOperation = defineOperation({
   name: "admin.backup.restore",
   permission: "backup.manage",
-  input: z.object({ name: z.string().min(1).max(200) }),
+  input: z.object({ name: z.string().min(1).max(200), recoveryKey: z.string().max(200).optional() }),
   audit: "backup.restore",
   transaction: false,
   run: async ({ input, audit: setAudit, afterCommit }) => {
+    let secretKeyRestored = false;
     try {
-      await stageRestore(input.name);
+      secretKeyRestored = (await stageRestore(input.name, { recoveryKey: input.recoveryKey })).secretKeyRestored;
     } catch (error) {
-      if (error instanceof RestoreError) fail("failed", `backup.errors.${error.code}` as MessageKey);
+      if (error instanceof RestoreError) {
+        if (error.code === "keyFormat" || error.code === "wrongKey") failField("recoveryKey", `backup.errors.${error.code}` as MessageKey);
+        fail("failed", `backup.errors.${error.code}` as MessageKey);
+      }
       logError("backup", error);
       fail("failed", "backup.errors.restoreFailed");
     }
-    setAudit({ target: input.name });
+    setAudit({ target: secretKeyRestored ? `${input.name} · mit Wiederherstellungsschlüssel` : input.name });
     afterCommit(() => scheduleRestart());
     return { name: input.name };
   },
-  onFailure: ({ input, principal, failure }) => (failure?.code === "failed" ? audit("backup.restoreFailed", { target: input.name, actor: { id: principal.user.id, name: principal.user.name } }) : undefined),
+  onFailure: ({ input, principal, failure }) =>
+    failure?.code === "failed" || (failure?.code === "invalid" && failure.fields?.recoveryKey)
+      ? audit("backup.restoreFailed", { target: input.name, actor: { id: principal.user.id, name: principal.user.name } })
+      : undefined,
 });
 
 export const restoreBackup = defineAction(restoreBackupOperation, { message: "backup.restoring" });

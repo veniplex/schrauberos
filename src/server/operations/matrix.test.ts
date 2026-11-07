@@ -182,7 +182,8 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
 
 describe("Berechtigungs-Matrix: Route Handler", () => {
   // Ohne Anmeldung erreichbar (Liveness für Docker/Launcher); alles andere verlangt Sitzung und Recht
-  const PUBLIC = new Set(["app/api/health/route.ts"]);
+  // Wiederherstellung in der Einrichtung: eigene Prüfung (Einrichtungs-Token, nur ohne Benutzer) – siehe der Test darunter und `src/app/api/setup/restore/route.test.ts`
+  const PUBLIC = new Set(["app/api/health/route.ts", "app/api/setup/restore/route.ts"]);
   // Programmierschnittstelle: authentifiziert nur über Bearer-Token und ignoriert das Sitzungs-Cookie vollständig (eigene Matrix: server/api/matrix.test.ts)
   const TOKEN_ONLY = new Set(["app/api/v1/[...path]/route.ts"]);
   const call = (route: (typeof routes)[number], method: string, handler: (typeof routes)[number]["methods"][number][1]) =>
@@ -202,6 +203,15 @@ describe("Berechtigungs-Matrix: Route Handler", () => {
         for (const [method, handler] of route.methods) assert.equal((await call(route, method, handler)).status, 401, `${method} ${route.url} (${mode})`);
       }
     }
+  });
+
+  it("die Wiederherstellung der Einrichtung antwortet nach der Einrichtung (es gibt Benutzer) mit 409 und ändert nichts", async () => {
+    env.signOut();
+    const route = routes.find((r) => r.file === "app/api/setup/restore/route.ts");
+    assert.ok(route, "Route nicht gefunden");
+    const before = await snapshot();
+    for (const [method, handler] of route.methods) assert.equal((await call(route, method, handler)).status, 409, `${method} ${route.url}`);
+    assert.deepEqual(await snapshot(), before);
   });
 
   it("die Programmierschnittstelle lässt sich mit einer Cookie-Sitzung nicht benutzen (auch nicht als Administrator): 401", async () => {

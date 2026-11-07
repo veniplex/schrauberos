@@ -49,8 +49,17 @@ export const auditDe = {
       runNow: "Automatisches Backup von Hand gestartet",
       restoreFailed: "Wiederherstellung fehlgeschlagen",
       uploadFailed: "Backup-Import fehlgeschlagen",
+      offsiteSettings: "Off-Site-Backup eingerichtet oder geändert",
+      offsiteFailed: "Off-Site-Backup fehlgeschlagen",
+      offsiteFetch: "Sicherung vom Off-Site-Ziel zurückgeholt",
+    },
+    secrets: {
+      keyCreated: "Wiederherstellungsschlüssel erzeugt",
+      keyConfirmed: "Wiederherstellungsschlüssel als gesichert bestätigt",
+      reset: "Nicht lesbare Geheimnisse zurückgesetzt (Backup ohne passenden Schlüssel)",
     },
     setup: {
+      restore: "Aus einem Backup wiederhergestellt (Einrichtung)",
       complete: "Ersteinrichtung abgeschlossen",
     },
     system: {

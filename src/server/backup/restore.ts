@@ -2,16 +2,34 @@ import Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readSync, readFileSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
+import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { constants as zlibConstants, createGunzip, gunzipSync } from "node:zlib";
 import { ArchiveError, extractArchive, type ArchiveLimits } from "@/lib/archive";
 import { DISK_RESERVE_BYTES, freeBytes } from "@/lib/disk";
 import { limitStream, StreamLimitError } from "@/lib/limit-stream";
-import { cancelPending, pendingDbFile, pendingFilesDir, restoreDir, writePending } from "@/lib/updates/restore";
+import { OffsiteCryptoError, createDecryptStream, isOffsiteHeader } from "@/lib/offsite/crypto";
+import { deriveOffsiteMasterKey, WRAPPED_SETTING_KEY } from "@/lib/secret-wrap";
+import { cancelPending, pendingDbFile, pendingFilesDir, restoreDir, writePending, writePendingSecretKey } from "@/lib/updates/restore";
 import { listMigrations } from "@/server/migrate";
+import { secretKeyHex } from "@/server/secrets";
 import { assertPlainTree, backupPath, backupsDir, checkDatabaseFile, countTree, createBackup, DB_ARCHIVE, gzipFile, linkTree, markTempActive, removeTree, uniqueBackupName, writeInfo } from "./core";
 
-export type RestoreErrorCode = "notFound" | "corrupt" | "notBackup" | "newer" | "tooLarge" | "diskFull";
+export type RestoreErrorCode =
+  | "notFound"
+  | "corrupt"
+  | "notBackup"
+  | "newer"
+  | "tooLarge"
+  | "diskFull"
+  /** Eingabe des Wiederherstellungsschlüssels fehlerhaft (Länge, Zeichen, Prüfzeichen) */
+  | "keyFormat"
+  /** Der Wiederherstellungsschlüssel passt nicht zu diesem Backup (oder die Datei ist verändert) */
+  | "wrongKey"
+  /** Das Backup enthält keine mit einem Wiederherstellungsschlüssel umhüllte Kopie von secret.key (zu alt oder ohne Schlüssel erstellt) */
+  | "noWrappedKey"
+  /** Verschlüsseltes Off-Site-Backup: der Wiederherstellungsschlüssel fehlt */
+  | "keyRequired";
 
 /** Fehler mit festem Code; die Oberfläche übersetzt `backup.errors.<code>`. */
 export class RestoreError extends Error {
@@ -89,27 +107,55 @@ async function unpackAndValidate(gzFile: string, dest: string, mode: "keep" | "c
  * Dateien bereitstellen und für den nächsten Start vormerken. Den Neustart und den Austausch übernimmt der Launcher.
  * Enthält die Sicherung keine Dateien (z. B. eine hochgeladene reine Datenbank), bleiben die vorhandenen Dateien unberührt.
  */
-export async function stageRestore(name: string): Promise<void> {
+export async function stageRestore(name: string, options: { recoveryKey?: string | null } = {}): Promise<{ secretKeyRestored: boolean }> {
   const dir = backupPath(name);
   if (!dir || !existsSync(path.join(dir, DB_ARCHIVE))) throw new RestoreError("notFound");
   mkdirSync(restoreDir(), { recursive: true });
   cancelPending();
   await unpackAndValidate(path.join(dir, DB_ARCHIVE), pendingDbFile(), "keep");
   const hasFiles = existsSync(path.join(dir, "files"));
+  let secretKeyRestored = false;
   try {
+    // Mit Wiederherstellungsschlüssel: die im Backup mitgelieferte Hülle öffnen – vor allem anderen, damit ein falscher Schlüssel nichts anlegt (kein Sicherungsstand vor der Wiederherstellung)
+    const entered = options.recoveryKey?.trim();
+    if (entered) {
+      const wrapped = readWrappedSecretKey(pendingDbFile());
+      if (!wrapped) throw new RestoreError("noWrappedKey");
+      const { openWrappedSecretKey } = await import("@/server/recovery-key-input"); // erst bei Bedarf geladen (Drosselung der Anmeldung, `server-only`)
+      const opened = await openWrappedSecretKey(entered, wrapped);
+      if (!opened.ok) throw new RestoreError(opened.reason === "format" ? "keyFormat" : "wrongKey");
+      // Derselbe Schlüssel wie der laufende: nichts auszutauschen
+      if (opened.secretKeyHex !== secretKeyHex()) {
+        writePendingSecretKey(opened.secretKeyHex);
+        secretKeyRestored = true;
+      }
+    }
     if (hasFiles) await linkTree(path.join(dir, "files"), pendingFilesDir());
     await createBackup("pre-restore");
   } catch (error) {
     cancelPending();
     throw error;
   }
-  writePending({ from: name, at: new Date().toISOString(), files: hasFiles });
+  writePending({ from: name, at: new Date().toISOString(), files: hasFiles, ...(secretKeyRestored ? { secretKey: true } : {}) });
+  return { secretKeyRestored };
+}
+
+/** Die umhüllte Kopie von secret.key aus einer Datenbankdatei (Backup); null, wenn es sie nicht gibt. */
+function readWrappedSecretKey(file: string): string | null {
+  const database = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    return (database.prepare(`SELECT value FROM AppSetting WHERE key = ?`).get(WRAPPED_SETTING_KEY) as { value: string } | undefined)?.value ?? null;
+  } catch {
+    return null;
+  } finally {
+    database.close();
+  }
 }
 
 const GZIP = [0x1f, 0x8b];
 const SQLITE_MAGIC = "SQLite format 3\0";
 
-type Sniffed = "tar" | "tar.gz" | "db" | "db.gz" | null;
+type Sniffed = "tar" | "tar.gz" | "db" | "db.gz" | "sobk" | null;
 
 /** Erkennt, was hochgeladen wurde: Backup-Archiv (tar), rohe oder gzip-komprimierte SQLite-Datei. */
 function sniff(file: string): Sniffed {
@@ -121,6 +167,7 @@ function sniff(file: string): Sniffed {
   } finally {
     closeSync(fd);
   }
+  if (isOffsiteHeader(head)) return "sobk";
   const kindOf = (b: Buffer, gz: boolean): Sniffed => {
     if (b.subarray(0, 16).toString("latin1") === SQLITE_MAGIC) return gz ? "db.gz" : "db";
     if (b.subarray(257, 262).toString("latin1") === "ustar") return gz ? "tar.gz" : "tar";
@@ -145,14 +192,33 @@ export const BACKUP_ARCHIVE_LIMITS: ArchiveLimits = { maxEntries: 500_000, maxBy
  * sie wird geprüft und danach gelöscht. Archive werden nur mit Ordnern und normalen Dateien, ohne gefährliche Pfade und unter den Grenzen in
  * `limits` (Einträge, Größe, freier Platz) entpackt (`lib/archive.ts`).
  */
-export async function importBackupFile(uploaded: string, limits: ArchiveLimits = BACKUP_ARCHIVE_LIMITS): Promise<string> {
-  const kind = sniff(uploaded);
+export async function importBackupFile(uploaded: string, limits: ArchiveLimits = BACKUP_ARCHIVE_LIMITS, options: { recoveryKey?: string | null } = {}): Promise<string> {
+  let kind = sniff(uploaded);
   if (!kind) {
     rmSync(uploaded, { force: true });
     throw new RestoreError("notBackup");
   }
   const root = backupsDir();
   mkdirSync(root, { recursive: true });
+  let source = uploaded;
+  let decrypted: { file: string; release: () => void } | null = null;
+  if (kind === "sobk") {
+    // Verschlüsseltes Off-Site-Backup (.sobk): mit dem Wiederherstellungsschlüssel streamend entschlüsseln; danach ist es ein gewöhnliches Archiv
+    try {
+      decrypted = await decryptUploaded(uploaded, options.recoveryKey, root, limits.maxBytes);
+    } catch (error) {
+      rmSync(uploaded, { force: true });
+      throw error;
+    }
+    source = decrypted.file;
+    kind = sniff(source) === "tar" ? "tar" : null;
+    if (!kind) {
+      rmSync(uploaded, { force: true });
+      rmSync(source, { force: true });
+      decrypted.release();
+      throw new RestoreError("notBackup");
+    }
+  }
   const work = path.join(root, `.import-${randomBytes(6).toString("hex")}`);
   mkdirSync(work);
   const release = markTempActive(work);
@@ -161,7 +227,7 @@ export async function importBackupFile(uploaded: string, limits: ArchiveLimits =
       const free = await freeBytes(root);
       const diskLimit = free === null ? Number.POSITIVE_INFINITY : Math.max(0, free - DISK_RESERVE_BYTES);
       try {
-        await extractArchive(uploaded, work, { ...limits, maxBytes: Math.min(limits.maxBytes, diskLimit) }, { noChmod: true });
+        await extractArchive(source, work, { ...limits, maxBytes: Math.min(limits.maxBytes, diskLimit) }, { noChmod: true });
       } catch (error) {
         if (!(error instanceof ArchiveError)) throw error;
         if (error.code === "unsupported" || error.code === "unsafePath") throw new RestoreError("notBackup");
@@ -188,9 +254,52 @@ export async function importBackupFile(uploaded: string, limits: ArchiveLimits =
     return name;
   } finally {
     rmSync(uploaded, { force: true });
+    if (decrypted) {
+      rmSync(decrypted.file, { force: true });
+      decrypted.release();
+    }
     // Ein entpacktes Archiv kann Ordner ohne Schreibrecht enthalten (noChmod): removeTree stellt die Rechte her, löscht asynchron und überdeckt nie den eigentlichen Fehler
     await removeTree(work).catch(() => undefined);
     release();
+  }
+}
+
+/**
+ * Entschlüsselt ein hochgeladenes `.sobk` in eine Zwischendatei im Backup-Ordner (mit Obergrenze und Platzprüfung wie beim Entpacken). Der Schlüssel wird gedrosselt geprüft
+ * (global); `wrongKey` heißt: falscher Schlüssel **oder** Datei verändert (nicht unterscheidbar).
+ */
+async function decryptUploaded(uploaded: string, recoveryKey: string | null | undefined, root: string, maxBytes: number): Promise<{ file: string; release: () => void }> {
+  const entered = recoveryKey?.trim();
+  if (!entered) throw new RestoreError("keyRequired");
+  const { throttledRecoveryKey } = await import("@/server/recovery-key-input");
+  const key = await throttledRecoveryKey(entered);
+  if (!key.ok) throw new RestoreError("keyFormat");
+  const file = path.join(root, `.decrypt-${randomBytes(6).toString("hex")}`);
+  const release = markTempActive(file);
+  try {
+    await decryptToFile(createReadStream(uploaded), file, deriveOffsiteMasterKey(key.key), root, maxBytes);
+  } catch (error) {
+    release();
+    throw error;
+  }
+  key.accept();
+  return { file, release };
+}
+
+/**
+ * Entschlüsselt einen `.sobk`-Strom nach `dest` – mit Obergrenze (`maxBytes`, zusätzlich der freie Platz abzüglich Reserve, laufend geprüft). Fehler als `RestoreError`:
+ * `wrongKey` (falscher Schlüssel oder verändert), `notBackup` (keine .sobk-Datei), `corrupt` (abgeschnitten), `tooLarge`/`diskFull`. Die halbe Datei wird in jedem Fall gelöscht.
+ */
+export async function decryptToFile(input: Readable, dest: string, masterKey: Buffer, root: string, maxBytes: number): Promise<void> {
+  const free = await freeBytes(root);
+  const diskLimit = free === null ? Number.POSITIVE_INFINITY : Math.max(0, free - DISK_RESERVE_BYTES);
+  try {
+    await pipeline(input, createDecryptStream(masterKey), limitStream({ maxBytes: Math.min(maxBytes, diskLimit), free: () => freeBytes(root), reserve: DISK_RESERVE_BYTES }), createWriteStream(dest));
+  } catch (error) {
+    rmSync(dest, { force: true });
+    if (error instanceof StreamLimitError) throw new RestoreError(error.code === "tooLarge" && diskLimit < maxBytes ? "diskFull" : error.code);
+    if (error instanceof OffsiteCryptoError) throw new RestoreError(error.code === "auth" ? "wrongKey" : error.code === "format" ? "notBackup" : "corrupt");
+    throw error;
   }
 }
 

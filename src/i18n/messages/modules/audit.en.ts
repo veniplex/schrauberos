@@ -51,8 +51,17 @@ export const auditEn: typeof auditDe = {
       runNow: "Automatic backup started manually",
       restoreFailed: "Restore failed",
       uploadFailed: "Backup import failed",
+      offsiteSettings: "Off-site backup set up or changed",
+      offsiteFailed: "Off-site backup failed",
+      offsiteFetch: "Backup fetched back from the off-site target",
+    },
+    secrets: {
+      keyCreated: "Recovery key created",
+      keyConfirmed: "Recovery key confirmed as saved",
+      reset: "Unreadable secrets reset (backup without matching key)",
     },
     setup: {
+      restore: "Restored from a backup (setup)",
       complete: "Initial setup completed",
     },
     system: {

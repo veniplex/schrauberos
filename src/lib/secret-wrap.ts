@@ -15,6 +15,9 @@ const AAD = Buffer.from("schrauberos:secret-key-wrap:v1");
 
 const derive = (recoveryKey: Buffer, salt: Buffer, info: string): Buffer => Buffer.from(hkdfSync("sha256", recoveryKey, salt, info, 32));
 
+/** Einstellung in der Datenbank, die den mit dem Wiederherstellungsschlüssel umhüllten Geheimnisschlüssel enthält (gelesen auch aus fremden Datenbankdateien beim Restore). */
+export const WRAPPED_SETTING_KEY = "secrets.wrapped";
+
 /** `secret.key` ist 32 Byte hexadezimal (64 Zeichen). */
 export const isSecretKeyHex = (value: string): boolean => /^[0-9a-f]{64}$/.test(value);
 

@@ -47,7 +47,7 @@ function create() {
       audit: new RateWindow({ perKeyMs: 10_000, globalLimit: 6, globalWindowMs: 60_000, maxKeys: 4, now }),
     },
     /**
-     * Eingabe des Wiederherstellungsschlüssels beim Restore (Verwaltung und Einrichtung): **nur global**, nie pro Konto. Das Budget verlangsamt (ab 5 Versuchen pro Minute je 500 ms mehr, höchstens
+     * Eingabe des Wiederherstellungsschlüssels beim Restore (Verwaltung und Einrichtung): **nur global**, nie pro Konto. Das Budget verlangsamt (ab dem siebten Versuch pro Minute je 500 ms mehr, höchstens
      * 8 s), weist aber nie ab. Der Schlüssel hat 256 Bit – Raten ist aussichtslos; die Drosselung hält Dauerbeschuss klein. Eigener Pfad, nicht die scrypt-Semaphoren der Anmeldung.
      */
     recoveryKey: new FailureBudget({ limit: 5, windowMs: 60_000, stepMs: 500, maxDelayMs: 8_000, maxStamps: 2_000, now }),
