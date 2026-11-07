@@ -2,6 +2,7 @@
 
 import { Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
+import { DuplicateNotice } from "@/components/ui/duplicate-notice";
 import { Card } from "@/components/ui/layout";
 import { COST_CATEGORIES, FLEET_STATUSES, FUEL_TYPES } from "@/modules/office/fleet/domain";
 import { useI18n } from "@/i18n/client";
@@ -143,6 +144,13 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
         </Field>
       </Card>
 
+      <DuplicateNotice
+        title={t("fleet.duplicate.title")}
+        message={(data) => t("fleet.duplicate.message", { plate: data.duplicatePlate ?? "" })}
+        openLabel={t("fleet.duplicate.open")}
+        openHref={(id) => `/fleet/${id}`}
+        anywayLabel={initial.id ? t("fleet.duplicate.anywaySave") : t("fleet.duplicate.anywayCreate")}
+      />
       <FormActions cancelHref={cancelHref} />
     </Form>
   );

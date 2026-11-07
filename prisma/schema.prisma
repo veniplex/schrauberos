@@ -236,6 +236,19 @@ model Vehicle {
   model          String?
   vin            String?
   year           Int?
+  // Kilometerstand (zuletzt bekannt)
+  mileageKm      Int?
+  // Kraftstoff: petrol | diesel | hybrid | electric | lpg | cng | hydrogen | other (Konstanten im Code, keine Enum)
+  fuel           String?
+  // Schlüsselnummern der Zulassungsbescheinigung: Herstellerschlüssel (4 Zeichen) und Typschlüssel (3 Zeichen), Großbuchstaben/Ziffern
+  hsn            String?
+  tsn            String?
+  firstRegistration DateTime?
+  // Hauptuntersuchung bzw. nächste wiederkehrende Prüfung als "JJJJ-MM" (der Monat genügt; neutral benannt, damit auch andere Prüfungen und Länder passen)
+  inspectionDue  String?
+  // weitere Prüfung (sp | gas | other) mit Fälligkeitsdatum – beides oder keines
+  extraInspectionKind String?
+  extraInspectionDue  DateTime?
   notes          String?
   externalSource String?
   externalId     String?
@@ -249,8 +262,10 @@ model Vehicle {
   appointments Appointment[]
 
   @@unique([externalSource, externalId])
+  // Kein Unique auf dem Kennzeichen: Dubletten sind erlaubt (Warnung mit Bestätigung in der Anwendung), etwa bei Halterwechsel oder wiederverwendeten Kennzeichen
   @@index([plateNorm])
   @@index([customerId])
+  @@index([inspectionDue])
 }
 
 // Halter-Historie eines Fahrzeugs (Halterwechsel). Der aktuelle Halter steht zusätzlich in Vehicle.customerId.

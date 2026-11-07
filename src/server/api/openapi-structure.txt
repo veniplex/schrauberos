@@ -39,9 +39,9 @@ POST /fleet-mileage fleet-mileage.create fleet.edit body=fleetVehicleId,date,km,
 GET /fleet-mileage/{id} fleet-mileage.get fleet.view
 DELETE /fleet-mileage/{id} fleet-mileage.delete fleet.edit
 GET /fleet-vehicles fleet-vehicles.list fleet.view query=q,status,driverId sort=plate,huDue,serviceDue,createdAt,updatedAt
-POST /fleet-vehicles fleet-vehicles.create fleet.edit body=plate,make,model,vin,year,fuelType,color,status,driverId,location,huDue,serviceDue,serviceDueKm,insuranceCompany,insurancePolicy,insuranceUntil,leasingProvider,leasingUntil,leasingRateCents,fuelCardNo,notes
+POST /fleet-vehicles fleet-vehicles.create fleet.edit body=plate,make,model,vin,year,fuelType,color,status,driverId,location,huDue,serviceDue,serviceDueKm,insuranceCompany,insurancePolicy,insuranceUntil,leasingProvider,leasingUntil,leasingRateCents,fuelCardNo,notes,allowDuplicate
 GET /fleet-vehicles/{id} fleet-vehicles.get fleet.view
-PATCH /fleet-vehicles/{id} fleet-vehicles.update fleet.edit body=plate,make,model,vin,year,fuelType,color,status,driverId,location,huDue,serviceDue,serviceDueKm,insuranceCompany,insurancePolicy,insuranceUntil,leasingProvider,leasingUntil,leasingRateCents,fuelCardNo,notes
+PATCH /fleet-vehicles/{id} fleet-vehicles.update fleet.edit body=plate,make,model,vin,year,fuelType,color,status,driverId,location,huDue,serviceDue,serviceDueKm,insuranceCompany,insurancePolicy,insuranceUntil,leasingProvider,leasingUntil,leasingRateCents,fuelCardNo,notes,allowDuplicate
 DELETE /fleet-vehicles/{id} fleet-vehicles.delete fleet.delete
 GET /invoices invoices.list invoices.view query=direction,status,customerId,q,issuedFrom,issuedTo sort=issueDate,dueDate,number,grossCents,createdAt
 POST /invoices invoices.create invoices.edit body=direction,number,partyName,customerId,issueDate,dueDate,netCents,vatCents,grossCents,status,paidAt,category,reference,notes
@@ -86,9 +86,9 @@ PATCH /tire-sets/{id} tire-sets.update tires.edit body=vehicleId,season,status,b
 DELETE /tire-sets/{id} tire-sets.delete tires.delete
 POST /tire-sets/{id}/dispose tire-sets.dispose tires.edit
 POST /tire-sets/{id}/status tire-sets.status tires.stock body=status
-GET /vehicles vehicles.list vehicles.view query=q,customerId sort=plate,make,year,createdAt,updatedAt
-POST /vehicles vehicles.create vehicles.edit body=customerId,plate,make,model,vin,year,notes
+GET /vehicles vehicles.list vehicles.view query=q,customerId,inspectionDue sort=plate,make,year,inspectionDue,createdAt,updatedAt
+POST /vehicles vehicles.create vehicles.edit body=customerId,plate,make,model,vin,year,mileageKm,fuel,hsn,tsn,firstRegistration,inspectionDue,extraInspectionKind,extraInspectionDue,notes,allowDuplicate
 GET /vehicles/{id} vehicles.get vehicles.view
-PATCH /vehicles/{id} vehicles.update vehicles.edit body=plate,make,model,vin,year,notes
+PATCH /vehicles/{id} vehicles.update vehicles.edit body=plate,make,model,vin,year,mileageKm,fuel,hsn,tsn,firstRegistration,inspectionDue,extraInspectionKind,extraInspectionDue,notes,allowDuplicate
 DELETE /vehicles/{id} vehicles.delete vehicles.delete
 POST /vehicles/{id}/transfer vehicles.transfer vehicles.edit body=customerId,date,note

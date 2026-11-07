@@ -8,6 +8,7 @@ import type { SearchHit, SearchProviderDef, SettingsTabDef, WidgetDef } from "./
 import { widgets as appointmentsWidgets } from "./workshop/appointments/widgets";
 import { settingsTabs as appointmentsSettings } from "./workshop/appointments/settings-tab";
 import { widgets as tiresWidgets } from "./workshop/tires/widgets";
+import { widgets as vehiclesWidgets } from "./workshop/vehicles/widgets";
 import { settingsTabs as tiresSettings } from "./workshop/tires/settings-tab";
 import { widgets as invoicesWidgets } from "./office/invoices/widgets";
 import { widgets as employeesWidgets } from "./office/employees/widgets";
@@ -38,6 +39,7 @@ import { searchProviders as handbookSearch } from "./handbook/manual/search";
 const ALL_WIDGETS: WidgetDef[] = [
   ...appointmentsWidgets,
   ...tiresWidgets,
+  ...vehiclesWidgets,
   ...invoicesWidgets,
   ...employeesWidgets,
   ...fleetWidgets,

@@ -1,6 +1,7 @@
 import { addDays, setHours, setMinutes, startOfDay, startOfWeek } from "date-fns";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { outgoingKeyOf } from "@/lib/invoice-number";
+import { addMonths, monthOf } from "@/lib/month";
 import { normalizePlate } from "@/lib/plate";
 import { slugify } from "@/lib/slug";
 
@@ -25,12 +26,16 @@ export async function seedDemo(db: PrismaClient) {
   if ((await db.customer.count()) > 0) return;
   console.log("Demo-Daten werden angelegt …");
 
+  // Prüffristen relativ zu heute, damit Dashboard-Baustein, Filter und Druckliste Beispiele haben (überfällig, laufender Monat, bald, später, keine)
+  const thisMonth = monthOf(new Date());
+  const due = (months: number) => addMonths(thisMonth, months);
+
   const customers = [
-    { firstName: "Anna", lastName: "Becker", phone: "0170 1234567", email: "anna.becker@example.com", street: "Lindenstr. 12", zip: "10115", city: "Berlin", vehicles: [{ plate: "B-AB 1234", make: "VW", model: "Golf VIII", year: 2021 }] },
-    { firstName: "Markus", lastName: "Schulz", phone: "0171 2345678", street: "Hauptstr. 5", zip: "10243", city: "Berlin", vehicles: [{ plate: "B-MS 4711", make: "BMW", model: "320d Touring", year: 2019 }, { plate: "B-MS 815", make: "Mini", model: "Cooper", year: 2017 }] },
-    { firstName: "Elif", lastName: "Yilmaz", phone: "0172 3456789", street: "Parkallee 3", zip: "10317", city: "Berlin", vehicles: [{ plate: "B-EY 2020", make: "Skoda", model: "Octavia Combi", year: 2020 }] },
-    { lastName: "Autohaus Nord GmbH", company: "Autohaus Nord GmbH", phone: "030 555010", street: "Industrieweg 8", zip: "13353", city: "Berlin", vehicles: [{ plate: "B-AN 100", make: "Ford", model: "Transit", year: 2022 }] },
-    { firstName: "Jürgen", lastName: "Krause", phone: "0173 4567890", street: "Dorfstr. 21", zip: "14612", city: "Falkensee", vehicles: [{ plate: "HVL-JK 77", make: "Opel", model: "Astra K", year: 2016 }] },
+    { firstName: "Anna", lastName: "Becker", phone: "0170 1234567", email: "anna.becker@example.com", street: "Lindenstr. 12", zip: "10115", city: "Berlin", vehicles: [{ plate: "B-AB 1234", make: "VW", model: "Golf VIII", year: 2021, fuel: "petrol", mileageKm: 48200, hsn: "0603", tsn: "BGD", inspectionDue: due(14) }] },
+    { firstName: "Markus", lastName: "Schulz", phone: "0171 2345678", street: "Hauptstr. 5", zip: "10243", city: "Berlin", vehicles: [{ plate: "B-MS 4711", make: "BMW", model: "320d Touring", year: 2019, fuel: "diesel", mileageKm: 112500, inspectionDue: due(0) }, { plate: "B-MS 815", make: "Mini", model: "Cooper", year: 2017, fuel: "petrol", mileageKm: 89000, inspectionDue: due(-2) }] },
+    { firstName: "Elif", lastName: "Yilmaz", phone: "0172 3456789", street: "Parkallee 3", zip: "10317", city: "Berlin", vehicles: [{ plate: "B-EY 2020", make: "Skoda", model: "Octavia Combi", year: 2020, fuel: "diesel", mileageKm: 76400, inspectionDue: due(1) }] },
+    { lastName: "Autohaus Nord GmbH", company: "Autohaus Nord GmbH", phone: "030 555010", street: "Industrieweg 8", zip: "13353", city: "Berlin", vehicles: [{ plate: "B-AN 100", make: "Ford", model: "Transit", year: 2022, fuel: "diesel", mileageKm: 61800, inspectionDue: due(8) }] },
+    { firstName: "Jürgen", lastName: "Krause", phone: "0173 4567890", street: "Dorfstr. 21", zip: "14612", city: "Falkensee", vehicles: [{ plate: "HVL-JK 77", make: "Opel", model: "Astra K", year: 2016, fuel: "lpg", mileageKm: 143000, inspectionDue: due(2), extraInspectionKind: "gas", extraInspectionDue: addDays(new Date(), 40) }] },
     { firstName: "Sabine", lastName: "Neumann", phone: "0174 5678901", street: "Seestr. 9", zip: "13086", city: "Berlin", vehicles: [{ plate: "B-SN 909", make: "Audi", model: "A3 Sportback", year: 2018 }] },
   ];
 

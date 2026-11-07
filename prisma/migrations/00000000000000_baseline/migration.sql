@@ -171,6 +171,14 @@ CREATE TABLE "Vehicle" (
     "model" TEXT,
     "vin" TEXT,
     "year" INTEGER,
+    "mileageKm" INTEGER,
+    "fuel" TEXT,
+    "hsn" TEXT,
+    "tsn" TEXT,
+    "firstRegistration" DATETIME,
+    "inspectionDue" TEXT,
+    "extraInspectionKind" TEXT,
+    "extraInspectionDue" DATETIME,
     "notes" TEXT,
     "externalSource" TEXT,
     "externalId" TEXT,
@@ -712,6 +720,9 @@ CREATE INDEX "Vehicle_plateNorm_idx" ON "Vehicle"("plateNorm");
 
 -- CreateIndex
 CREATE INDEX "Vehicle_customerId_idx" ON "Vehicle"("customerId");
+
+-- CreateIndex
+CREATE INDEX "Vehicle_inspectionDue_idx" ON "Vehicle"("inspectionDue");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Vehicle_externalSource_externalId_key" ON "Vehicle"("externalSource", "externalId");

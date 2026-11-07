@@ -39,7 +39,7 @@ const api = async (method: string, path: string, init: Init = {}) => {
 const ifMatch = (item: Json) => ({ "if-match": `"${item.version}"` });
 
 describe("Fahrzeuge", () => {
-  it("anlegen mit Halter (Halter-Historie), Kennzeichen eindeutig, ändern, Halterwechsel, löschen", async () => {
+  it("anlegen mit Halter (Halter-Historie), Kennzeichen-Dublette ist eine Warnung, ändern, Halterwechsel, löschen", async () => {
     const owner = await env.db.customer.create({ data: { lastName: "Halter" } });
     const other = await env.db.customer.create({ data: { lastName: "Neu" } });
     const created = await api("POST", "/vehicles", { body: { plate: "b-ab 1234", make: "VW", customerId: owner.id } });
@@ -70,6 +70,38 @@ describe("Fahrzeuge", () => {
 
     assert.equal((await api("DELETE", `/vehicles/${vehicle.id}`)).status, 204);
     assert.deepEqual((await env.db.auditLog.findMany({ orderBy: { createdAt: "asc" } })).map((a) => a.action).filter((a) => a.startsWith("vehicle")), ["vehicle.create", "vehicle.update", "vehicle.transfer", "vehicle.delete"]);
+  });
+
+  it("Prüffristen und weitere Felder: schreiben, filtern, sortieren, leeren; Dublette nur mit allowDuplicate", async () => {
+    const created = await api("POST", "/vehicles", {
+      body: { plate: "B-HU 10", inspectionDue: "2026-11", extraInspectionKind: "sp", extraInspectionDue: "2026-12-15", mileageKm: 98765, fuel: "diesel", hsn: "0603", tsn: "BGD", firstRegistration: "2018-05-03" },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    const v = created.json.data as Json;
+    assert.deepEqual([v.inspectionDue, v.extraInspectionKind, v.extraInspectionDue, v.mileageKm, v.fuel, v.hsn, v.tsn, v.firstRegistration], ["2026-11", "sp", "2026-12-15", 98765, "diesel", "0603", "BGD", "2018-05-03"]);
+    await api("POST", "/vehicles", { body: { plate: "B-HU 11", inspectionDue: "2027-02" } });
+
+    const inMonth = await api("GET", "/vehicles?inspectionDue=2026-11");
+    assert.deepEqual((inMonth.json.data as Json[]).map((x) => x.plate), ["B-HU 10"]);
+    const sorted = await api("GET", "/vehicles?sort=-inspectionDue");
+    assert.deepEqual((sorted.json.data as Json[]).slice(0, 2).map((x) => x.plate), ["B-HU 11", "B-HU 10"]);
+
+    assert.equal((await api("POST", "/vehicles", { body: { plate: "B-HU 12", inspectionDue: "2026-13" } })).status, 422);
+    assert.equal((await api("POST", "/vehicles", { body: { plate: "B-HU 12", hsn: "12" } })).status, 422);
+    assert.equal((await api("POST", "/vehicles", { body: { plate: "B-HU 12", fuel: "wasser" } })).status, 422);
+    assert.ok((await api("POST", "/vehicles", { body: { plate: "B-HU 12", extraInspectionKind: "gas" } })).json.fields.extraInspectionDue);
+
+    // PATCH: null leert die Frist, andere Felder bleiben
+    const cleared = await api("PATCH", `/vehicles/${v.id}`, { body: { inspectionDue: null, mileageKm: 99000 }, headers: ifMatch(v) });
+    assert.equal(cleared.status, 200, JSON.stringify(cleared.json));
+    assert.deepEqual([cleared.json.data.inspectionDue, cleared.json.data.mileageKm, cleared.json.data.extraInspectionKind, cleared.json.data.hsn], [null, 99000, "sp", "0603"]);
+
+    // Dublette: 422 mit Feld plate, mit allowDuplicate gespeichert
+    const dup = await api("POST", "/vehicles", { body: { plate: "b hu-10" } });
+    assert.equal(dup.status, 422);
+    assert.ok(dup.json.fields.plate);
+    assert.equal((await api("POST", "/vehicles", { body: { plate: "b hu-10", allowDuplicate: true } })).status, 201);
+    assert.equal(await env.db.vehicle.count({ where: { plateNorm: "BHU10" } }), 2);
   });
 });
 

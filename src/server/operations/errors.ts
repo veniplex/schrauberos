@@ -32,6 +32,8 @@ export type OperationFailure = {
   params?: Vars;
   /** Feldname → Meldung */
   fields?: Record<string, FieldMessage>;
+  /** Zusatzangaben für das Formular (nur Text, z. B. Kennung und Kennzeichen eines vorhandenen Fahrzeugs bei einer Kennzeichen-Warnung); Server Actions geben sie als `state.data` weiter, die API nicht */
+  data?: Record<string, string>;
 };
 
 /** Standardmeldung je Fehlercode (wenn der Fehler keinen eigenen Schlüssel mitbringt). */
@@ -70,9 +72,9 @@ export function failField(field: string, key: MessageKey, params?: Vars): never 
   throw new OperationError({ code: "invalid", fields: { [field]: { key, params } } });
 }
 
-/** Mehrere Feldfehler auf einmal. */
-export function failFields(fields: Record<string, FieldMessage>): never {
-  throw new OperationError({ code: "invalid", fields });
+/** Mehrere Feldfehler auf einmal; `data`: Zusatzangaben für das Formular (siehe `OperationFailure.data`). */
+export function failFields(fields: Record<string, FieldMessage>, data?: Record<string, string>): never {
+  throw new OperationError({ code: "invalid", fields, ...(data ? { data } : {}) });
 }
 
 /**

@@ -47,6 +47,8 @@ const vehicleBody = z.strictObject({
   leasingRateCents: z.number().int().min(0).max(2_000_000_000).nullable().optional(),
   fuelCardNo: text(40),
   notes: text(2000),
+  /** Ein Kennzeichen, das es im Fuhrpark schon gibt, ist eine Warnung (422 mit Feld `plate`); mit `true` wird es trotzdem gespeichert. */
+  allowDuplicate: z.boolean().optional(),
 });
 
 const vehicleItem = z.object({

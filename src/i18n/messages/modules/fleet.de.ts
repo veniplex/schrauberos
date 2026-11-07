@@ -78,6 +78,14 @@ export const fleetDe = {
   errors: {
     amount: "Ungültiger Betrag, z. B. 49,90.",
     kmLower: "Der Kilometerstand liegt unter dem zuletzt erfassten Wert ({km} km).",
+    plateExists: "Es gibt schon ein Firmenfahrzeug mit diesem Kennzeichen.",
+  },
+  duplicate: {
+    title: "Dieses Kennzeichen gibt es schon im Fuhrpark",
+    message: "{plate} ist bereits erfasst. Trotzdem speichern, wenn es sich um ein anderes Fahrzeug handelt.",
+    open: "Vorhandenes Fahrzeug öffnen",
+    anywayCreate: "Trotzdem anlegen",
+    anywaySave: "Trotzdem speichern",
   },
   widgets: { title: "Fuhrpark", allFine: "Keine Fälligkeiten in den nächsten 60 Tagen.", licenses: "Führerscheinkontrolle" },
 };

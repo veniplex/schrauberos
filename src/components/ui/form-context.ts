@@ -11,6 +11,8 @@ export type FormState = {
   error?: string;
   fieldErrors?: Record<string, string>;
   message?: string;
+  /** Zusatzangaben eines Fehlers, die das Formular für einen Hinweis braucht (z. B. das Fahrzeug, dessen Kennzeichen schon vergeben ist); nur Text, bereits für die Anzeige geeignet */
+  data?: Record<string, string>;
   /** Die Anfrage hat den Server nicht erreicht (Eingabe bleibt erhalten, erneut absenden genügt) */
   network?: boolean;
 };

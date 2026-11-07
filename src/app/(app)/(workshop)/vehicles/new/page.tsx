@@ -25,6 +25,7 @@ export default async function NewVehiclePage({ searchParams }: { searchParams: P
           initial={{
             customer: customer ? { id: customer.id, label: customerDisplayName(customer), sublabel: customer.city ?? undefined } : null,
             plate: (sp.plate ?? "").trim().slice(0, 14), make: "", model: "", vin: "", year: "", notes: "",
+            mileage: "", fuel: "", hsn: "", tsn: "", firstRegistration: "", inspectionDue: "", extraKind: "", extraDue: "",
           }}
         />
       </div>

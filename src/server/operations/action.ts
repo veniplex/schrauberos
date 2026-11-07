@@ -60,6 +60,7 @@ export function stateOf(failure: OperationFailure, t: Translator["t"]): ActionSt
   const state: ActionState = {};
   if (failure.fields) state.fieldErrors = Object.fromEntries(Object.entries(failure.fields).map(([name, f]) => [name, t(f.key, f.params)]));
   if (!failure.fields || failure.key) state.error = t(failure.key ?? DEFAULT_KEYS[failure.code], failure.params);
+  if (failure.data) state.data = failure.data;
   return state;
 }
 

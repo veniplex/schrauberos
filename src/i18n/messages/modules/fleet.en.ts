@@ -79,6 +79,14 @@ export const fleetEn: typeof fleetDe = {
   errors: {
     amount: "Invalid amount, e.g. 49.90.",
     kmLower: "The mileage is below the last recorded value ({km} km).",
+    plateExists: "There is already a company vehicle with this plate.",
+  },
+  duplicate: {
+    title: "This plate already exists in the fleet",
+    message: "{plate} is already on record. Save anyway if this is a different vehicle.",
+    open: "Open existing vehicle",
+    anywayCreate: "Create anyway",
+    anywaySave: "Save anyway",
   },
   widgets: { title: "Fleet", allFine: "Nothing due in the next 60 days.", licenses: "Licence checks" },
 };

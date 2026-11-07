@@ -8,7 +8,8 @@ import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
-import { toDateInput, todayInput } from "@/lib/dates";
+import { nowDate, toDateInput, todayInput } from "@/lib/dates";
+import { monthStart } from "@/lib/month";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -16,6 +17,9 @@ import { STATUS_TONE } from "@/modules/workshop/appointments/public";
 import { HealthBadge, SeasonBadge, formatTireSize, getTireRules, setHealth } from "@/modules/workshop/tires/public";
 import { deleteVehicle } from "@/modules/workshop/vehicles/actions";
 import { TransferForm } from "@/modules/workshop/vehicles/forms";
+import { extraInspectionState, inspectionState, monthOf, type InspectionState } from "@/modules/workshop/vehicles/domain";
+import { INSPECTION_TONE } from "@/modules/workshop/vehicles/status-tone";
+import { formatMileage } from "@/modules/workshop/vehicles/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -49,6 +53,12 @@ export default async function VehiclePage({
 
   const canEdit = session.can("vehicles.edit");
   const base = `/vehicles/${vehicle.id}`;
+  const thisMonth = monthOf(nowDate());
+  const monthLabel = (month: string) => date(monthStart(month), { month: "long", year: "numeric" });
+  const inspectionBadge = (state: InspectionState | null, month: string) =>
+    state ? <StatusBadge tone={INSPECTION_TONE[state]}>{t(`vehicles.inspection.${state}`, { month: monthLabel(month) })}</StatusBadge> : null;
+  const dueState = inspectionState(vehicle.inspectionDue, thisMonth);
+  const extraState = extraInspectionState(vehicle.extraInspectionDue, thisMonth);
 
   return (
     <>
@@ -175,11 +185,39 @@ export default async function VehiclePage({
             )}
           </Card>
 
+          <Card title={t("vehicles.sections.inspections")}>
+            <DefinitionList
+              items={[
+                {
+                  label: t("vehicles.fields.inspectionDue"),
+                  value: vehicle.inspectionDue ? inspectionBadge(dueState, vehicle.inspectionDue) : <span className="text-ink-muted">{t("vehicles.inspection.none")}</span>,
+                },
+                ...(vehicle.extraInspectionKind && vehicle.extraInspectionDue
+                  ? [
+                      {
+                        label: td(`vehicles.extraKinds.${vehicle.extraInspectionKind}`, vehicle.extraInspectionKind),
+                        value: (
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            <span className="tabular">{date(vehicle.extraInspectionDue)}</span>
+                            {extraState && extraState !== "ok" ? <StatusBadge tone={INSPECTION_TONE[extraState]}>{t(`vehicles.inspection.${extraState}`, { month: monthLabel(monthOf(vehicle.extraInspectionDue)) })}</StatusBadge> : null}
+                          </span>
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </Card>
+
           <Card title={t("vehicles.details")}>
             <DefinitionList
               items={[
                 { label: t("vehicles.fields.vin"), value: vehicle.vin ? <span className="font-mono">{vehicle.vin}</span> : null },
                 { label: t("vehicles.fields.year"), value: vehicle.year },
+                { label: t("vehicles.fields.firstRegistration"), value: vehicle.firstRegistration ? date(vehicle.firstRegistration) : null },
+                { label: t("vehicles.fields.fuel"), value: vehicle.fuel ? td(`vehicles.fuelTypes.${vehicle.fuel}`, vehicle.fuel) : null },
+                { label: t("vehicles.fields.mileage"), value: vehicle.mileageKm != null ? <span className="tabular">{formatMileage(vehicle.mileageKm, i18n.number)}</span> : null },
+                { label: `${t("vehicles.fields.hsn")} / ${t("vehicles.fields.tsn")}`, value: vehicle.hsn || vehicle.tsn ? <span className="font-mono">{[vehicle.hsn, vehicle.tsn].filter(Boolean).join(" / ")}</span> : null },
                 { label: t("common.notes"), value: vehicle.notes },
               ]}
             />

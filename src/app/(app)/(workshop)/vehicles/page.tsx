@@ -1,54 +1,60 @@
 import type { Metadata } from "next";
-import { Plus } from "lucide-react";
-import { Badge, EmptyState, Plate, TextLink } from "@/components/ui/layout";
+import { Plus, Printer } from "lucide-react";
+import { Badge, EmptyState, Plate, StatusBadge, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { LinkButton } from "@/components/ui/buttons";
 import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
-import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
-import { normalizePlate } from "@/lib/plate";
+import { nowDate } from "@/lib/dates";
+import { isMonth, monthStart } from "@/lib/month";
+import { inspectionState, monthOf } from "@/modules/workshop/vehicles/domain";
+import { vehicleListWhere } from "@/modules/workshop/vehicles/queries";
+import { INSPECTION_TONE } from "@/modules/workshop/vehicles/status-tone";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { contains, searchWhere } from "@/server/search";
-import { SearchInput, Select } from "@/components/ui/form";
+import { Input, SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return { title: t("nav.vehicles") };
 }
 
-const SORTS = ["plate", "vehicle"] as const;
+const SORTS = ["plate", "vehicle", "inspection"] as const;
 const DEFAULT = { sort: "plate", dir: "asc" } as const;
 
-export default async function VehiclesPage({ searchParams }: { searchParams: Promise<{ q?: string; owner?: string; sort?: string; dir?: string; page?: string }> }) {
+export default async function VehiclesPage({ searchParams }: { searchParams: Promise<{ q?: string; owner?: string; inspection?: string; month?: string; sort?: string; dir?: string; page?: string }> }) {
   const session = await requirePermission("vehicles.view");
-  const [{ t, tp }, sp] = await Promise.all([getI18n(), searchParams]);
+  const [{ t, tp, date }, sp] = await Promise.all([getI18n(), searchParams]);
   const q = (sp.q ?? "").trim();
-  const plate = normalizePlate(q);
   const noOwnerOnly = sp.owner === "none";
+  // Prüffrist: „bald fällig oder überfällig“, „ohne Frist“ oder ein bestimmter Monat (Liste für Anrufe, siehe Druckliste)
+  const thisMonth = monthOf(nowDate());
+  const inspection = sp.inspection === "soon" || sp.inspection === "none" ? sp.inspection : undefined;
+  const month = sp.month && isMonth(sp.month) ? sp.month : undefined;
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT });
 
-  // Der Anzeigename des Halters ist in der Fahrzeugliste sichtbar (Richtlinie D7), Kontaktdaten gehören nicht zum Suchumfang
-  const text = searchWhere<Prisma.VehicleWhereInput>(q, session.can, [
-    { where: () => (plate ? { plateNorm: { contains: plate } } : { id: "" }) },
-    { where: (term) => ({ vin: contains(term) }) },
-    { where: (term) => ({ make: contains(term) }) },
-    { where: (term) => ({ model: contains(term) }) },
-    { where: (term) => ({ customer: { is: { OR: [{ lastName: contains(term) }, { firstName: contains(term) }, { company: contains(term) }] } } }) },
-  ]);
-  const where = { ...(noOwnerOnly ? { customerId: null } : {}), ...(text ?? {}) };
+  const where = vehicleListWhere({ q, noOwnerOnly, inspection, month }, session.can, thisMonth);
 
   const total = await db.vehicle.count({ where });
   const page = clampPage(list.page, total, list.pageSize);
-  const orderBy = list.sort === "vehicle" ? [{ make: list.dir }, { model: list.dir }, { plateNorm: "asc" as const }] : [{ plateNorm: list.dir }];
+  const orderBy =
+    list.sort === "vehicle"
+      ? [{ make: list.dir }, { model: list.dir }, { plateNorm: "asc" as const }]
+      : list.sort === "inspection"
+        ? [{ inspectionDue: list.dir }, { plateNorm: "asc" as const }]
+        : [{ plateNorm: list.dir }];
   const vehicles = await db.vehicle.findMany({ where, include: { customer: true, _count: { select: { tireSets: true, appointments: true } } }, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("vehicles.edit");
   const canSeeCustomers = session.can("customers.view");
-  const links = listLinks("/vehicles", { q: q || undefined, owner: noOwnerOnly ? "none" : undefined }, list, DEFAULT);
+  const filters = { q: q || undefined, owner: noOwnerOnly ? "none" : undefined, inspection, month };
+  const links = listLinks("/vehicles", filters, list, DEFAULT);
+  // Druckliste: dieselben Filter (ohne Sortierung/Seite – die Liste ist nach Frist sortiert)
+  const printHref = `/vehicles/print?${new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => !!entry[1])).toString()}`;
+  const monthLabel = (value: string) => date(monthStart(value), { month: "long", year: "numeric" });
 
   return (
     <>
@@ -57,19 +63,24 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         description={t("vehicles.description")}
         help="workshop.vehicles"
         actions={
-          canEdit ? (
-            <LinkButton href="/vehicles/new" variant="primary">
-              <Plus className="size-4" aria-hidden /> {t("vehicles.new")}
+          <>
+            <LinkButton href={printHref}>
+              <Printer className="size-4" aria-hidden /> {t("vehicles.print.button")}
             </LinkButton>
-          ) : null
+            {canEdit ? (
+              <LinkButton href="/vehicles/new" variant="primary">
+                <Plus className="size-4" aria-hidden /> {t("vehicles.new")}
+              </LinkButton>
+            ) : null}
+          </>
         }
       />
 
       <FilterBar
         keep={sortFields(list, DEFAULT)}
-        columns="sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
-        active={Boolean(q || noOwnerOnly)}
-        extrasOpen={noOwnerOnly}
+        columns="sm:grid-cols-[minmax(0,1fr)_11rem_13rem_10rem_auto]"
+        active={Boolean(q || noOwnerOnly || inspection || month)}
+        extrasOpen={noOwnerOnly || Boolean(inspection || month)}
         resetHref="/vehicles"
         search={<SearchInput name="q" defaultValue={q} placeholder={t("vehicles.searchList")} aria-label={t("common.search")} />}
       >
@@ -77,6 +88,12 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
           <option value="">{t("vehicles.filters.anyOwner")}</option>
           <option value="none">{t("vehicles.filters.noOwner")}</option>
         </Select>
+        <Select name="inspection" defaultValue={inspection ?? ""} aria-label={t("vehicles.fields.inspectionDue")}>
+          <option value="">{t("vehicles.filters.anyInspection")}</option>
+          <option value="soon">{t("vehicles.filters.inspectionSoon")}</option>
+          <option value="none">{t("vehicles.filters.inspectionNone")}</option>
+        </Select>
+        <Input name="month" type="month" defaultValue={month ?? ""} aria-label={t("vehicles.filters.month")} placeholder="11/2026" />
       </FilterBar>
 
       <DataTable
@@ -89,7 +106,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         minWidth="44rem"
         summary={tp("vehicles.count", total)}
         footer={<Pagination page={page} pageSize={list.pageSize} total={total} hrefFor={links.pageHref} />}
-        empty={<EmptyState title={t("vehicles.listEmpty")} hint={q || noOwnerOnly ? t("common.noResults") : t("vehicles.listEmptyHint")} />}
+        empty={<EmptyState title={t("vehicles.listEmpty")} hint={q || noOwnerOnly || inspection || month ? t("common.noResults") : t("vehicles.listEmptyHint")} />}
         columns={[
           { id: "plate", header: t("vehicles.fields.plate"), priority: "primary", sort: "plate", cell: (v) => <Plate>{v.plate}</Plate> },
           {
@@ -118,6 +135,15 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
               ) : (
                 <Badge>{t("vehicles.noOwner")}</Badge>
               ),
+          },
+          {
+            id: "inspection",
+            header: t("vehicles.cols.inspection"),
+            sort: "inspection",
+            cell: (v) => {
+              const state = inspectionState(v.inspectionDue, thisMonth);
+              return v.inspectionDue && state ? <StatusBadge tone={INSPECTION_TONE[state]}>{t(`vehicles.inspection.${state}`, { month: monthLabel(v.inspectionDue) })}</StatusBadge> : <span className="text-ink-muted">–</span>;
+            },
           },
           { id: "tires", header: t("nav.tires"), align: "end", priority: "low", cell: (v) => v._count.tireSets },
           { id: "appointments", header: t("nav.appointments"), align: "end", priority: "low", cell: (v) => v._count.appointments },

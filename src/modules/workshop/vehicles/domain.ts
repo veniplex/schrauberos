@@ -1,0 +1,53 @@
+import { isMonth, monthsBetween, monthOf } from "@/lib/month";
+
+/**
+ * Fachlogik der Fahrzeuge (rein, ohne Datenbank und Uhr): Kraftstoffarten, weitere Prüfungen, Schlüsselnummern und die Prüffrist (HU) als **Monat**.
+ *
+ * Die Prüffrist heißt neutral „Hauptuntersuchung/Prüfung fällig“ (`inspectionDue`, „JJJJ-MM“): Gemeint ist die nächste wiederkehrende Hauptprüfung – in Deutschland die HU, in Österreich
+ * das „Pickerl“, in der Schweiz die MFK. Ein Monat genügt (Plakette/Pickerl gelten bis Monatsende). Daneben kann **eine weitere Prüfung** mit Datum stehen (Sicherheitsprüfung, Gasanlage …).
+ */
+
+export const FUEL_TYPES = ["petrol", "diesel", "hybrid", "electric", "lpg", "cng", "hydrogen", "other"] as const;
+export type FuelType = (typeof FUEL_TYPES)[number];
+
+export const EXTRA_INSPECTION_KINDS = ["sp", "gas", "other"] as const;
+export type ExtraInspectionKind = (typeof EXTRA_INSPECTION_KINDS)[number];
+
+/** Wie viele Monate im Voraus das Dashboard-Fenster „bald fällig“ reicht (der laufende Monat und die folgenden). */
+export const INSPECTION_SOON_MONTHS = 2;
+
+/** Herstellerschlüsselnummer (HSN, Feld 2.1: vier Zeichen) und Typschlüsselnummer (TSN, Feld 2.2: drei Zeichen) – Großbuchstaben und Ziffern, ohne Leerzeichen. */
+export const HSN_PATTERN = /^[0-9A-Z]{4}$/;
+export const TSN_PATTERN = /^[0-9A-Z]{3}$/;
+export { MONTH_PATTERN, addMonths, isMonth, monthOf, monthsBetween } from "@/lib/month";
+
+export type InspectionState = "overdue" | "thisMonth" | "soon" | "ok";
+
+/**
+ * Stand der Prüffrist: `overdue` = der Monat ist vorbei, `thisMonth` = fällig im laufenden Monat (läuft Ende des Monats ab), `soon` = in den nächsten `soonMonths` Monaten, sonst `ok`.
+ * `null` = keine Frist erfasst.
+ */
+export function inspectionState(due: string | null | undefined, currentMonth: string, soonMonths = INSPECTION_SOON_MONTHS): InspectionState | null {
+  if (!due || !isMonth(due) || !isMonth(currentMonth)) return null;
+  const diff = monthsBetween(currentMonth, due);
+  return diff < 0 ? "overdue" : diff === 0 ? "thisMonth" : diff <= soonMonths ? "soon" : "ok";
+}
+
+/** Gilt die Frist als „bald fällig“ (überfällig, laufender Monat oder in den nächsten Monaten)? Grundlage von Dashboard-Baustein und Listenfilter. */
+export const isInspectionAttention = (due: string | null | undefined, currentMonth: string, soonMonths = INSPECTION_SOON_MONTHS): boolean => {
+  const state = inspectionState(due, currentMonth, soonMonths);
+  return state !== null && state !== "ok";
+};
+
+/** Die weitere Prüfung (SP, Gasanlage …) wird nach dem Monat ihres Datums bewertet (Monatsgenauigkeit wie die HU). */
+export const extraInspectionState = (due: Date | null | undefined, currentMonth: string, soonMonths = INSPECTION_SOON_MONTHS): InspectionState | null =>
+  due ? inspectionState(monthOf(due), currentMonth, soonMonths) : null;
+
+/** Kilometerstand-Eingabe: ganze Zahl ohne Tausenderpunkte (`123.456` und `123 456` gelten als 123456). */
+export function parseMileage(value: string): number | null {
+  const digits = value.replace(/[.\s']/g, "");
+  return /^\d{1,7}$/.test(digits) ? Number(digits) : null;
+}
+
+/** Schlüsselnummern: Eingabe vereinheitlichen (Leerzeichen entfernen, Großbuchstaben). */
+export const normalizeKey = (value: string): string => value.replace(/\s+/g, "").toUpperCase();

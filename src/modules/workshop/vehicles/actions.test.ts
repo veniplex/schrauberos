@@ -34,15 +34,72 @@ describe("saveVehicle", () => {
     assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { action: "vehicle.create" } })).entityId, v.id);
   });
 
-  it("meldet doppelte Kennzeichen (mit und ohne Halter) und unbekannte Halter als Feldfehler", async () => {
+  it("warnt bei doppelten Kennzeichen (mit und ohne Halter) mit dem vorhandenen Fahrzeug, statt zu sperren; unbekannte Halter und ungültige FIN bleiben Feldfehler", async () => {
     const c = await env.db.customer.create({ data: { lastName: "Müller" } });
-    await env.db.vehicle.create({ data: { plate: "B-AB 1", plateNorm: "BAB1", customerId: c.id } });
-    await env.db.vehicle.create({ data: { plate: "B-AB 2", plateNorm: "BAB2" } });
-    assert.match((await actions.saveVehicle({}, form({ plate: "B-AB 1" }))).fieldErrors?.plate ?? "", /Müller/);
-    assert.match((await actions.saveVehicle({}, form({ plate: "b ab-2" }))).fieldErrors?.plate ?? "", /ohne Halter/);
+    const first = await env.db.vehicle.create({ data: { plate: "B-AB 1", plateNorm: "BAB1", customerId: c.id } });
+    const second = await env.db.vehicle.create({ data: { plate: "B-AB 2", plateNorm: "BAB2" } });
+    const withOwner = await actions.saveVehicle({}, form({ plate: "B-AB 1" }));
+    assert.match(withOwner.fieldErrors?.plate ?? "", /Müller/);
+    assert.deepEqual(withOwner.data, { duplicateId: first.id, duplicatePlate: "B-AB 1", duplicateOwner: "Müller" }, "das Formular bekommt das vorhandene Fahrzeug für „Vorhandenes Fahrzeug öffnen“");
+    const noOwner = await actions.saveVehicle({}, form({ plate: "b ab-2" }));
+    assert.match(noOwner.fieldErrors?.plate ?? "", /ohne Halter/);
+    assert.equal(noOwner.data?.duplicateId, second.id);
     assert.ok((await actions.saveVehicle({}, form({ plate: "B-XY 9", customerId: "gibt-es-nicht" }))).fieldErrors?.customerId);
     assert.ok((await actions.saveVehicle({}, form({ plate: "B-XY 9", vin: "zu-kurz" }))).fieldErrors?.vin);
-    assert.equal(await env.db.vehicle.count(), 2);
+    assert.equal(await env.db.vehicle.count(), 2, "nichts wurde gespeichert");
+  });
+
+  it("„Trotzdem anlegen“ (allowDuplicate) speichert die Dublette und vermerkt es im Audit; die Warnung kommt auch bei anderer Schreibweise (Umlaut zerlegt, Trenner)", async () => {
+    await env.db.vehicle.create({ data: { plate: "MÜ-AB 12", plateNorm: "MÜAB12" } });
+    const warning = await actions.saveVehicle({}, form({ plate: "mu\u0308 ab-12" }));
+    assert.ok(warning.data?.duplicateId, "zerlegtes Ü wird als dasselbe Kennzeichen erkannt");
+    const target = await redirectOf(() => actions.saveVehicle({}, form({ plate: "MÜ-AB 12", allowDuplicate: "1" })));
+    assert.ok(target);
+    assert.equal(await env.db.vehicle.count({ where: { plateNorm: "MÜAB12" } }), 2);
+    assert.match((await env.db.auditLog.findFirstOrThrow({ where: { action: "vehicle.create" } })).target ?? "", /Dublette bestätigt/);
+  });
+
+  it("beim Ändern zählt das Fahrzeug selbst nicht als Dublette", async () => {
+    await redirectOf(() => actions.saveVehicle({}, form({ plate: "B-AB 1" })));
+    const v = await env.db.vehicle.findFirstOrThrow();
+    const { versionOf } = await import("@/lib/concurrency");
+    assert.ok(await redirectOf(() => actions.saveVehicle({}, form({ id: v.id, version: versionOf(v), plate: "b-ab 1", make: "Opel" }))));
+  });
+
+  it("speichert Prüffrist (Monat in verschiedenen Schreibweisen), weitere Prüfung, Kilometerstand, Kraftstoff, HSN/TSN und Erstzulassung", async () => {
+    await redirectOf(() =>
+      actions.saveVehicle({}, form({ plate: "B-HU 1", inspectionDue: "11/2026", extraInspectionKind: "gas", extraInspectionDue: "2027-03-15", mileageKm: "123.456", fuel: "diesel", hsn: "0603", tsn: "bgd", firstRegistration: "2019-04-02" })),
+    );
+    const v = await env.db.vehicle.findFirstOrThrow();
+    assert.equal(v.inspectionDue, "2026-11");
+    assert.equal(v.extraInspectionKind, "gas");
+    assert.equal(v.extraInspectionDue?.toISOString().slice(0, 10), "2027-03-15");
+    assert.equal(v.mileageKm, 123456);
+    assert.equal(v.fuel, "diesel");
+    assert.equal(v.hsn, "0603");
+    assert.equal(v.tsn, "BGD");
+    assert.equal(v.firstRegistration?.toISOString().slice(0, 10), "2019-04-02");
+    const { version } = { version: (await import("@/lib/concurrency")).versionOf(v) };
+    // „2027-01“ im Monatsfeld des Browsers
+    assert.ok(await redirectOf(() => actions.saveVehicle({}, form({ id: v.id, version, plate: "B-HU 1", inspectionDue: "2027-01" }))));
+    const changed = await env.db.vehicle.findUniqueOrThrow({ where: { id: v.id } });
+    assert.equal(changed.inspectionDue, "2027-01");
+    assert.equal(changed.extraInspectionDue, null, "ein weggelassenes Feld wird geleert (wie im Formular)");
+  });
+
+  it("prüft die neuen Felder: Monat, Kilometerstand, HSN/TSN, Kraftstoff, weitere Prüfung braucht Art und Datum", async () => {
+    const errors = async (data: Record<string, string>) => (await actions.saveVehicle({}, form({ plate: "B-ZZ 9", ...data }))).fieldErrors ?? {};
+    assert.ok((await errors({ inspectionDue: "13/2026" })).inspectionDue);
+    assert.ok((await errors({ inspectionDue: "nächstes Jahr" })).inspectionDue);
+    assert.ok((await errors({ mileageKm: "viel" })).mileageKm);
+    assert.ok((await errors({ mileageKm: "12345678" })).mileageKm);
+    assert.ok((await errors({ hsn: "123" })).hsn);
+    assert.ok((await errors({ tsn: "ABCD" })).tsn);
+    assert.ok((await errors({ fuel: "wasser" })).fuel);
+    assert.ok((await errors({ extraInspectionKind: "sp" })).extraInspectionDue);
+    assert.ok((await errors({ extraInspectionDue: "2027-01-01" })).extraInspectionKind);
+    assert.ok((await errors({ firstRegistration: "2019-02-30" })).firstRegistration);
+    assert.equal(await env.db.vehicle.count(), 0);
   });
 
   it("ändern prüft die Version", async () => {

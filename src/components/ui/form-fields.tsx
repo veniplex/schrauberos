@@ -18,6 +18,8 @@ export type ActionState = {
   fieldErrors?: Record<string, string>;
   /** Erfolgsmeldung (bereits übersetzt) */
   message?: string;
+  /** Zusatzangaben eines Fehlers für einen Hinweis im Formular (siehe `OperationFailure.data`) */
+  data?: Record<string, string>;
   /** Die Anfrage hat den Server nicht erreicht (nur im Browser gesetzt) */
   network?: boolean;
 };

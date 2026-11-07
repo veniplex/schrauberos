@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { dateText, moneyCents } from "@/lib/zod-fields";
-import { formatPlate } from "@/lib/plate";
+import { formatPlate, normalizePlate } from "@/lib/plate";
 import { COST_CATEGORIES, FLEET_STATUSES, FUEL_TYPES, nextLicenseCheck } from "@/modules/office/fleet/domain";
-import { defineOperation, fail, failField } from "@/server/operations";
+import { defineOperation, fail, failField, failFields } from "@/server/operations";
 import type { Tx } from "@/server/operations";
 
+/** Häkchen und Knopf des Formulars („1“, „on“) und Wahrheitswerte der API; fehlt der Wert, gilt `false`. */
+const flag = z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean());
 const dateOpt = dateText().optional();
 const dateReq = dateText();
 const noon = (d: string) => new Date(`${d}T12:00:00`);
@@ -47,6 +49,8 @@ const vehicleInput = z.object({
   leasingRate: moneyCents("fleet.errors.amount").pipe(z.number().refine((cents) => cents >= 0, { error: "fleet.errors.amount" })).optional(),
   fuelCardNo: z.string().max(40).optional(),
   notes: z.string().max(2000).optional(),
+  /** Das Kennzeichen gibt es schon, und das ist gewollt (Bestätigung nach der Warnung) */
+  allowDuplicate: flag.optional(),
 });
 
 export const saveFleetVehicleOperation = defineOperation({
@@ -56,6 +60,12 @@ export const saveFleetVehicleOperation = defineOperation({
   audit: (input) => (input.id ? "fleet.update" : "fleet.create"),
   run: async ({ input: { id, version, huDue, serviceDue, insuranceUntil, leasingUntil, leasingRate, plate, ...d }, tx, audit }) => {
     if (d.driverId && !(await tx.employee.findUnique({ where: { id: d.driverId }, select: { id: true } }))) failField("driverId", "validation.invalid");
+
+    // Dublette unter den Firmenfahrzeugen: Warnung mit Bestätigung (wie bei Kundenfahrzeugen), keine Sperre. Der Fuhrpark ist klein; verglichen wird die normalisierte Schreibweise
+    // (Firmenfahrzeuge haben keine eigene Spalte dafür). Kundenfahrzeuge gelten nicht als Dublette: Ein Firmenwagen darf in der Werkstatt auch als Fahrzeug geführt werden.
+    const norm = normalizePlate(plate);
+    const duplicate = norm ? (await tx.fleetVehicle.findMany({ where: id ? { id: { not: id } } : {}, select: { id: true, plate: true } })).find((other) => normalizePlate(other.plate) === norm) : undefined;
+    if (duplicate && !d.allowDuplicate) failFields({ plate: { key: "fleet.errors.plateExists" } }, { duplicateId: duplicate.id, duplicatePlate: duplicate.plate });
 
     const data = {
       plate: formatPlate(plate),
@@ -82,7 +92,7 @@ export const saveFleetVehicleOperation = defineOperation({
     };
     if (id && !(await claimRow(tx.fleetVehicle, id, version))) fail("conflict");
     const saved = id ? await tx.fleetVehicle.update({ where: { id }, data }) : await tx.fleetVehicle.create({ data });
-    audit({ target: saved.plate, entityId: saved.id });
+    audit({ target: duplicate ? `${saved.plate} (Dublette bestätigt)` : saved.plate, entityId: saved.id });
     return { id: saved.id };
   },
 });
