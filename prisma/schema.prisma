@@ -321,6 +321,7 @@ model Customer {
   ownerships   VehicleOwnership[]
   appointments Appointment[]
   invoices     Invoice[]
+  orders       Order[]
 
   @@index([lastName])
   @@index([archivedAt])
@@ -377,6 +378,7 @@ model Vehicle {
   ownerships   VehicleOwnership[]
   tireSets     TireSet[]
   appointments Appointment[]
+  orders       Order[]
 
   // Kein Unique auf dem Kennzeichen: Dubletten sind erlaubt (Warnung mit Bestätigung in der Anwendung), etwa bei Halterwechsel oder wiederverwendeten Kennzeichen
   @@index([plateNorm])
@@ -453,6 +455,7 @@ model Appointment {
   tireSet   TireSet?         @relation(fields: [tireSetId], references: [id], onDelete: SetNull)
   assignee  User?            @relation("AppointmentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   createdBy User?            @relation("AppointmentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  orders    Order[]
 
   @@index([startsAt])
   @@index([vehicleId])
@@ -1117,4 +1120,181 @@ model MailMessage {
   @@index([createdAt])
   @@index([status, createdAt])
   @@index([userId, createdAt])
+}
+
+// ───────────── Zähler (Plattform, F2): fortlaufende, lückenlose Nummern ─────────────
+
+// Ein Zähler je Schlüssel (und Jahr). Der nächste Wert wird in der Transaktion vergeben, die die Nummer verbraucht (`nextCounterValue`, src/server/counters.ts): scheitert sie, bleibt auch der
+// Zähler stehen – es gibt keine Lücken. Schlüssel gehören den Funktionen ("orders", später "invoices" …); year = 0: Zähler ohne Jahreswechsel.
+model Counter {
+  key       String
+  year      Int      @default(0)
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([key, year])
+}
+
+// ───────────── Werkstattaufträge / Arbeitskarten (F2, workshop.orders) ─────────────
+
+model Order {
+  id            String    @id @default(cuid())
+  // fortlaufend und lückenlos, Muster A-JJJJ-NNNN (Zähler "orders")
+  number        String    @unique
+  // accepted | in_progress | ready | picked_up | cancelled
+  status        String    @default("accepted")
+  vehicleId     String
+  // Kunde zum Zeitpunkt der Annahme (aus dem Fahrzeughalter abgeleitet, oder direkt gewählt); null = ohne Kunde
+  customerId    String?
+  appointmentId String?
+  // Kundenwunsch / Beschreibung des Auftrags
+  request       String?
+  // Kilometerstand bei Annahme (schreibt – wenn höher – ins Fahrzeug)
+  mileageKm     Int?
+  acceptedAt    DateTime  @default(now())
+  // Zeitpunkt des Abschlusses ("Abgeholt"); beim Wiedereröffnen wieder null
+  closedAt      DateTime?
+  createdByName String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Aufträge werden nie gelöscht (Status "Storniert"); Fahrzeug und Kunde sind deshalb Restrict
+  vehicle     Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  customer    Customer?       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  appointment Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  items       OrderItem[]
+  findings    OrderFinding[]
+  approvals   OrderApproval[]
+  events      OrderEvent[]
+
+  @@index([status, acceptedAt])
+  @@index([vehicleId])
+  @@index([customerId])
+  @@index([appointmentId])
+  @@index([acceptedAt])
+}
+
+// Position eines Auftrags (Arbeit, Teil, Sonstiges). Preise netto in ganzen Cent, Menge in Tausendsteln, Sätze in Basispunkten (src/lib/line-items.ts).
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  position      Int
+  // labor | part | other
+  kind          String  @default("labor")
+  description   String
+  unit          String  @default("")
+  quantityMilli Int
+  unitCents     Int
+  taxBp         Int
+  discountBp    Int     @default(0)
+  // Verweis, den eine andere Funktion setzt (z. B. refType "article", refId = Artikel); der Auftrag kennt die Bedeutung nicht
+  refType       String?
+  refId         String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, position])
+  @@index([refType, refId])
+}
+
+// Befund (Freitext, mehrere je Auftrag)
+model OrderFinding {
+  id         String   @id @default(cuid())
+  orderId    String
+  text       String
+  authorName String
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+// Freigabe-Protokoll bei Mehrarbeit: unveränderlich (kein Bearbeiten, kein Löschen), nur anlegen
+model OrderApproval {
+  id             String   @id @default(cuid())
+  orderId        String
+  // freigegebener Mehrbetrag, brutto in Cent
+  amountCents    Int
+  reason         String
+  // signature (Unterschrift am Tablet, PNG unter /data/files) | typed (getippter Name mit Bestätigung) | phone (telefonisch)
+  method         String
+  approverName   String
+  // relativer Pfad der Unterschrift (nur method = signature)
+  signaturePath  String?
+  recordedByName String
+  createdAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+// Verlauf: Annahme, Statuswechsel, Wiedereröffnen, Freigaben (Timeline)
+model OrderEvent {
+  id      String   @id @default(cuid())
+  orderId String
+  // created | status | reopened | approval
+  kind    String
+  status  String?
+  byName  String
+  note    String?
+  at      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, at])
+}
+
+// ───────────── Teile & Lager (F4, workshop.parts) ─────────────
+
+model Article {
+  id            String    @id @default(cuid())
+  // Artikelnummer, eindeutig
+  number        String    @unique
+  name          String
+  // normalisierte Suchspalte (Artikelnummer und Bezeichnung, src/lib/search-key.ts)
+  searchKey     String    @default("")
+  unit          String    @default("Stk")
+  supplier      String?
+  // Einkaufs- und Verkaufspreis netto in ganzen Cent (nur mit Recht parts.prices gelesen)
+  purchaseCents Int?
+  saleCents     Int?
+  // Steuersatz in Basispunkten
+  taxBp         Int       @default(1900)
+  // Bestand und Mindestmenge in Tausendsteln der Einheit; negativer Bestand ist erlaubt (mit Warnung)
+  stockMilli    Int       @default(0)
+  minStockMilli Int       @default(0)
+  notes         String?
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  movements StockMovement[]
+
+  @@index([archivedAt])
+  @@index([name])
+}
+
+// Lagerbewegung: unveränderlich (nur anlegen). Vorzeichen in quantityMilli: Zugang +, Abgang −.
+model StockMovement {
+  id              String   @id @default(cuid())
+  articleId       String
+  // receipt (Wareneingang) | order (Auftragsabgang) | correction (Inventur/Korrektur) | reversal (Rückbuchung beim Wiedereröffnen)
+  kind            String
+  quantityMilli   Int
+  stockAfterMilli Int
+  // Bezug zum Auftrag (ohne Fremdschlüssel: die Funktion kennt Aufträge nur über ihre Hooks)
+  orderId         String?
+  orderNumber     String?
+  // Lieferschein / Eingangsrechnung (Nummer, von Hand eingetragen) bzw. Bezeichnung der Inventur
+  reference       String?
+  note            String?
+  byName          String
+  createdAt       DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Restrict)
+
+  @@index([articleId, createdAt])
+  @@index([orderId])
 }

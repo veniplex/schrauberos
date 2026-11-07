@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { useCallback, useId, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { INTL_LOCALE } from "@/i18n/config";
 import { useI18n } from "@/i18n/client";
@@ -10,6 +10,7 @@ import {
   createEditorState,
   editorReducer,
   evaluateRows,
+  LINE_ITEM_ADD_EVENT,
   lineResult,
   MAX_LINES,
   parseDraft,
@@ -20,6 +21,7 @@ import {
   type EditorField,
   type EditorRow,
   type EditorState,
+  type LineItemAddDetail,
 } from "@/lib/line-items";
 import { formatCents } from "@/lib/money";
 import { Button } from "./buttons";
@@ -64,6 +66,7 @@ export function LineItemEditor({
   exempt = false,
   errors,
   disabled,
+  kinds,
 }: {
   /** Name des Absendefeldes (Standard „items“) */
   name?: string;
@@ -77,17 +80,20 @@ export function LineItemEditor({
   /** Fehler je Feld, Schlüssel `<Zeile>.<Feld>` (Feld: description, quantity, unit, unitPrice, taxRate, discount); Standard: aus dem umgebenden `Form` */
   errors?: Record<string, string>;
   disabled?: boolean;
+  /** Arten der Position (z. B. Arbeit/Teil/Sonstiges): zeigt je Position eine Auswahl „Art“; die erste ist die Vorgabe. Das Absendefeld trägt sie als `kind`. */
+  kinds?: readonly { value: string; label: string }[];
 }) {
   const { t, tp, locale } = useI18n();
   const form = useFormContext();
   const headingId = useId();
   const root = useRef<HTMLDivElement>(null);
-  const defaults = useMemo(() => ({ taxRate: exempt ? "0" : defaultTaxRate }), [exempt, defaultTaxRate]);
+  const defaultKind = kinds?.[0]?.value ?? "";
+  const defaults = useMemo(() => ({ taxRate: exempt ? "0" : defaultTaxRate, kind: defaultKind }), [exempt, defaultTaxRate, defaultKind]);
   const [state, dispatch] = useReducer((current: EditorState, action: EditorAction) => editorReducer(current, action, defaults), undefined, () => createEditorState(rowsFromItems(initialItems, locale), defaults));
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const pendingFocus = useRef<string | null>(null);
 
-  const rows = useMemo(() => (exempt ? state.rows.map((row) => ({ ...row, taxRate: "0" })) : state.rows), [state.rows, exempt]);
+  const rows = useMemo(() => (exempt || defaultKind ? state.rows.map((row) => ({ ...row, ...(exempt ? { taxRate: "0" } : {}), kind: row.kind || defaultKind })) : state.rows), [state.rows, exempt, defaultKind]);
   const evaluation = useMemo(() => evaluateRows(rows, { exempt }), [rows, exempt]);
   const { totals } = evaluation;
   const money = (cents: number) => formatCents(cents, INTL_LOCALE[locale]);
@@ -100,6 +106,17 @@ export function LineItemEditor({
     element.addEventListener(DRAFT_STATE_EVENT, handler);
     return () => element.removeEventListener(DRAFT_STATE_EVENT, handler);
   }, []);
+
+  // andere Funktionen fügen Positionen über ein Ereignis ein (Artikel im Auftrag); der Editor kennt sie nicht
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<LineItemAddDetail>).detail;
+      if (!detail || (detail.name ?? "items") !== name || disabled) return;
+      dispatch({ type: "add", row: detail.row });
+    };
+    window.addEventListener(LINE_ITEM_ADD_EVENT, handler);
+    return () => window.removeEventListener(LINE_ITEM_ADD_EVENT, handler);
+  }, [name, disabled]);
 
   // eine neue Zeile nimmt den Fokus (Beschreibung), sobald sie im DOM steht
   const focusNew = useCallback((element: HTMLInputElement | null, key: string) => {
@@ -169,17 +186,30 @@ export function LineItemEditor({
           return (
             <li key={row.key} role="group" aria-label={t("ui.lineItems.position", { n: index + 1 })} className={clsx("grid grid-cols-2 gap-3 rounded-md border border-line bg-surface p-3 @lg:grid-cols-4", "@5xl:items-start @5xl:gap-2 @5xl:border-0 @5xl:bg-transparent @5xl:p-0", COLUMNS)}>
               <p className="col-span-full flex items-center justify-between text-sm font-semibold @5xl:sr-only">{t("ui.lineItems.position", { n: index + 1 })}</p>
-              <Field className="col-span-full @5xl:col-span-1" label={t("ui.lineItems.description")} labelClassName="@5xl:sr-only" error={issueText(index, row.key, "description")}>
-                <Input
-                  ref={(element) => focusNew(element, row.key)}
-                  value={row.description}
-                  maxLength={300}
-                  disabled={disabled}
-                  autoComplete="off"
-                  onChange={(event) => set(row.key, "description", event.target.value)}
-                  onBlur={() => touch(row.key, "description")}
-                />
-              </Field>
+              <div className="col-span-full flex flex-col gap-2 @5xl:col-span-1">
+                <Field label={t("ui.lineItems.description")} labelClassName="@5xl:sr-only" error={issueText(index, row.key, "description")}>
+                  <Input
+                    ref={(element) => focusNew(element, row.key)}
+                    value={row.description}
+                    maxLength={300}
+                    disabled={disabled}
+                    autoComplete="off"
+                    onChange={(event) => set(row.key, "description", event.target.value)}
+                    onBlur={() => touch(row.key, "description")}
+                  />
+                </Field>
+                {kinds ? (
+                  <Field label={t("ui.lineItems.kind")} labelClassName="@5xl:sr-only">
+                    <Select value={row.kind || defaultKind} disabled={disabled} onChange={(event) => set(row.key, "kind", event.target.value)}>
+                      {kinds.map((kind) => (
+                        <option key={kind.value} value={kind.value}>
+                          {kind.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                ) : null}
+              </div>
               <Field label={t("ui.lineItems.quantity")} labelClassName="@5xl:sr-only" error={issueText(index, row.key, "quantity")}>
                 <Input value={row.quantity} inputMode="decimal" disabled={disabled} autoComplete="off" className="text-right tabular" onChange={(event) => set(row.key, "quantity", event.target.value)} onBlur={() => touch(row.key, "quantity")} />
               </Field>

@@ -252,9 +252,23 @@ describe("Auswertung und Übergabe an den Server", () => {
   it("rowsFromItems → Editor → Absendefeld ist verlustfrei (Bearbeiten)", () => {
     const items = [{ description: "Arbeit", unit: "Std.", quantityMilli: 1500, unitCents: 8500, taxBp: 1900, discountBp: 250 }];
     const rows = createEditorState(rowsFromItems(items)).rows;
-    assert.deepEqual(rows[0], { key: "r0", description: "Arbeit", unit: "Std.", quantity: "1,5", unitPrice: "85,00", taxRate: "19", discount: "2,5" });
+    assert.deepEqual(rows[0], { key: "r0", description: "Arbeit", unit: "Std.", quantity: "1,5", unitPrice: "85,00", taxRate: "19", discount: "2,5", kind: "", refType: "", refId: "" });
     assert.deepEqual(lineItemsInput().parse(serializeSubmit(rows)), [{ ...items[0] }]);
     const english = createEditorState(rowsFromItems(items, "en")).rows[0];
     assert.deepEqual([english.quantity, english.unitPrice, english.discount], ["1.5", "85.00", "2.5"]);
+  });
+
+  it("Art und Verweis (kind, refType/refId) laufen mit durch – und fehlen im Absendefeld, wenn der Aufrufer sie nicht nutzt", () => {
+    const plain = createEditorState([{ description: "a", unitPrice: "1" }]).rows;
+    assert.deepEqual(JSON.parse(serializeSubmit(plain))[0], { description: "a", unit: "", quantityMilli: 1000, unitCents: 100, taxBp: 1900, discountBp: 0 });
+    const rows = createEditorState(rowsFromItems([{ description: "Filter", unit: "Stk", quantityMilli: 2000, unitCents: 1250, taxBp: 1900, kind: "part", refType: "article", refId: "abc" }])).rows;
+    assert.deepEqual([rows[0].kind, rows[0].refType, rows[0].refId], ["part", "article", "abc"]);
+    const parsed = lineItemsInput().parse(serializeSubmit(rows));
+    assert.deepEqual([parsed[0].kind, parsed[0].refType, parsed[0].refId], ["part", "article", "abc"]);
+    // ein Verweis ohne Kennung wird nicht halb übertragen
+    assert.equal(JSON.parse(serializeSubmit([{ ...rows[0], refId: "" }]))[0].refType, undefined);
+    // auch der Entwurf trägt die Zusätze
+    const restored = editorReducer(createEditorState([]), { type: "replace", rows: parseDraft(serializeDraft(rows)) }).rows[0];
+    assert.deepEqual([restored.kind, restored.refType, restored.refId], ["part", "article", "abc"]);
   });
 });

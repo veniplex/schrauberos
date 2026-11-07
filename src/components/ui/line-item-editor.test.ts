@@ -149,6 +149,30 @@ describe("LineItemEditor", () => {
     assert.doesNotMatch(plain(rows()[0].textContent), /Zu hoch/);
   });
 
+  it("mit `kinds`: je Position eine Auswahl „Art“, die erste ist die Vorgabe und steht im Absendefeld", async () => {
+    const kinds = [{ value: "labor", label: "Arbeit" }, { value: "part", label: "Teil" }];
+    const { rows, field, submitted } = await mountEditor({ kinds, initialItems: [{ ...ITEMS[0], kind: "part" }, ITEMS[1]] });
+    const select = field(rows()[0], /Art/) as HTMLSelectElement;
+    assert.equal(select.value, "part");
+    assert.equal((field(rows()[1], /Art/) as HTMLSelectElement).value, "labor", "ohne Angabe gilt die erste Art");
+    assert.deepEqual(submitted().map((item) => item.kind), ["part", "labor"]);
+    await act(() => void select.dispatchEvent(new window.Event("change", { bubbles: true })));
+    // ohne `kinds` gibt es weder Auswahl noch Feld
+    await view?.unmount();
+    const plainEditor = await mountEditor();
+    assert.equal(plainEditor.root.querySelectorAll("select").length, 3, "nur die Steuersätze");
+    assert.ok(plainEditor.submitted().every((item) => !("kind" in item)));
+  });
+
+  it("fremde Funktionen fügen Positionen über das Ereignis ein (mit Verweis); ein Ereignis für ein anderes Feld wird ignoriert", async () => {
+    const { LINE_ITEM_ADD_EVENT } = await import("@/lib/line-items");
+    const { rows, submitted } = await mountEditor({ initialItems: [], kinds: [{ value: "labor", label: "Arbeit" }, { value: "part", label: "Teil" }] });
+    await act(() => void window.dispatchEvent(new window.CustomEvent(LINE_ITEM_ADD_EVENT, { detail: { name: "items", row: { description: "Ölfilter", unit: "Stk", unitPrice: "12,50", taxRate: "19", kind: "part", refType: "article", refId: "a1" } } })));
+    await act(() => void window.dispatchEvent(new window.CustomEvent(LINE_ITEM_ADD_EVENT, { detail: { name: "anderes", row: { description: "Fremd" } } })));
+    assert.equal(rows().length, 1);
+    assert.deepEqual([submitted()[0].description, submitted()[0].kind, submitted()[0].refType, submitted()[0].refId, submitted()[0].unitCents], ["Ölfilter", "part", "article", "a1", 1250]);
+  });
+
   it("mapLineItemErrors bildet die Pfade des Servers auf Zeile und Feld ab", async () => {
     const { mapLineItemErrors } = await import("./line-item-editor");
     assert.deepEqual(mapLineItemErrors({ "items.1.unitCents": "a", "items.0.description": "b", "2.taxBp": "c", "items.1.quantityMilli": "d", andere: "x", "items.x.unitCents": "y" }, "items"), {

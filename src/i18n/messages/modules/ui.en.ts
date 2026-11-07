@@ -7,6 +7,7 @@ export const uiEn: typeof uiDe = {
     description: "Description",
     quantity: "Quantity",
     unit: "Unit",
+    kind: "Type",
     unitPrice: "Unit price net",
     taxRate: "Tax rate",
     discount: "Discount %",

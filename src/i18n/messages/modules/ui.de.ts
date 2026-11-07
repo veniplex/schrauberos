@@ -6,6 +6,7 @@ export const uiDe = {
     description: "Beschreibung",
     quantity: "Menge",
     unit: "Einheit",
+    kind: "Art",
     unitPrice: "Einzelpreis netto",
     taxRate: "Steuersatz",
     discount: "Rabatt %",

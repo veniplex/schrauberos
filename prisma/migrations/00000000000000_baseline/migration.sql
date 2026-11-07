@@ -792,6 +792,124 @@ CREATE TABLE "MailMessage" (
     "attachments" TEXT
 );
 
+-- CreateTable
+CREATE TABLE "Counter" (
+    "key" TEXT NOT NULL,
+    "year" INTEGER NOT NULL DEFAULT 0,
+    "value" INTEGER NOT NULL DEFAULT 0,
+    "updatedAt" DATETIME NOT NULL,
+
+    PRIMARY KEY ("key", "year")
+);
+
+-- CreateTable
+CREATE TABLE "Order" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "number" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'accepted',
+    "vehicleId" TEXT NOT NULL,
+    "customerId" TEXT,
+    "appointmentId" TEXT,
+    "request" TEXT,
+    "mileageKm" INTEGER,
+    "acceptedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "closedAt" DATETIME,
+    "createdByName" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Order_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Order_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Order_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "OrderItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "orderId" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "kind" TEXT NOT NULL DEFAULT 'labor',
+    "description" TEXT NOT NULL,
+    "unit" TEXT NOT NULL DEFAULT '',
+    "quantityMilli" INTEGER NOT NULL,
+    "unitCents" INTEGER NOT NULL,
+    "taxBp" INTEGER NOT NULL,
+    "discountBp" INTEGER NOT NULL DEFAULT 0,
+    "refType" TEXT,
+    "refId" TEXT,
+    CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "OrderFinding" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "orderId" TEXT NOT NULL,
+    "text" TEXT NOT NULL,
+    "authorName" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "OrderFinding_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "OrderApproval" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "orderId" TEXT NOT NULL,
+    "amountCents" INTEGER NOT NULL,
+    "reason" TEXT NOT NULL,
+    "method" TEXT NOT NULL,
+    "approverName" TEXT NOT NULL,
+    "signaturePath" TEXT,
+    "recordedByName" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "OrderApproval_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "OrderEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "orderId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "status" TEXT,
+    "byName" TEXT NOT NULL,
+    "note" TEXT,
+    "at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "OrderEvent_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Article" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "number" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "searchKey" TEXT NOT NULL DEFAULT '',
+    "unit" TEXT NOT NULL DEFAULT 'Stk',
+    "supplier" TEXT,
+    "purchaseCents" INTEGER,
+    "saleCents" INTEGER,
+    "taxBp" INTEGER NOT NULL DEFAULT 1900,
+    "stockMilli" INTEGER NOT NULL DEFAULT 0,
+    "minStockMilli" INTEGER NOT NULL DEFAULT 0,
+    "notes" TEXT,
+    "archivedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "StockMovement" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "articleId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "quantityMilli" INTEGER NOT NULL,
+    "stockAfterMilli" INTEGER NOT NULL,
+    "orderId" TEXT,
+    "orderNumber" TEXT,
+    "reference" TEXT,
+    "note" TEXT,
+    "byName" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "StockMovement_articleId_fkey" FOREIGN KEY ("articleId") REFERENCES "Article" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
@@ -1043,3 +1161,51 @@ CREATE INDEX "MailMessage_status_createdAt_idx" ON "MailMessage"("status", "crea
 
 -- CreateIndex
 CREATE INDEX "MailMessage_userId_createdAt_idx" ON "MailMessage"("userId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Order_number_key" ON "Order"("number");
+
+-- CreateIndex
+CREATE INDEX "Order_status_acceptedAt_idx" ON "Order"("status", "acceptedAt");
+
+-- CreateIndex
+CREATE INDEX "Order_vehicleId_idx" ON "Order"("vehicleId");
+
+-- CreateIndex
+CREATE INDEX "Order_customerId_idx" ON "Order"("customerId");
+
+-- CreateIndex
+CREATE INDEX "Order_appointmentId_idx" ON "Order"("appointmentId");
+
+-- CreateIndex
+CREATE INDEX "Order_acceptedAt_idx" ON "Order"("acceptedAt");
+
+-- CreateIndex
+CREATE INDEX "OrderItem_orderId_position_idx" ON "OrderItem"("orderId", "position");
+
+-- CreateIndex
+CREATE INDEX "OrderItem_refType_refId_idx" ON "OrderItem"("refType", "refId");
+
+-- CreateIndex
+CREATE INDEX "OrderFinding_orderId_createdAt_idx" ON "OrderFinding"("orderId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "OrderApproval_orderId_createdAt_idx" ON "OrderApproval"("orderId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "OrderEvent_orderId_at_idx" ON "OrderEvent"("orderId", "at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Article_number_key" ON "Article"("number");
+
+-- CreateIndex
+CREATE INDEX "Article_archivedAt_idx" ON "Article"("archivedAt");
+
+-- CreateIndex
+CREATE INDEX "Article_name_idx" ON "Article"("name");
+
+-- CreateIndex
+CREATE INDEX "StockMovement_articleId_createdAt_idx" ON "StockMovement"("articleId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "StockMovement_orderId_idx" ON "StockMovement"("orderId");

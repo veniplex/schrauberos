@@ -131,8 +131,11 @@ export const parseUnitCents = (text: string): number | null => {
 
 /* ------------------------------------------------------------------ Zustand des Editors */
 
-/** Eine Zeile des Editors, alle Werte als Eingabetext (so lässt sich halb Getipptes darstellen). */
-export type EditorRow = { key: string; description: string; quantity: string; unit: string; unitPrice: string; taxRate: string; discount: string };
+/**
+ * Eine Zeile des Editors, alle Werte als Eingabetext (so lässt sich halb Getipptes darstellen). `kind` (Art der Position, z. B. Arbeit/Teil) und `refType`/`refId` (Verweis, den eine andere
+ * Funktion beim Einfügen setzt, z. B. ein Artikel) sind optionale Zusätze: leer, wenn der Aufrufer sie nicht nutzt, und dann auch nicht im Absendefeld.
+ */
+export type EditorRow = { key: string; description: string; quantity: string; unit: string; unitPrice: string; taxRate: string; discount: string; kind: string; refType: string; refId: string };
 export type EditorField = Exclude<keyof EditorRow, "key">;
 export type EditorState = { rows: EditorRow[]; nextKey: number };
 /** Eine Zeile ohne Schlüssel – so wird der Zustand für Entwürfe gesichert. */
@@ -145,10 +148,17 @@ export type EditorAction =
   | { type: "move"; key: string; delta: -1 | 1 }
   | { type: "replace"; rows: readonly Partial<EditorRowDraft>[] };
 
-export const EDITOR_FIELDS: readonly EditorField[] = ["description", "quantity", "unit", "unitPrice", "taxRate", "discount"];
+/**
+ * Ereignis, mit dem eine andere Funktion eine Position in den Editor einfügt (z. B. „Artikel einfügen“ im Auftrag): `window.dispatchEvent(new CustomEvent(LINE_ITEM_ADD_EVENT, { detail }))`.
+ * `name` ist das Absendefeld des Editors (Standard „items“), `row` die vorbelegten Werte als Eingabetext. Der Editor kennt den Absender nicht.
+ */
+export const LINE_ITEM_ADD_EVENT = "so-line-item-add";
+export type LineItemAddDetail = { name?: string; row: Partial<EditorRowDraft> };
+
+export const EDITOR_FIELDS: readonly EditorField[] = ["description", "quantity", "unit", "unitPrice", "taxRate", "discount", "kind", "refType", "refId"];
 
 export function blankRow(key: string, defaults: Partial<EditorRowDraft> = {}): EditorRow {
-  return { key, description: "", quantity: "1", unit: "", unitPrice: "", taxRate: "19", discount: "", ...defaults };
+  return { key, description: "", quantity: "1", unit: "", unitPrice: "", taxRate: "19", discount: "", kind: "", refType: "", refId: "", ...defaults };
 }
 
 export function createEditorState(rows: readonly Partial<EditorRowDraft>[], defaults: Partial<EditorRowDraft> = {}): EditorState {
@@ -250,13 +260,25 @@ export function serializeSubmit(rows: readonly EditorRow[]): string {
       const unitCents = parseUnitCents(row.unitPrice);
       const taxBp = parsePercentBp(row.taxRate);
       const discountBp = row.discount.trim() === "" ? 0 : parsePercentBp(row.discount);
-      return { description: row.description.trim(), unit: row.unit.trim(), quantityMilli, unitCents, taxBp, discountBp };
+      return {
+        description: row.description.trim(),
+        unit: row.unit.trim(),
+        quantityMilli,
+        unitCents,
+        taxBp,
+        discountBp,
+        ...(row.kind ? { kind: row.kind } : {}),
+        ...(row.refType && row.refId ? { refType: row.refType, refId: row.refId } : {}),
+      };
     }),
   );
 }
 
 /** Positionen aus gespeicherten Zahlen zurück in Eingabetexte (Bearbeiten-Formular). */
-export function rowsFromItems(items: ReadonlyArray<{ description: string; unit?: string; quantityMilli: number; unitCents: number; taxBp: number; discountBp?: number }>, locale: "de" | "en" = "de"): EditorRowDraft[] {
+export function rowsFromItems(
+  items: ReadonlyArray<{ description: string; unit?: string; quantityMilli: number; unitCents: number; taxBp: number; discountBp?: number; kind?: string; refType?: string | null; refId?: string | null }>,
+  locale: "de" | "en" = "de",
+): EditorRowDraft[] {
   return items.map((item) => ({
     description: item.description,
     unit: item.unit ?? "",
@@ -264,6 +286,9 @@ export function rowsFromItems(items: ReadonlyArray<{ description: string; unit?:
     unitPrice: locale === "de" ? centsToInput(item.unitCents) : centsToInput(item.unitCents).replace(",", "."),
     taxRate: scaledToInput(item.taxBp, PERCENT_DECIMALS, locale),
     discount: item.discountBp ? scaledToInput(item.discountBp, PERCENT_DECIMALS, locale) : "",
+    kind: item.kind ?? "",
+    refType: item.refType ?? "",
+    refId: item.refId ?? "",
   }));
 }
 
@@ -295,6 +320,10 @@ export const lineItemsSchema = (options: { max?: number } = {}) =>
         unitCents: z.number({ error: "validation.invalid" }).int().min(-MAX_UNIT_CENTS).max(MAX_UNIT_CENTS),
         taxBp: z.number({ error: "validation.number" }).int().min(0).max(10_000),
         discountBp: z.number({ error: "validation.number" }).int().min(0).max(10_000).default(0),
+        /** Zusätze, die nur der Aufrufer deutet (Art der Position, Verweis auf einen Artikel) */
+        kind: z.string().max(20).optional(),
+        refType: z.string().max(20).optional(),
+        refId: z.string().max(64).optional(),
       }),
     )
     .max(options.max ?? MAX_LINES);

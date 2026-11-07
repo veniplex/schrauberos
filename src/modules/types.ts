@@ -162,3 +162,27 @@ export type PrivacyProviderDef = {
   collect(subject: PrivacySubject): Promise<PrivacySection[]>;
   retention?(subject: PrivacySubject): Promise<RetentionItem[]>;
 };
+
+/**
+ * Ort, an dem eine Seite Beiträge anderer Funktionen einhängt („Erweiterungspunkt“): Der Gastgeber kennt seine Gäste nicht, er fragt nur `sectionsFor(session, host)` (`registry.ts`).
+ *  - `orders.detail`: Abschnitt (Karte) auf der Auftragsseite (Teile & Lager: „Verbrauchte Teile“),
+ *  - `orders.items`: Werkzeug über dem Positionen-Editor eines Auftrags (Teile & Lager: Artikel einfügen),
+ *  - `appointments.detail`: Knopf im Termin (Aufträge: „Auftrag aus Termin“).
+ */
+export type SectionHost = "orders.detail" | "orders.items" | "appointments.detail";
+
+/** Was ein Abschnitt vom Gastgeber bekommt: die Kennung der Sache (Auftrag, Termin) und die Sitzung. */
+export type SectionProps = { entityId: string; session: AppSession };
+
+/** Beitrag einer Funktion zu einer Seite einer anderen (`sections.tsx` der Funktion, eingesammelt in `registry.ts`). Erscheint nur bei aktiver Funktion und vorhandenem Recht. */
+export type SectionDef = {
+  id: string;
+  feature: FeatureId;
+  host: SectionHost;
+  permission: Permission;
+  order: number;
+  /** Weiche Abhängigkeiten, die zusätzlich aktiv sein müssen */
+  uses?: readonly FeatureId[];
+  /** Server Component; `null` = nichts anzuzeigen */
+  Component: (props: SectionProps) => ReactNode | Promise<ReactNode>;
+};
