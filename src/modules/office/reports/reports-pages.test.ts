@@ -136,6 +136,18 @@ describe("Offene Posten, Auslastung, Einlagerung, Fälligkeiten", () => {
     assert.ok(root.querySelector("a[href='/reports/due?months=12']"));
   });
 
+  it("Fälligkeiten: jeder Monat des Zeitraums steht im Diagramm – auch ohne Fristen; der Listenhinweis nur bei voller Liste", async () => {
+    await login(MAIN);
+    const root = await render(await (await page("due/page"))({ searchParams: Promise.resolve({ months: "6" }) } as never));
+   // das Fahrzeug ist 2020-01 überfällig, im Zeitraum (6 Monate) gibt es keine kommende Frist: trotzdem sechs Monate auf der Achse (Tabellen-Alternative des Diagramms)
+    const text = plain(root.textContent);
+    assert.match(text, /7 Werte je Reihe/, "Überfällig plus sechs Monate");
+    assert.equal((text.match(/Fahrzeuge, [^:]+: 0/g) ?? []).length, 6, "alle sechs Monate stehen als Nullmonat in der Tabelle des Diagramms (datumsunabhängig gezählt)");
+    assert.doesNotMatch(plain(root.textContent), /Angezeigt werden die ersten 50 Zeilen/, "weniger als 50 Zeilen: kein Hinweis");
+    const open = await render(await (await page("open-items/page"))({ searchParams: Promise.resolve({}) } as never));
+    assert.doesNotMatch(plain(open.textContent), /Angezeigt werden die ersten 50 Zeilen/);
+  });
+
   it("Fälligkeiten nur mit einer Quelle: ohne Fahrzeug-, Fuhrpark- und Rechnungsrecht Weiterleitung; mit nur einem Recht nur dieser Teil", async () => {
     const Page = await page("due/page");
     await login(["reports.view", "tires.view"]);
@@ -158,6 +170,9 @@ describe("Baustein und Schnellsuche", () => {
     assert.match(plain(root.textContent), /Umsatz im laufenden Monat/);
     assert.match(plain(root.textContent), /119,00/);
     assert.ok(root.querySelector("a[href='/reports/revenue']"));
+    const label = root.querySelector("a[href='/reports/revenue']")!.getAttribute("aria-label") ?? "";
+    assert.match(label, /119,00/, "der zugängliche Name nennt den Betrag (sonst läse ein Screenreader ihn nicht vor)");
+    assert.match(label, /1 Beleg/);
     await login(["reports.view"]);
     root = await render((await RevenueWidget()) ?? createElement("div", { id: "leer" }));
     assert.ok(root.querySelector("#leer"), "ohne Rechnungsrecht kein Betrag");

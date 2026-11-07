@@ -22,7 +22,7 @@ export async function RevenueWidget() {
   const eur = (cents: number) => formatCents(cents, INTL_LOCALE[locale]);
   const month = date(monthStart(today.slice(0, 7)), { month: "long", year: "numeric" });
   return (
-    <CardLink href="/reports/revenue" aria-label={`${t("reports.widget.title")}: ${month}`}>
+    <CardLink href="/reports/revenue" aria-label={`${t("reports.widget.title")}: ${month}, ${t("reports.widget.gross")} ${eur(report.total.grossCents)}, ${tp("reports.widget.documents", report.total.count)}`}>
       <p className="text-sm text-ink-muted">
         {t("reports.widget.title")} · {month}
       </p>

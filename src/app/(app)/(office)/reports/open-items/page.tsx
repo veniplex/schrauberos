@@ -13,6 +13,7 @@ import { formatCents } from "@/lib/money";
 import { AGE_BUCKETS, type AgeBucket } from "@/modules/office/invoices/public";
 import { canOpenReport } from "@/modules/office/reports/access";
 import { openItemsReport, type OpenItemsReport } from "@/modules/office/reports/queries";
+import { REPORT_LIST_LIMIT } from "@/modules/office/reports/domain";
 import { ReportChart } from "@/modules/office/reports/report-chart";
 import { requirePermission } from "@/server/auth/session";
 import { defaultFormatId } from "@/server/csv/format";
@@ -90,7 +91,7 @@ export default async function OpenItemsReportPage({ searchParams }: { searchPara
               caption={t("reports.openItems.listTitle")}
               rowKey={(row) => row.id}
               minWidth="40rem"
-              summary={t("reports.common.limitHint", { max: 50 })}
+              summary={report.items.length >= REPORT_LIST_LIMIT ? t("reports.common.limitHint", { max: REPORT_LIST_LIMIT }) : undefined}
               columns={[
                 { id: "number", header: t("reports.openItems.cols.number"), priority: "primary", cell: (row) => <span className="font-mono">{row.number}</span> },
                 { id: "party", header: t("reports.openItems.cols.party"), cell: (row) => row.partyName },

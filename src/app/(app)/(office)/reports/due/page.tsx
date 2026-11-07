@@ -13,6 +13,7 @@ import { formatCents } from "@/lib/money";
 import { monthStart } from "@/lib/month";
 import { canOpenReport } from "@/modules/office/reports/access";
 import { DUE_MONTH_CHOICES, dueReport } from "@/modules/office/reports/queries";
+import { REPORT_LIST_LIMIT, monthKeys } from "@/modules/office/reports/domain";
 import { ReportChart } from "@/modules/office/reports/report-chart";
 import { requirePermission } from "@/server/auth/session";
 import { defaultFormatId } from "@/server/csv/format";
@@ -42,7 +43,14 @@ export default async function DueReportPage({ searchParams }: { searchParams: Pr
   const nothing = !report.inspection && !report.fleet && !report.payments;
   const rules = ["inspection", "payments"] as const;
   const inspection = report.inspection;
-  const monthRows = inspection ? [...(inspection.overdue > 0 ? [{ key: "overdue", label: t("reports.due.inspection.overdue"), count: inspection.overdue }] : []), ...inspection.months.map((m) => ({ key: m.month, label: monthText(m.month), count: m.count }))] : [];
+  // jeder Monat des Zeitraums steht auf der Achse – auch ohne Fristen (sonst wäre die Zeitachse unregelmäßig)
+  const countOf = new Map(inspection?.months.map((m) => [m.month, m.count]) ?? []);
+  const monthRows = inspection
+    ? [
+        ...(inspection.overdue > 0 ? [{ key: "overdue", label: t("reports.due.inspection.overdue"), count: inspection.overdue }] : []),
+        ...monthKeys(report.today, `${report.untilMonth}-01`).map((month) => ({ key: month, label: monthText(month), count: countOf.get(month) ?? 0 })),
+      ]
+    : [];
 
   return (
     <>
@@ -84,7 +92,7 @@ export default async function DueReportPage({ searchParams }: { searchParams: Pr
                   caption={t("reports.due.inspection.title")}
                   rowKey={(row) => row.id}
                   minWidth="32rem"
-                  summary={t("reports.common.limitHint", { max: 50 })}
+                  summary={inspection.items.length >= REPORT_LIST_LIMIT ? t("reports.common.limitHint", { max: REPORT_LIST_LIMIT }) : undefined}
                   columns={[
                     { id: "plate", header: t("reports.due.inspection.cols.plate"), priority: "primary", cell: (row) => row.plate },
                     { id: "vehicle", header: t("reports.due.inspection.cols.vehicle"), cell: (row) => row.vehicleName || "–" },
