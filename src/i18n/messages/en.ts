@@ -126,6 +126,10 @@ export const en: Messages = {
     widgetText: "The rest of the overview keeps working.",
     loading: "Loading …",
   },
+  pwa: {
+    updateReady: "A new version is available. Reload to switch.",
+    updateReload: "Reload",
+  },
   nav: {
     modules: "Modules & features",
     backup: "Backups",

@@ -20,6 +20,16 @@ export const SECURITY_HEADERS = [
 export const PROXY_FREE_PATHS = ["/_next/static/:path*", "/_next/image", "/favicon.ico", "/manifest.webmanifest", "/sw.js", "/icon.:ext", "/apple-icon.:ext", "/icons/:path*", "/api/health", "/api/backups/upload", "/api/setup/restore"];
 export const CSP_FALLBACK_HEADERS = [{ key: "Content-Security-Policy", value: contentSecurityPolicy({ dev: process.env.NODE_ENV !== "production" }) }];
 
+/**
+ * Der Service Worker (`public/sw.js`, P3-5) wird nie vom Zwischenspeicher des Browsers (oder eines Proxys davor) geliefert: Ein Update der App ändert die Adresse (`?v=`), aber auch
+ * ein gleichbleibender Inhalt soll bei jedem Aufruf nachgefragt werden (ETag). Der Header kommt aus der Konfiguration, **nicht** aus dem Proxy: `/sw.js` steht in `PROXY_FREE_PATHS`
+ * (außerhalb des Proxys) und bekommt von dort auch seine CSP.
+ */
+export const SERVICE_WORKER_HEADERS = [
+  { key: "Cache-Control", value: "no-cache" },
+  { key: "Content-Type", value: "text/javascript; charset=utf-8" },
+];
+
 /** Grenzen für Anfrage-Bodies in Byte-Schreibweise von Next; der Proxy-Puffer muss größer sein als das Limit der Server Actions. */
 export const SERVER_ACTION_BODY_LIMIT = "12mb";
 export const PROXY_BODY_LIMIT = "13mb";
@@ -47,6 +57,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
       ...PROXY_FREE_PATHS.map((source) => ({ source, headers: CSP_FALLBACK_HEADERS })),
+      { source: "/sw.js", headers: SERVICE_WORKER_HEADERS },
     ];
   },
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-better-sqlite3", "better-sqlite3"],

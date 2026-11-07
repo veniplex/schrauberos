@@ -2,6 +2,7 @@
 
 import { LogOut, UserRound } from "lucide-react";
 import { clearFormDrafts } from "@/components/ui/form";
+import { clearOfflineCachesInBrowser } from "@/lib/sw-client";
 import { Menu, MenuHeader, MenuLink, MenuSubmit } from "@/components/ui/menu";
 import { useI18n } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
@@ -63,7 +64,14 @@ export function UserMenu({
       <MenuLink href="/account">
         <UserRound className="size-4" aria-hidden /> {t("nav.account")}
       </MenuLink>
-      <form action={logoutAction} onSubmit={() => clearFormDrafts()}>
+      <form
+        action={logoutAction}
+        onSubmit={() => {
+          clearFormDrafts();
+          // Zwischenspeicher des Service Workers leeren (P3-5); wartet nicht, das Abmelden geht sofort weiter
+          void clearOfflineCachesInBrowser();
+        }}
+      >
         <MenuSubmit>
           <LogOut className="size-4" aria-hidden /> {t("auth.logout")}
         </MenuSubmit>

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { pathToRegexp } from "next/dist/compiled/path-to-regexp";
 import { Readable } from "node:stream";
 import { getCloneableBody } from "next/dist/server/body-streams";
-import nextConfig, { CSP_FALLBACK_HEADERS, PROXY_BODY_LIMIT, SECURITY_HEADERS, SERVER_ACTION_BODY_LIMIT } from "../next.config";
+import nextConfig, { CSP_FALLBACK_HEADERS, PROXY_BODY_LIMIT, SECURITY_HEADERS, SERVER_ACTION_BODY_LIMIT, SERVICE_WORKER_HEADERS } from "../next.config";
 
 /**
  * Die Basis-Header aus `next.config.ts`. Geprüft wird nicht nur der Inhalt der Konfiguration, sondern mit dem Mustervergleich, den auch
@@ -49,6 +49,17 @@ describe("next.config: Basis-Header", () => {
     for (const path of ["/", "/login", "/appointments", "/api/v1/customers", "/api/ical/abc.ics", "/api/invoices/xyz/file", "/api/docs/images/abc", "/api/backups/status", "/api/healthz", "/icons-secret"]) {
       assert.equal(withCsp(path).length, 0, `${path}: der Proxy (oder die Route) setzt die CSP, nicht die Konfiguration`);
     }
+  });
+
+  it("der Service Worker kommt nie aus einem Zwischenspeicher (no-cache) und als JavaScript; andere Pfade bekommen das nicht (P3-5)", async () => {
+    const rules = await nextConfig.headers!();
+    const forPath = (path: string) => rules.filter((rule) => pathToRegexp(rule.source).test(path) && rule.headers.some((h) => h.key === "Cache-Control"));
+    assert.equal(forPath("/sw.js").length, 1);
+    assert.deepEqual(forPath("/sw.js")[0].headers, SERVICE_WORKER_HEADERS);
+    assert.equal(SERVICE_WORKER_HEADERS.find((h) => h.key === "Cache-Control")?.value, "no-cache");
+    for (const path of ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/sw.json", "/_next/static/chunks/a.js"]) assert.equal(forPath(path).length, 0, path);
+    // die CSP des Service Workers bleibt die Rückfall-Richtlinie ohne Nonce (er liegt außerhalb des Proxys)
+    assert.ok(rules.some((rule) => pathToRegexp(rule.source).test("/sw.js") && rule.headers.some((h) => h.key === "Content-Security-Policy")));
   });
 
   it("verbietet das Einbetten von außen und die Typerkennung, ohne die PDF-Vorschau derselben Herkunft zu sperren", () => {

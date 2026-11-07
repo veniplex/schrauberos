@@ -37,6 +37,8 @@ export default defineConfig({
     locale: "de-DE",
     timezoneId: "Europe/Berlin",
     storageState: authFile("admin"),
+    // Der Service Worker (P3-5) ist nur in e2e/tests/pwa.spec.ts aktiv; sonst verfälschte sein Zwischenspeicher Messungen (Netz, Baselines, Screenshots)
+    serviceWorkers: "block",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

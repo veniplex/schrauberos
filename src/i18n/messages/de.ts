@@ -127,6 +127,10 @@ export const de = {
     widgetText: "Der Rest der Übersicht funktioniert weiter.",
     loading: "Wird geladen …",
   },
+  pwa: {
+    updateReady: "Neue Version verfügbar. Zum Wechseln neu laden.",
+    updateReload: "Neu laden",
+  },
   nav: {
     modules: "Module & Funktionen",
     backup: "Backups",

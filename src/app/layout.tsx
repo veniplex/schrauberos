@@ -9,12 +9,24 @@ import { ToastProvider } from "@/components/ui/toast";
 import { I18nProvider } from "@/i18n/client";
 import { getLocale, getMessages, getTheme } from "@/i18n/server";
 import { contrastInk, isHexColor } from "@/lib/color";
+import { PWA_APPLE_ICON, PWA_NAME, PWA_THEME_COLOR } from "@/lib/pwa";
 import { startupState } from "@/server/startup-state";
+import { appVersion } from "@/server/app-version";
 import { getWorkshop } from "@/server/workshop";
 import { ReinstallNotice } from "./reinstall-notice";
+import { ServiceWorkerRegistrar } from "./service-worker-registrar";
 
 /** `viewport-fit=cover`: Die Safe-Area (Notch, Home-Balken) ist nutzbar – Kopfzeile, Seitenfach, Toast und Aktionsleiste berücksichtigen sie über `env(safe-area-inset-*)`. */
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  // Farbe der Statusleiste/Titelleiste der installierten App und mobiler Browser: die Fläche der Kopfzeile, je nach Hell/Dunkel des Geräts (Werte der Tokens, `lib/pwa.ts`)
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: PWA_THEME_COLOR.light },
+    { media: "(prefers-color-scheme: dark)", color: PWA_THEME_COLOR.dark },
+  ],
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   if (startupState().status === "reinstall") return { title: "SchrauberOS", robots: { index: false, follow: false } };
@@ -23,6 +35,10 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: workshop.name, template: `%s · ${workshop.name}` },
     description: "Werkstatt-Dashboard",
     robots: { index: false, follow: false },
+    // Installierte App (P3-5): das Manifest liefert `manifest.ts` selbst; iOS braucht das Symbol und den Namen als Metaangaben
+    applicationName: PWA_NAME,
+    icons: { apple: PWA_APPLE_ICON },
+    appleWebApp: { capable: true, title: workshop.name, statusBarStyle: "default" },
   };
 }
 
@@ -54,7 +70,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         <I18nProvider locale={locale} messages={messages}>
           <NavProgress />
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            {children}
+            <ServiceWorkerRegistrar version={appVersion()} />
+          </ToastProvider>
         </I18nProvider>
       </body>
     </html>

@@ -390,6 +390,7 @@ describe("Modulautonomie", () => {
   /** Plattform-Route Handler (keiner Funktion zugeordnet) – mit Begründung. Neue Route Handler gehören der Funktion (`routes` in der `feature.ts`), nicht hierher. */
   const PLATFORM_API_ROUTES: Record<string, string> = {
     "api/health": "Gesundheitsprüfung des Containers",
+    "api/logo": "Werkstatt-Logo aus dem Profil (Plattform): öffentlich lesbar, nur Rasterbilder, für Anmeldeseite und Kopfzeile",
     "api/search": "Schnellsuche: aggregiert die Anbieter der Funktionen (registry.ts)",
     "api/setup": "Wiederherstellung bei der Einrichtung vor dem ersten Benutzer",
     "api/exchange": "CSV-Austausch: ein Rahmen für alle Datenarten (server/csv), die Funktionen liefern Spalten und Rechte (modules/exchange.ts)",

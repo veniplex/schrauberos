@@ -12,6 +12,7 @@ import { Alert } from "./layout";
  * Formular nach dem Speichern selbst meldet (`Form`).
  *
  * - **Erfolg** verschwindet nach `TOAST_SUCCESS_MS` (mindestens 5 s; steht still, solange man mit Maus oder Tastatur darauf ist), ein **Fehler bleibt**, bis man ihn schließt.
+ * - Mit `action` (ein Knopf, z. B. „Neu laden“ bei einer neuen Version) bleibt auch ein Hinweis stehen, bis man ihn schließt oder den Knopf drückt.
  * - Er liegt unten über der Safe-Area des Geräts und über der Aktionsleiste eines Formulars (`FormActions`, siehe `.toast-viewport` in globals.css).
  * - **Die beiden Live-Regionen sind immer im DOM** (leer, solange es keine Meldung gibt): Screenreader sagen nur Änderungen an einer Region an, die schon da war.
  *   Erfolg kommt in die höfliche (`polite`), ein Fehler in die sofortige (`assertive`) Region.
@@ -20,7 +21,8 @@ export const TOAST_SUCCESS_MS = 6000;
 const MAX_TOASTS = 4;
 
 export type ToastTone = "success" | "error" | "info";
-export type ToastInput = { id?: string; tone: ToastTone; text: string };
+export type ToastAction = { label: string; onClick: () => void };
+export type ToastInput = { id?: string; tone: ToastTone; text: string; action?: ToastAction };
 type ToastItem = ToastInput & { id: string };
 
 type ToastApi = { show: (toast: ToastInput) => void; dismiss: (id: string) => void };
@@ -67,7 +69,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function ToastCard({ item, dismiss, closeLabel }: { item: ToastItem; dismiss: (id: string) => void; closeLabel: string }) {
   const [paused, setPaused] = useState(false);
-  const sticky = item.tone === "error";
+  const sticky = item.tone === "error" || item.action !== undefined;
   useEffect(() => {
     if (sticky || paused) return;
     const timer = setTimeout(() => dismiss(item.id), TOAST_SUCCESS_MS);
@@ -89,6 +91,13 @@ function ToastCard({ item, dismiss, closeLabel }: { item: ToastItem; dismiss: (i
             <X className="size-4" aria-hidden />
           </Button>
         </div>
+        {item.action ? (
+          <div className="mt-2">
+            <Button size="sm" onClick={item.action.onClick}>
+              {item.action.label}
+            </Button>
+          </div>
+        ) : null}
       </Alert>
     </div>
   );
