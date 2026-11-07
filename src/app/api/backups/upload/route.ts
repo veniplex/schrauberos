@@ -8,8 +8,9 @@ import { DISK_RESERVE_BYTES, freeBytes } from "@/lib/disk";
 import { getSession } from "@/server/auth/session";
 import { logError } from "@/lib/log-safe";
 import { audit } from "@/server/audit";
-import { backupsDir } from "@/server/backup/core";
+import { backupsDir, markTempActive } from "@/server/backup/core";
 import { importBackupFile, RestoreError } from "@/server/backup/restore";
+import { isBehindProxy } from "@/server/auth/network";
 import { isSameOriginUpload } from "@/server/request-guard";
 import { startupState } from "@/server/startup-state";
 
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!session.can("backup.manage")) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  if (!isSameOriginUpload(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!isSameOriginUpload(request, await isBehindProxy())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   if (!request.body) return NextResponse.json({ error: "notBackup" }, { status: 400 });
 
   mkdirSync(backupsDir(), { recursive: true });
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       );
     },
   });
+  const release = markTempActive(tmp); // das Aufräumen liegengebliebener Zwischendateien fasst sie nicht an, solange der Upload läuft
   try {
     await pipeline(Readable.fromWeb(request.body as Parameters<typeof Readable.fromWeb>[0]), counter, createWriteStream(tmp));
     const name = await importBackupFile(tmp);
@@ -80,5 +82,7 @@ export async function POST(request: NextRequest) {
     logError("backup:upload", error);
     await audit("backup.uploadFailed", { target: "uploadFailed" });
     return NextResponse.json({ error: "uploadFailed" }, { status: 500 });
+  } finally {
+    release();
   }
 }

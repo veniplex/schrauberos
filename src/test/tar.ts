@@ -4,8 +4,8 @@
  */
 export type RawEntry = {
   name: string;
-  /** typeflag: "0" Datei, "5" Ordner, "2" Symlink, "1" Hardlink, "3" Zeichengerät, "4" Blockgerät, "6" FIFO */
-  type?: "0" | "5" | "2" | "1" | "3" | "4" | "6";
+  /** typeflag: "0" Datei, "5" Ordner, "2" Symlink, "1" Hardlink, "3" Zeichengerät, "4" Blockgerät, "6" FIFO, "L" GNU-Langname (Name ././@LongLink, Inhalt = langer Pfad des nächsten Eintrags) */
+  type?: "0" | "5" | "2" | "1" | "3" | "4" | "6" | "L";
   linkname?: string;
   data?: string | Buffer;
   /** Größe im Kopf, falls abweichend vom Inhalt (z. B. riesig angekündigt) */

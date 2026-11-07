@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { asciiFileName, contentDisposition, deliveryHeaders } from "./file-delivery";
+import { asciiFileName, contentDisposition, deliveryHeaders, truncateName } from "./file-delivery";
 
 describe("Auslieferungs-Kopfzeilen je Dateityp", () => {
   const h = (mime: string, extra: Partial<Parameters<typeof deliveryHeaders>[0]> = {}) => deliveryHeaders({ mime, name: "Datei.bin", ...extra });
@@ -69,5 +69,28 @@ describe("Content-Disposition: Dateiname", () => {
     assert.equal(asciiFileName("...."), "datei");
     assert.equal(asciiFileName(".htaccess"), "htaccess");
     assert.equal(asciiFileName("a".repeat(500)).length, 120);
+  });
+});
+
+describe("Dateinamen mit Emoji und Ersatzzeichen (ZP3-S-F4)", () => {
+  it("truncateName kürzt nach Zeichen, schneidet kein Ersatzpaar durch und ersetzt einzelne Ersatzzeichen", () => {
+    const emoji = "😀";
+    const name = `${"a".repeat(119)}${emoji}.pdf`; // das Emoji liegt auf den UTF-16-Einheiten 119/120: slice(0, 120) schnitte es entzwei
+    const cut = truncateName(name);
+    assert.equal([...cut].length, 120);
+    assert.ok(cut.endsWith(emoji), "ganzes Zeichen oder gar nicht");
+    assert.equal(cut, cut.toWellFormed());
+    assert.equal(truncateName("\ud83d allein"), "� allein", "einzelnes Ersatzzeichen wird ersetzt");
+    assert.equal(truncateName("kurz.pdf"), "kurz.pdf");
+  });
+
+  it("contentDisposition wirft bei Emoji-Namen nie – auch nicht an der Kürzungsgrenze oder mit einzelnem Ersatzzeichen (sonst wäre der Beleg dauerhaft nicht auslieferbar)", () => {
+    for (const name of [`${"a".repeat(119)}😀.pdf`, `${"a".repeat(118)}😀😀.pdf`, "\ud83d.pdf", `${"b".repeat(119)}\ud83d`, "😀".repeat(200)]) {
+      const header = contentDisposition("attachment", name);
+      assert.match(header, /^attachment; filename="[\x20-\x7e]+"; filename\*=UTF-8''/);
+      assert.doesNotThrow(() => decodeURIComponent(header.split("UTF-8''")[1]), name);
+    }
+    // gespeicherte Namen aus früheren Versionen (bereits mitten im Ersatzpaar abgeschnitten) bleiben auslieferbar
+    assert.doesNotThrow(() => deliveryHeaders({ mime: "application/pdf", name: `${"a".repeat(119)}\ud83d` }));
   });
 });

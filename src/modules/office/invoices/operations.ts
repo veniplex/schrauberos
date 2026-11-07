@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { logError } from "@/lib/log-safe";
+import { truncateName } from "@/lib/file-delivery";
 import { checkUpload } from "@/lib/upload-sniff";
 import { dateText, moneyCents } from "@/lib/zod-fields";
 import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, invoiceFileLocation, outgoingKeyOf } from "@/modules/office/invoices/domain";
@@ -52,7 +53,7 @@ export const saveInvoiceOperation = defineOperation({
     const data = new Uint8Array(await file.arrayBuffer());
     const checked = checkUpload(data, file.type, INVOICE_FILE_TYPES);
     if (!checked.ok) failField("file", "invoices.errors.fileType");
-    const upload = { name: file.name.slice(0, 120), mime: checked.mime, size: file.size, data };
+    const upload = { name: truncateName(file.name), mime: checked.mime, size: file.size, data };
     const location = invoiceFileLocation({ direction: d.direction, issueDate: noon(d.issueDate), number: d.number, partyName: d.partyName }, upload.mime);
     return { upload, stored: await storeFile(location.dir, location.name, upload.data) };
   },

@@ -14,9 +14,17 @@
 const INLINE_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"]);
 const KNOWN_TYPES = new Set([...INLINE_TYPES, "application/xml"]);
 
+/**
+ * Kürzt einen Dateinamen auf höchstens `max` **Zeichen** (nicht UTF-16-Einheiten) und macht ihn wohlgeformt: `slice` schneidet ein Emoji (Ersatzpaar) in der Mitte durch,
+ * und `encodeURIComponent` wirft bei einem einzelnen Ersatzzeichen einen `URIError` – der Beleg wäre dauerhaft nicht mehr auslieferbar.
+ */
+export function truncateName(name: string, max = 120): string {
+  return [...name].slice(0, max).join("").toWellFormed();
+}
+
 /** Nur ASCII, ohne Steuerzeichen, Anführungszeichen, Backslash und Pfadtrenner; nie leer. */
 export function asciiFileName(name: string, fallback = "datei"): string {
-  const cleaned = name
+  const cleaned = truncateName(name, 400)
     .replace(/[^\x20-\x7e]/g, "_")
     .replace(/["\\/:*?<>|%;]/g, "_")
     .replace(/\s+/g, " ")
@@ -27,7 +35,7 @@ export function asciiFileName(name: string, fallback = "datei"): string {
 
 /** Wert von `Content-Disposition`. */
 export function contentDisposition(disposition: "inline" | "attachment", name: string): string {
-  const encoded = encodeURIComponent(name.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 120) || "datei").replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  const encoded = encodeURIComponent(truncateName(name.replace(/[\u0000-\u001f\u007f]/g, "")) || "datei").replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   return `${disposition}; filename="${asciiFileName(name)}"; filename*=UTF-8''${encoded}`;
 }
 

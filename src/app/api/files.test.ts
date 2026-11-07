@@ -54,7 +54,8 @@ describe("Doku-Bild hochladen (ZP2-A-F12: wird protokolliert; SEC-12: Inhalt, He
     const body = new FormData();
     body.set("area", area);
     if (file) body.set("file", file);
-    return imageRoute.POST(new NextRequest("http://localhost/api/docs/images", { method: "POST", body, headers }));
+    // Ein Browser sendet die Länge des Bodys mit (Pflicht, ZP3-S-F6); in diesem Test genügt eine passende Näherung
+    return imageRoute.POST(new NextRequest("http://localhost/api/docs/images", { method: "POST", body, headers: { "content-length": String((file?.size ?? 0) + 1024), ...headers } }));
   };
 
   it("legt das Bild ab, antwortet mit Adresse und schreibt einen Audit-Eintrag (Bereich, Dateiname); Fehlschläge schreiben nichts", async () => {
@@ -75,6 +76,34 @@ describe("Doku-Bild hochladen (ZP2-A-F12: wird protokolliert; SEC-12: Inhalt, He
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "docs.imageUpload" } });
     assert.equal(entry.entityId, id);
     assert.equal(entry.target, `${area}: Schaltplan.png`);
+  });
+
+  it("ohne Content-Length 411, und wer in keinem Bereich bearbeiten darf, bekommt 403, bevor der Body gelesen wird (ZP3-S-F6)", async () => {
+    const { DOC_PERMISSIONS, DOC_AREAS } = await import("@/capabilities/docs/areas");
+    const area = DOC_AREAS[0];
+    // Der Body wird bei einem Verstoß nie gelesen: ein Strom, der beim Lesen wirft, zeigt es
+    let read = false;
+    const poisoned = () =>
+      new ReadableStream(
+        {
+          pull() {
+            read = true;
+            throw new Error("Body gelesen");
+          },
+        },
+        { highWaterMark: 0 }, // nichts vorab lesen: pull() läuft nur, wenn jemand den Body liest
+      );
+    const post = (headers: Record<string, string>) =>
+      imageRoute.POST(new NextRequest("http://localhost/api/docs/images", { method: "POST", body: poisoned(), headers, duplex: "half" } as ConstructorParameters<typeof NextRequest>[1]));
+
+    await signInWith([]);
+    assert.equal((await post({ ...HEADERS, "content-length": "100" })).status, 403, "kein Bearbeiten-Recht in irgendeinem Bereich");
+    assert.equal((await post({ ...HEADERS })).status, 403, "Recht vor Längenprüfung");
+    await signInWith([DOC_PERMISSIONS[area].edit]);
+    assert.equal((await post({ ...HEADERS })).status, 411, "ohne Content-Length (z. B. chunked) gibt es keine Grenze");
+    assert.equal((await post({ ...HEADERS, "content-length": "abc" })).status, 411);
+    assert.equal((await post({ ...HEADERS, "content-length": "-5" })).status, 411);
+    assert.equal(read, false, "der Body wurde nie gelesen");
   });
 
   it("HTML als .png (mit Typ image/png), ein Bild unter falschem Typ und Text werden abgelehnt (415) – es wird nichts gespeichert", async () => {

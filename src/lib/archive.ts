@@ -1,3 +1,4 @@
+import { readdir, readlink, realpath } from "node:fs/promises";
 import path from "node:path";
 import * as tar from "tar";
 
@@ -28,12 +29,48 @@ export type ArchiveLimits = { maxEntries: number; maxBytes: number };
 
 const ALLOWED_TYPES = new Set(["File", "OldFile", "ContiguousFile", "Directory"]);
 
-/** Bleibt das Ziel eines Symlinks (relativ zu seinem Ordner) im Zielverzeichnis des Entpackens? */
+/**
+ * Bleibt das Ziel eines Symlinks (relativ zu seinem Ordner) im Zielverzeichnis des Entpackens? Erlaubt sind nur `..` **am Anfang** des Ziels (`../lib/x`); ein `..` hinter einem
+ * Namen (`a/../../x`) wird abgelehnt, weil die rein textuelle Auflösung hier nicht stimmt, sobald ein Zwischenglied selbst ein Symlink ist. Ob der fertige Baum
+ * wirklich im Ziel bleibt, prüft `assertSymlinksInside` nach dem Entpacken auf dem Dateisystem.
+ */
 export function symlinkStaysInside(entryPath: string, linkPath: string): boolean {
   if (!linkPath || linkPath.includes("\0") || linkPath.includes("\\") || linkPath.startsWith("/") || /^[A-Za-z]:/.test(linkPath)) return false;
+  const segments = linkPath.split("/");
+  const firstName = segments.findIndex((segment) => segment !== ".." && segment !== ".");
+  if (firstName >= 0 && segments.slice(firstName).includes("..")) return false;
   const base = "/__root__";
   const target = path.posix.resolve(base, path.posix.dirname(entryPath), linkPath);
   return target.startsWith(`${base}/`);
+}
+
+/**
+ * Nach dem Entpacken: Jeder Symlink im Baum muss – auf dem Dateisystem aufgelöst (über Zwischenglieder, die selbst Symlinks sind) – im Zielverzeichnis bleiben. Der Textvergleich
+ * beim Filtern kann das nicht allein leisten (ein Symlink auf `.` oder ein tiefer Ordner-Symlink verändert, was `..` später bedeutet).
+ */
+export async function assertSymlinksInside(root: string): Promise<void> {
+  const base = await realpath(root);
+  const inside = (resolved: string) => {
+    const rel = path.relative(base, resolved);
+    return rel === "" || (rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+  };
+  const walk = async (dir: string): Promise<void> => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        let resolved: string;
+        try {
+          resolved = await realpath(full);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ArchiveError("unsafePath", "SymbolicLink");
+          // Ziel (noch) nicht vorhanden: vom echten Ordner des Links aus auflösen
+          resolved = path.resolve(await realpath(dir), await readlink(full));
+        }
+        if (!inside(resolved)) throw new ArchiveError("unsafePath", "SymbolicLink");
+      } else if (entry.isDirectory()) await walk(full);
+    }
+  };
+  await walk(root);
 }
 
 /** Ist der Pfad eines Archiv-Eintrags nicht erlaubt (absolut, `..`, Laufwerk, Rückwärtsstrich, NUL, leer)? */
@@ -86,5 +123,6 @@ export async function extractArchive(file: string, cwd: string, limits: ArchiveL
     throw violation ?? new ArchiveError("corrupt");
   }
   if (violation) throw violation;
+  if (options.symlinks === "inside") await assertSymlinksInside(cwd);
   return { entries, bytes };
 }

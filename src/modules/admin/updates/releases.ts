@@ -40,11 +40,36 @@ export const downloadAsset = (url: string, timeoutMs: number) => githubFetch(url
 
 const request = (url: string, accept: string) => githubFetch(url, accept, { metadata: true });
 
+/** Obergrenze für kleine Assets (Manifest, Signatur, Schlüsselliste): gemeldete **und** tatsächlich gelesene Größe. */
+export const SMALL_ASSET_MAX_BYTES = 64 * 1024;
+
+/** Liest einen Body höchstens bis `max` Bytes; mehr → `null` (der Rest wird verworfen, die Verbindung abgebrochen). */
+export async function readCapped(body: ReadableStream<Uint8Array> | null, max: number): Promise<Buffer | null> {
+  if (!body) return Buffer.alloc(0);
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > max) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
 async function smallAsset(asset: GithubAsset): Promise<Buffer> {
-  if (asset.size > 64 * 1024) throw new UpdateError("badRelease", `${asset.name} zu groß`);
+  if (asset.size > SMALL_ASSET_MAX_BYTES) throw new UpdateError("badRelease", `${asset.name} zu groß`);
   const res = await githubFetch(asset.url, "application/octet-stream");
   if (!res.ok) throw new UpdateError("badRelease", `${asset.name}: HTTP ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+  // Die gemeldete Größe ist nur eine Angabe der Gegenseite: auch das tatsächlich Gelesene wird begrenzt
+  const data = await readCapped(res.body, SMALL_ASSET_MAX_BYTES);
+  if (!data) throw new UpdateError("badRelease", `${asset.name} zu groß`);
+  return data;
 }
 
 /** Lädt das neueste Release, prüft die Signatur des Manifests und liefert die verifizierten Angaben. */

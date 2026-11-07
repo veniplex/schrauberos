@@ -9,7 +9,7 @@ import { DISK_RESERVE_BYTES, freeBytes } from "@/lib/disk";
 import { limitStream, StreamLimitError } from "@/lib/limit-stream";
 import { cancelPending, pendingDbFile, pendingFilesDir, restoreDir, writePending } from "@/lib/updates/restore";
 import { listMigrations } from "@/server/migrate";
-import { assertPlainTree, backupPath, backupsDir, checkDatabaseFile, countTree, createBackup, DB_ARCHIVE, gzipFile, linkTree, uniqueBackupName, writeInfo } from "./core";
+import { assertPlainTree, backupPath, backupsDir, checkDatabaseFile, countTree, createBackup, DB_ARCHIVE, gzipFile, linkTree, markTempActive, removeTree, uniqueBackupName, writeInfo } from "./core";
 
 export type RestoreErrorCode = "notFound" | "corrupt" | "notBackup" | "newer" | "tooLarge" | "diskFull";
 
@@ -155,6 +155,7 @@ export async function importBackupFile(uploaded: string, limits: ArchiveLimits =
   mkdirSync(root, { recursive: true });
   const work = path.join(root, `.import-${randomBytes(6).toString("hex")}`);
   mkdirSync(work);
+  const release = markTempActive(work);
   try {
     if (kind === "tar" || kind === "tar.gz") {
       const free = await freeBytes(root);
@@ -187,7 +188,9 @@ export async function importBackupFile(uploaded: string, limits: ArchiveLimits =
     return name;
   } finally {
     rmSync(uploaded, { force: true });
-    rmSync(work, { recursive: true, force: true });
+    // Ein entpacktes Archiv kann Ordner ohne Schreibrecht enthalten (noChmod): removeTree stellt die Rechte her, löscht asynchron und überdeckt nie den eigentlichen Fehler
+    await removeTree(work).catch(() => undefined);
+    release();
   }
 }
 

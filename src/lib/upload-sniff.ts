@@ -3,8 +3,10 @@
  * Behauptungen des Absenders. Nur Dateien, deren Inhalt zum erlaubten Typ passt, werden angenommen; **gespeichert und ausgeliefert wird der erkannte Typ**.
  * Eine HTML-Datei, die als `.png` hochgeladen wird, wird so abgelehnt, statt später im Browser als Seite ausgeführt zu werden.
  *
- * Erkannt werden PNG, JPEG, WebP, GIF, PDF, SVG (nur für das Werkstatt-Logo) und XML (vorbereitend für XRechnung/ZUGFeRD: UBL/CII mit XML-Deklaration;
- * HTML- und SVG-Wurzeln gelten nicht als XML).
+ * Erkannt werden PNG, JPEG, WebP, GIF, PDF, SVG (nur für das Werkstatt-Logo) und XML (vorbereitend für XRechnung/ZUGFeRD). **XML nur als elektronische Rechnung**:
+ * mit XML-Deklaration, einer Wurzel aus der Positivliste (UBL `Invoice`/`CreditNote`, CII `CrossIndustryInvoice`), ohne `<!DOCTYPE`, `<!ENTITY` und `<?xml-stylesheet`
+ * (externe Entitäten und Formatvorlagen sind die Angriffsfläche von XML; eine Rechnung braucht beides nie). Wer diese Dateien später **parst**, schaltet DTDs und
+ * externe Entitäten im Parser trotzdem aus (Pflicht, siehe README „Uploads und Archive“).
  */
 
 export type SniffedType = "image/png" | "image/jpeg" | "image/webp" | "image/gif" | "application/pdf" | "image/svg+xml" | "application/xml";
@@ -30,6 +32,9 @@ function xmlRoot(head: string): string | null {
   return m ? m[2].toLowerCase() : null;
 }
 
+/** Wurzelelemente (klein geschrieben, ohne Namensraum-Präfix), die als XML-Beleg angenommen werden: XRechnung/ZUGFeRD in den Syntaxen UBL und CII. */
+export const XML_INVOICE_ROOTS: ReadonlySet<string> = new Set(["invoice", "creditnote", "crossindustryinvoice"]);
+
 /** Erkennt den Dateityp am Inhalt; null, wenn er zu keinem der bekannten Typen passt. */
 export function sniffContentType(bytes: Uint8Array): SniffedType | null {
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "image/png";
@@ -43,9 +48,10 @@ export function sniffContentType(bytes: Uint8Array): SniffedType | null {
   const root = xmlRoot(head);
   if (root === null) return null;
   if (root === "svg") return "image/svg+xml";
-  // XML nur mit ausdrücklicher Deklaration und ohne Wurzeln, die ein Browser als Seite oder Formatvorlage ausführen würde
-  if (/^\s*<\?xml/i.test(head) && !["html", "stylesheet", "transform", "script"].includes(root)) return "application/xml";
-  return null;
+  // XML nur mit ausdrücklicher Deklaration, einer bekannten Rechnungs-Wurzel und ohne DTD/Entitäten/Formatvorlagen
+  if (!/^\s*<\?xml/i.test(head) || !XML_INVOICE_ROOTS.has(root)) return null;
+  if (/<!DOCTYPE|<!ENTITY|<\?xml-stylesheet/i.test(head)) return null;
+  return "application/xml";
 }
 
 /** Verwandte Angaben zum selben Typ („text/xml“ ist „application/xml“; „image/jpg“ ist verbreitet falsch für JPEG). */

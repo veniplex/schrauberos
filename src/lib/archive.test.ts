@@ -135,4 +135,66 @@ describe("Pfadprüfung", () => {
     assert.equal(symlinkStaysInside("a", "C:/x"), false);
     assert.equal(symlinkStaysInside("a", ""), false);
   });
+  it("symlinkStaysInside: ein „..“ hinter einem Namen wird abgelehnt (textuelle Auflösung stimmt nicht über Symlink-Zwischenglieder)", () => {
+    assert.equal(symlinkStaysInside("lib/a.so", "../x/y"), true);
+    assert.equal(symlinkStaysInside("lib/a.so", "./b"), true);
+    assert.equal(symlinkStaysInside("a", "x/../y"), false);
+    assert.equal(symlinkStaysInside("a/b/c/z", "y/../../.."), false);
+    assert.equal(symlinkStaysInside("a", "x/.."), false);
+  });
+});
+
+describe("Symlinks: Prüfung auf dem Dateisystem (ZP3-S-F3) und lange Pfade", () => {
+  const linux = process.platform !== "win32";
+
+  it("assertSymlinksInside: Links im Baum bleiben im Ziel – auch über Zwischenglieder, die selbst Symlinks sind; Schleifen und Ziele außerhalb werden abgelehnt", { skip: !linux }, async () => {
+    const { symlinkSync } = await import("node:fs");
+    const { assertSymlinksInside } = await import("./archive");
+    mkdirSync(path.join(target, "a", "b", "c"), { recursive: true });
+    mkdirSync(path.join(work, "draussen"));
+    symlinkSync("../..", path.join(target, "a", "b", "c", "y")); // zeigt auf „a“: innen
+    symlinkSync("b", path.join(target, "a", "ok")); // innen
+    symlinkSync("gibt-es-nicht", path.join(target, "a", "lose")); // ins Leere, aber im Ziel
+    await assertSymlinksInside(target);
+
+    // wirkliche Auflösung über das Zwischenglied y (= a): „y/../..“ landet außerhalb des Ziels – textuell sah es innen aus
+    symlinkSync("a/b/c/y/../..", path.join(target, "z"));
+    await assert.rejects(assertSymlinksInside(target), (e) => e instanceof ArchiveError && e.code === "unsafePath");
+    rmSync(path.join(target, "z"));
+    await assertSymlinksInside(target);
+
+    symlinkSync(path.join(work, "draussen"), path.join(target, "a", "raus"));
+    await assert.rejects(assertSymlinksInside(target), (e) => e instanceof ArchiveError && e.code === "unsafePath");
+    rmSync(path.join(target, "a", "raus"));
+
+    symlinkSync("../schleife2", path.join(target, "a", "schleife1"));
+    symlinkSync("a/schleife1", path.join(target, "schleife2"));
+    await assert.rejects(assertSymlinksInside(target), (e) => e instanceof ArchiveError && e.code === "unsafePath", "Schleife");
+  });
+
+  it("extractArchive mit „inside“: ein Symlink auf den eigenen Ordner und ein „..“-Link darüber schreiben nichts außerhalb", { skip: !linux }, async () => {
+    const outside = path.join(work, "draussen.txt");
+    const code = await extract(
+      [
+        { name: "d/", type: "5" },
+        { name: "d/self", type: "2", linkname: "." },
+        { name: "d/self/up", type: "2", linkname: ".." },
+        { name: "d/self/up/draussen.txt", data: "böse" },
+      ],
+      LIMITS,
+      { symlinks: "inside" },
+    );
+    void code; // je nach node-tar abgelehnt oder harmlos innerhalb des Ziels entpackt – entscheidend ist, dass nichts außerhalb landet
+    assert.equal(existsSync(outside), false);
+    assert.equal(existsSync(path.join(work, "up")), false);
+  });
+
+  it("GNU-Langname mit „..“ wird erkannt (der Eintrag trägt den langen Pfad außerhalb des 100-Zeichen-Kopfes); ein langer, harmloser Pfad wird entpackt", async () => {
+    const long = "ordner/".repeat(20);
+    assert.equal(await extract([{ name: "././@LongLink", type: "L", data: `${long}../../draussen.txt\0` }, { name: "gekuerzt", data: "böse" }]), "unsafePath");
+    assert.equal(existsSync(path.join(work, "draussen.txt")), false);
+    assert.equal(existsSync(path.join(target, "gekuerzt")), false, "nach dem ersten Verstoß wird nichts mehr geschrieben");
+    assert.equal(await extract([{ name: "././@LongLink", type: "L", data: `${long}datei.txt\0` }, { name: "gekuerzt", data: "gut" }]), null);
+    assert.equal(readFileSync(path.join(target, `${long}datei.txt`), "utf8"), "gut");
+  });
 });

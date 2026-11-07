@@ -92,3 +92,25 @@ describe("Release-Prüfung mit Schlüsselkette", () => {
     assert.ok("release" in (await releases.checkLatestRelease(true)));
   });
 });
+
+describe("Kleine Assets: Größe wird auch beim Lesen begrenzt (ZP3 Kleinigkeit)", () => {
+  it("readCapped liest bis zur Grenze und bricht darüber ab (die gemeldete Größe ist nur eine Angabe der Gegenseite)", async () => {
+    const stream = (chunks: number[]) => new ReadableStream<Uint8Array>({ start: (c) => (chunks.forEach((n) => c.enqueue(new Uint8Array(n))), c.close()) });
+    assert.equal((await releases.readCapped(stream([100, 200]), 1000))?.length, 300);
+    assert.equal(await releases.readCapped(stream([600, 600]), 1000), null, "mehr als erlaubt, obwohl jeder Block klein ist");
+    assert.equal((await releases.readCapped(null, 10))?.length, 0);
+    assert.equal((await releases.readCapped(stream([1000]), 1000))?.length, 1000, "genau die Grenze ist erlaubt");
+  });
+
+  it("ein Asset, das weniger meldet als es liefert (Gegenseite lügt), macht das Release ungültig statt den Speicher zu füllen", async () => {
+    fakeGithub(builtIn);
+    const honest = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/asset/manifest.json")) return new Response(new Uint8Array(releases.SMALL_ASSET_MAX_BYTES + 1));
+      return honest(input, init);
+    }) as typeof fetch;
+    const check = await releases.checkLatestRelease(true);
+    assert.equal("error" in check ? check.error : "ok", "badRelease");
+  });
+});
