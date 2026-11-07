@@ -30,11 +30,15 @@ eingebaute. Die Seite zeigt den Grund in Klartext (zum Beispiel „Eine Datei de
 des NAS in dem Ordner. Die Version wird dann gesperrt: Der Knopf **„Version … reparieren“** lädt dasselbe Paket erneut, prüft es vollständig und ersetzt die beschädigte Kopie.
 
 * **„Prüfung nicht abgeschlossen“** heißt: Die Prüfung wurde unterbrochen oder konnte nicht lesen (Zeitüberschreitung auf einer langsamen Platte, Container-Stopp während der Prüfung). Das ist **kein** Befund über die
-  Dateien; die Version wird nicht gesperrt, bis dahin läuft die eingebaute Version, und der nächste Start prüft erneut. Wiederholt sich das dreimal in Folge, gilt die Version als fehlgeschlagen.
+  Dateien; die Version wird nicht gesperrt, bis dahin läuft die eingebaute Version, und der nächste Start prüft erneut. Nur ein **Abbruch** der Prüfung oder ein **Lesefehler** des Datenträgers zählt als Fehlversuch:
+  Wiederholt sich das dreimal, gilt die Version als fehlgeschlagen. Eine **Zeitüberschreitung** (großes Paket auf langsamer Platte) zählt nie – die Version bleibt eingetragen, bis die Prüfung einmal durchläuft.
+* **„Update installiert, aber nicht gestartet: Ruhezustand nicht erzwingbar“** heißt: Vor der Prüfung müssen alle Prozesse der alten Anwendung beendet sein, und das ließ sich nicht herstellen. Die Version wurde deshalb
+  gar nicht geprüft und nicht gestartet; es läuft die eingebaute Version, und der nächste Start versucht es erneut. Das zählt nie als Fehlversuch. Bleibt es dauerhaft so, hilft der Server-Betreuer
+  (der Container-Log nennt die Ursache).
 * **Ist die eingebaute Version zu alt für die Datenbank** (nach einem Rückfall von einer bewährten Version, deren Updates die Datenbank erweitert haben), startet die Anwendung **nicht**, um die Daten nicht zu gefährden.
   Sie schreibt eine deutliche Meldung ins Container-Log; abhelfen kann man nur, indem man das Docker-Image aktualisiert (der Server-Betreuer: `docker compose pull && docker compose up -d`).
 * **Hinweis auf ablaufende Beglaubigung:** Wird ein Release mit einem neu beglaubigten Schlüssel signiert, steht 90 Tage vor dem Ablauf der Beglaubigung ein Hinweis an der Version. Danach lässt sich diese Version nicht mehr
-  installieren, bis ein erneuertes Release erscheint. Bereits installierte Versionen laufen weiter.
+  installieren, bis ein erneuertes Release erscheint. Bereits installierte Versionen laufen weiter. Meldet die Anwendung eine abgelaufene Beglaubigung, obwohl das Release neu ist, stimmt eventuell die **Systemuhr des Servers** nicht.
 
 Was die Prüfung **nicht** leistet: Sie schützt davor, dass veränderter oder nachgeladener Code **einen Neustart überlebt**. Eine bereits laufende, kompromittierte Anwendung kann damit nicht gestoppt werden,
 und auch Daten (Datenbank, Dateien, Backups) prüft sie nicht.
