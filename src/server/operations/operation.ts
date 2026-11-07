@@ -87,7 +87,8 @@ export type OperationDef<S extends z.ZodType, R, P> = {
   permissionFor?: (raw: unknown) => PermissionRequirement;
   /**
    * Nur für das Konto: Auch Personen mit ausstehendem Passwortwechsel (`mustChangePassword`) dürfen diese Operation ausführen
-   * (Profil, Passwort ändern, Notzugangs-Code bestätigen, Anzeigeeinstellungen). Alle anderen werden zum Konto umgeleitet. Gilt nur mit
+   * (Profil, Passwort ändern, Notzugangs-Code bestätigen, Anzeigeeinstellungen) – und die Einrichtung der Zwei-Faktor-Anmeldung, die die Pflicht für Administratoren verlangt
+   * (ohne diese Ausnahme sperrte die Pflicht die Einrichtung selbst aus). Alle anderen werden zum Konto umgeleitet. Gilt nur mit
    * `permission: "authenticated"`.
    */
   allowPasswordChange?: boolean;

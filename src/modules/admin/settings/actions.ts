@@ -12,7 +12,7 @@ import { CSP_MODE_KEY, parseCspMode, setCspModeInProcess } from "@/lib/csp-mode"
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
 import { IDLE_TIMEOUT_KEY, IDLE_TIMEOUT_MAX_HOURS, parseIdleHours, REQUIRE_2FA_ADMINS_KEY } from "@/server/auth/policy";
 import { jobRunner } from "@/server/jobs";
-import { defineAction, defineOperation, failField } from "@/server/operations";
+import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
 
@@ -131,7 +131,9 @@ const saveSecurityOperation = defineOperation({
   permission: "settings.manage",
   input: securityInput,
   audit: "settings.security",
-  run: async ({ input, tx, audit }) => {
+  run: async ({ input, principal, tx, audit }) => {
+    // Schutz vor Selbstaussperrung: Die Pflicht schaltet nur ein, wer als Administrator selbst schon einen zweiten Faktor hat (sonst gälte sie sofort auch für die eigene Sitzung)
+    if (input.requireTwoFactorAdmins && principal.user.isAdmin && !principal.user.twoFactor) fail("conflict", "settings.errors.requireTwoFactorOwn");
     // Alter und neuer Wert stehen im Audit-Log (die Frist des Audit-Logs selbst zu verkürzen ist eine Änderung, die man später nachvollziehen können muss)
     const [oldProxy, oldRetention, oldIdle, oldRequire] = await Promise.all([
       tx.appSetting.findUnique({ where: { key: BEHIND_PROXY_KEY } }),

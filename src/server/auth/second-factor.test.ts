@@ -543,7 +543,9 @@ describe("Zurücksetzen", () => {
 describe("Richtlinie: Pflicht für Administratoren und Leerlauf-Abmeldung", () => {
   it("Pflicht-2FA (Standard aus): Administratoren ohne zweiten Faktor kommen nur zur Kontoseite, andere Konten nicht betroffen, Ausschalten ist gesperrt", async () => {
     const chef = await admin();
+    const boss = await admin("boss");
     const anna = await person();
+    await enableDirect(chef);
     await env.signIn(chef);
     assert.equal((await session.getSession())?.user.mustSetupTwoFactor, false, "Standard: aus");
 
@@ -551,26 +553,52 @@ describe("Richtlinie: Pflicht für Administratoren und Leerlauf-Abmeldung", () =
     assert.equal((await env.db.appSetting.findUniqueOrThrow({ where: { key: "auth.require2faAdmins" } })).value, "true");
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "settings.security" } });
     assert.match(entry.target ?? "", /2FA für Administratoren freiwillig → Pflicht/);
+    assert.equal((await session.getSession())?.user.mustSetupTwoFactor, false, "wer ihn hat, ist nicht betroffen");
 
+    // boss hat keinen zweiten Faktor: nur die Kontoseite, auch die Datenwege der Seiten (JSON/Dateien mit Cookie-Sitzung) bleiben zu
+    env.signOut();
+    await env.signIn(boss);
     assert.equal((await session.getSession())?.user.mustSetupTwoFactor, true);
     assert.equal(await redirectOf(() => session.requireSession()), "/account");
-    // auch die Datenwege der Seiten (JSON/Dateien mit Cookie-Sitzung) bleiben bis zur Einrichtung zu
     const status = await import("@/app/api/backups/status/route");
     assert.equal((await status.GET()).status, 401);
+    assert.equal(await redirectOf(() => settingsActions.saveSecurity({}, form({ behindProxy: false }))), "/account", "andere Aktionen sind zu");
     env.signOut();
     await env.signIn(anna);
     assert.equal((await session.getSession())?.user.mustSetupTwoFactor, false);
 
-    // nach der Einrichtung ist der Administrator frei, kann den zweiten Faktor aber nicht mehr ausschalten
+    // ZP5-1: Die Einrichtung selbst ist über die echten Aktionen erreichbar (sonst sperrte die Pflicht alle Administratoren aus)
     env.signOut();
-    await env.signIn(chef);
-    await enableDirect(chef);
+    await env.signIn(boss);
+    const started = (await sec.startTwoFactor({}, form({ password: ADMIN_PW }))) as import("@/platform/account/security-actions").TwoFactorSetupState;
+    assert.ok(started.setup, started.error);
+    const secretBytes = base32Decode(started.setup.secret)!;
+    const done = await sec.enableTwoFactor({}, form({ code: totp(secretBytes, clock), backupConfirmed: true }));
+    assert.equal(done.ok, true, done.error);
+
+    // nach der Einrichtung ist boss frei, kann den zweiten Faktor aber nicht mehr ausschalten
     assert.equal((await session.getSession())?.user.mustSetupTwoFactor, false);
     assert.equal(await redirectOf(() => session.requireSession()), null);
     assert.equal((await (await import("@/app/api/backups/status/route")).GET()).status, 200);
     const refused = await sec.disableTwoFactor({}, form({ password: ADMIN_PW }));
     assert.ok(refused.error);
-    assert.equal(await sf.secondFactorRequired(chef.id), true);
+    assert.equal(await sf.secondFactorRequired(boss.id), true);
+  });
+
+  it("Schutz vor Selbstaussperrung: Wer als Administrator selbst keinen zweiten Faktor hat, kann die Pflicht nicht einschalten; wer ihn hat, kann sie auch zurücknehmen", async () => {
+    const chef = await admin();
+    await env.signIn(chef);
+    const refused = await settingsActions.saveSecurity({}, form({ behindProxy: false, requireTwoFactorAdmins: true }));
+    assert.ok(refused.error, "abgelehnt");
+    assert.match(refused.error ?? "", /selbst/);
+    assert.equal(await env.db.appSetting.findUnique({ where: { key: "auth.require2faAdmins" } }), null, "nichts gespeichert");
+    assert.equal(await env.db.auditLog.count({ where: { action: "settings.security" } }), 0);
+    assert.equal((await session.getSession())?.user.mustSetupTwoFactor, false);
+
+    await enableDirect(chef);
+    assert.equal((await settingsActions.saveSecurity({}, form({ behindProxy: false, requireTwoFactorAdmins: true }))).ok, true);
+    assert.equal((await settingsActions.saveSecurity({}, form({ behindProxy: false }))).ok, true, "ohne Häkchen: Pflicht zurückgenommen");
+    assert.equal((await env.db.appSetting.findUniqueOrThrow({ where: { key: "auth.require2faAdmins" } })).value, "false");
   });
 
   it("Leerlauf-Abmeldung: Standard aus; mit Frist endet eine Sitzung ohne Anfragen (und wird gelöscht), eine benutzte nicht", async () => {

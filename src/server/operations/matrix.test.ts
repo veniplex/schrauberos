@@ -124,6 +124,25 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
     assert.deepEqual(await snapshot(), before);
   });
 
+  it("Pflicht-2FA ohne eingerichteten zweiten Faktor (auch als Administrator): nur die Konto-Aktionen sind erreichbar, alles andere leitet zum Konto – nichts verändert", async () => {
+    await env.db.appSetting.create({ data: { key: "auth.require2faAdmins", value: "true" } });
+    try {
+      await signInAs({ admin: true });
+      const before = await snapshot();
+      for (const action of actions) {
+        const expected = action.operation.allowPasswordChange ? {} : { redirect: "/account" };
+        assert.deepEqual(await outcomeOf(() => action({}, form({}))), expected, action.operation.name);
+        assert.deepEqual(await outcomeOf(() => action(form({}))), expected, action.operation.name);
+      }
+      assert.deepEqual(await snapshot(), before);
+      // Die Einrichtung selbst darf die Pflicht nie aussperren (ZP5-1)
+      const reachable = new Set(actions.filter((a) => a.operation.allowPasswordChange).map((a) => a.operation.name));
+      for (const name of ["account.startTwoFactor", "account.enableTwoFactor", "account.changePassword"]) assert.ok(reachable.has(name), name);
+    } finally {
+      await env.db.appSetting.deleteMany({ where: { key: "auth.require2faAdmins" } });
+    }
+  });
+
   it("nur Konto-Operationen erlauben den ausstehenden Passwortwechsel – und nur mit „authenticated“", () => {
     for (const action of actions) {
       if (action.operation.allowPasswordChange) {

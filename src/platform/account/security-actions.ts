@@ -44,6 +44,8 @@ export type TwoFactorSetupState = {
 const startOperation = defineOperation({
   name: "account.startTwoFactor",
   permission: "authenticated",
+  // Auch mit Pflicht-2FA ohne eingerichteten zweiten Faktor (`mustSetupTwoFactor`) erreichbar – sonst sperrte die Pflicht die Einrichtung selbst aus (ZP5-1)
+  allowPasswordChange: true,
   input: passwordInput,
   audit: false,
   auditReason: "Die Einrichtung ist erst mit der Bestätigung des Codes wirksam; das Einschalten selbst ist protokolliert (auth.twoFactorEnabled)",
@@ -74,6 +76,7 @@ const enableInput = z.object({
 const enableOperation = defineOperation({
   name: "account.enableTwoFactor",
   permission: "authenticated",
+  allowPasswordChange: true, // siehe account.startTwoFactor
   input: enableInput,
   audit: "auth.twoFactorEnabled",
   prepare: async ({ principal }) => {

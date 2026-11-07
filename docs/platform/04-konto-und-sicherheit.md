@@ -36,6 +36,7 @@ und Sie richten sie neu ein. Das Audit-Log hält es fest.
 
 **Pflicht für Administratoren:** Die Administration kann die Zwei-Faktor-Anmeldung für Administrator-Konten verlangen (Einstellungen → Sicherheit, Standard: aus). Dann erreichen
 Administratoren ohne eingerichteten zweiten Faktor nach der Anmeldung nur noch „Mein Konto“, bis sie ihn eingerichtet haben, und können ihn nicht mehr ausschalten.
+Die Pflicht lässt sich nur einschalten, wenn Sie selbst bereits einen zweiten Faktor eingerichtet haben (sonst sperrten Sie sich selbst aus). Auf „Mein Konto“ bleibt die Einrichtung des zweiten Faktors für betroffene Administratoren immer erreichbar. Zurücknehmen kann die Pflicht jeder Administrator mit eingerichtetem zweiten Faktor in den Einstellungen.
 
 ## Meine Sitzungen
 

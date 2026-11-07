@@ -409,6 +409,7 @@ export const en: Messages = {
       logoType: "Allowed: PNG, JPEG, WebP or SVG.",
       logoSize: "The logo may be at most 200 KB.",
       auditRetentionMin: "At least {min} days (or 0 for unlimited).",
+      requireTwoFactorOwn: "You can only make this mandatory after you have set up two-factor sign-in yourself (My account → Security). Otherwise you would lock yourself out.",
     },
     workshop: {
       identity: "Details",
