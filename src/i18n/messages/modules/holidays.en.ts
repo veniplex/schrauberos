@@ -78,7 +78,7 @@ export const holidaysEn: typeof holidaysDe = {
     assumption: "Assumption Day",
     worldChildrensDay: "World Children's Day",
     jeuneGeneve: "Genevan Fast",
-    lundiJeune: "Fast Monday (Lundi du Jeûne)",
+    lundiJeune: "Fast Monday (Vaud, Neuchâtel)",
     stRupert: "St Rupert's Day (Salzburg)",
     germanUnity: "German Unity Day",
     austrianNationalDay: "National Day",
