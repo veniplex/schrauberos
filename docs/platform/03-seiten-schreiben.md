@@ -18,7 +18,7 @@ Rohes HTML wird nicht ausgegeben (aus Sicherheitsgründen).
 
 ## Bilder
 
-Bilder lassen sich per Knopf hochladen oder aus der Zwischenablage einfügen (PNG, JPEG, WebP oder GIF, bis 2 MB). Ein Bild sehen
+Bilder lassen sich per Knopf hochladen oder aus der Zwischenablage einfügen (PNG, JPEG, WebP oder GIF, bis 2 MB). **Fotos werden vor dem Hochladen automatisch verkleinert** (längste Seite 1600 Pixel, als JPEG); auch ein Handyfoto von 6 MB passt deshalb. Bilder mit Transparenz und GIF-Animationen bleiben unverändert. Ein HEIC-Foto, das der Browser nicht umwandeln kann (Chrome auf Android), bitte als JPEG aufnehmen oder speichern. Ein Bild sehen
 nur Personen, die eine Seite lesen dürfen, in der es eingebunden ist: Steht es nur auf einer Seite eines eingeschränkten Kapitels,
 bleibt es für alle anderen unsichtbar. Bilder, die auf keiner Seite stehen (hochgeladen, aber nicht gespeichert oder wieder
 entfernt), sehen nur Bearbeiter.

@@ -7,6 +7,8 @@ Das Rechnungsarchiv sammelt **Eingangsrechnungen** (von Lieferanten) und **Ausga
 * **Beleg:** Zur Rechnung kann ein Beleg (PDF, PNG, JPEG, WebP oder XML-E-Rechnung, bis 10 MB) hochgeladen werden. Die Anwendung prüft den Inhalt der Datei,
   nicht nur die Endung: Eine Datei, die sich als PDF ausgibt, aber etwas anderes ist, wird abgelehnt. Belege (PDF, Bilder) lassen sich im Browser ansehen,
   XML-Dateien nur herunterladen. Ein Beleg kann ersetzt oder entfernt werden.
+  **Fotos vom Handy** werden vor dem Hochladen automatisch verkleinert (längste Seite 1600 Pixel, als JPEG) – ein Foto von 6 MB wird so zu weit unter 1 MB und passt auch bei schlechtem Netz. Auf dem Handy gibt es zusätzlich „Foto aufnehmen“ für die Kamera.
+  PDF-Dateien bleiben unverändert. Liegt das Foto im Format HEIC vor und der Browser kann es nicht umwandeln (Chrome auf Android), erscheint ein Hinweis: bitte als JPEG aufnehmen oder speichern (iPhone: Einstellungen › Kamera › Formate › „Maximale Kompatibilität“).
 * **Status:** Offen, Bezahlt oder Storniert. „Überfällig“ ergibt sich automatisch aus der Fälligkeit. Mit „Als bezahlt markieren“
   lässt sich eine Rechnung schnell abschließen.
 * **Doppelte Rechnungen** (gleiche Nummer beim selben Partner) werden abgelehnt. **Ausgangsrechnungsnummern sind eindeutig:** Dieselbe Nummer

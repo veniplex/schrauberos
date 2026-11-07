@@ -134,7 +134,7 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
           </p>
         ) : null}
         <Field label={t("invoices.sections.file")} name="file" hint={initial.file ? t("invoices.fileReplaceHint") : t("invoices.fileHint")}>
-          <FileInput name="file" accept="application/pdf,image/png,image/jpeg,image/webp,application/xml,text/xml,.xml" maxBytes={INVOICE_FILE_MAX_BYTES} />
+          <FileInput variant="photo" name="file" accept="application/pdf,image/png,image/jpeg,image/webp,application/xml,text/xml,.xml" maxBytes={INVOICE_FILE_MAX_BYTES} />
         </Field>
         {initial.file ? (
           <Checkbox name="removeFile" label={t("invoices.removeFile")} className="mt-3" />

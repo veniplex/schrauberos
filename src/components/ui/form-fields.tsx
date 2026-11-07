@@ -1,10 +1,12 @@
 "use client";
 
 import clsx from "clsx";
-import { Search } from "lucide-react";
+import { Camera, Loader2, Search } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import type { ComponentProps, HTMLAttributes, ReactNode, Ref, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ChangeEvent, ComponentProps, HTMLAttributes, ReactNode, Ref, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useI18n } from "@/i18n/client";
+import { ImageError, browserImageEngine, prepareImage, setInputFiles, type ImageEngine } from "@/lib/image-resize";
+import { Button } from "./buttons";
 import { FieldContext, formErrorId, useField, useFormContext, type FieldContextValue } from "./form-context";
 
 /** Rückgabe-Zustand aller Formular-Server-Actions (für useActionState). */
@@ -239,39 +241,184 @@ export function ColorInput({ className, ...props }: Omit<InputHTMLAttributes<HTM
 
 const MEGABYTE = 1024 * 1024;
 
+type FileProblem = "tooLarge" | "heic" | "failed";
+
 /**
  * Dateiauswahl. Prüft die Größe **vor dem Absenden** (`maxBytes`, Standard 10 MB): Eine zu große Datei wird abgelehnt, das Feld geleert und
- * „Datei zu groß (max. 10 MB)“ angezeigt – statt einer generischen Fehlerseite des Servers. `onReject` übernimmt die Meldung selbst.
+ * „Datei zu groß (max. 10 MB)“ angezeigt – statt einer generischen Fehlerseite des Servers. `onReject` übernimmt die Meldung selbst (zweites Argument: der Grund).
+ *
+ * `variant="photo"` ist der Foto-Baustein: Rasterbilder werden vor dem Absenden auf 1600 px verkleinert und als JPEG (Qualität 0,8) kodiert (`src/lib/image-resize.ts`);
+ * PDF, XML, GIF, Bilder mit Transparenz u. a. bleiben, wie sie sind. **`maxBytes` gilt für das verkleinerte Ergebnis**: Ein 6-MB-Handyfoto passt dann auch in ein 2-MB-Feld.
+ * Die verkleinerte Datei wird ins Dateifeld zurückgeschrieben (`DataTransfer`) – ein Formular mit Server Action sendet, was im Feld steht, sonst ginge das Original hoch.
+ * Während der Verarbeitung steht „Foto wird verkleinert …“, und das Formular lässt sich nicht absenden (sonst ginge ebenfalls das Original hoch).
+ * Bei Touch gibt es zusätzlich „Foto aufnehmen“ (Kamera, `capture`); `camera={false}` lässt ihn weg. Ein HEIC-Foto, das der Browser nicht dekodieren kann (Chrome unter
+ * Android), wird mit einer verständlichen Erklärung abgelehnt.
  */
-export function FileInput({ className, maxBytes = 10 * MEGABYTE, onReject, onChange, ref, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { ref?: Ref<HTMLInputElement>; maxBytes?: number; onReject?: (file: File) => void }) {
+export function FileInput({
+  className,
+  maxBytes = 10 * MEGABYTE,
+  onReject,
+  onChange,
+  ref,
+  variant = "file",
+  camera = true,
+  imageEngine = browserImageEngine,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
+  ref?: Ref<HTMLInputElement>;
+  maxBytes?: number;
+  onReject?: (file: File, reason?: FileProblem) => void;
+  variant?: "file" | "photo";
+  /** Nur `variant="photo"`: Knopf „Foto aufnehmen“ bei Touch (Standard an) */
+  camera?: boolean;
+  /** Nur für Tests: Dekodieren/Kodieren austauschen */
+  imageEngine?: ImageEngine;
+}) {
   const { t } = useI18n();
   const field = useField();
   const errorId = useId();
-  const [tooLarge, setTooLarge] = useState(false);
-  const describedBy = [props["aria-describedby"] ?? field?.describedBy, tooLarge ? errorId : null].filter(Boolean).join(" ") || undefined;
+  const statusId = useId();
+  const [problem, setProblem] = useState<FileProblem | null>(null);
+  const [pending, setPending] = useState(false);
+  const inner = useRef<HTMLInputElement | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  // Dateien, die der Baustein selbst bereitgestellt hat (verkleinert oder bewusst unverändert): sie werden nicht noch einmal verarbeitet
+  const prepared = useRef(new WeakSet<File>());
+  const run = useRef(0);
+  const photo = variant === "photo";
+
+  const setRef = useCallback(
+    (element: HTMLInputElement | null) => {
+      inner.current = element;
+      if (typeof ref === "function") ref(element);
+      else if (ref) ref.current = element;
+    },
+    [ref],
+  );
+
+  // Solange ein Foto verkleinert wird, gibt es nichts abzusenden (das Feld enthielte noch das Original)
+  useEffect(() => {
+    const form = inner.current?.form;
+    if (!pending || !form) return;
+    const block = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    form.addEventListener("submit", block, true);
+    return () => form.removeEventListener("submit", block, true);
+  }, [pending]);
+
+  const reject = (file: File, reason: FileProblem) => {
+    // `onReject`: Der Aufrufer meldet die Ablehnung selbst (z. B. ein verstecktes Feld hinter einem Werkzeugknopf); sonst steht der Hinweis unter dem Feld
+    setProblem(onReject ? null : reason);
+    if (inner.current) inner.current.value = "";
+    onReject?.(file, reason);
+  };
+
+  /** Verarbeitet die gewählten Dateien; gibt die zu sendenden zurück oder null, wenn abgelehnt (das Feld ist dann geleert). */
+  async function settle(input: HTMLInputElement, picked: File[]): Promise<File[] | null> {
+    let files = picked;
+    if (photo && picked.some((file) => !prepared.current.has(file))) {
+      const mine = ++run.current;
+      setPending(true);
+      try {
+        const out: File[] = [];
+        for (const file of picked) out.push(prepared.current.has(file) ? file : (await prepareImage(file, imageEngine, { maxBytes })).file);
+        if (mine !== run.current) return null; // inzwischen wurde etwas anderes gewählt
+        // zurück ins Feld; geht das nicht (sehr alter Browser), bleiben die Originale stehen
+        files = out.some((file, i) => file !== picked[i]) ? (setInputFiles(input, out) ? out : picked) : out;
+        for (const file of files) prepared.current.add(file);
+      } catch (error) {
+        if (mine !== run.current) return null;
+        reject(picked[0], error instanceof ImageError && error.code === "heic" ? "heic" : "failed");
+        return null;
+      } finally {
+        if (mine === run.current) setPending(false);
+      }
+    }
+    return withinLimit(files) ? files : null;
+  }
+
+  /** Größenprüfung (für das, was gesendet würde); bei Überschreitung abgelehnt und das Feld geleert. */
+  function withinLimit(files: File[]) {
+    const tooBig = files.find((file) => file.size > maxBytes);
+    if (tooBig) {
+      reject(tooBig, "tooLarge");
+      return false;
+    }
+    setProblem(null);
+    return true;
+  }
+
+  async function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.target;
+    const picked = Array.from(input.files ?? []);
+    if (picked.length === 0) {
+      setProblem(null);
+      onChange?.(event);
+      return;
+    }
+    // ohne Foto-Verarbeitung gleich, ohne Umweg über eine asynchrone Wartezeit
+    if (!photo) {
+      if (withinLimit(picked)) onChange?.(event);
+      return;
+    }
+    if (await settle(input, picked)) onChange?.(event);
+  }
+
+  // Kamera: das Foto wird verkleinert, ins eigentliche Feld gelegt und dort wie jede andere Auswahl gemeldet
+  async function handleCamera(event: ChangeEvent<HTMLInputElement>) {
+    const shot = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    const main = inner.current;
+    if (!main || shot.length === 0) return;
+    const files = await settle(main, shot);
+    if (!files || !setInputFiles(main, files)) return;
+    main.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  const describedBy = [props["aria-describedby"] ?? field?.describedBy, problem ? errorId : null, pending ? statusId : null].filter(Boolean).join(" ") || undefined;
   return (
     <>
-      <input
-        {...props}
-        id={props.id ?? field?.id}
-        aria-describedby={describedBy}
-        aria-invalid={tooLarge || field?.invalid || undefined}
-        type="file"
-        ref={ref}
-        onChange={(event) => {
-          const tooBig = Array.from(event.target.files ?? []).find((file) => file.size > maxBytes);
-          // `onReject`: Der Aufrufer meldet die Ablehnung selbst (z. B. ein verstecktes Feld hinter einem Werkzeugknopf); sonst steht der Hinweis unter dem Feld
-          setTooLarge(Boolean(tooBig) && !onReject);
-          if (tooBig) {
-            event.target.value = "";
-            onReject?.(tooBig);
-          } else onChange?.(event);
-        }}
-        className={clsx("block min-h-(--tap) w-full text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-control file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:bg-surface-hover", className)}
-      />
-      {tooLarge ? (
+      <div className={photo && camera ? "flex flex-wrap items-center gap-2" : undefined}>
+        <input
+          {...props}
+          id={props.id ?? field?.id}
+          aria-describedby={describedBy}
+          aria-invalid={problem || field?.invalid ? true : undefined}
+          aria-busy={pending || undefined}
+          type="file"
+          ref={setRef}
+          onChange={(event) => void handleChange(event)}
+          className={clsx(
+            "block min-h-(--tap) w-full text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-control file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:bg-surface-hover",
+            photo && camera && "min-w-0 flex-1 basis-56",
+            className,
+          )}
+        />
+        {photo && camera ? (
+          <>
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden tabIndex={-1} onChange={(event) => void handleCamera(event)} />
+            {/* nur bei Touch: Am Rechner gibt es keine Kamera-Auswahl, dort genügt das Dateifenster */}
+            <Button className="hidden pointer-coarse:inline-flex" disabled={pending || props.disabled} onClick={() => cameraRef.current?.click()}>
+              <Camera className="size-4" aria-hidden /> {t("common.photoCamera")}
+            </Button>
+          </>
+        ) : null}
+      </div>
+      {photo ? (
+        // immer im DOM, damit der Wechsel angesagt wird (eine erst beim Auftauchen eingefügte Live-Region sagen Screenreader oft nicht an)
+        <p id={statusId} role="status" className={pending ? "mt-1 flex items-center gap-2 text-xs text-ink-muted" : "sr-only"}>
+          {pending ? (
+            <>
+              <Loader2 className="size-3.5 animate-spin" aria-hidden /> {t("common.photoWorking")}
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      {problem ? (
         <p id={errorId} role="alert" className="field-error">
-          {t("common.fileTooLarge", { max: Math.round(maxBytes / MEGABYTE) })}
+          {problem === "tooLarge" ? t("common.fileTooLarge", { max: Math.round(maxBytes / MEGABYTE) }) : problem === "heic" ? t("common.photoHeic") : t("common.photoFailed")}
         </p>
       ) : null}
     </>

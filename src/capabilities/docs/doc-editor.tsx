@@ -9,6 +9,7 @@ import { saveDocPage } from "./actions";
 import { Markdown } from "@/components/ui/markdown";
 import { SegmentedControl } from "@/components/ui/segmented";
 import { Alert } from "@/components/ui/layout";
+import { ImageError, browserImageEngine, prepareImage } from "@/lib/image-resize";
 import { DOC_AREAS_WITH_PASSWORD_HINT, DOC_IMAGE_MAX_BYTES } from "./areas";
 
 export type DocEditorInitial = {
@@ -81,10 +82,19 @@ export function DocEditor({
     });
   }
 
-  async function upload(file: File) {
+  /** `fromPaste`: Ein eingefügtes Bild kommt nicht über das Dateifeld (das schon verkleinert hat) und wird hier verkleinert. */
+  async function upload(original: File, fromPaste = false) {
     setUploadError(null);
     setUploading(true);
     try {
+      let file = original;
+      if (fromPaste) {
+        file = (await prepareImage(original, browserImageEngine, { maxBytes: DOC_IMAGE_MAX_BYTES })).file;
+        if (file.size > DOC_IMAGE_MAX_BYTES) {
+          setUploadError(t("docs.errors.imageSize"));
+          return;
+        }
+      }
       const fd = new FormData();
       fd.set("area", area);
       fd.set("file", file);
@@ -99,8 +109,8 @@ export function DocEditor({
         const snippet = `\n![${alt}](${url})\n`;
         return { value: v.slice(0, s) + snippet + v.slice(e), start: s + snippet.length, end: s + snippet.length };
       });
-    } catch {
-      setUploadError(t("docs.errors.upload"));
+    } catch (error) {
+      setUploadError(error instanceof ImageError ? t("common.photoHeic") : t("docs.errors.upload"));
     } finally {
       setUploading(false);
     }
@@ -149,8 +159,10 @@ export function DocEditor({
             <FileInput
               ref={fileRef}
               accept="image/png,image/jpeg,image/webp,image/gif"
+              variant="photo"
+              camera={false}
               maxBytes={DOC_IMAGE_MAX_BYTES}
-              onReject={() => setUploadError(t("docs.errors.imageSize"))}
+              onReject={(_file, reason) => setUploadError(reason === "heic" ? t("common.photoHeic") : reason === "failed" ? t("common.photoFailed") : t("docs.errors.imageSize"))}
               className="hidden"
               aria-hidden
               tabIndex={-1}
@@ -179,7 +191,7 @@ export function DocEditor({
             const file = [...e.clipboardData.files].find((f) => f.type.startsWith("image/"));
             if (file) {
               e.preventDefault();
-              void upload(file);
+              void upload(file, true);
             }
           }}
           hidden={tab !== "edit"}
