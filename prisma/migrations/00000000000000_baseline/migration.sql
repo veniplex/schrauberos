@@ -88,6 +88,7 @@ CREATE TABLE "Session" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastUsedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userAgent" TEXT,
+    "ipHint" TEXT,
     CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -99,7 +100,35 @@ CREATE TABLE "KnownDevice" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastUsedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userAgent" TEXT,
+    "ipHint" TEXT,
+    "useCount" INTEGER NOT NULL DEFAULT 1,
+    "failedLogins" INTEGER NOT NULL DEFAULT 0,
+    "lockedUntil" DATETIME,
     CONSTRAINT "KnownDevice_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "TwoFactor" (
+    "userId" TEXT NOT NULL PRIMARY KEY,
+    "secret" TEXT,
+    "enabledAt" DATETIME,
+    "lastStep" INTEGER NOT NULL DEFAULT 0,
+    "failedAttempts" INTEGER NOT NULL DEFAULT 0,
+    "lockedUntil" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "resetReason" TEXT,
+    "resetAt" DATETIME,
+    CONSTRAINT "TwoFactor_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "TwoFactorBackupCode" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "codeHash" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "usedAt" DATETIME,
+    CONSTRAINT "TwoFactorBackupCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -708,6 +737,12 @@ CREATE UNIQUE INDEX "KnownDevice_tokenHash_key" ON "KnownDevice"("tokenHash");
 
 -- CreateIndex
 CREATE INDEX "KnownDevice_userId_idx" ON "KnownDevice"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TwoFactorBackupCode_codeHash_key" ON "TwoFactorBackupCode"("codeHash");
+
+-- CreateIndex
+CREATE INDEX "TwoFactorBackupCode_userId_idx" ON "TwoFactorBackupCode"("userId");
 
 -- CreateIndex
 CREATE INDEX "Customer_lastName_idx" ON "Customer"("lastName");

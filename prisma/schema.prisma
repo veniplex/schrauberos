@@ -45,6 +45,9 @@ model User {
   recoveryAcks    RecoveryNoticeAck[]
   knownDevices    KnownDevice[]
   apiTokens       ApiToken[]
+  // Zweiter Faktor (TOTP) und Sicherungscodes – bewusst eigene Tabellen: Änderungen daran sollen die Version (updatedAt) des Benutzerformulars nicht berühren
+  twoFactor       TwoFactor?
+  backupCodes     TwoFactorBackupCode[]
 
   @@unique([authSource, externalId])
 }
@@ -128,6 +131,8 @@ model Session {
   createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
   userAgent  String?
+  // Grober Teil der Client-Adresse (IPv4 ohne letztes Byte, IPv6 nur die ersten 48 Bit) – nur hinter dem Reverse-Proxy bekannt, für die Liste „Meine Sitzungen“
+  ipHint     String?
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -136,7 +141,8 @@ model Session {
 
 // „Bekanntes Gerät“: Nach einer erfolgreichen Anmeldung bekommt der Browser ein langes, zufälliges Geräte-Cookie (gespeichert wird nur
 // sein Hash). Anmeldungen mit gültigem Geräte-Cookie des Kontos unterliegen nicht der Konto-Wartezeit, die jemand ohne dieses Cookie
-// durch Dauerbeschuss auslösen kann (siehe docs/platform und README, „Anmeldung“). Je Konto höchstens 10 Geräte.
+// durch Dauerbeschuss auslösen kann (siehe docs/platform und README, „Anmeldung“). Je Konto höchstens 10 Geräte. Ein Gerät entsteht nur, wenn die Person
+// bei der Anmeldung „Dieses Gerät merken“ wählt; es ersetzt nie das Passwort und nie den zweiten Faktor.
 model KnownDevice {
   id         String   @id @default(cuid())
   tokenHash  String   @unique
@@ -144,7 +150,45 @@ model KnownDevice {
   createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
   userAgent  String?
+  ipHint     String?
+  // Wie oft das Gerät angemeldet wurde (1 = nur die Anmeldung, bei der es entstand). Geräte mit 1 verdrängt ein neues Gerät zuerst; ein benutztes verdrängt nie ein anderes benutztes.
+  useCount   Int      @default(1)
+  // Fehlversuche vom Gerät aus (dauerhaft, überstehen einen Neustart – wie User.failedLogins) und die daraus folgende Wartezeit dieses Geräts
+  failedLogins Int      @default(0)
+  lockedUntil  DateTime?
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Zweiter Faktor (TOTP, RFC 6238) – höchstens eine Zeile je Konto. Das Geheimnis liegt **verschlüsselt** (AES-256-GCM, Schlüssel secret.key außerhalb der Backups)
+// in "secret"; nach einem Restore ohne passenden Schlüssel ist es unlesbar und die Zeile wird zurückgesetzt (secret = null, resetReason). enabledAt = null: Einrichtung
+// begonnen, noch nicht bestätigt (kein zweiter Faktor bei der Anmeldung). lastStep ist der letzte akzeptierte Zeitschritt (ein Code gilt nur einmal).
+model TwoFactor {
+  userId         String    @id
+  secret         String?
+  enabledAt      DateTime?
+  lastStep       Int       @default(0)
+  // Fehlversuche beim zweiten Faktor (dauerhaft) und die daraus folgende Wartezeit des Kontos für diesen Schritt
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  createdAt      DateTime  @default(now())
+  // Grund der letzten Zurücksetzung ("key" = Backup ohne Schlüssel, "recovery" = Notzugang, "admin" = Administration), bis die Person den Hinweis bestätigt hat
+  resetReason    String?
+  resetAt        DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Sicherungscodes für den Fall, dass das Telefon fehlt: je Konto 10 Einmalcodes, gespeichert nur als SHA-256-Hash (mit Konto gebunden). usedAt gesetzt = verbraucht.
+model TwoFactorBackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
