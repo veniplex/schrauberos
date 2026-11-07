@@ -25,6 +25,10 @@ export function allowLoopbackForTests(): void {
 /** Namen, die nie ein Ziel sein sollen (Metadaten-Dienste, der eigene Rechner). */
 const FORBIDDEN_NAMES = new Set(["metadata.google.internal", "metadata.goog", "instance-data", "instance-data.ec2.internal", "metadata.azure.com"]);
 
+/** Übliche Namen des eigenen Rechners außer `localhost` (stehen in `/etc/hosts`); wie `localhost` nur in Tests erlaubt. Beim Verbinden prüft ohnehin die aufgelöste Adresse – das ist die frühe, verständliche Ablehnung. */
+const LOCAL_NAMES = new Set(["localhost", "localhost.localdomain", "localhost6", "localhost6.localdomain6", "ip6-localhost", "ip6-loopback"]);
+const isLocalName = (name: string) => LOCAL_NAMES.has(name) || name.endsWith(".localhost");
+
 const toInt = (a: number, b: number, c: number, d: number) => (((a << 24) | (b << 16) | (c << 8) | d) >>> 0) as number;
 const inCidr = (value: number, base: [number, number, number, number], bits: number): boolean => {
   const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
@@ -70,6 +74,7 @@ function embeddedV4(g: number[]): [number, number, number, number] | null {
   const v4 = (hi: number, lo: number): [number, number, number, number] => [hi >> 8, hi & 255, lo >> 8, lo & 255];
   const zeros = (from: number, to: number) => g.slice(from, to).every((x) => x === 0);
   if (zeros(0, 5) && g[5] === 0xffff) return v4(g[6], g[7]); // ::ffff:a.b.c.d
+  if (zeros(0, 4) && g[4] === 0xffff && g[5] === 0) return v4(g[6], g[7]); // ::ffff:0:a.b.c.d (SIIT)
   if (zeros(0, 6)) return v4(g[6], g[7]); // ::a.b.c.d (veraltet; auch ::1 → 0.0.0.1)
   if (g[0] === 0x64 && g[1] === 0xff9b && zeros(2, 6)) return v4(g[6], g[7]); // NAT64
   if (g[0] === 0x2002) return v4(g[1], g[2]); // 6to4
@@ -126,6 +131,7 @@ export function isAllowedAddress(ip: string): boolean {
     const embedded = embeddedV4(g);
     if (embedded && !v4Verdict(embedded)) return false;
     if ((g[0] & 0xffc0) === 0xfe80) return false; // fe80::/10
+    if ((g[0] & 0xffc0) === 0xfec0) return false; // fec0::/10 (Site-Local, veraltet)
     if ((g[0] & 0xff00) === 0xff00) return false; // Multicast
     if (g[0] === 0xfd00 && g[1] === 0x0ec2) return false; // fd00:ec2::/32 (AWS)
   } else {
@@ -162,14 +168,14 @@ export function isForbiddenHost(host: string): boolean {
   if (!canonical) return true;
   if (canonical.kind === "ip") return !isAllowedAddress(canonical.ip);
   if (FORBIDDEN_NAMES.has(canonical.name)) return true;
-  return !offsiteNetwork.allowLoopback && (canonical.name === "localhost" || canonical.name.endsWith(".localhost"));
+  return !offsiteNetwork.allowLoopback && isLocalName(canonical.name);
 }
 
 /** Loopback-Adresse oder -Name (für die Regel „Klartext-HTTP nur für den eigenen Rechner“, die nur in Tests greift). */
 export function isLoopbackHost(host: string): boolean {
   const canonical = canonicalHost(host);
   if (!canonical) return false;
-  if (canonical.kind === "name") return canonical.name === "localhost" || canonical.name.endsWith(".localhost");
+  if (canonical.kind === "name") return isLocalName(canonical.name);
   if (isIP(canonical.ip) === 4) return /^127\./.test(canonical.ip);
   const g = v6Groups(canonical.ip);
   if (!g) return false;

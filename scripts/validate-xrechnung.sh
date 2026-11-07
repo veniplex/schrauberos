@@ -38,15 +38,26 @@ fi
 command -v java >/dev/null || { echo "Java fehlt (ab Version 11 nötig)." >&2; exit 1; }
 mkdir -p "$work"
 
-fetch() { # <Adresse> <Datei> <SHA-256>
-  curl --fail --location --silent --show-error --retry 3 --output "$2" "$1"
-  echo "$3  $2" | sha256sum --check --strict --quiet || { echo "Prüfsumme von $(basename "$2") stimmt nicht – Download verworfen." >&2; rm -f "$2"; exit 1; }
+verify() { # <Datei> <SHA-256>: bricht ab und verwirft die Datei, wenn die Prüfsumme nicht stimmt
+  echo "$2  $1" | sha256sum --check --strict --quiet || { echo "Prüfsumme von $(basename "$1") stimmt nicht – Datei verworfen." >&2; rm -f "$1"; exit 1; }
+}
+
+fetch() { # <Adresse> <Datei> <SHA-256>: nur HTTPS (auch bei Weiterleitungen), danach Prüfsumme
+  curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error --retry 3 --output "$2" "$1"
+  verify "$2" "$3"
+}
+
+# Eine schon vorhandene Datei im Arbeitsordner wird nur benutzt, wenn ihre Prüfsumme stimmt (sonst neu geladen)
+ensure() { # <Adresse> <Datei> <SHA-256>
+  if [ -f "$2" ] && echo "$3  $2" | sha256sum --check --strict --quiet 2>/dev/null; then return 0; fi
+  rm -f "$2"
+  fetch "$1" "$2" "$3"
 }
 
 jar="$work/validator-${VALIDATOR_VERSION}-standalone.jar"
 config_zip="$work/$CONFIG_ZIP"
-[ -f "$jar" ] || fetch "$VALIDATOR_URL" "$jar" "$VALIDATOR_SHA256"
-[ -f "$config_zip" ] || fetch "$CONFIG_URL" "$config_zip" "$CONFIG_SHA256"
+ensure "$VALIDATOR_URL" "$jar" "$VALIDATOR_SHA256"
+ensure "$CONFIG_URL" "$config_zip" "$CONFIG_SHA256"
 
 rm -rf "$work/config" "$work/out"
 mkdir -p "$work/config" "$work/out"

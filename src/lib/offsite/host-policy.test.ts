@@ -132,3 +132,14 @@ describe("Eigene Schnittstellenadressen (auch in gemappter und anderer IPv6-Schr
     assert.equal(isAllowedAddress("::ffff:808:808"), true);
   });
 });
+
+describe("weitere Schreibweisen des eigenen Rechners", () => {
+  it("Namen aus /etc/hosts (localhost6, ip6-localhost, localhost.localdomain) und Site-Local/SIIT sind verboten", () => {
+    for (const host of ["localhost6", "ip6-localhost", "ip6-loopback", "localhost.localdomain", "LOCALHOST6.", "::ffff:0:7f00:1", "::ffff:0:a9fe:a9fe", "fec0::1", "[febf::1]"]) {
+      assert.equal(isForbiddenHost(host), true, host);
+    }
+    assert.equal(isAllowedAddress("::ffff:0:808:808"), true, "SIIT mit öffentlicher Adresse bleibt erlaubt");
+    allowLoopbackForTests();
+    assert.equal(isForbiddenHost("localhost6"), false, "im Test erlaubt wie localhost");
+  });
+});
