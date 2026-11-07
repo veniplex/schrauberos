@@ -48,6 +48,7 @@ export const auditEn: typeof auditDe = {
       restore: "Backup restored",
       upload: "Backup uploaded",
       createFailed: "Backup failed",
+      runNow: "Automatic backup started manually",
       restoreFailed: "Restore failed",
       uploadFailed: "Backup import failed",
     },

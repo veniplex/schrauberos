@@ -78,6 +78,7 @@ export const AUDIT_ACTIONS = [
   "backup.restore",
   "backup.upload",
   "backup.createFailed",
+  "backup.runNow",
   "backup.restoreFailed",
   "backup.uploadFailed",
   "apiToken.create",

@@ -46,6 +46,7 @@ export const auditDe = {
       restore: "Backup wiederhergestellt",
       upload: "Backup hochgeladen",
       createFailed: "Backup fehlgeschlagen",
+      runNow: "Automatisches Backup von Hand gestartet",
       restoreFailed: "Wiederherstellung fehlgeschlagen",
       uploadFailed: "Backup-Import fehlgeschlagen",
     },

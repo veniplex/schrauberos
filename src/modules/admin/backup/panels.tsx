@@ -6,7 +6,7 @@ import { Loader2, Upload } from "lucide-react";
 import { Button, ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
 import { Alert } from "@/components/ui/layout";
 import type { ActionState } from "@/components/ui/form";
-import { createManualBackup, restoreBackup } from "./actions";
+import { createManualBackup, restoreBackup, runAutoBackupNow } from "./actions";
 import { FieldError, FileInput } from "@/components/ui/form";
 
 export function CreateBackupForm({ label }: { label: string }) {
@@ -16,6 +16,21 @@ export function CreateBackupForm({ label }: { label: string }) {
       {state.error ? <Alert tone="danger">{state.error}</Alert> : state.ok ? <Alert tone="success">{state.message}</Alert> : null}
       <div>
         <SubmitButton>{label}</SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+/** „Jetzt erneut versuchen“ in der Fehlermeldung des automatischen Backups. */
+export function RetryAutoBackupForm({ label }: { label: string }) {
+  const [state, action] = useActionState<ActionState, FormData>(runAutoBackupNow, {});
+  return (
+    <form action={action} className="mt-3 flex flex-col gap-2">
+      {state.error ? <FieldError>{state.error}</FieldError> : null}
+      <div>
+        <SubmitButton variant="secondary" size="sm">
+          {label}
+        </SubmitButton>
       </div>
     </form>
   );

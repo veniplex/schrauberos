@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { constants as zlibConstants, createGunzip, gunzipSync } from "node:zlib";
 import { ArchiveError, extractArchive, type ArchiveLimits } from "@/lib/archive";
 import { DISK_RESERVE_BYTES, freeBytes } from "@/lib/disk";
+import { limitStream, StreamLimitError } from "@/lib/limit-stream";
 import { cancelPending, pendingDbFile, pendingFilesDir, restoreDir, writePending } from "@/lib/updates/restore";
 import { listMigrations } from "@/server/migrate";
 import { assertPlainTree, backupPath, backupsDir, checkDatabaseFile, countTree, createBackup, DB_ARCHIVE, gzipFile, linkTree, uniqueBackupName, writeInfo } from "./core";
@@ -50,14 +51,29 @@ function makeSelfContained(file: string): void {
   rmSync(`${file}-shm`, { force: true });
 }
 
-/** Entpackt einen Datenbank-Schnappschuss (.gz), prüft ihn und macht ihn zu einer einzelnen, in sich geschlossenen Datei. */
-async function unpackAndValidate(gzFile: string, dest: string, mode: "keep" | "check"): Promise<void> {
+/** Größte entpackte Datenbank, die angenommen wird (zusätzlich begrenzt der freie Platz). Eine Werkstatt-Datenbank ist um Größenordnungen kleiner. */
+export const DATABASE_MAX_BYTES = 64 * 1024 ** 3;
+
+/**
+ * Entpackt eine gzip-komprimierte Datenbank nach `dest` – **mit Obergrenze** (Gzip-Bombe): höchstens `min(DATABASE_MAX_BYTES, freier Platz − Reserve)`, der freie Platz wird
+ * laufend nachgeprüft. Zu groß → `tooLarge`/`diskFull`, kaputt → `corrupt`; die halbe Datei wird in jedem Fall gelöscht.
+ */
+export async function gunzipDatabase(gzFile: string, dest: string, maxBytes = DATABASE_MAX_BYTES): Promise<void> {
+  const dir = path.dirname(dest);
+  const free = await freeBytes(dir);
+  const diskLimit = free === null ? Number.POSITIVE_INFINITY : Math.max(0, free - DISK_RESERVE_BYTES);
   try {
-    await pipeline(createReadStream(gzFile), createGunzip(), createWriteStream(dest));
-  } catch {
+    await pipeline(createReadStream(gzFile), createGunzip(), limitStream({ maxBytes: Math.min(maxBytes, diskLimit), free: () => freeBytes(dir), reserve: DISK_RESERVE_BYTES }), createWriteStream(dest));
+  } catch (error) {
     removeDatabaseFiles(dest);
+    if (error instanceof StreamLimitError) throw new RestoreError(error.code === "tooLarge" && diskLimit < maxBytes ? "diskFull" : error.code);
     throw new RestoreError("corrupt");
   }
+}
+
+/** Entpackt einen Datenbank-Schnappschuss (.gz), prüft ihn und macht ihn zu einer einzelnen, in sich geschlossenen Datei. */
+async function unpackAndValidate(gzFile: string, dest: string, mode: "keep" | "check"): Promise<void> {
+  await gunzipDatabase(gzFile, dest);
   try {
     validateDatabase(dest);
     if (mode === "keep") makeSelfContained(dest);
@@ -155,7 +171,7 @@ export async function importBackupFile(uploaded: string, limits: ArchiveLimits =
       if (!existsSync(path.join(work, DB_ARCHIVE))) throw new RestoreError("notBackup");
     } else {
       const raw = path.join(work, "database.db");
-      if (kind === "db.gz") await pipeline(createReadStream(uploaded), createGunzip(), createWriteStream(raw)).catch(() => rmSync(raw, { force: true }));
+      if (kind === "db.gz") await gunzipDatabase(uploaded, raw);
       else renameSync(uploaded, raw);
       validateDatabase(raw);
       await gzipFile(raw, path.join(work, DB_ARCHIVE));

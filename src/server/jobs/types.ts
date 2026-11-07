@@ -13,6 +13,8 @@ export type JobContext = {
   signal: AbortSignal;
   /** Wievielter Versuch in Folge (1 = erster; steigt mit jedem Fehlschlag) */
   attempt: number;
+  /** Von Hand angestoßen („Jetzt ausführen“): Zeit- und Tagesbedingungen des Jobs gelten dann nicht */
+  manual: boolean;
 };
 
 /** Wiederholung nach einem Fehlschlag: Wartezeit = Basis · 2^(Fehlschläge − 1), höchstens `maxDelayMs`. Der Job gibt nie auf, er wird nur seltener versucht. */
@@ -30,6 +32,13 @@ export type JobDef = {
   retry?: JobRetry;
   /** Obergrenze für einen Lauf (Standard 30 Minuten) */
   timeoutMs?: number;
+  /**
+   * Billige Vorabprüfung **nur mit Lesezugriffen**, bevor der Job belegt wird: `false` → kein Lauf, keine Schreibzugriffe (kein Lauf-Eintrag, keine Sperre); der Job bleibt
+   * fällig und wird beim nächsten Takt wieder gefragt. Für Jobs, die meistens nichts zu tun haben (Outbox alle 15 s). Gilt nicht für „Jetzt ausführen“.
+   */
+  shouldRun?: (ctx: { now: Date }) => Promise<boolean>;
+  /** Nach einem Fehlschlag (auch Zeitüberschreitung): z. B. fürs Audit-Log. Fehler darin werden nur protokolliert. */
+  onFailure?: (info: { attempt: number; timedOut: boolean }) => Promise<void>;
   /**
    * Führt den Job aus. Muss **wiederholbar** sein (ein Neustart mitten im Lauf holt ihn nach) und wirft bei Fehlern. Die Rückgabe ist eine kurze Ergebnismeldung
    * für die Statusansicht (keine Nutzdaten, keine Geheimnisse).
@@ -53,12 +62,20 @@ export type OutboxMessage = {
 export type OutboxHandlerDef = {
   /** Eindeutig, `<bereich>.<name>`: bereits bediente Abnehmer werden bei einer Wiederholung übersprungen */
   id: string;
-  /** Funktion, der der Abnehmer gehört: ist sie ausgeschaltet, wird nichts zugestellt (das Ereignis gilt dann für diesen Abnehmer als erledigt) */
+  /**
+   * Funktion, der der Abnehmer gehört: ist sie ausgeschaltet, wird nichts zugestellt – das Ereignis bleibt für diesen Abnehmer **offen** (geparkt) und wird nachgeholt, wenn die
+   * Funktion wieder eingeschaltet wird; sonst verfällt es mit der Aufbewahrung (14 Tage, `OUTBOX_KEEP_PROCESSED_DAYS`).
+   */
   feature?: FeatureId;
   /** Ereignistypen: exakt ("invoice.paid"), Präfix mit Stern am Ende ("invoice.*") oder "*" */
   types: readonly string[];
   /** Fehlversuche, bevor das Ereignis als fehlgeschlagen gilt (Standard 8) */
   maxAttempts?: number;
-  /** Stellt zu; wirft bei Fehlern (dann folgt eine Wiederholung mit Wartezeit). Wird mindestens einmal aufgerufen – idempotent über `message.id`. */
-  handle: (message: OutboxMessage) => Promise<void>;
+  /** Zeitlimit je Zustellung in Millisekunden (Standard 30 s): Danach gilt sie als gescheitert und `signal` ist ausgelöst – ein hängender Abnehmer blockiert nie die Zustellung. */
+  timeoutMs?: number;
+  /**
+   * Stellt zu; wirft bei Fehlern (dann folgt eine Wiederholung mit Wartezeit). Wird mindestens einmal aufgerufen – idempotent über `message.id`. Netzwerkaufrufe sollten
+   * `ctx.signal` weiterreichen; kommt ein Abnehmer nach dem Zeitlimit doch noch zum Ende, wurde das Ereignis möglicherweise zugestellt, ohne vermerkt zu sein (dann folgt eine Wiederholung).
+   */
+  handle: (message: OutboxMessage, ctx: { signal: AbortSignal }) => Promise<void>;
 };

@@ -6,10 +6,11 @@ import { getI18n } from "@/i18n/server";
 import { readPending, readRestoreResult } from "@/lib/updates/restore";
 import { requirePermission } from "@/server/auth/session";
 import { listBackups } from "@/server/backup/core";
+import { autoBackupFailing } from "@/server/backup/status";
 import { getBackupSettings } from "@/server/backup/settings";
 import { jobStateOf } from "@/server/jobs/status";
 import { removeBackup } from "@/modules/admin/backup/actions";
-import { CreateBackupForm, RestoreForm, RestoreWatcher, UploadForm } from "@/modules/admin/backup/panels";
+import { CreateBackupForm, RestoreForm, RestoreWatcher, RetryAutoBackupForm, UploadForm } from "@/modules/admin/backup/panels";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -24,8 +25,8 @@ function size(bytes: number) {
 
 export default async function BackupPage() {
   await requirePermission("backup.manage");
-  const { t, td, date } = await getI18n();
-  const [settings, backups, autoJob] = [await getBackupSettings(), listBackups(), await jobStateOf("backup.auto")];
+  const { t, td, tp, date } = await getI18n();
+  const [settings, backups, autoJob] = [await getBackupSettings(), await listBackups(), await jobStateOf("backup.auto")];
   const pending = readPending();
   const result = readRestoreResult();
   const when = (d: Date | string) => date(d, { dateStyle: "medium", timeStyle: "short" });
@@ -44,14 +45,14 @@ export default async function BackupPage() {
           </Alert>
         ) : null}
 
-        {autoJob && autoJob.failures > 0 ? (
+        {autoJob && autoBackupFailing(autoJob, backups[0]?.createdAt ?? null) ? (
           <Alert tone="danger">
-            {t("backup.failed", {
-              count: autoJob.failures,
+            {tp("backup.failed", autoJob.failures, {
               date: autoJob.lastRunAt ? when(autoJob.lastRunAt) : "–",
               reason: autoJob.lastMessage ?? "–",
               next: autoJob.nextRunAt ? when(autoJob.nextRunAt) : "–",
             })}
+            <RetryAutoBackupForm label={t("backup.retry.button")} />
           </Alert>
         ) : null}
 

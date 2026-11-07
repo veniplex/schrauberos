@@ -9,6 +9,7 @@ import { createBackup, deleteBackup, isBackupName } from "@/server/backup/core";
 import { RestoreError, stageRestore } from "@/server/backup/restore";
 import { BACKUP_KINDS } from "@/server/backup/kinds";
 import { RETENTION_MAX_DAYS, RETENTION_MAX_KEEP, saveBackupSettings, type BackupRetention } from "@/server/backup/settings";
+import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, fail } from "@/server/operations";
 import { scheduleRestart } from "@/server/restart";
 
@@ -35,6 +36,24 @@ const createManualBackupOperation = defineOperation({
   onFailure: ({ principal, failure }) => (failure?.code === "failed" ? audit("backup.createFailed", { actor: { id: principal.user.id, name: principal.user.name } }) : undefined),
 });
 
+/** „Jetzt erneut versuchen“ in der Fehlermeldung: führt den Job `backup.auto` sofort aus (Uhrzeit und „heute schon“ gelten dann nicht). */
+const runAutoBackupOperation = defineOperation({
+  name: "admin.backup.runAuto",
+  permission: "backup.manage",
+  input: none,
+  audit: "backup.runNow",
+  transaction: false,
+  run: async ({ audit: setAudit }) => {
+    const result = await jobRunner().runNow("backup.auto");
+    if (!result) fail("busy", "backup.errors.busy");
+    if (result.status === "error") fail("failed", "backup.errors.createFailed");
+    setAudit({ target: "backup.auto" });
+    return { ran: true };
+  },
+});
+
+export const runAutoBackupNow = defineAction(runAutoBackupOperation, { revalidate: ["/admin/backup"], message: "backup.retry.done" });
+
 export const createManualBackup = defineAction(createManualBackupOperation, { revalidate: ["/admin/backup"], message: "backup.created" });
 
 const removeBackupOperation = defineOperation({
@@ -44,7 +63,7 @@ const removeBackupOperation = defineOperation({
   audit: "backup.delete",
   transaction: false,
   run: async ({ input, audit: setAudit }) => {
-    if (!isBackupName(input.name) || !deleteBackup(input.name)) fail("notFound", "backup.errors.notFound");
+    if (!isBackupName(input.name) || !(await deleteBackup(input.name))) fail("notFound", "backup.errors.notFound");
     setAudit({ target: input.name });
     return { name: input.name };
   },
@@ -76,7 +95,12 @@ const restoreBackupOperation = defineOperation({
 
 export const restoreBackup = defineAction(restoreBackupOperation, { message: "backup.restoring" });
 
-const retentionField = (max: number) => z.coerce.number().int().min(0).max(max);
+/**
+ * Ganze Zahl von 0 bis `max`. Ein **leeres** Feld ist ein Fehler, nie 0: `Number("")` ist 0, und bei der Aufbewahrung hieße 0 „unbegrenzt“ (Datenschutz: Speicherbegrenzung) –
+ * ein versehentlich geleertes Feld darf nicht stillschweigend die Löschfristen abschalten.
+ */
+const retentionField = (max: number) =>
+  z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? undefined : value), z.coerce.number().int().min(0).max(max));
 /** Aufbewahrung je Art als flache Formularfelder `keep_<art>` und `days_<art>` (0 = unbegrenzt). */
 const retentionShape: Record<string, ReturnType<typeof retentionField>> = Object.fromEntries(
   BACKUP_KINDS.flatMap((kind) => [
@@ -87,7 +111,7 @@ const retentionShape: Record<string, ReturnType<typeof retentionField>> = Object
 
 const planInput = z.object({
   enabled: z.boolean(),
-  hour: z.coerce.number().int().min(0).max(23),
+  hour: retentionField(23),
   ...retentionShape,
 });
 

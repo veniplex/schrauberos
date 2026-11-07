@@ -13,15 +13,14 @@ export const jobs: JobDef[] = [
     schedule: { every: 10 * 60_000 },
     retry: { baseDelayMs: 15 * 60_000, maxDelayMs: 4 * 60 * 60_000 },
     timeoutMs: 60 * 60_000,
-    run: async ({ now, attempt }) => {
-      try {
-        const name = await runAutoBackup(now);
-        return name ? `Backup angelegt: ${name}` : undefined;
-      } catch (error) {
-        // Im Audit-Log nur der erste Fehlschlag einer Serie (die Wiederholungen stehen in der Statusansicht)
-        if (attempt === 1) await audit("backup.createFailed", { actor: { id: null, name: "System" } });
-        throw error;
-      }
+    run: async ({ now, signal, manual }) => {
+      const result = await runAutoBackup(now, { force: manual, signal });
+      if (!result) return undefined;
+      return result.pruneFailed ? `Backup angelegt: ${result.name}; Aufbewahrung fehlgeschlagen (läuft täglich erneut)` : `Backup angelegt: ${result.name}`;
+    },
+    // Im Audit-Log nur der erste Fehlschlag einer Serie (die Wiederholungen stehen in der Statusansicht) – auch eine Zeitüberschreitung gehört dazu
+    onFailure: async ({ attempt }) => {
+      if (attempt === 1) await audit("backup.createFailed", { actor: { id: null, name: "System" } });
     },
   },
   {
