@@ -1,12 +1,11 @@
 import { z } from "zod";
 import type { Vehicle } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
-import { normalizePlate } from "@/lib/plate";
 import { dateOnly, dayOrNull, iso, nullableString, oneOf, optionalDate, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
 import { EXTRA_INSPECTION_KINDS, FUEL_TYPES, HSN_PATTERN, TSN_PATTERN } from "./domain";
+import { vehicleTextWhere } from "./queries";
 import { deleteVehicleOperation, saveVehicleOperation, transferVehicleOperation } from "./operations";
 
 /**
@@ -99,7 +98,7 @@ export const endpoints = defineResource({
     where: ({ q, customerId, inspectionDue }) => ({
       ...(customerId ? { customerId } : {}),
       ...(inspectionDue ? { inspectionDue } : {}),
-      ...(q ? { OR: [{ plateNorm: contains(normalizePlate(q) || q) }, { plate: contains(q) }, { make: contains(q) }, { model: contains(q) }, { vin: contains(q) }] } : {}),
+      ...(q ? { OR: vehicleTextWhere(q).filter((c) => !("customer" in c)) } : {}),
     }),
     sorts: {
       plate: (dir) => ({ plateNorm: dir }),

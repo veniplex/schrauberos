@@ -2,6 +2,7 @@ import { addDays } from "@/lib/zone";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { addMonths, monthOf } from "@/lib/month";
 import { normalizePlate } from "@/lib/plate";
+import { searchKey } from "@/lib/search-key";
 import type { SeedDef } from "@/modules/types";
 
 /** Beispielfahrzeuge mit Halter (Nachname des Kunden aus dem Demo-Seed der Kunden; ohne Kunden entstehen sie ohne Halter). */
@@ -29,7 +30,7 @@ async function demo(db: PrismaClient) {
   for (const { owner, vehicle } of vehicles) {
     const customerId = customerIds[owner];
     await db.vehicle.create({
-      data: { ...vehicle, plateNorm: normalizePlate(vehicle.plate), customerId, ownerships: customerId ? { create: [{ customerId }] } : undefined },
+      data: { ...vehicle, plateNorm: normalizePlate(vehicle.plate), searchKey: searchKey(vehicle.make, vehicle.model), customerId, ownerships: customerId ? { create: [{ customerId }] } : undefined },
     });
   }
 
@@ -42,7 +43,7 @@ async function demo(db: PrismaClient) {
     });
   }
   // Fahrzeug ohne Halter (Bestand)
-  await db.vehicle.create({ data: { plate: "B-GW 200", plateNorm: normalizePlate("B-GW 200"), make: "VW", model: "Polo", year: 2018, notes: "Gebrauchtwagen im Bestand" } });
+  await db.vehicle.create({ data: { plate: "B-GW 200", plateNorm: normalizePlate("B-GW 200"), searchKey: searchKey("VW", "Polo"), make: "VW", model: "Polo", year: 2018, notes: "Gebrauchtwagen im Bestand" } });
 }
 
 export const seeds: SeedDef[] = [{ id: "vehicles", feature: "workshop.vehicles", order: 40, demo }];

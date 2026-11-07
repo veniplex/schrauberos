@@ -252,6 +252,10 @@ model Customer {
   zip            String?
   city           String?
   notes          String?
+  // Normalisierte Suchspalten (src/lib/search-key.ts, von den Operationen gepflegt): Name/Firma, Ort (klein, ohne Akzente, ä/ae/a), Telefon nur Ziffern
+  nameKey        String    @default("")
+  cityKey        String    @default("")
+  phoneKey       String    @default("")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -289,6 +293,8 @@ model Vehicle {
   extraInspectionKind String?
   extraInspectionDue  DateTime?
   notes          String?
+  // Normalisierte Suchspalte (src/lib/search-key.ts, von den Operationen gepflegt): Marke, Modell, FIN
+  searchKey      String    @default("")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -700,6 +706,8 @@ model Invoice {
   outgoingKey String?   @unique
   // Lieferant (incoming) bzw. Rechnungsempfänger (outgoing)
   partyName  String
+  // normalisierte Suchspalte zu partyName (src/lib/search-key.ts, von den Operationen gepflegt)
+  partyKey   String    @default("")
   // optional: Kunde aus der Kundenverwaltung (nur outgoing)
   customerId String?
   issueDate  DateTime

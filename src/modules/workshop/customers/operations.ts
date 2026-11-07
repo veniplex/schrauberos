@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { defineOperation, fail } from "@/server/operations";
-import { customerDisplayName, customerHasLinks } from "./domain";
+import { customerDisplayName, customerHasLinks, customerSearchKeys } from "./domain";
 
 /** Eingabe eines Kunden – auch die Prüfung der Zeilen des CSV-Imports (`exchange.ts`). */
 export const customerInput = z
@@ -27,11 +27,12 @@ export type CustomerFields = z.output<typeof customerInput>;
 
 /** Die Felder der Tabelle zu einer geprüften Eingabe (Anlegen, Ändern und CSV-Import gleich). */
 export function customerRecord(d: CustomerFields) {
+  // Bei reinen Firmenkunden dient der Firmenname als Nachname (Sortierung/Suche)
+  const lastName = d.lastName ?? d.company!;
   return {
     customerNumber: d.customerNumber ?? null,
     firstName: d.firstName ?? null,
-    // Bei reinen Firmenkunden dient der Firmenname als Nachname (Sortierung/Suche)
-    lastName: d.lastName ?? d.company!,
+    lastName,
     company: d.company ?? null,
     email: d.email ?? null,
     phone: d.phone ?? null,
@@ -39,6 +40,7 @@ export function customerRecord(d: CustomerFields) {
     zip: d.zip ?? null,
     city: d.city ?? null,
     notes: d.notes ?? null,
+    ...customerSearchKeys({ ...d, lastName }),
   };
 }
 

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { createTestEnv, type TestEnv } from "@/test/harness";
+import { customerSearchKeys } from "@/modules/workshop/customers/domain";
+import { searchKey } from "@/lib/search-key";
 
 /**
  * Auswahl-Suchen (Richtlinie D7): Der Anzeigename des Kunden ist in Termin-, Fahrzeug- und Reifenkontext sichtbar;
@@ -25,9 +27,9 @@ beforeEach(async () => {
   await env.db.role.deleteMany();
   env.signOut();
   const customer = await env.db.customer.create({
-    data: { firstName: "Erika", lastName: "Mustermann", email: "erika@example.org", phone: "0123 456", street: "Hauptstr. 1", zip: "10115", city: "Berlin", notes: "zahlt schlecht", customerNumber: "K-7" },
+    data: { firstName: "Erika", lastName: "Mustermann", email: "erika@example.org", phone: "0123 456", street: "Hauptstr. 1", zip: "10115", city: "Berlin", notes: "zahlt schlecht", customerNumber: "K-7", ...customerSearchKeys({ firstName: "Erika", lastName: "Mustermann", city: "Berlin", phone: "0123 456" }) },
   });
-  await env.db.vehicle.create({ data: { plate: "B AB 123", plateNorm: "BAB123", make: "VW", model: "Golf", customerId: customer.id } });
+  await env.db.vehicle.create({ data: { plate: "B AB 123", plateNorm: "BAB123", make: "VW", model: "Golf", searchKey: searchKey("VW", "Golf"), customerId: customer.id } });
 });
 
 const as = async (permissions: string[]) => {

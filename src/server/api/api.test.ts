@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { apiRequest, makeToken } from "@/test/api-helpers";
 import { createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
+import { customerSearchKeys } from "@/modules/workshop/customers/domain";
 
 /**
  * API-Kern: Authentifizierung (Bearer, nie Cookie), Drosselung nur im Fehlerpfad, Rate-Limit je Token, Idempotenz, Fehlerformat, Seiten, ETag.
@@ -203,7 +204,7 @@ describe("Drosselung", () => {
 describe("Lesen: Seiten, Sortierung, Filter, ETag", () => {
   it("Seiten mit Obergrenze, Sortierung nur über die Whitelist, Filter strikt", async () => {
     const { token } = await makeToken(env, owner());
-    for (const [i, name] of ["Berg", "Adler", "Cäsar", "Dorn", "Eich"].entries()) await env.db.customer.create({ data: { lastName: name, city: i % 2 ? "Köln" : "Bonn" } });
+    for (const [i, name] of ["Berg", "Adler", "Cäsar", "Dorn", "Eich"].entries()) await env.db.customer.create({ data: { lastName: name, city: i % 2 ? "Köln" : "Bonn", ...customerSearchKeys({ lastName: name, city: i % 2 ? "Köln" : "Bonn" }) } });
     const names = async (query: string) => ((await json(await call(apiRequest("GET", `/customers${query}`, { token })))).data as Array<{ lastName: string }>).map((c) => c.lastName);
 
     assert.deepEqual(await names(""), ["Adler", "Berg", "Cäsar", "Dorn", "Eich"]);

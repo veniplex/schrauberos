@@ -311,7 +311,12 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
   (keine SMB-/NFS-Freigabe). Grenzen: keine mehreren App-Instanzen, keine Hochverfügbarkeit.
 * Schema nur in `prisma/schema.prisma`. **Keine Enums und keine Json-Felder** – Zustände sind Strings mit festen Werten im Code
   (hält einen späteren Datenbankwechsel offen). Textsuche immer über `contains()` aus `src/server/search.ts` (Prisma maskiert `%`/`_` unter SQLite nicht: `contains()` entfernt `%`, ein Suchtext nur aus Platzhaltern findet nichts) (SQLite unterscheidet
-  bei Umlauten Groß-/Kleinschreibung).
+  bei Umlauten Groß-/Kleinschreibung). **Normalisierte Suchspalten (P2b-1):** Namen, Orte, Telefonnummern, Marke/Modell/FIN und Rechnungspartner suchen über Spalten, die die Operationen beim Schreiben mitpflegen
+  (`Customer.nameKey/cityKey/phoneKey`, `Vehicle.searchKey`, `Invoice.partyKey`; reine Funktionen in `src/lib/search-key.ts`: klein, ohne Akzente, ä/ö/ü in beiden Schreibungen „ae“ und „a“, ß → ss, Trenner als Leerzeichen, Telefon nur
+  Ziffern mit +49/+43/+41 → 0; Kennzeichen wie bisher über `plateNorm`). Die Suche geht über `keyContains`/`phoneContains` (`src/server/search.ts`: jedes Wort muss vorkommen, Reihenfolge egal; Telefon erst ab 3 Ziffern ohne Buchstaben); die
+  Bedingungen stehen je Funktion in `queries.ts` (`customerSearchFields`, `vehicleTextWhere`, `invoiceTextWhere`) und gelten für Liste, Schnellsuche, Auswahlfelder und API gleich. **Wer eine Zeile dieser Tabellen schreibt (Operation, Import, Seed), setzt die Spalten mit**
+  (`customerRecord`/`vehicleRecord`/`invoiceRecord`); Tests, die Zeilen direkt anlegen und dann suchen, tragen sie selbst ein. **Live-Filter:** `FilterBar` enthält `LiveFilter` (`components/ui/live-filter.tsx`): Es hört auf das GET-Formular und ruft nach
+  350 ms Tipppause (Auswahlfelder sofort) `router.replace` mit derselben Adresse wie das Absenden auf – keine zweite Filterlogik im Browser, Wartezustand per `useTransition`; `ResetFilterButton` lädt die ungefilterte Liste und setzt danach die Felder zurück.
 * **Geld** als ganze Cent (`Int`), Eingabe über `parseMoneyToCents`.
 * **Dateien** (Rechnungsbelege, Doku-Bilder) liegen als normale Dateien unter `/data/files` (`src/server/files.ts`) mit lesbaren
   ASCII-Pfaden, z. B. `rechnungen/2026/eingang/2026-03-14_Lieferant_RE-1234.pdf`; die Datenbank hält nur den relativen `path`

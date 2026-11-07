@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
-import { contains } from "@/server/search";
+import { contains, keyContains } from "@/server/search";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 
 const ALLOWED = ["customers.view", "customers.edit", "invoices.edit"] as const;
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const withAddress = session.can("customers.view");
   const customers = await db.customer.findMany({
-    where: { OR: [{ lastName: contains(q) }, { firstName: contains(q) }, { company: contains(q) }, { customerNumber: contains(q) }, ...(withAddress ? [{ city: contains(q) }] : [])] },
+    where: { OR: [keyContains("nameKey", q), { customerNumber: contains(q) }, ...(withAddress ? [keyContains("cityKey", q)] : [])] },
     select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true, ...(withAddress ? { city: true } : {}) },
     orderBy: { lastName: "asc" },
     take: 8,

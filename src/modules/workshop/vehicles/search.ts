@@ -1,9 +1,8 @@
 import "server-only";
-import { normalizePlate } from "@/lib/plate";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
 import type { SearchProviderDef } from "@/modules/types";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { vehicleTextWhere } from "./queries";
 
 /** Schnellsuche: Fahrzeuge nach Kennzeichen, Hersteller, Modell, FIN und Halter (Halter nur als Anzeigename, Richtlinie D7). */
 export const searchProviders: SearchProviderDef[] = [
@@ -14,19 +13,8 @@ export const searchProviders: SearchProviderDef[] = [
     groupKey: "vehicles.search.group",
     order: 31,
     async search(q, { limit }) {
-      const plate = normalizePlate(q);
       const rows = await db.vehicle.findMany({
-        where: {
-          OR: [
-            ...(plate ? [{ plateNorm: { contains: plate } }] : []),
-            { make: contains(q) },
-            { model: contains(q) },
-            { vin: contains(q) },
-            { customer: { lastName: contains(q) } },
-            { customer: { firstName: contains(q) } },
-            { customer: { company: contains(q) } },
-          ],
-        },
+        where: { OR: vehicleTextWhere(q) },
         orderBy: { plateNorm: "asc" },
         take: limit,
         select: { id: true, plate: true, make: true, model: true, customer: { select: { firstName: true, lastName: true, company: true } } },

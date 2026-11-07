@@ -85,6 +85,7 @@ export const de = {
     helpForPage: "Hilfe zu dieser Seite",
     moreFilters: "Weitere Filter",
     resetFilters: "Zurücksetzen",
+    filtering: "Liste wird gefiltert …",
     pagination: "Seitenwahl",
     previousPage: "Vorherige Seite",
     nextPage: "Nächste Seite",

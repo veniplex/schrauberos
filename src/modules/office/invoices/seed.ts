@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { outgoingKeyOf } from "@/lib/invoice-number";
+import { searchKey } from "@/lib/search-key";
 import { atDay, noonOf } from "@/lib/seed-days";
 import type { SeedDef } from "@/modules/types";
 
@@ -12,7 +13,7 @@ async function demo(db: PrismaClient) {
   const inv = (direction: "incoming" | "outgoing", number: string, partyName: string, issueAgo: number, dueIn: number | null, grossCents: number, status = "open", extra: Record<string, unknown> = {}) =>
     db.invoice.create({
       data: {
-        direction, number, outgoingKey: outgoingKeyOf(direction, number), partyName, issueDate: noonOf(atDay(-issueAgo)), dueDate: dueIn == null ? null : noonOf(atDay(dueIn)),
+        direction, number, outgoingKey: outgoingKeyOf(direction, number), partyName, partyKey: searchKey(partyName), issueDate: noonOf(atDay(-issueAgo)), dueDate: dueIn == null ? null : noonOf(atDay(dueIn)),
         grossCents, netCents: Math.round(grossCents / 1.19), vatCents: grossCents - Math.round(grossCents / 1.19),
         status, paidAt: status === "paid" ? noonOf(atDay(-Math.max(issueAgo - 10, 1))) : null, ...extra,
       },

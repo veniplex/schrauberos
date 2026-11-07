@@ -5,7 +5,7 @@ import { endOfDayIn, startOfDayIn } from "@/lib/dates";
 import { centsText, dateOnly, day, dayOrNull, iso, nullableString, oneOf } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
+import { invoiceTextWhere } from "./queries";
 import { INVOICE_DIRECTIONS, INVOICE_STATUSES } from "./domain";
 import { deleteInvoiceOperation, markInvoicePaidOperation, reopenInvoiceOperation, saveInvoiceOperation } from "./operations";
 
@@ -115,7 +115,7 @@ export const endpoints = defineResource({
       ...(status ? { status } : {}),
       ...(customerId ? { customerId } : {}),
       ...(issuedFrom || issuedTo ? { issueDate: { ...(issuedFrom ? { gte: startOfDayIn(issuedFrom) } : {}), ...(issuedTo ? { lte: endOfDayIn(issuedTo) } : {}) } } : {}),
-      ...(q ? { OR: [{ number: contains(q) }, { partyName: contains(q) }, { reference: contains(q) }, { category: contains(q) }] } : {}),
+      ...(q ? { OR: invoiceTextWhere(q) } : {}),
     }),
     sorts: {
       issueDate: (dir) => ({ issueDate: dir }),

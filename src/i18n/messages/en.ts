@@ -84,6 +84,7 @@ export const en: Messages = {
     helpForPage: "Help for this page",
     moreFilters: "More filters",
     resetFilters: "Reset",
+    filtering: "Filtering the list …",
     pagination: "Pages",
     previousPage: "Previous page",
     nextPage: "Next page",

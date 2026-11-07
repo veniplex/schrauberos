@@ -1,9 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
-import { contains } from "@/server/search";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
-import { normalizePlate } from "@/lib/plate";
+import { vehicleTextWhere } from "@/modules/workshop/vehicles/queries";
 
 const ALLOWED = ["appointments.create", "appointments.edit", "tires.create", "tires.edit", "vehicles.view"] as const;
 
@@ -19,18 +18,8 @@ export async function GET(request: NextRequest) {
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 60);
   if (q.length < 1) return NextResponse.json({ results: [] });
 
-  const plate = normalizePlate(q);
   const vehicles = await db.vehicle.findMany({
-    where: {
-      OR: [
-        ...(plate ? [{ plateNorm: { contains: plate } }] : []),
-        { make: contains(q) },
-        { model: contains(q) },
-        { customer: { lastName: contains(q) } },
-        { customer: { firstName: contains(q) } },
-        { customer: { company: contains(q) } },
-      ],
-    },
+    where: { OR: vehicleTextWhere(q) },
     select: { id: true, plate: true, make: true, model: true, customer: { select: { firstName: true, lastName: true, company: true } } },
     orderBy: { plateNorm: "asc" },
     take: 8,

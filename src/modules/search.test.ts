@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { createTestEnv, type TestEnv } from "@/test/harness";
+import { customerSearchKeys } from "@/modules/workshop/customers/domain";
+import { searchKey } from "@/lib/search-key";
 
 /**
  * Schnellsuche und „Neu“-Menü: Die Funktionen liefern Suchanbieter (`search.ts`) und `quickActions` (`feature.ts`); die Plattform aggregiert nur (Route `/api/search`,
@@ -92,9 +94,9 @@ describe("Verhalten", () => {
     await env.db.user.deleteMany();
     await env.db.role.deleteMany();
     env.signOut();
-    const customer = await env.db.customer.create({ data: { firstName: "Erika", lastName: "Suchtest", city: "Berlin", customerNumber: "K-9" } });
-    await env.db.vehicle.create({ data: { plate: "B XY 999", plateNorm: "BXY999", make: "Suchtest-Auto", customerId: customer.id } });
-    await env.db.invoice.create({ data: { direction: "incoming", number: "RE-Suchtest-1", partyName: "Lieferant", issueDate: new Date(), grossCents: 100 } });
+    const customer = await env.db.customer.create({ data: { firstName: "Erika", lastName: "Suchtest", city: "Berlin", customerNumber: "K-9", ...customerSearchKeys({ firstName: "Erika", lastName: "Suchtest", city: "Berlin" }) } });
+    await env.db.vehicle.create({ data: { plate: "B XY 999", plateNorm: "BXY999", make: "Suchtest-Auto", searchKey: searchKey("Suchtest-Auto"), customerId: customer.id } });
+    await env.db.invoice.create({ data: { direction: "incoming", number: "RE-Suchtest-1", partyName: "Lieferant", partyKey: searchKey("Lieferant"), issueDate: new Date(), grossCents: 100 } });
   });
 
   it("ohne Sitzung 401, ohne ein einziges durchsuchbares Recht 403, zu kurzer Begriff liefert nichts", async () => {
@@ -163,7 +165,7 @@ describe("Verhalten", () => {
   });
 
   it("Termine werden auch über den Halter des Fahrzeugs gefunden; Mitarbeiter: nur aktive", async () => {
-    const holder = await env.db.customer.create({ data: { lastName: "Haltermann" } });
+    const holder = await env.db.customer.create({ data: { lastName: "Haltermann", ...customerSearchKeys({ lastName: "Haltermann" }) } });
     const vehicle = await env.db.vehicle.create({ data: { plate: "K AB 1", plateNorm: "KAB1", customerId: holder.id } });
     await env.db.appointment.create({ data: { title: "Inspektion", startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), vehicleId: vehicle.id } });
     await env.db.employee.createMany({ data: [{ firstName: "Aktiv", lastName: "Sucher", active: true }, { firstName: "Ehemalig", lastName: "Sucher", active: false }] });

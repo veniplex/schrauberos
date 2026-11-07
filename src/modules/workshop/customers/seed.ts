@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { SeedDef } from "@/modules/types";
+import { customerSearchKeys } from "./domain";
 
 /** Beispielkunden. Die Kundennummern beginnen bei 10001; Fahrzeuge, Reifen und Termine legen die jeweiligen Funktionen an (sie finden die Kunden über den Nachnamen). */
 const CUSTOMERS = [
@@ -15,7 +16,10 @@ async function demo(db: PrismaClient) {
   if ((await db.customer.count()) > 0) return;
   console.log("Demo-Daten (Kunden) werden angelegt …");
   let nr = 10001;
-  for (const c of CUSTOMERS) await db.customer.create({ data: { ...c, customerNumber: String(nr++) } });
+  for (const c of CUSTOMERS) {
+    const customerNumber = String(nr++);
+    await db.customer.create({ data: { ...c, customerNumber, ...customerSearchKeys(c) } });
+  }
 }
 
 export const seeds: SeedDef[] = [{ id: "customers", feature: "workshop.customers", order: 30, demo }];

@@ -4,8 +4,9 @@ import { versionOf } from "@/lib/concurrency";
 import { iso, nullableString, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
+import { keyContains } from "@/server/search";
 import { deleteCustomerOperation, saveCustomerOperation } from "./operations";
+import { customerSearchFields } from "./queries";
 
 /**
  * API-Ressource „Kunden“ (`/api/v1/customers`). Schreiben läuft über dieselben Operationen wie die Oberfläche (Prüfung der Sache, Audit); Kunden mit
@@ -71,10 +72,8 @@ export const endpoints = defineResource({
   list: {
     filters: z.strictObject({ q: z.string().max(100).optional(), city: z.string().max(80).optional() }),
     where: ({ q, city }) => ({
-      ...(city ? { city: contains(city) } : {}),
-      ...(q
-        ? { OR: [{ lastName: contains(q) }, { firstName: contains(q) }, { company: contains(q) }, { customerNumber: contains(q) }, { city: contains(q) }, { phone: contains(q) }, { email: contains(q) }] }
-        : {}),
+      ...(city ? keyContains("cityKey", city) : {}),
+      ...(q ? { OR: customerSearchFields.map((f) => f.where(q)) } : {}),
     }),
     sorts: {
       lastName: (dir) => ({ lastName: dir }),

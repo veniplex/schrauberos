@@ -2,7 +2,16 @@ import "server-only";
 import { startOfDay, wallOf } from "@/lib/zone";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
+import { contains, keyContains } from "@/server/search";
 import type { InvoiceTotals } from "./domain";
+
+/**
+ * Suchbedingungen für Rechnungen (Liste, Schnellsuche, API): der Geschäftspartner über die normalisierte Spalte `partyKey` (Umlaute, Groß-/Kleinschreibung, Trenner), Nummer, Referenz
+ * und Kategorie als Teilstring. Jedes Element ist eine ODER-Alternative; `category: false` lässt die Kategorie weg (Schnellsuche).
+ */
+export function invoiceTextWhere(term: string, options: { category?: boolean } = { category: true }): Prisma.InvoiceWhereInput[] {
+  return [{ number: contains(term) }, keyContains("partyKey", term), { reference: contains(term) }, ...(options.category === false ? [] : [{ category: contains(term) }])];
+}
 
 /**
  * Summen über alle Rechnungen, die `where` trifft – von der Datenbank gerechnet (`aggregate`), nicht über eine geladene Seite: Die Kacheln über der Liste

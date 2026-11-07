@@ -183,6 +183,9 @@ CREATE TABLE "Customer" (
     "zip" TEXT,
     "city" TEXT,
     "notes" TEXT,
+    "nameKey" TEXT NOT NULL DEFAULT '',
+    "cityKey" TEXT NOT NULL DEFAULT '',
+    "phoneKey" TEXT NOT NULL DEFAULT '',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -206,6 +209,7 @@ CREATE TABLE "Vehicle" (
     "extraInspectionKind" TEXT,
     "extraInspectionDue" DATETIME,
     "notes" TEXT,
+    "searchKey" TEXT NOT NULL DEFAULT '',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Vehicle_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -504,6 +508,7 @@ CREATE TABLE "Invoice" (
     "number" TEXT NOT NULL,
     "outgoingKey" TEXT,
     "partyName" TEXT NOT NULL,
+    "partyKey" TEXT NOT NULL DEFAULT '',
     "customerId" TEXT,
     "issueDate" DATETIME NOT NULL,
     "dueDate" DATETIME,

@@ -1,3 +1,5 @@
+import { phoneKey, searchKey } from "@/lib/search-key";
+
 /** Anzeigename eines Kunden; ohne Kunde (z. B. Fahrzeug ohne Halter) ein Gedankenstrich. */
 export function customerDisplayName(
   c: { firstName?: string | null; lastName: string; company?: string | null } | null | undefined,
@@ -6,6 +8,14 @@ export function customerDisplayName(
   // Bei reinen Firmenkunden steht der Firmenname zusätzlich im Nachnamen (Sortierung/Suche)
   const person = [c.firstName, c.company && c.lastName === c.company ? "" : c.lastName].filter(Boolean).join(" ");
   return c.company ? `${c.company}${person ? ` (${person})` : ""}` : person;
+}
+
+/**
+ * Die normalisierten Suchspalten eines Kunden (`nameKey`, `cityKey`, `phoneKey`; siehe `src/lib/search-key.ts`). Sie werden bei jedem Schreiben mit gepflegt
+ * (`customerRecord`), damit die Suche Umlaute, Groß-/Kleinschreibung und Trenner in Namen und Telefonnummern verträgt.
+ */
+export function customerSearchKeys(c: { firstName?: string | null; lastName: string; company?: string | null; city?: string | null; phone?: string | null }) {
+  return { nameKey: searchKey(c.firstName, c.lastName, c.company), cityKey: searchKey(c.city), phoneKey: phoneKey(c.phone) };
 }
 
 /** Womit ein Kunde noch verknüpft ist: Wer Fahrzeuge (auch früher gehalten) oder Rechnungen hat, ist nicht löschbar. */

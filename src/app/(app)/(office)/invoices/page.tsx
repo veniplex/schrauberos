@@ -14,11 +14,11 @@ import { INTL_LOCALE } from "@/i18n/config";
 import { currentYear, startOfDayIn, todayInput } from "@/lib/dates";
 import { clampPage, listHref, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { INVOICE_DIRECTIONS, paymentState, type InvoiceDirection } from "@/modules/office/invoices/domain";
-import { invoiceSums, invoiceYears } from "@/modules/office/invoices/queries";
+import { invoiceSums, invoiceTextWhere, invoiceYears } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { contains, searchWhere } from "@/server/search";
+import { searchWhere } from "@/server/search";
 import { PaymentBadge } from "@/modules/office/invoices/ui";
 import { SearchInput, Select } from "@/components/ui/form";
 
@@ -49,12 +49,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT, dirParam: ORDER_PARAM });
 
   const yearRange = year ? { issueDate: { gte: startOfDayIn(`${year}-01-01`), lt: startOfDayIn(`${year + 1}-01-01`) } } : {};
-  const text = searchWhere<Prisma.InvoiceWhereInput>(q, session.can, [
-    { where: (term) => ({ number: contains(term) }) },
-    { where: (term) => ({ partyName: contains(term) }) },
-    { where: (term) => ({ reference: contains(term) }) },
-    { where: (term) => ({ category: contains(term) }) },
-  ]);
+  const text = searchWhere<Prisma.InvoiceWhereInput>(q, session.can, [{ where: (term) => ({ OR: invoiceTextWhere(term) }) }]);
   const where: Prisma.InvoiceWhereInput = {
     direction,
     ...yearRange,

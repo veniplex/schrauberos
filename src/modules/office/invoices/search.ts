@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
 import type { SearchProviderDef } from "@/modules/types";
+import { invoiceTextWhere } from "./queries";
 
 /** Schnellsuche: Rechnungen nach Nummer, Geschäftspartner und Referenz. */
 export const searchProviders: SearchProviderDef[] = [
@@ -13,7 +13,7 @@ export const searchProviders: SearchProviderDef[] = [
     order: 40,
     async search(q, { limit }) {
       const rows = await db.invoice.findMany({
-        where: { OR: [{ number: contains(q) }, { partyName: contains(q) }, { reference: contains(q) }] },
+        where: { OR: invoiceTextWhere(q, { category: false }) },
         orderBy: { issueDate: "desc" },
         take: limit,
         select: { id: true, number: true, partyName: true },

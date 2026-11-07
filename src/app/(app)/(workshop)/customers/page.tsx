@@ -11,10 +11,10 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
-import { countCustomers, listCustomers } from "@/modules/workshop/customers/queries";
+import { countCustomers, customerSearchFields, listCustomers } from "@/modules/workshop/customers/queries";
 import { normalizePlate } from "@/lib/plate";
 import { requirePermission } from "@/server/auth/session";
-import { contains, searchWhere } from "@/server/search";
+import { searchWhere } from "@/server/search";
 import { SearchInput } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -35,13 +35,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   // Wörterbuch pro Berechtigung: Kennzeichen nur durchsuchbar, wer Fahrzeuge sehen darf
   const where =
     searchWhere<Prisma.CustomerWhereInput>(q, session.can, [
-      { where: (term) => ({ lastName: contains(term) }) },
-      { where: (term) => ({ firstName: contains(term) }) },
-      { where: (term) => ({ company: contains(term) }) },
-      { where: (term) => ({ customerNumber: contains(term) }) },
-      { where: (term) => ({ city: contains(term) }) },
-      { where: (term) => ({ phone: contains(term) }) },
-      { where: (term) => ({ email: contains(term) }) },
+      ...customerSearchFields,
       { permission: "vehicles.view", where: () => (plate ? { vehicles: { some: { plateNorm: { contains: plate } } } } : { id: "" }) },
     ]) ?? {};
 

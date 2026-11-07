@@ -4,6 +4,7 @@ import { claimRow } from "@/lib/concurrency";
 import { logError } from "@/lib/log-safe";
 import { truncateName } from "@/lib/file-delivery";
 import { checkUpload } from "@/lib/upload-sniff";
+import { searchKey } from "@/lib/search-key";
 import { dateText, moneyCents } from "@/lib/zod-fields";
 import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, invoiceFileLocation, outgoingKeyOf } from "@/modules/office/invoices/domain";
 import { defineOperation, fail, failField, mapPrismaError } from "@/server/operations";
@@ -57,6 +58,7 @@ export function invoiceRecord(d: InvoiceImportFields, customerId: string | null)
     number: d.number,
     outgoingKey: outgoingKeyOf(d.direction, d.number),
     partyName: d.partyName,
+    partyKey: searchKey(d.partyName),
     customerId: d.direction === "outgoing" ? customerId : null,
     issueDate: noon(d.issueDate),
     dueDate: d.dueDate ? noon(d.dueDate) : null,

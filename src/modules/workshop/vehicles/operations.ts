@@ -3,6 +3,7 @@ import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { formatPlate, normalizePlate } from "@/lib/plate";
+import { searchKey } from "@/lib/search-key";
 import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { parseMonthInput } from "@/lib/month";
 import { defineOperation, fail, failField, failFields } from "@/server/operations";
@@ -56,6 +57,7 @@ export type VehicleFields = z.output<typeof vehicleInput>;
 export function vehicleRecord(d: Pick<VehicleFields, "plate" | "make" | "model" | "vin" | "year" | "mileageKm" | "fuel" | "hsn" | "tsn" | "firstRegistration" | "inspectionDue" | "extraInspectionKind" | "extraInspectionDue" | "notes">) {
   return {
     plate: formatPlate(d.plate),
+    searchKey: searchKey(d.make, d.model, d.vin),
     plateNorm: normalizePlate(d.plate),
     make: d.make ?? null,
     model: d.model ?? null,

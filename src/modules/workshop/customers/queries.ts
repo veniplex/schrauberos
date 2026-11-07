@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Viewer } from "@/modules/types";
 import { db } from "@/server/db";
+import { contains, keyContains, phoneContains, type SearchField } from "@/server/search";
 
 /**
  * Lesezugriffe der Funktion „Kunden“. Richtlinie (D7): Der **Anzeigename** eines Kunden ist in Termin-, Fahrzeug-, Reifen- und Rechnungskontext sichtbar, Kontaktdaten
@@ -29,6 +30,19 @@ const CUSTOMER = {
   createdAt: true,
   updatedAt: true,
 } as const satisfies Prisma.CustomerSelect;
+
+/**
+ * Suchfelder der Kundenliste, der Schnellsuche und der API (Wörterbuch pro Berechtigung, `searchWhere`): Name und Firma über die normalisierte Spalte `nameKey`, Kundennummer,
+ * Ort (`cityKey`), Telefon (`phoneKey`, nur Ziffern) und E-Mail. Alle Felder sind Kontaktdaten und gehören zu `customers.view`; wer nur den Namen sehen darf, nimmt `customerNameSearch`.
+ */
+export const customerNameSearch: SearchField<Prisma.CustomerWhereInput> = { where: (term) => keyContains("nameKey", term) };
+export const customerSearchFields: ReadonlyArray<SearchField<Prisma.CustomerWhereInput>> = [
+  customerNameSearch,
+  { where: (term) => ({ customerNumber: contains(term) }) },
+  { where: (term) => keyContains("cityKey", term) },
+  { where: (term) => phoneContains("phoneKey", term) },
+  { where: (term) => ({ email: contains(term) }) },
+];
 
 export type CustomerContact = { phone: string | null; city: string | null };
 

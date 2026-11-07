@@ -6,8 +6,17 @@ import type { Permission } from "@/modules/catalog";
 import type { Viewer } from "@/modules/types";
 import { customerContacts, customerNameSelect } from "@/modules/workshop/customers/public";
 import { db } from "@/server/db";
-import { contains, searchWhere } from "@/server/search";
+import { keyContains, searchWhere } from "@/server/search";
 import { INSPECTION_SOON_MONTHS } from "./domain";
+
+/**
+ * Suchbedingungen für Fahrzeuge (Liste, Schnellsuche, Auswahlfelder, API): Kennzeichen über `plateNorm` (ohne Trenner, Großschreibung), Marke/Modell/FIN über die normalisierte Spalte
+ * `searchKey` und der Halter über seine `nameKey` (nur der Name, Richtlinie D7). Jedes Element ist eine ODER-Alternative.
+ */
+export function vehicleTextWhere(term: string): Prisma.VehicleWhereInput[] {
+  const plate = normalizePlate(term);
+  return [...(plate ? [{ plateNorm: { contains: plate } }] : []), keyContains("searchKey", term), { customer: { is: keyContains("nameKey", term) } }];
+}
 
 /** Filter der Fahrzeugliste – dieselben für die Liste und die Druckliste. */
 export type VehicleListFilters = {
@@ -25,14 +34,7 @@ export type VehicleListFilters = {
  */
 export function vehicleListWhere(filters: VehicleListFilters, can: (permission: Permission) => boolean, currentMonth: string): Prisma.VehicleWhereInput {
   const { q, noOwnerOnly, inspection, month } = filters;
-  const plate = normalizePlate(q);
-  const text = searchWhere<Prisma.VehicleWhereInput>(q, can, [
-    { where: () => (plate ? { plateNorm: { contains: plate } } : { id: "" }) },
-    { where: (term) => ({ vin: contains(term) }) },
-    { where: (term) => ({ make: contains(term) }) },
-    { where: (term) => ({ model: contains(term) }) },
-    { where: (term) => ({ customer: { is: { OR: [{ lastName: contains(term) }, { firstName: contains(term) }, { company: contains(term) }] } } }) },
-  ]);
+  const text = searchWhere<Prisma.VehicleWhereInput>(q, can, [{ where: (term) => ({ OR: vehicleTextWhere(term) }) }]);
   return {
     ...(noOwnerOnly ? { customerId: null } : {}),
     ...(inspection === "soon" ? { inspectionDue: { not: null, lte: addMonths(currentMonth, INSPECTION_SOON_MONTHS) } } : {}),
