@@ -1081,6 +1081,7 @@ CREATE TABLE "FileAttachment" (
     "strippedBytes" INTEGER NOT NULL DEFAULT 0,
     "archivedAt" DATETIME,
     "archivedByName" TEXT,
+    "purgedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "FileAttachment_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -1148,6 +1149,7 @@ CREATE TABLE "Checklist" (
     "completedAt" DATETIME,
     "completedByName" TEXT,
     "createdByName" TEXT NOT NULL,
+    "createdById" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Checklist_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "ChecklistTemplate" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -1187,6 +1189,7 @@ CREATE TABLE "ChecklistEvent" (
     "byName" TEXT NOT NULL,
     "note" TEXT,
     "signaturePath" TEXT,
+    "signatureHash" TEXT,
     "at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "ChecklistEvent_checklistId_fkey" FOREIGN KEY ("checklistId") REFERENCES "Checklist" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -1540,6 +1543,9 @@ CREATE INDEX "TimeEntry_startedAt_idx" ON "TimeEntry"("startedAt");
 CREATE INDEX "TimeCorrection_entryId_at_idx" ON "TimeCorrection"("entryId", "at");
 
 -- CreateIndex
+CREATE INDEX "FileAttachment_archivedAt_purgedAt_idx" ON "FileAttachment"("archivedAt", "purgedAt");
+
+-- CreateIndex
 CREATE INDEX "FileAttachment_vehicleId_archivedAt_createdAt_idx" ON "FileAttachment"("vehicleId", "archivedAt", "createdAt");
 
 -- CreateIndex
@@ -1577,3 +1583,6 @@ CREATE INDEX "ChecklistItem_checklistId_position_idx" ON "ChecklistItem"("checkl
 
 -- CreateIndex
 CREATE INDEX "ChecklistEvent_checklistId_at_idx" ON "ChecklistEvent"("checklistId", "at");
+
+-- CreateIndex
+CREATE INDEX "ChecklistEvent_signatureHash_idx" ON "ChecklistEvent"("signatureHash");

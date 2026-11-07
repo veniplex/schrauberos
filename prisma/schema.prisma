@@ -1556,6 +1556,8 @@ model FileAttachment {
   strippedBytes  Int       @default(0)
   archivedAt     DateTime?
   archivedByName String?
+  // Datei endgültig vom Datenträger gelöscht (Löschlauf, einige Tage nach dem Entfernen; Backups behalten ihre Verweise); die Zeile bleibt als Nachweis ohne Name und Beschriftung
+  purgedAt       DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -1563,6 +1565,7 @@ model FileAttachment {
   order   Order?   @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@unique([uploadedById, uploadKey])
+  @@index([archivedAt, purgedAt])
   @@index([vehicleId, archivedAt, createdAt])
   @@index([orderId, archivedAt, createdAt])
   @@index([createdAt])
@@ -1648,6 +1651,8 @@ model Checklist {
   completedAt     DateTime?
   completedByName String?
   createdByName   String
+  // Konto, das die Checkliste begonnen hat (ohne Fremdschlüssel: Konten werden gelöscht, die Checkliste bleibt); das Recht zum Verwerfen hängt daran, nie am Anzeigenamen
+  createdById     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -1699,10 +1704,13 @@ model ChecklistEvent {
   byName        String
   note          String?
   signaturePath String?
+  // Prüfsumme der Unterschrift, die beim Wiederöffnen aufgehoben wurde: das Bild bleibt für andere Checklisten gesperrt
+  signatureHash String?
   at            DateTime @default(now())
 
   checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
 
   @@index([checklistId, at])
+  @@index([signatureHash])
 }
 
