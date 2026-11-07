@@ -19,7 +19,7 @@ export const vehiclesDe = {
   confirmDeleteAppointments_other: "{count} Termine verlieren die Zuordnung zum Fahrzeug.",
   empty: "Noch kein Fahrzeug erfasst.",
   listEmpty: "Keine Fahrzeuge gefunden.",
-  listEmptyHint: "Lege das erste Fahrzeug an. Es braucht keinen Kunden.",
+  listEmptyHint: "Das erste Fahrzeug anlegen. Es braucht keinen Kunden.",
   count_one: "{count} Fahrzeug",
   count_other: "{count} Fahrzeuge",
   noOwner: "ohne Halter",

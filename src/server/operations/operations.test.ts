@@ -334,7 +334,7 @@ describe("defineAction – Server-Action-Adapter", () => {
     assert.deepEqual(fieldState, { fieldErrors: { name: "Pflichtfeld." } });
     assert.ok((await action({}, form({ name: "doppelt" }))).fieldErrors?.name);
     assert.equal((await action({}, form({ name: "weg" }))).error, "Dieser Eintrag existiert nicht mehr.");
-    assert.equal((await action({}, form({ name: "boom" }))).error, "Das hat nicht geklappt. Bitte versuche es noch einmal.");
+    assert.equal((await action({}, form({ name: "boom" }))).error, "Das hat nicht geklappt. Bitte noch einmal versuchen.");
     assert.equal(env.browser.writes.filter((w) => w.name === "so_flash").length, 0, "im Formularzustand kein Flash");
   });
 

@@ -10,7 +10,7 @@ export const backupDe = {
   restoreTimeout: "Die Anwendung ist noch nicht wieder erreichbar. Bitte in einer Minute die Seite neu laden. Startet sie mit den wiederhergestellten Daten nicht, kehrt sie automatisch zum vorherigen Stand zurück.",
   create: { title: "Backup erstellen", button: "Jetzt Backup erstellen" },
   schedule: {
-    on: "Automatisch jede Nacht ab {hour}:00 Uhr. Wie lange Backups aufbewahrt werden, stellen Sie je Art unter Einstellungen → Backups ein.",
+    on: "Automatisch jede Nacht ab {hour}:00 Uhr. Wie lange Backups aufbewahrt werden, wird je Art unter Einstellungen → Backups eingestellt.",
     off: "Automatische Backups sind ausgeschaltet (Einstellungen → Backups).",
   },
   list: {
@@ -47,10 +47,10 @@ export const backupDe = {
   retry: { button: "Jetzt erneut versuchen", done: "Das automatische Backup wurde angelegt." },
   retention: {
     title: "Aufbewahrung",
-    intro: "Backups enthalten personenbezogene Daten (Kunden, Mitarbeiter, Rechnungen). Legen Sie fest, wie lange sie aufbewahrt werden: Es bleiben höchstens die neuesten Backups der Art UND keines, das älter ist als die Tagesgrenze. 0 bedeutet unbegrenzt. Das neueste Backup überhaupt bleibt immer erhalten.",
+    intro: "Backups enthalten personenbezogene Daten (Kunden, Mitarbeiter, Rechnungen). Hier wird festgelegt, wie lange sie aufbewahrt werden: Es bleiben höchstens die neuesten Backups der Art UND keines, das älter ist als die Tagesgrenze. 0 bedeutet unbegrenzt. Das neueste Backup überhaupt bleibt immer erhalten.",
     keep: "Neueste behalten (Anzahl)",
     days: "Höchstens so alt (Tage)",
-    note: "Aufgeräumt wird nach jedem automatischen Backup und täglich nachts. Kopien, die Sie heruntergeladen haben, kann die Anwendung nicht löschen – sie gehören bei der Aufbewahrung mit bedacht.",
+    note: "Aufgeräumt wird nach jedem automatischen Backup und täglich nachts. Heruntergeladene Kopien kann die Anwendung nicht löschen – sie sind bei der Aufbewahrung mitzubedenken.",
   },
   upload: {
     title: "Backup hochladen",

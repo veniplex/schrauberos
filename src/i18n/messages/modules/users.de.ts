@@ -16,7 +16,7 @@ export const usersDe = {
   unlocked: "Die Wartezeit wurde aufgehoben.",
   adminRightsBadge: "Verwaltungsrechte",
   adminRightsHint: "Dieses Konto ist kein Administrator, hat aber Rechte der Verwaltung (Benutzer, Rollen, Einstellungen, Module, Backups oder Updates). Bitte prüfen, ob das gewollt ist.",
-  readOnlyNotice: "Dieses Konto hat Rechte, die du selbst nicht hast. Du kannst es ansehen, aber nicht ändern.",
+  readOnlyNotice: "Dieses Konto hat Rechte, die man selbst nicht hat. Es lässt sich ansehen, aber nicht ändern.",
   roleLocked: "Nur Administratoren können diese Rolle vergeben oder entziehen.",
   linkedEmployee: "Mitarbeiter: {name}",
   sourceLocal: "Lokal",

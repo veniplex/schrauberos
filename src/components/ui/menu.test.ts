@@ -73,4 +73,10 @@ describe("Menu", () => {
     await act(() => void link.dispatchEvent(new window.FocusEvent("focusout", { bubbles: true, relatedTarget: m.root.querySelector("#other") })));
     assert.equal(m.trigger().getAttribute("aria-expanded"), "false");
   });
+
+  it("ohne label hat der Knopf keinen aria-label (der sichtbare Text ist der Name – sonst verletzt ein abweichender Name „Label im Namen“)", async () => {
+    const { Menu } = await import("./menu");
+    view = await mount(await withRouter(createElement(Menu as never, { trigger: "Anna Muster" }, "x")));
+    assert.equal(view.container.querySelector("button")?.hasAttribute("aria-label"), false);
+  });
 });

@@ -12,7 +12,7 @@ export const modulesDe = {
   },
   title: "Module & Funktionen",
   platformNote: "Die Verwaltung (Benutzer, Rollen, Einstellungen, Backups, Updates, Audit-Log) und die Hilfe gehören zur Plattform und sind immer aktiv. Hier lassen sich die fachlichen Module und ihre Funktionen ein- und ausschalten.",
-  description: "Schalten Sie ganze Module oder einzelne Funktionen ein oder aus. Beim Ausschalten bleiben alle Daten erhalten – es wird nur der Zugriff gesperrt (Seiten, Navigation, Dashboard, Rechte).",
+  description: "Ganze Module oder einzelne Funktionen ein- oder ausschalten. Beim Ausschalten bleiben alle Daten erhalten – es wird nur der Zugriff gesperrt (Seiten, Navigation, Dashboard, Rechte).",
   moduleSwitch: "Modul {name}",
   featureSwitch: "Funktion {name}",
   turnOn: "Einschalten",

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Input } from "@/components/ui/form";
-import { Card, EmptyState, NavLink, TextLink } from "@/components/ui/layout";
+import { Alert, Card, EmptyState, NavLink, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { Markdown } from "@/components/ui/markdown";
 import { PageToc } from "@/components/ui/toc";
@@ -20,7 +20,7 @@ const fold = (text: string) => text.toLocaleLowerCase("de");
  * für diese Anmeldung freigeben (aktive Funktion, Recht).
  */
 export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]; topicId?: string; query?: string }) {
-  const { t } = await getI18n();
+  const { t, locale } = await getI18n();
   const sections = await loadSections(groups, t("help.general"), (g) => t(g.nameKey));
   const all = sections.flatMap((s) => s.topics.map((topic) => ({ ...topic, section: s })));
 
@@ -50,6 +50,12 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
   return (
     <>
       <PageHeader title={t("help.title")} description={t("help.description")} />
+      {/* Die Hilfe-Kapitel (docs/) gibt es nur auf Deutsch – mit anderer Oberfläche sagt die Seite das ausdrücklich */}
+      {locale !== "de" ? (
+        <Alert tone="info" className="mb-4">
+          {t("help.germanOnly")}
+        </Alert>
+      ) : null}
       <form action="/help" role="search" className="mb-4 flex flex-wrap items-center gap-3">
         <Input name="q" defaultValue={search} placeholder={t("help.searchPlaceholder")} aria-label={t("help.searchPlaceholder")} className="min-w-56 flex-1 sm:max-w-sm" />
         <SubmitButton variant="secondary">{t("common.search")}</SubmitButton>

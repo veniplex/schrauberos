@@ -19,7 +19,7 @@ export const docsDe = {
   noPasswordsHint: "Keine Passwörter oder Zugangsdaten in die Dokumentation schreiben – sie ist für alle lesbar, die das Recht dazu haben, und jede alte Fassung bleibt im Verlauf erhalten.",
   searchPlaceholder: "Titel und Inhalt durchsuchen …",
   empty: "Noch keine Seiten.",
-  emptyHint: "Lege die erste Seite an – Markdown mit Überschriften, Listen, Tabellen und Bildern wird unterstützt.",
+  emptyHint: "Die erste Seite anlegen – Markdown mit Überschriften, Listen, Tabellen und Bildern wird unterstützt.",
   emptyPage: "Diese Seite hat noch keinen Inhalt.",
   count_one: "{count} Seite",
   count_other: "{count} Seiten",
@@ -34,7 +34,7 @@ export const docsDe = {
   current: "aktuell",
   restore: "Diese Fassung wiederherstellen",
   restoreConfirm: "Diese Fassung als neue aktuelle Version übernehmen? Die jetzige Fassung bleibt im Verlauf erhalten.",
-  pickVersion: "Wähle links eine Version aus, um sie anzusehen.",
+  pickVersion: "Links eine Version auswählen, um sie anzusehen.",
   tabs: { edit: "Bearbeiten", preview: "Vorschau" },
   areas: {
     handbook: { title: "Handbuch", description: "Prozesse, Arbeitsanweisungen und Wissen für das ganze Unternehmen – in Kapiteln, die sich auf Rollen beschränken lassen." },

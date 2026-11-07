@@ -11,12 +11,12 @@ Bei Terminen kann ein Arbeitsplatz nie doppelt belegt werden, auch wenn zwei Per
 ## Formulare
 
 * **Pflichtfelder** tragen einen Stern (*). Beim Speichern prüft die Anwendung alle Eingaben und nennt Fehler **am Feld** und gesammelt oben im Formular
-  („Bitte prüfe diese 2 Angaben“) – ein Klick auf einen Eintrag springt ins Feld. Die Meldungen sagen, was fehlt: eine ungültige E-Mail-Adresse, eine FIN mit
+  („Bitte diese 2 Angaben prüfen“) – ein Klick auf einen Eintrag springt ins Feld. Die Meldungen sagen, was fehlt: eine ungültige E-Mail-Adresse, eine FIN mit
   falscher Länge, ein ungültiges Datum, eine Zahl außerhalb des erlaubten Bereichs.
 * **Ihre Eingabe bleibt erhalten**, auch wenn das Speichern scheitert – bei einem Fehler im Formular ebenso wie bei **„Keine Verbindung zum Server“**
   (dann einfach noch einmal speichern). Nur Passwörter und Dateien müssen neu eingegeben bzw. gewählt werden.
 * **Entwurf:** Längere Formulare (Kunde, Fahrzeug, Termin, Reifensatz, Rechnung, Mitarbeiter) merken sich Ihre Eingabe in diesem Browser-Tab. Schließen Sie
-  das Formular versehentlich, finden Sie sie beim erneuten Öffnen wieder („Dein nicht gespeicherter Entwurf wurde wiederhergestellt“, mit **Entwurf
+  das Formular versehentlich, finden Sie sie beim erneuten Öffnen wieder („Der nicht gespeicherte Entwurf wurde wiederhergestellt“, mit **Entwurf
   verwerfen**). Nach dem Speichern und beim Abmelden ist der Entwurf gelöscht. Passwörter und die sensiblen Mitarbeiterfelder (Notfallkontakt) werden nie gemerkt.
 * **Speichern und weiter:** Beim Anlegen eines Kunden führt **Speichern und Fahrzeug anlegen** direkt zum Fahrzeugformular – der neue Kunde ist schon als Halter eingetragen.
 * **Dateien:** Zu große Dateien werden schon beim Auswählen abgelehnt („Datei zu groß (max. 10 MB)“), nicht erst nach dem Hochladen.
@@ -35,10 +35,23 @@ Bei Terminen kann ein Arbeitsplatz nie doppelt belegt werden, auch wenn zwei Per
   Fahrzeugsuche nichts, bietet sie **Fahrzeug neu anlegen** an (mit dem Suchtext als Kennzeichen), sofern Sie Fahrzeuge anlegen dürfen. Schlägt die Suche selbst fehl, steht das
   im Feld.
 
-## Suchen und Filtern
+## Listen, Suchen und Filtern
 
-Die **Suche in der Kopfleiste** durchsucht alle Bereiche auf einmal (siehe „Die Oberfläche“ in „Erste Schritte“). Die Listen (Kunden, Fahrzeuge, Reifensätze, Rechnungen, Mitarbeiter …) haben außerdem oben ein eigenes Suchfeld und Filter. Die Suche findet
-Teile von Wörtern. Bei Umlauten kommt es auf die Schreibweise an: „müller“ findet „Müller“, „MÜLLER“ findet es nicht.
+Die **Suche in der Kopfleiste** durchsucht alle Bereiche auf einmal (siehe „Die Oberfläche“ in „Erste Schritte“). Die Listen (Kunden, Fahrzeuge, Reifensätze, Rechnungen, Mitarbeiter, Fuhrpark, Geräte, Verkabelung, Benutzer, Audit-Log …) sind alle gleich aufgebaut:
+
+* **Suchfeld und Filter** stehen oben. Die Suche findet Teile von Wörtern; bei Umlauten kommt es auf die Schreibweise an („müller“ findet „Müller“, „MÜLLER“ findet es nicht). Durchsucht werden nur Angaben, die Sie auch sehen dürfen. Ist ein Filter gesetzt, erscheint **Zurücksetzen**. Auf dem Handy bleibt das Suchfeld immer sichtbar, die übrigen Filter stehen hinter **Weitere Filter**.
+* **Sortieren:** Ein Klick auf eine Spaltenüberschrift mit Pfeil sortiert danach, ein zweiter Klick kehrt die Richtung um. Auf dem Handy stehen die sortierbaren Spalten als Auswahl über der Liste.
+* **Seiten:** Lange Listen zeigen 25 (Audit-Log 50) Einträge je Seite; unter der Liste stehen **Vorherige/Nächste Seite** und „26–50 von 80“. Die Zahl über der Liste ist immer die **Gesamtzahl** der Treffer, die Summen darüber (z. B. bei Rechnungen) gelten für alle Treffer des Zeitraums, nicht nur für die angezeigte Seite.
+* **Ganze Zeile anklicken:** Ein Klick (oder Tippen) irgendwo in der Zeile öffnet den Eintrag; Links und Knöpfe in der Zeile (z. B. der Fahrer) behalten ihre eigene Wirkung.
+* **Breite Tabellen** lassen sich seitlich wischen (oder per Tastatur: in die Tabelle tabben und die Pfeiltasten nutzen); ein Schatten und ein Hinweis zeigen, dass rechts noch Spalten folgen. Unter Tabletbreite wird jede Zeile zur **Karte** mit den wichtigsten Angaben.
+
+## Orientierung
+
+* Jede Seite eines einzelnen Eintrags (Ansehen, Bearbeiten, Neu anlegen) hat oben einen **Weg zurück** („← Kunden“, am Desktop als Pfad „Kunden › Müller“) – auch in einem auf dem Handy installierten Fenster ohne Zurück-Taste.
+* Das **Fragezeichen** oben rechts öffnet das Hilfekapitel zur Seite.
+* **Löschen** steht auf der Seite eines Eintrags im **Gefahrenbereich** am Ende, abgesetzt von den gewöhnlichen Aktionen; es fragt vorher nach.
+* **Farben und Symbole:** Zustände zeigen eine Marke mit Symbol, nicht nur eine Farbe: grün (in Ordnung/erledigt), gelb (bald fällig/Aufmerksamkeit), rot (überfällig/Fehler), blau (in Arbeit/Information), grau (neutral).
+* Die Hilfe gibt es nur auf Deutsch; bei englischer Oberfläche weist die Hilfeseite darauf hin. Lange Kapitel haben oben ein einklappbares Inhaltsverzeichnis („Auf dieser Seite“), am breiten Bildschirm steht es neben dem Text.
 
 ## Wenn etwas nicht klappt
 

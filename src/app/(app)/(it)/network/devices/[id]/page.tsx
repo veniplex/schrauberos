@@ -157,9 +157,9 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                     >
                       <span className="tabular font-semibold">{p}</span>
                       {l ? (
-                        <Link href={`/network/devices/${l.other.id}`} className="mt-0.5 flex min-h-(--tap-row) items-center truncate text-accent-text hover:underline" title={`${l.other.name}${l.otherPort ? ` · ${l.otherPort}` : ""}`}>
+                        <TextLink href={`/network/devices/${l.other.id}`} className="mt-0.5 flex truncate" title={`${l.other.name}${l.otherPort ? ` · ${l.otherPort}` : ""}`}>
                           {l.other.name}
-                        </Link>
+                        </TextLink>
                       ) : (
                         <span className="mt-0.5 block text-ink-muted">{t("network.portFree")}</span>
                       )}

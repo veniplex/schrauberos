@@ -45,6 +45,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               {t("recovery.link")}
             </TextLink>
           </p>
+          <p className="mt-1 text-center text-sm text-ink-muted">{t("auth.forgotPassword")}</p>
         </Card>
       </div>
     </main>

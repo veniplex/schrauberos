@@ -27,7 +27,7 @@ export const tiresDe = {
   planChange: "Wechsel planen",
   searchPlaceholder: "Kennzeichen, Kunde, Marke oder Lagerort …",
   empty: "Keine Reifensätze gefunden.",
-  emptyHint: "Lege den ersten Reifensatz an oder passe die Filter an.",
+  emptyHint: "Den ersten Reifensatz anlegen oder die Filter anpassen.",
   count_one: "{count} Reifensatz",
   count_other: "{count} Reifensätze",
   ageYears: "{years} J.",

@@ -173,6 +173,7 @@ export const en: Messages = {
     searchPlaceholder: "Search the help …",
     results: "Search results",
     noResults: "No help chapters match.",
+    germanOnly: "The help is available in German only.",
   },
   setup: {
     title: "Initial setup",
@@ -204,6 +205,7 @@ export const en: Messages = {
       busy: "Many people are signing in right now. Please try again in a moment.",
       inactive: "This account is disabled.",
     },
+    forgotPassword: "Forgot your password? Please ask your administrator.",
     forbiddenTitle: "No access",
     forbiddenText: "You don't have permission for this page. Please contact your administrator.",
   },

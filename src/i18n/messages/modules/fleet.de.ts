@@ -15,7 +15,7 @@ export const fleetDe = {
   deleteConfirm: "Eintrag löschen?",
   searchPlaceholder: "Kennzeichen, Modell, FIN oder Fahrer …",
   empty: "Keine Fahrzeuge gefunden.",
-  emptyHint: "Lege das erste Firmenfahrzeug an.",
+  emptyHint: "Das erste Firmenfahrzeug anlegen.",
   count_one: "{count} Fahrzeug",
   count_other: "{count} Fahrzeuge",
   noDriver: "ohne Fahrer",

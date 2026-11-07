@@ -92,7 +92,7 @@ describe("Form", () => {
     assert.equal(f.input("password").value, "", "Passwörter werden nie wiederhergestellt");
     const summary = f.root.querySelector("[data-form-errors]");
     assert.ok(summary, "Fehlerzusammenfassung");
-    assert.match(summary.textContent ?? "", /Bitte prüfe diese Angabe/);
+    assert.match(summary.textContent ?? "", /Bitte diese Angabe prüfen/);
     assert.match(summary.textContent ?? "", /E-Mail: Bitte eine gültige E-Mail-Adresse/);
     assert.ok(document.activeElement === summary, "Fokus auf der Zusammenfassung");
     const email = f.input("email");

@@ -3,7 +3,7 @@
 Die **Einstellungen** sind in Reiter gegliedert. Welche Reiter es gibt, hängt von den aktiven Funktionen ab: Jede Funktion bringt
 ihre eigenen Einstellungen mit.
 
-* **Werkstatt:** Name, Untertitel, Adresse, Logo, Akzentfarbe, **Zeitzone** (gilt sofort) und Öffnungszeiten.
+* **Werkstatt:** Name, Untertitel, Adresse, Logo, Akzentfarbe (eine frei gewählte Farbe, die als Schrift zu blass wäre, wird mit einem Hinweis markiert), **Zeitzone** (gilt sofort) und Öffnungszeiten.
 * **Sicherheit:** „Die Anwendung läuft hinter einem Reverse-Proxy“. Nur wenn das eingeschaltet ist, wertet die Anmeldung die Adresse des
   Clients aus dem Header `X-Forwarded-For` aus und bremst Fehlversuche zusätzlich je Adresse. **Nur einschalten, wenn wirklich ein
   Reverse-Proxy davorsteht**, der die Client-Adresse als letzten Eintrag anhängt (nginx: `proxy_add_x_forwarded_for`). Ohne echten Proxy

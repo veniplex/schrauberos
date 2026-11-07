@@ -14,7 +14,7 @@ export const employeesDe = {
   confirmDelete: "Mitarbeiter „{name}“ wirklich löschen? Abwesenheiten und Qualifikationen werden mit gelöscht.",
   searchPlaceholder: "Name, Personalnummer, Funktion, E-Mail …",
   empty: "Keine Mitarbeiter gefunden.",
-  emptyHint: "Lege den ersten Mitarbeiter an oder passe die Filter an.",
+  emptyHint: "Den ersten Mitarbeiter anlegen oder die Filter anpassen.",
   count_one: "{count} Mitarbeiter",
   count_other: "{count} Mitarbeiter",
   inactive: "ausgeschieden",

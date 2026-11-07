@@ -17,7 +17,7 @@ export const customersDe = {
   saveAndAddVehicle: "Speichern und Fahrzeug anlegen",
   searchPlaceholder: "Name, Kundennummer, Ort, Telefon oder Kennzeichen …",
   empty: "Keine Kunden gefunden.",
-  emptyHint: "Lege den ersten Kunden an.",
+  emptyHint: "Den ersten Kunden anlegen.",
   count_one: "{count} Kunde",
   count_other: "{count} Kunden",
   cols: { name: "Kunde", contact: "Kontakt", vehicles: "Fahrzeuge" },
