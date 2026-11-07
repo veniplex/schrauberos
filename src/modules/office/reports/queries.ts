@@ -7,6 +7,7 @@ import type { Viewer } from "@/modules/types";
 import { utilizationSource } from "@/modules/workshop/appointments/public";
 import { storageOverview, type StorageOverview } from "@/modules/workshop/tires/public";
 import { vehicleInspectionOverview, type VehicleInspectionOverview } from "@/modules/workshop/vehicles/public";
+import { Semaphore } from "@/lib/semaphore";
 import { getHolidays } from "@/server/holidays";
 import { getWorkshop } from "@/server/workshop";
 import { MAX_REVENUE_MONTHS, REPORT_LIST_LIMIT, daysOf, lastDayOfMonth, monthKeys, monthOfDay, openingIntervals, overlapMinutes, snapToMonths, totalMinutes, utilizationPercent } from "./domain";
@@ -17,6 +18,12 @@ import { MAX_REVENUE_MONTHS, REPORT_LIST_LIMIT, daysOf, lastDayOfMonth, monthKey
  * hat – der Aufrufer prüft zusätzlich `reports.view` (`access.ts`).
  */
 
+/**
+ * **Aufwand begrenzen:** Die aufwendigen Berichte (Umsatz: bis zu 37 Abfragen, Auslastung: bis zu 50 000 Termine im Speicher) laufen höchstens dreifach gleichzeitig je Prozess – weitere warten (kein Abweisen:
+ * es sind angemeldete Personen mit dem Recht). Zusammen mit den Obergrenzen je Bericht (36 Monate, 366 Tage, 50 000 Termine mit Hinweis, 50 Zeilen in Listen) bleibt ein Bericht eine begrenzte Arbeit.
+ */
+const reportLane = new Semaphore(3, 0);
+
 /* ───────────── Umsatz je Monat ───────────── */
 
 export type RevenueReport = { from: string; to: string; months: RevenueMonth[]; total: { count: number; netCents: number; vatCents: number; grossCents: number; incomplete: number; derived: number } };
@@ -26,7 +33,7 @@ export async function revenueReport(viewer: Viewer, period: { from: string; to: 
   const snapped = snapToMonths(period.from, period.to);
   const months = monthKeys(snapped.from, snapped.to);
   if (months.length > MAX_REVENUE_MONTHS) throw new Error("Zeitraum zu lang");
-  const rows = await revenueByMonth(viewer, months);
+  const rows = await reportLane.run(() => revenueByMonth(viewer, months));
   if (!rows) return null;
   const total = rows.reduce((sum, r) => ({ count: sum.count + r.count, netCents: sum.netCents + r.netCents, vatCents: sum.vatCents + r.vatCents, grossCents: sum.grossCents + r.grossCents, incomplete: sum.incomplete + r.incomplete, derived: sum.derived + r.derived }), { count: 0, netCents: 0, vatCents: 0, grossCents: 0, incomplete: 0, derived: 0 });
   return { from: snapped.from, to: snapped.to, months: rows, total };
@@ -51,7 +58,7 @@ export type UtilizationReport = { from: string; to: string; capacityMinutes: num
  * innerhalb davon (`overlapMinutes`). Termine ohne Arbeitsplatz stehen in einer eigenen Zeile ohne Prozent (sie haben keine Kapazität, an der man sie messen könnte).
  */
 export async function utilizationReport(viewer: Viewer, period: { from: string; to: string }): Promise<UtilizationReport | null> {
-  const source = await utilizationSource(viewer, startOfDay(period.from), startOfDay(addDaysToKey(period.to, 1)));
+  const source = await reportLane.run(() => utilizationSource(viewer, startOfDay(period.from), startOfDay(addDaysToKey(period.to, 1))));
   if (!source) return null;
   const [workshop, holidays] = await Promise.all([getWorkshop(), getHolidays()]);
   const intervals = openingIntervals(daysOf(period.from, period.to), workshop.hours, holidays);

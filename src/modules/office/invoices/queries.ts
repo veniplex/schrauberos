@@ -59,6 +59,27 @@ export async function invoiceYears(currentYear: number): Promise<number[]> {
  */
 const COUNTS_AS_REVENUE = { NOT: { status: "cancelled", cancelsInvoiceId: null, cancelledBy: { is: null } } } as const satisfies Prisma.InvoiceWhereInput;
 
+const INCOMPLETE_BLOCK = 2_000;
+type IncompleteRow = { issueDate: Date; netCents: number | null; vatCents: number | null; grossCents: number; deductedCents: number; deductedNetCents: number; deductedVatCents: number };
+
+/** Die Belege des Zeitraums ohne Netto oder ohne Steuer, blockweise nach Kennung gelesen. */
+async function incompleteRows(base: Prisma.InvoiceWhereInput): Promise<IncompleteRow[]> {
+  const out: IncompleteRow[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const block = await db.invoice.findMany({
+      where: { AND: [base, { OR: [{ netCents: null }, { vatCents: null }] }] },
+      orderBy: { id: "asc" },
+      take: INCOMPLETE_BLOCK,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: { id: true, issueDate: true, netCents: true, vatCents: true, grossCents: true, deductedCents: true, deductedNetCents: true, deductedVatCents: true },
+    });
+    for (const row of block) out.push(row);
+    if (block.length < INCOMPLETE_BLOCK) return out;
+    cursor = block[block.length - 1].id;
+  }
+}
+
 export type RevenueMonth = {
   month: string;
   count: number;
@@ -96,11 +117,8 @@ export async function revenueByMonth(viewer: Viewer, months: readonly string[]):
         db.invoice.aggregate({ where: { AND: [baseOf(rangeOf(month, month)), { netCents: { not: null } }, { vatCents: { not: null } }] }, _sum: SUMS, _count: { _all: true } }),
       ),
     ),
-    // unvollständige Belege (selten, von Hand erfasst): in einer Abfrage über den ganzen Zeitraum, die Monate ordnet die Werkstatt-Zone zu
-    db.invoice.findMany({
-      where: { AND: [baseOf(rangeOf(months[0], months[months.length - 1])), { OR: [{ netCents: null }, { vatCents: null }] }] },
-      select: { issueDate: true, netCents: true, vatCents: true, grossCents: true, deductedCents: true, deductedNetCents: true, deductedVatCents: true },
-    }),
+    // unvollständige Belege (selten, von Hand erfasst): über den ganzen Zeitraum, in Blöcken von je 2 000 Zeilen (der Speicher bleibt begrenzt, auch bei sehr vielen Handbelegen); die Monate ordnet die Werkstatt-Zone zu
+    incompleteRows(baseOf(rangeOf(months[0], months[months.length - 1]))),
   ]);
 
   const rows = months.map((month, index): RevenueMonth => {

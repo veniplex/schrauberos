@@ -262,6 +262,21 @@ describe("Umsatz: Belege mit nur Netto oder nur Steuer (von Hand erfasst)", () =
     assert.deepEqual(r!.months[0], { month: "2026-02", count: 4, netCents: 30_000, vatCents: 5_700, grossCents: 47_600, incomplete: 1, derived: 2 });
     assert.deepEqual(r!.total, { count: 4, netCents: 30_000, vatCents: 5_700, grossCents: 47_600, incomplete: 1, derived: 2 });
   });
+
+  it("sehr viele unvollständige Belege werden blockweise gelesen (über 2 000 Zeilen) und stimmen; mehrere Berichte gleichzeitig liefern dasselbe", async () => {
+    const issueDate = await noon("2026-03-05");
+    await env.db.invoice.createMany({ data: Array.from({ length: 4_500 }, (_, i) => ({ direction: "outgoing", number: `BULK-${i}`, partyName: "Muster GmbH", issueDate, grossCents: 100, ...(i % 3 === 0 ? { netCents: 84 } : i % 3 === 1 ? { vatCents: 16 } : {}) })) });
+    try {
+      const S = await session(["invoices.view"]);
+      const reports = await Promise.all(Array.from({ length: 8 }, () => queries.revenueReport(S, { from: "2026-03-01", to: "2026-03-31" })));
+      const march = reports[0]!.months[0];
+      // 1 500 nur mit Netto (84 → Steuer 16), 1 500 nur mit Steuer (16 → Netto 84), 1 500 ohne beides
+      assert.deepEqual({ count: march.count, incomplete: march.incomplete, derived: march.derived, gross: march.grossCents, net: march.netCents, vat: march.vatCents }, { count: 4_500, incomplete: 1_500, derived: 3_000, gross: 450_000, net: 3_000 * 84, vat: 3_000 * 16 });
+      for (const r of reports) assert.deepEqual(r, reports[0]);
+    } finally {
+      await env.db.invoice.deleteMany({ where: { number: { startsWith: "BULK-" } } });
+    }
+  });
 });
 
 describe("Offene Posten", () => {
