@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { labelGeometry, labelsPerPage, parseBoundedInt, parseLabelFormat, type LabelContent } from "@/lib/labels";
+import { labelGeometry, labelsPerPage, parseClampedInt, parseLabelFormat, type LabelContent } from "@/lib/labels";
 import { inspectPdf } from "@/test/pdf-text";
 import { buildLabelsPdf, mm, PdfError } from ".";
 
@@ -26,8 +26,14 @@ describe("Etikettenformate (lib/labels)", () => {
     assert.equal(parseLabelFormat("100x50"), "100x50");
     assert.equal(parseLabelFormat("a4"), "62x29", "unbekannt: Standard, kein Fehler");
     assert.equal(parseLabelFormat(undefined), "62x29");
-    assert.equal(parseBoundedInt("3", 1, 24, 1), 3);
-    for (const bad of ["0", "25", "-1", "3.5", "abc", "", "99999", undefined]) assert.equal(parseBoundedInt(bad, 1, 24, 7), 7, String(bad));
+    assert.deepEqual(parseClampedInt("3", 1, 24, 1), { value: 3, clamped: false, asked: 3 });
+    // außerhalb der Grenzen wird geklemmt (nicht still auf den Standard zurückgesetzt) und gemeldet
+    assert.deepEqual(parseClampedInt("30", 1, 24, 1), { value: 24, clamped: true, asked: 30 });
+    assert.deepEqual(parseClampedInt("0", 1, 24, 1), { value: 1, clamped: true, asked: 0 });
+    assert.deepEqual(parseClampedInt("-3", 0, 23, 0), { value: 0, clamped: true, asked: -3 });
+    assert.deepEqual(parseClampedInt("99999", 1, 24, 1), { value: 24, clamped: true, asked: 99999 });
+    // keine ganze Zahl: Standard, kein Klemmen
+    for (const bad of ["3.5", "abc", "", "1e3", "99999999999", undefined]) assert.deepEqual(parseClampedInt(bad, 1, 24, 7), { value: 7, clamped: false, asked: null }, String(bad));
   });
 });
 

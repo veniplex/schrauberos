@@ -409,7 +409,10 @@ html[data-form-actions] {
 
 /* ───────── Etiketten (PrintLabels, components/ui/print-label.tsx) ─────────
    Jedes Etikettenformat hat eine benannte Seite in genau seinem Maß (ohne Rand): ein Etikett = eine Seite; der A4-Bogen ist ein Raster. Am Bildschirm eine Vorschau in Originalgröße (Millimeter),
-   im Ausdruck ohne Rahmen. Im Ausdruck verschwinden Seitenrand und Innenabstand der App (`:has`), sonst säße das Etikett verschoben auf der Seite. */
+   im Ausdruck ohne Rahmen. Im Ausdruck verschwinden Seitenrand und Innenabstand der App (`:has`), sonst säße das Etikett verschoben auf der Seite.
+   Ohne `:has` (Chrome < 105, Safari < 15.4, Firefox < 121) bleibt der Innenabstand der App stehen und das Raster sitzt verschoben: ein bekannter, hier nicht umgehbarer Fall (kein Skript wegen CSP) –
+   dort das PDF drucken (README „Druck, Etiketten und Karten“). Der Bogen ist im Ausdruck 0,5 mm niedriger als die Seite (296,5 statt 297 mm, `overflow: hidden`): Läge er genau auf der Seitenhöhe,
+   könnte die Rundung auf Layout-Einheiten eine leere Seite zwischen den Bögen erzeugen. Die Etiketten sitzen oben bündig, der Verlust trifft nur den Rand der letzten Reihe. */
 @page label-62x29 {
   size: 62mm 29mm;
   margin: 0;
@@ -459,6 +462,15 @@ html[data-form-actions] {
   align-self: stretch;
   overflow: hidden;
 }
+.print-label-title,
+.print-label-body {
+  /* zu langer Text endet auf „…“ (Zeilenzahl je Format als --label-lines, print-label.tsx) */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--label-lines, 8);
+  line-clamp: var(--label-lines, 8);
+  overflow: hidden;
+}
 .print-label-title {
   margin: 0;
   font-weight: 700;
@@ -491,6 +503,10 @@ html[data-form-actions] {
   }
   .print-label-page:last-child {
     break-after: auto;
+  }
+  .print-label-sheet {
+    height: 296.5mm;
+    overflow: hidden;
   }
   .print-label {
     outline: none;

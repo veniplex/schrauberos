@@ -11,6 +11,7 @@ import { Table } from "./layout";
  */
 export function PrintCard({ model, qrLabel, className }: { model: CardModel; qrLabel: string; className?: string }) {
   const matrix = model.qr ? qrMatrix(model.qr.data) : null;
+  const totalWeight = model.table ? model.table.columns.reduce((sum, column) => sum + (column.weight ?? 1), 0) || 1 : 1;
   return (
     <article className={clsx("print-card flex flex-col gap-4 text-sm", className)} aria-label={model.title}>
       <header className="flex items-start justify-between gap-4">
@@ -19,8 +20,8 @@ export function PrintCard({ model, qrLabel, className }: { model: CardModel; qrL
           <h1 className="text-2xl font-semibold">{model.title}</h1>
           {model.facts.length > 0 ? (
             <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
-              {model.facts.map(([label, value]) => (
-                <div key={label} className="contents">
+              {model.facts.map(([label, value], index) => (
+                <div key={index} className="contents">
                   <dt className="text-ink-muted">{label}</dt>
                   <dd className="min-w-0 [overflow-wrap:anywhere]">{value}</dd>
                 </div>
@@ -36,8 +37,8 @@ export function PrintCard({ model, qrLabel, className }: { model: CardModel; qrL
         ) : null}
       </header>
 
-      {(model.blocks ?? []).map((block) => (
-        <section key={block.heading} className="print-keep">
+      {(model.blocks ?? []).map((block, index) => (
+        <section key={index} className="print-keep">
           <h2 className="text-sm font-semibold">{block.heading}</h2>
           <p className="mt-1 whitespace-pre-line [overflow-wrap:anywhere]">{block.text}</p>
         </section>
@@ -49,11 +50,17 @@ export function PrintCard({ model, qrLabel, className }: { model: CardModel; qrL
           {model.table.rows.length === 0 ? (
             <p className="text-ink-muted">{model.table.empty}</p>
           ) : (
-            <Table caption={model.table.heading} className="w-full text-sm">
+            <Table caption={model.table.heading} className="w-full table-fixed text-sm">
+              {/* Spaltenbreiten wie im PDF: die Gewichte des Modells (`CardColumn.weight`, Standard 1) als Anteile */}
+              <colgroup>
+                {model.table.columns.map((column, i) => (
+                  <col key={i} style={{ width: `${(((column.weight ?? 1) / totalWeight) * 100).toFixed(2)}%` }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
-                  {model.table.columns.map((column) => (
-                    <th key={column.header} className={clsx(column.align === "right" && "text-right", column.align === "center" && "text-center")}>
+                  {model.table.columns.map((column, i) => (
+                    <th key={i} className={clsx(column.align === "right" && "text-right", column.align === "center" && "text-center")}>
                       {column.header}
                     </th>
                   ))}
@@ -63,7 +70,7 @@ export function PrintCard({ model, qrLabel, className }: { model: CardModel; qrL
                 {model.table.rows.map((row, index) => (
                   <tr key={index} className="print-keep">
                     {model.table!.columns.map((column, i) => (
-                      <td key={column.header} className={clsx("[overflow-wrap:anywhere]", column.align === "right" && "text-right", column.align === "center" && "text-center")}>
+                      <td key={i} className={clsx("[overflow-wrap:anywhere]", column.align === "right" && "text-right", column.align === "center" && "text-center")}>
                         {row[i] ?? ""}
                       </td>
                     ))}
@@ -77,8 +84,8 @@ export function PrintCard({ model, qrLabel, className }: { model: CardModel; qrL
 
       {model.extras && model.extras.length > 0 ? (
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
-          {model.extras.map(([label, value]) => (
-            <div key={label} className="contents">
+          {model.extras.map(([label, value], index) => (
+            <div key={index} className="contents">
               <dt className="text-ink-muted">{label}</dt>
               <dd className="min-w-0 [overflow-wrap:anywhere]">{value}</dd>
             </div>

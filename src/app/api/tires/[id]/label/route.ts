@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { getI18n } from "@/i18n/server";
 import { safeName } from "@/lib/filename";
-import { MAX_LABEL_COPIES, parseBoundedInt, parseLabelFormat, labelsPerPage } from "@/lib/labels";
+import { MAX_LABEL_COPIES, parseClampedInt, parseLabelFormat, labelsPerPage } from "@/lib/labels";
 import { errorResponse } from "@/lib/file-delivery";
 import { tireLabelContent } from "@/modules/workshop/tires/label";
 import { tireLabelData } from "@/modules/workshop/tires/queries";
@@ -25,8 +25,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const query = request.nextUrl.searchParams;
   const format = parseLabelFormat(query.get("format"));
-  const copies = parseBoundedInt(query.get("copies") ?? undefined, 1, MAX_LABEL_COPIES, 1);
-  const skip = parseBoundedInt(query.get("skip") ?? undefined, 0, labelsPerPage(format) - 1, 0);
+  // außerhalb der Grenzen wird geklemmt (nicht still auf 1/0 zurückgesetzt); die Seite zeigt den Hinweis dazu
+  const copies = parseClampedInt(query.get("copies") ?? undefined, 1, MAX_LABEL_COPIES, 1).value;
+  const skip = parseClampedInt(query.get("skip") ?? undefined, 0, labelsPerPage(format) - 1, 0).value;
   const i18n = await getI18n();
   const content = tireLabelContent(data, i18n, await getPublicUrl());
   try {

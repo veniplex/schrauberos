@@ -7,7 +7,7 @@ import { PdfPreview } from "@/components/ui/pdf-preview";
 import { PrintButton } from "@/components/ui/print-layout";
 import { PrintLabels } from "@/components/ui/print-label";
 import { getI18n } from "@/i18n/server";
-import { MAX_LABEL_COPIES, labelsPerPage, parseBoundedInt, parseLabelFormat } from "@/lib/labels";
+import { MAX_LABEL_COPIES, labelsPerPage, parseClampedInt, parseLabelFormat } from "@/lib/labels";
 import { tireLabelContent } from "@/modules/workshop/tires/label";
 import { tireLabelData } from "@/modules/workshop/tires/queries";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
@@ -33,8 +33,10 @@ export default async function TireLabelPage({ params, searchParams }: { params: 
   const { t } = i18n;
 
   const format = parseLabelFormat(sp.format);
-  const copies = parseBoundedInt(sp.copies, 1, MAX_LABEL_COPIES, 1);
-  const skip = parseBoundedInt(sp.skip, 0, labelsPerPage("sheet-3x8") - 1, 0);
+  const copiesAsked = parseClampedInt(sp.copies, 1, MAX_LABEL_COPIES, 1);
+  const skipAsked = parseClampedInt(sp.skip, 0, labelsPerPage("sheet-3x8") - 1, 0);
+  const copies = copiesAsked.value;
+  const skip = skipAsked.value;
   const base = await getPublicUrl();
   const content = tireLabelContent(data, i18n, base);
   const pdfSrc = `/api/tires/${encodeURIComponent(id)}/label?format=${format}&copies=${copies}&skip=${skip}`;
@@ -60,6 +62,16 @@ export default async function TireLabelPage({ params, searchParams }: { params: 
             {session.can("settings.manage") ? <TextLink href="/settings?tab=security">{t("tires.label.setAddress")}</TextLink> : t("tires.label.askAdmin")}
           </Alert>
         )}
+        {copiesAsked.clamped ? (
+          <Alert tone="warning" className="mb-5">
+            {t("tires.label.copiesClamped", { asked: String(copiesAsked.asked), max: String(MAX_LABEL_COPIES) })}
+          </Alert>
+        ) : null}
+        {skipAsked.clamped && format === "sheet-3x8" ? (
+          <Alert tone="warning" className="mb-5">
+            {t("tires.label.skipClamped", { asked: String(skipAsked.asked), max: String(labelsPerPage("sheet-3x8") - 1) })}
+          </Alert>
+        ) : null}
         <div className="mb-5">
           <LabelOptions format={format} copies={copies} skip={skip} copiesHint={t("tires.label.copiesHint")} />
         </div>

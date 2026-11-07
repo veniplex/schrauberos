@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import type { CSSProperties } from "react";
 import { labelGeometry, labelsPerPage, type LabelContent, type LabelFormat } from "@/lib/labels";
 import { qrMatrix, type QrMatrix } from "@/lib/qr";
 
@@ -25,11 +26,19 @@ export function PrintQr({ matrix, label, className }: { matrix: QrMatrix; label:
   );
 }
 
-const SIZES: Record<LabelFormat, { title: string; body: string }> = {
-  "62x29": { title: "12pt", body: "6pt" },
-  "100x50": { title: "20pt", body: "10pt" },
-  "sheet-3x8": { title: "12pt", body: "7.5pt" },
+/**
+ * Schriftgrößen und die Zeilen, die in den Kasten passen (aus Etikettenhöhe abzüglich Rand 2 mm, Titelzeile und Zeilenhöhe 1,15 gerechnet): Was darüber hinausgeht, wird mit „…“ gekürzt (`line-clamp`) –
+ * nicht still abgeschnitten wie bei `overflow: hidden` allein. (Das PDF verkleinert die Schrift stufenweise bis 5 pt, bevor es kürzt: eine Druckansicht kürzt früher. Beides ist so gewollt – die Ansicht
+ * ist die schnelle Vorschau, das PDF der verlässliche Weg.)
+ */
+const SIZES: Record<LabelFormat, { title: string; body: string; titleLines: number; bodyLines: number }> = {
+  "62x29": { title: "12pt", body: "6pt", titleLines: 1, bodyLines: 7 },
+  "100x50": { title: "20pt", body: "10pt", titleLines: 1, bodyLines: 8 },
+  "sheet-3x8": { title: "12pt", body: "7.5pt", titleLines: 1, bodyLines: 8 },
 };
+
+/** die Zeilenzahl als Eigenschaft; `globals.css` kürzt mit `line-clamp` und „…“ */
+const clamp = (lines: number) => ({ "--label-lines": lines }) as CSSProperties;
 
 function Cell({ format, label, qrLabel, empty }: { format: LabelFormat; label?: LabelContent; qrLabel: string; empty?: boolean }) {
   const g = labelGeometry(format);
@@ -40,10 +49,10 @@ function Cell({ format, label, qrLabel, empty }: { format: LabelFormat; label?: 
       {label ? (
         <>
           <div className="print-label-text">
-            <p className="print-label-title" style={{ fontSize: size.title }}>
+            <p className="print-label-title" style={{ fontSize: size.title, ...clamp(size.titleLines) }}>
               {label.title}
             </p>
-            <p className="print-label-body" style={{ fontSize: size.body }}>
+            <p className="print-label-body" style={{ fontSize: size.body, ...clamp(size.bodyLines) }}>
               {label.lines.filter((line) => line.trim() !== "").join("\n")}
             </p>
           </div>

@@ -43,11 +43,15 @@ export const parseLabelFormat = (value: unknown): LabelFormat => (isLabelFormat(
 /** Höchstzahl gleicher Etiketten in einem Druck (ein Satz bekommt meist zwei: Reifen und Regal). */
 export const MAX_LABEL_COPIES = 24;
 
-/** Ganzzahl in Grenzen aus einem Parameter; fehlend oder ungültig → `fallback`. */
-export function parseBoundedInt(value: unknown, min: number, max: number, fallback: number): number {
-  if (typeof value !== "string" || !/^\d{1,4}$/.test(value)) return fallback;
-  const n = Number(value);
-  return n >= min && n <= max ? n : fallback;
+/**
+ * Ganzzahl aus einem Parameter, **in die Grenzen geklemmt**: `copies=30` ergibt 24 (nicht still 1), `skip=-3` ergibt 0. `clamped` sagt, dass der verlangte Wert (`asked`) abweicht – die Seite nennt es.
+ * Fehlt der Parameter oder ist er keine ganze Zahl (`abc`, `3.5`), gilt `fallback` (kein Klemmen, `asked` ist `null`).
+ */
+export function parseClampedInt(value: unknown, min: number, max: number, fallback: number): { value: number; clamped: boolean; asked: number | null } {
+  if (typeof value !== "string" || !/^-?\d{1,9}$/.test(value)) return { value: fallback, clamped: false, asked: null };
+  const asked = Number(value);
+  const clamped = Math.min(max, Math.max(min, asked));
+  return { value: clamped, clamped: clamped !== asked, asked };
 }
 
 /** Was ein Etikett zeigt (die Funktion füllt es, Layout und Format sind Sache der Bausteine): Hauptzeile groß, Zeilen darunter klein, optional ein QR-Code (der Inhalt ist eine absolute Adresse). */

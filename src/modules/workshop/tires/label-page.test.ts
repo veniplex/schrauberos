@@ -85,4 +85,24 @@ describe("Seite /tires/[id]/label", () => {
     view = null;
     assert.equal(await isNotFound(() => Page({ params: Promise.resolve({ id: ids.restricted }), searchParams: Promise.resolve({}) })), true);
   });
+
+  it("Anzahl und Überspringen außerhalb der Grenzen werden geklemmt und genannt (nicht still auf den Standard gesetzt); Texte werden mit „…“ gekürzt statt still abgeschnitten", async () => {
+    await login(["tires.view"]);
+    const { default: Page } = await import("@/app/(app)/(workshop)/tires/[id]/label/page");
+    await view?.unmount();
+    const root = await render(await Page({ params: Promise.resolve({ id: ids.set }), searchParams: Promise.resolve({ format: "sheet-3x8", copies: "30", skip: "99" }) }));
+    const text = plain(root.textContent);
+    assert.match(text, /Verlangt waren 30 Etiketten – es sind höchstens 24 je Druck/);
+    assert.match(text, /Verlangt waren 99 übersprungene Felder – möglich sind 0 bis 23/);
+    assert.equal(root.querySelectorAll("[data-label-cell='empty']").length, 23);
+    assert.equal(root.querySelectorAll("[data-label-cell='label']").length, 24, "24 Etiketten: eins auf dem ersten Bogen (23 Felder übersprungen), 23 auf dem zweiten");
+    const title = root.querySelector(".print-label-title") as HTMLElement;
+    assert.equal(title.style.getPropertyValue("--label-lines"), "1", "Zeilenzahl je Format; globals.css kürzt mit … (line-clamp)");
+    assert.equal((root.querySelector(".print-label-body") as HTMLElement).style.getPropertyValue("--label-lines"), "8");
+    assert.match(plain(text), /tatsächlicher Größe/);
+    await view!.unmount();
+    view = null;
+    const plainRoot = await render(await Page({ params: Promise.resolve({ id: ids.set }), searchParams: Promise.resolve({ copies: "2" }) }));
+    assert.doesNotMatch(plain(plainRoot.textContent), /Verlangt waren/, "kein Hinweis ohne Abweichung");
+  });
 });

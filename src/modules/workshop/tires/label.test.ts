@@ -113,11 +113,15 @@ describe("Route /api/tires/[id]/label", () => {
     assert.match(download.headers.get("content-disposition") ?? "", /^attachment; filename="etikett-B-AB-1234\.pdf"/);
   });
 
-  it("ungültige Parameter fallen auf Standardwerte zurück; die Anzahl ist begrenzt", async () => {
+  it("unbekanntes Format fällt auf den Standard zurück; Anzahl und Überspringen außerhalb der Grenzen werden geklemmt (nicht still auf den Standard gesetzt)", async () => {
     await login(["tires.view"]);
     const res = await get(ids.set, "?format=a4&copies=500&skip=-3");
     assert.equal(res.status, 200);
-    assert.equal(inspectPdf(Buffer.from(await res.arrayBuffer())).pageCount, 1, "ungültige Anzahl: 1");
+    assert.equal(inspectPdf(Buffer.from(await res.arrayBuffer())).pageCount, 24, "500 → höchstens 24 Etiketten (Einzelformat: eine Seite je Etikett)");
+    const sheet = await get(ids.set, "?format=sheet-3x8&copies=2&skip=99");
+    assert.equal(inspectPdf(Buffer.from(await sheet.arrayBuffer())).pageCount, 2, "skip=99 → 23: das zweite Etikett steht auf der nächsten Seite");
+    const junk = await get(ids.set, "?copies=abc&skip=x");
+    assert.equal(inspectPdf(Buffer.from(await junk.arrayBuffer())).pageCount, 1, "keine Zahl: Standard");
   });
 
   it("der QR-Code kommt aus der Einstellung, nie aus dem Host-Header", async () => {

@@ -51,6 +51,10 @@ describe("Seite /orders/[id]/card", () => {
     const root = await render(await Page({ params: Promise.resolve({ id: ids.order }), searchParams: Promise.resolve({ size: "a5" }) }));
     const text = plain(root.textContent);
     assert.ok(root.querySelector(".print-a5"), "benannte Seite A5");
+    // Spaltenbreiten wie im PDF (Gewichte des Modells 0,6/1,1/4,2/1,4/0,9 als Anteile), nicht gleich breit
+    const widths = [...root.querySelectorAll("table col")].map((col) => parseFloat((col as HTMLElement).style.width));
+    assert.equal(widths.length, 5);
+    assert.ok(widths[2] > widths[0] * 5 && Math.abs(widths.reduce((a, b) => a + b, 0) - 100) < 0.1, `Spaltenanteile ${widths}`);
     assert.match(text, /Auftragskarte A-2026-0001/);
     assert.match(text, /Bremsen prüfen/);
     assert.match(text, /Bremsbeläge wechseln/);
