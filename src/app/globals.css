@@ -405,7 +405,10 @@ dialog.drawer[open] {
   top: 0.5rem;
   z-index: 80;
   transform: translateY(-200%);
-  padding: 0.5rem 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 0.875rem;
   border-radius: var(--r-md);
   background: var(--accent);
   color: var(--accent-ink);

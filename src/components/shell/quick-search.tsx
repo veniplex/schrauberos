@@ -114,7 +114,7 @@ export function QuickSearch() {
 
   return (
     <>
-      <Button ref={toggle} variant="ghost" size="icon" className="lg:hidden" aria-label={t("nav.searchOpen")} aria-expanded={expanded} aria-controls={resultsId} onClick={() => setExpanded(true)}>
+      <Button ref={toggle} variant="ghost" size="icon" className="lg:hidden" aria-label={t("nav.searchOpen")} aria-expanded={expanded} onClick={() => setExpanded(true)}>
         <Search className="size-4" aria-hidden />
       </Button>
       <div
