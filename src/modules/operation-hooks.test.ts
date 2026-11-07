@@ -74,6 +74,12 @@ describe("Operations-Hooks", () => {
     assert.deepEqual(hookViolations(operationHooks, owners), []);
   });
 
+  it("jeder Hook auf customers.anonymize läuft auch bei ausgeschalteter Funktion (always): deren Daten bleiben in der Datenbank", () => {
+    const missing = operationHooks.filter((h) => h.operation === "customers.anonymize" && !h.always).map((h) => h.feature);
+    assert.deepEqual(missing, []);
+    assert.ok(operationHooks.filter((h) => h.operation === "customers.anonymize").length >= 6);
+  });
+
   it("die Prüfung erkennt Tippfehler, unbekannte Funktionen und fehlende Deklarationen – und lässt Richtiges durch", () => {
     // office.fleet deklariert office.invoices nicht (und umgekehrt) – prüfen, was der Katalog tatsächlich sagt
     const fleet = FEATURES.find((f) => featureKey(f) === "office.fleet")!;

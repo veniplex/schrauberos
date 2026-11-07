@@ -6,6 +6,7 @@ import { appointmentStatusForOrder } from "./order-sync";
 const anonymize: OperationHookDef = {
   operation: "customers.anonymize",
   feature: "workshop.appointments",
+  always: true,
   run: async ({ tx, input }) => {
     const { id } = input as { id: string };
     await tx.appointment.updateMany({ where: { customerId: id }, data: { customerId: null, notes: null, title: "(anonymisiert)" } });

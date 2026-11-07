@@ -1,7 +1,6 @@
 import "server-only";
 import type { PrivacySection, PrivacySubject, RetentionItem } from "@/lib/privacy";
 import { db } from "@/server/db";
-import type { FeatureId } from "./catalog";
 import type { PrivacyProviderDef } from "./types";
 
 import { privacyProviders as handbook } from "./handbook/manual/privacy";
@@ -19,9 +18,9 @@ import { privacyProviders as vehicles } from "./workshop/vehicles/privacy";
 
 /**
  * Composition Root des Datenschutzes (P4b-5): Jede Funktion meldet in ihrer `privacy.ts` (`privacyProviders`), welche Daten sie zu einem Kunden führt; hier werden die Beiträge
- * eingesammelt – für die Auskunft (`collectDisclosure`) und die Aufbewahrungsfristen (`collectRetention`). Nur Beiträge **aktiver** Funktionen zählen. Die Anonymisierung läuft über
+ * eingesammelt – für die Auskunft (`collectDisclosure`) und die Aufbewahrungsfristen (`collectRetention`). **Alle** Beiträge zählen, auch die ausgeschalteter Funktionen: Ihre Daten bleiben in der Datenbank (und kämen beim Wiedereinschalten zurück) – Auskunft und Aufbewahrungsfristen dürfen sie nicht auslassen. Die Anonymisierung läuft über
  * transaktionale Hooks (`operation-hooks.ts`) auf der Operation `customers.anonymize`, nicht über diese Anbieter.
- * Neue Funktion mit personenbezogenen Daten zum Kunden: `privacy.ts` anlegen, hier eintragen, bei Freitext/Verknüpfungen einen Hook für `customers.anonymize` ergänzen.
+ * Neue Funktion mit personenbezogenen Daten zum Kunden: `privacy.ts` anlegen, hier eintragen, bei Freitext/Verknüpfungen einen Hook für `customers.anonymize` ergänzen (mit `always: true`: er läuft auch bei ausgeschalteter Funktion).
  */
 export const PRIVACY_PROVIDERS: readonly PrivacyProviderDef[] = [...customers, ...vehicles, ...appointments, ...tires, ...orders, ...files, ...checklists, ...invoices, ...billing, ...handbook, ...itDocs].sort((a, b) => a.order - b.order);
 
@@ -37,18 +36,16 @@ export async function privacySubject(customerId: string): Promise<PrivacySubject
   return c ? { id: c.id, terms: termsOf(c) } : null;
 }
 
-const active = (features: ReadonlySet<string>) => PRIVACY_PROVIDERS.filter((p) => features.has(p.feature as FeatureId));
-
-/** Alle Daten zum Kunden aus den aktiven Funktionen, in der Reihenfolge der Anbieter. */
-export async function collectDisclosure(features: ReadonlySet<string>, subject: PrivacySubject): Promise<PrivacySection[]> {
+/** Alle Daten zum Kunden aus allen Funktionen (auch ausgeschalteten), in der Reihenfolge der Anbieter. */
+export async function collectDisclosure(subject: PrivacySubject): Promise<PrivacySection[]> {
   const out: PrivacySection[] = [];
-  for (const provider of active(features)) out.push(...(await provider.collect(subject)));
+  for (const provider of PRIVACY_PROVIDERS) out.push(...(await provider.collect(subject)));
   return out;
 }
 
-/** Belege mit Aufbewahrungsfrist aus den aktiven Funktionen. */
-export async function collectRetention(features: ReadonlySet<string>, subject: PrivacySubject): Promise<RetentionItem[]> {
+/** Belege mit Aufbewahrungsfrist aus allen Funktionen (auch ausgeschalteten). */
+export async function collectRetention(subject: PrivacySubject): Promise<RetentionItem[]> {
   const out: RetentionItem[] = [];
-  for (const provider of active(features)) if (provider.retention) out.push(...(await provider.retention(subject)));
+  for (const provider of PRIVACY_PROVIDERS) if (provider.retention) out.push(...(await provider.retention(subject)));
   return out;
 }

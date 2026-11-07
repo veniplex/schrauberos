@@ -9,6 +9,7 @@ export const hooks: OperationHookDef[] = [
   {
     operation: "customers.anonymize",
     feature: "workshop.files",
+    always: true,
     run: async ({ tx, input }) => {
       const { id } = input as { id: string };
       const mine = { OR: [{ vehicle: { is: { customerId: id } } }, { order: { is: { customerId: id } } }] };

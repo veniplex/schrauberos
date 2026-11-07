@@ -36,7 +36,7 @@ export async function PrivacyPanel({ session, customer }: { session: AppSession;
   let canAnonymize = false;
   if (canPrivacy) {
     const [subject, config] = await Promise.all([privacySubject(customer.id), getPrivacyConfig()]);
-    const items = subject ? await collectRetention(session.features, subject) : [];
+    const items = subject ? await collectRetention(subject) : [];
     const block = anonymizeBlock({ anonymizedAt: customer.anonymizedAt, confirmed: Boolean(config.confirmedAt), items, rules: config.rules });
     canAnonymize = block === null;
     blocked = !block ? null : block.reason === "running" ? t("privacy.panel.blocked.running", { date: block.until }) : t(`privacy.panel.blocked.${block.reason}`);

@@ -11,6 +11,7 @@ export const hooks: OperationHookDef[] = [
   {
     operation: "customers.anonymize",
     feature: "workshop.orders",
+    always: true,
     run: async ({ tx, input }) => {
       const { id } = input as { id: string };
       const mine = { order: { customerId: id } };

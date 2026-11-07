@@ -22,8 +22,13 @@ export type OperationHookContext = {
 export type OperationHookDef = {
   /** Name der Operation, auf die der Hook reagiert */
   operation: string;
-  /** Funktion, der der Hook gehört: läuft nur, wenn sie aktiv ist */
+  /** Funktion, der der Hook gehört: läuft nur, wenn sie aktiv ist (außer `always`) */
   feature: FeatureId;
+  /**
+   * Läuft auch bei **ausgeschalteter** Funktion. Nur für Hooks, die Bestandsdaten der Funktion bereinigen (Anonymisierung `customers.anonymize`): Die Daten bleiben bei
+   * ausgeschalteter Funktion in der Datenbank und kämen beim Wiedereinschalten zurück. Fachliche Folgehooks (Status, Lager …) gehören nie hierher.
+   */
+  always?: boolean;
   run: (ctx: OperationHookContext) => Promise<void> | void;
 };
 
@@ -36,6 +41,6 @@ export function setOperationHooksForTest(hooks: readonly OperationHookDef[] | nu
 
 export async function runOperationHooks(ctx: OperationHookContext): Promise<void> {
   for (const hook of override ?? registered) {
-    if (hook.operation === ctx.operation && ctx.principal.features.has(hook.feature)) await hook.run(ctx);
+    if (hook.operation === ctx.operation && (hook.always || ctx.principal.features.has(hook.feature))) await hook.run(ctx);
   }
 }

@@ -22,7 +22,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
   const subject = await privacySubject(id);
   if (!subject) return NextResponse.json({ error: "notFound" }, { status: 404, headers: baseHeaders });
-  const [sections, { t }] = await Promise.all([collectDisclosure(session.features, subject), getI18n()]);
+  const [sections, { t }] = await Promise.all([collectDisclosure(subject), getI18n()]);
 
   const body = {
     customerId: subject.id,

@@ -177,7 +177,7 @@ export const anonymizeCustomerOperation = defineOperation({
   audit: "customer.anonymize",
   prepare: async ({ input, principal }) => {
     const subject = await privacySubject(input.id);
-    const items: RetentionItem[] = subject ? await collectRetention(principal.features, subject) : [];
+    const items: RetentionItem[] = subject ? await collectRetention(subject) : [];
     return { items };
   },
   run: async ({ input, prepared, tx, audit }) => {

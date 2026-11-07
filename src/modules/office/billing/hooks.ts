@@ -12,6 +12,7 @@ export const hooks: OperationHookDef[] = [
   {
     operation: "customers.anonymize",
     feature: "office.billing",
+    always: true,
     run: async ({ tx, input }) => {
       const { id } = input as { id: string };
       // Entwürfe (nie festgeschrieben) gehen ganz: Positionen und Anrechnungen folgen per Cascade

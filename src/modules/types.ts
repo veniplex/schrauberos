@@ -152,7 +152,7 @@ export type SeedDef = {
 /**
  * Beitrag einer Funktion zum Datenschutz (P4b-5, `privacy.ts` der Funktion, eingesammelt in `src/modules/privacy.ts`): **alle Daten dieser Funktion zu einem Kunden** für die Auskunft
  * (Art. 15 DSGVO) und die Belege, deren Aufbewahrungsfrist eine Anonymisierung sperrt. Die Anonymisierung selbst läuft über transaktionale Hooks auf `customers.anonymize`
- * (`operation-hooks.ts`). Der Anbieter läuft nur, wenn die Funktion aktiv ist; die Auskunft liefert bewusst alles zum Kunden, unabhängig von den Leserechten der Person
+ * (`operation-hooks.ts`). Der Anbieter läuft auch bei ausgeschalteter Funktion (ihre Daten bleiben in der Datenbank); die Auskunft liefert bewusst alles zum Kunden, unabhängig von den Leserechten der Person
  * (das Recht `customers.disclose` ist das Sonderrecht dafür).
  */
 export type PrivacyProviderDef = {

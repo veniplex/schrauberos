@@ -95,7 +95,7 @@ export const disclosureExport: ExportDef = {
   open: async ({ session, query, t }) => {
     const subject = await privacySubject(query.get("customer") ?? "");
     if (!subject) return { error: "common.errors.notFound" };
-    const sections = await collectDisclosure(session.features, subject);
+    const sections = await collectDisclosure(subject);
     const table = disclosureRows(sections, (key) => t(key));
     async function* rows() {
       for (const row of table) yield row;

@@ -8,6 +8,7 @@ export const hooks: OperationHookDef[] = [
   {
     operation: "customers.anonymize",
     feature: "workshop.vehicles",
+    always: true,
     run: async ({ tx, input }) => {
       const { id } = input as { id: string };
       await tx.vehicle.updateMany({ where: { customerId: id }, data: { customerId: null, notes: null } });

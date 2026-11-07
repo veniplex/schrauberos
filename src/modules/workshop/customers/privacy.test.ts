@@ -238,13 +238,15 @@ describe("Aufbewahrungsfristen und Anonymisierung", () => {
     assert.ok((await env.db.customer.findUniqueOrThrow({ where: { id: customer.id } })).anonymizedAt);
   });
 
-  it("ausgeschaltete Funktionen werden nicht bereinigt (Hooks laufen nur für aktive Funktionen)", async () => {
+  it("ausgeschaltete Funktionen werden trotzdem bereinigt (Anonymisierungs-Hooks laufen mit always: die Daten blieben sonst in der Datenbank und kämen beim Einschalten zurück)", async () => {
     const { customer, appointment } = await customerWithData();
     await env.db.privacySettings.create({ data: { id: "default", retentionInvoiceYears: 1, retentionBooksYears: 1, retentionConfirmedAt: new Date(), retentionConfirmedByName: "Admin" } });
     await env.db.featureSetting.create({ data: { key: "workshop.appointments", enabled: false } });
     await login(["customers.privacy"]);
     await redirectOf(() => actions.anonymizeCustomer(form({ id: customer.id })));
-    assert.equal((await env.db.appointment.findUniqueOrThrow({ where: { id: appointment.id } })).notes, "Rückruf unter 0171 123");
+    const after = await env.db.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
+    assert.equal(after.notes, null);
+    assert.equal(after.title, "(anonymisiert)");
   });
 });
 
@@ -306,12 +308,12 @@ describe("Auskunft", () => {
     assert.equal(await env.db.auditLog.count({ where: { action: "customer.disclose" } }), 1);
   });
 
-  it("ausgeschaltete Funktionen liefern keine Daten (Termine aus): Abschnitt fehlt", async () => {
+  it("ausgeschaltete Funktionen gehören zur Auskunft (Termine aus): die Daten sind weiter gespeichert", async () => {
     const { customer } = await customerWithData();
     await env.db.featureSetting.create({ data: { key: "workshop.appointments", enabled: false } });
     await login(["customers.view", "customers.disclose"]);
     const { text } = await csvOf(customer.id);
-    assert.equal(text.includes("Meier Inspektion"), false);
+    assert.ok(text.includes("Meier Inspektion"));
     assert.ok(text.includes("B-AB 1"));
   });
 });
