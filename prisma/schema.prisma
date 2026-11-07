@@ -188,6 +188,9 @@ model TireSettings {
   treadReplaceMm      Float    @default(3.0)
   tireAgeWarnYears    Int      @default(6)
   tireAgeReplaceYears Int      @default(10)
+  // Winterfenster (Monate 1–12, einschließlich; Beginn nach Ende = über den Jahreswechsel): Standard Oktober bis März
+  winterStartMonth    Int      @default(10)
+  winterEndMonth      Int      @default(3)
   updatedAt           DateTime @updatedAt
 }
 
@@ -345,7 +348,7 @@ model TireSet {
   speedIndex      String?
   // none | steel | alloy
   rimType         String   @default("none")
-  // stored | mounted | disposed
+  // stored (im Lager) | mounted (ausgelagert, beim Kunden montiert) | disposed
   status          String   @default("stored")
   // Lagerort, z. B. "Halle A / Regal 3 / Fach 2"
   storageLocation String?

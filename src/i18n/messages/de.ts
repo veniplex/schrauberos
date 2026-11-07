@@ -281,6 +281,7 @@ export const de = {
       view: "Reifenlager ansehen",
       create: "Reifensätze einlagern",
       edit: "Reifensätze bearbeiten",
+      stock: "Reifensätze ein-/ausbuchen",
       delete: "Reifensätze löschen",
     },
     customers: {
@@ -426,7 +427,7 @@ export const de = {
     },
     appointmentKind: { general: "Allgemein", tire_change: "Reifenwechsel (Reifenliste)" },
     season: { summer: "Sommer", winter: "Winter", allseason: "Ganzjahr" },
-    tireSetStatus: { stored: "Eingelagert", mounted: "Ausgelagert", disposed: "Entsorgt" },
+    tireSetStatus: { stored: "Eingelagert", mounted: "Ausgelagert (beim Kunden montiert)", disposed: "Entsorgt" },
     rimType: { none: "Ohne Felgen", steel: "Stahlfelgen", alloy: "Alufelgen" },
     position: { FL: "Vorne links", FR: "Vorne rechts", RL: "Hinten links", RR: "Hinten rechts", SPARE: "Ersatzrad" },
     condition: { new: "Neu", good: "Gut", fair: "Ausreichend", worn: "Abgefahren", damaged: "Beschädigt" },

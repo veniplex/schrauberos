@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
-import { Badge, EmptyState, Plate, TextLink } from "@/components/ui/layout";
+import { EmptyState, Plate, StatusBadge, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { LinkButton } from "@/components/ui/buttons";
@@ -15,6 +15,8 @@ import { formatTireSize } from "@/modules/workshop/tires/domain";
 import { requirePermission } from "@/server/auth/session";
 import { bySeverity, listTireSets, type TireSetRow } from "@/modules/workshop/tires/queries";
 import { HealthBadge, SeasonBadge } from "@/modules/workshop/tires/ui";
+import { TIRE_SET_STATUS_TONE, WRONG_SEASON_TONE } from "@/modules/workshop/tires/status-tone";
+import type { TireSetStatus } from "@/modules/workshop/tires/constants";
 import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("nav.tires") };
 }
 
-type SearchParams = { q?: string; status?: string; season?: string; attention?: string; swap?: string; sort?: string; dir?: string; page?: string };
+type SearchParams = { q?: string; status?: string; season?: string; attention?: string; swap?: string; wrong?: string; sort?: string; dir?: string; page?: string };
 
 /** Durchsuchbar sind Kennzeichen, Anzeigename des Halters (Richtlinie D7), Fahrzeug, Marke/Modell und Lagerort – nichts davon braucht ein Recht über `tires.view` hinaus. */
 function haystack(s: TireSetRow) {
@@ -43,18 +45,22 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
   const i18n = await getI18n();
   const { t, tp, td, date } = i18n;
 
-  const status = sp.status && (sp.status === "all" || (TIRE_SET_STATUSES as readonly string[]).includes(sp.status)) ? sp.status : "stored";
+  // „Falsche Saison“ betrifft montierte Sätze: ohne eigene Statuswahl zeigt die Liste dann die ausgelagerten statt der eingelagerten
+  const status = sp.status && (sp.status === "all" || (TIRE_SET_STATUSES as readonly string[]).includes(sp.status)) ? sp.status : sp.wrong ? "mounted" : "stored";
   const season = sp.season && (TIRE_SEASONS as readonly string[]).includes(sp.season) ? sp.season : "";
   const q = (sp.q ?? "").trim().toLowerCase();
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT });
 
-  const all = await listTireSets(status === "all" ? {} : { status });
-  const attentionCount = all.filter((s) => s.status === "stored" && (s.health.health === "warn" || s.health.health === "replace")).length;
-  const swapCount = all.filter((s) => s.swapDue).length;
+  const every = await listTireSets();
+  const all = status === "all" ? every : every.filter((s) => s.status === status);
+  const attentionCount = every.filter((s) => s.status === "stored" && (s.health.health === "warn" || s.health.health === "replace")).length;
+  const swapCount = every.filter((s) => s.swapDue).length;
+  const wrongCount = every.filter((s) => s.wrongSeason).length;
 
   let rows = all.filter((s) => (!season || s.season === season) && (!q || haystack(s).includes(q)));
   if (sp.attention) rows = rows.filter((s) => s.health.health === "warn" || s.health.health === "replace");
   if (sp.swap) rows = rows.filter((s) => s.swapDue);
+  if (sp.wrong) rows = rows.filter((s) => s.wrongSeason);
   const sign = list.dir === "asc" ? 1 : -1;
   const byPlate = (a: TireSetRow, b: TireSetRow) => a.vehicle.plateNorm.localeCompare(b.vehicle.plateNorm) || a.season.localeCompare(b.season);
   const sorters: Record<SortKey, (a: TireSetRow, b: TireSetRow) => number> = {
@@ -73,10 +79,11 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
   const canPlan = session.can("appointments.create");
   const filters = {
     q: sp.q?.trim() || undefined,
-    status: sp.status && status !== "stored" ? status : undefined,
+    status: sp.status && status !== (sp.wrong ? "mounted" : "stored") ? status : undefined,
     season: season || undefined,
     attention: sp.attention ? "1" : undefined,
     swap: sp.swap ? "1" : undefined,
+    wrong: sp.wrong ? "1" : undefined,
   };
   const links = listLinks("/tires", filters, list, DEFAULT);
   const hasFilter = Boolean(filters.q || filters.status || filters.season);
@@ -100,9 +107,10 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
         label={t("tires.title")}
         className="mb-4"
         options={[
-          { href: "/tires", active: !sp.attention && !sp.swap, label: t("tires.filters.all") },
+          { href: "/tires", active: !sp.attention && !sp.swap && !sp.wrong, label: t("tires.filters.all") },
           { href: "/tires?attention=1", active: !!sp.attention, label: `${t("tires.filters.attention")} (${attentionCount})` },
           { href: "/tires?swap=1", active: !!sp.swap, label: `${t("tires.filters.swap")} (${swapCount})` },
+          { href: "/tires?wrong=1", active: !!sp.wrong, label: `${t("tires.filters.wrongSeason")} (${wrongCount})` },
         ]}
       />
 
@@ -111,11 +119,12 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
         columns="sm:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]"
         active={hasFilter}
         extrasOpen={Boolean(filters.status || filters.season)}
-        resetHref={listLinks("/tires", { attention: filters.attention, swap: filters.swap }, list, DEFAULT).pageHref(1)}
+        resetHref={listLinks("/tires", { attention: filters.attention, swap: filters.swap, wrong: filters.wrong }, list, DEFAULT).pageHref(1)}
         search={<SearchInput name="q" defaultValue={sp.q ?? ""} placeholder={t("tires.searchPlaceholder")} aria-label={t("common.search")} />}
       >
         {sp.attention ? <input type="hidden" name="attention" value="1" /> : null}
         {sp.swap ? <input type="hidden" name="swap" value="1" /> : null}
+        {sp.wrong ? <input type="hidden" name="wrong" value="1" /> : null}
         <Select name="status" defaultValue={status} aria-label={t("common.status")}>
           <option value="all">{t("tires.filters.anyStatus")}</option>
           {TIRE_SET_STATUSES.map((s) => (
@@ -173,7 +182,8 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
               <>
                 <div className="flex flex-wrap items-center gap-2">
                   <SeasonBadge season={s.season} td={td} />
-                  {s.status !== "stored" ? <Badge>{td(`enums.tireSetStatus.${s.status}`, s.status)}</Badge> : null}
+                  {s.status !== "stored" ? <StatusBadge tone={TIRE_SET_STATUS_TONE[s.status as TireSetStatus] ?? "neutral"}>{td(`enums.tireSetStatus.${s.status}`, s.status)}</StatusBadge> : null}
+                  {s.wrongSeason ? <StatusBadge tone={WRONG_SEASON_TONE}>{t("tires.wrongSeason.badge")}</StatusBadge> : null}
                 </div>
                 <p className="mt-1 text-sm">{[s.brand, s.model].filter(Boolean).join(" ") || "–"}</p>
                 <p className="text-xs text-ink-muted tabular">{formatTireSize(s)}</p>

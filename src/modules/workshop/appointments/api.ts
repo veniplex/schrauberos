@@ -7,8 +7,8 @@ import { dateOnly, iso, nullableString, optionalRef } from "@/server/api/format"
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { apiProblem } from "@/server/operations";
-import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES } from "./constants";
-import { createAppointmentOperation, deleteAppointmentOperation, updateAppointmentOperation } from "./operations";
+import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, QUICK_STATUSES } from "./constants";
+import { createAppointmentOperation, deleteAppointmentOperation, setAppointmentStatusOperation, updateAppointmentOperation } from "./operations";
 
 /**
  * API-Ressourcen „Termine“ (`/api/v1/appointments`) sowie die Nachschlagelisten Arbeitsplätze (`/bays`) und Terminarten (`/appointment-types`, nur lesend –
@@ -144,6 +144,17 @@ export const appointmentEndpoints = defineResource({
     rename: { duration: "durationMinutes" },
   },
   remove: { permission: "appointments.delete", operation: deleteAppointmentOperation },
+  actions: [
+    {
+      name: "status",
+      summary: "Quick status step: start (in_progress) or finish (done) an appointment; only the status changes (send the current ETag in If-Match)",
+      permission: "appointments.edit",
+      operation: setAppointmentStatusOperation,
+      body: z.strictObject({ status: z.enum(QUICK_STATUSES) }),
+      ifMatch: true,
+      toInput: (id, b, { version }) => ({ id, status: b.status, version }),
+    },
+  ],
 });
 
 const bayItem = z.object({ id: z.string(), name: z.string(), active: z.boolean(), sortOrder: z.number().int() });

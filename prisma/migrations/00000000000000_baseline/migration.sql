@@ -136,6 +136,8 @@ CREATE TABLE "TireSettings" (
     "treadReplaceMm" REAL NOT NULL DEFAULT 3.0,
     "tireAgeWarnYears" INTEGER NOT NULL DEFAULT 6,
     "tireAgeReplaceYears" INTEGER NOT NULL DEFAULT 10,
+    "winterStartMonth" INTEGER NOT NULL DEFAULT 10,
+    "winterEndMonth" INTEGER NOT NULL DEFAULT 3,
     "updatedAt" DATETIME NOT NULL
 );
 

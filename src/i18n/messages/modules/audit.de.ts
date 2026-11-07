@@ -97,6 +97,7 @@ export const auditDe = {
     appointment: {
       create: "Termin angelegt",
       update: "Termin geändert",
+      status: "Terminstatus geändert",
       delete: "Termin gelöscht",
     },
     customer: {
@@ -113,6 +114,8 @@ export const auditDe = {
     tires: {
       create: "Reifensatz angelegt",
       update: "Reifensatz geändert",
+      stock: "Reifensatz ein-/ausgebucht",
+      dispose: "Reifensatz als entsorgt markiert",
       delete: "Reifensatz gelöscht",
     },
     invoice: {

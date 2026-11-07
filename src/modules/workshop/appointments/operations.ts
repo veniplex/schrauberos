@@ -2,9 +2,9 @@ import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { isHexColor } from "@/lib/color";
-import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
+import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, QUICK_STATUSES } from "@/modules/workshop/appointments/constants";
 import { defineOperation, fail, failField, type RunContext } from "@/server/operations";
-import { appointmentWindow, findBayClash } from "./domain";
+import { appointmentWindow, findBayClash, quickStatusOptions } from "./domain";
 
 const appointmentInput = z.object({
   id: z.string().optional(),
@@ -99,6 +99,28 @@ export const updateAppointmentOperation = defineOperation({
   input: appointmentInput.refine((d) => !!d.id, { message: "validation.invalid", path: ["id"] }),
   audit: "appointment.update",
   run: saveAppointmentRun,
+});
+
+/**
+ * Schnellstatus: „Starten“ (In Arbeit) und „Fertig“ direkt auf Karte, Liste und Übersicht. Wie das Bearbeiten ein Recht `appointments.edit`, aber nur der Status
+ * ändert sich (Zeit, Arbeitsplatz und alles andere bleiben, deshalb keine Prüfung auf Doppelbelegung). `version` ist Pflicht: Hat jemand den Termin inzwischen
+ * geändert oder denselben Schritt schon getan, meldet die Aktion einen Konflikt statt still zu überschreiben. Erlaubt sind nur die Schritte aus `quickStatusOptions`.
+ */
+export const setAppointmentStatusOperation = defineOperation({
+  name: "appointments.setStatus",
+  permission: "appointments.edit",
+  input: z.object({ id: z.string().min(1), version: z.string().min(1), status: z.enum(QUICK_STATUSES) }),
+  audit: "appointment.status",
+  run: async ({ input, tx, audit }) => {
+    const appointment = await tx.appointment.findUnique({ where: { id: input.id }, select: { title: true, status: true } });
+    if (!appointment) fail("notFound");
+    if (appointment.status === input.status) fail("conflict");
+    if (!quickStatusOptions(appointment.status).includes(input.status)) fail("invalid", "appointments.errors.statusStep");
+    if (!(await claimRow(tx.appointment, input.id, input.version))) fail("conflict");
+    await tx.appointment.update({ where: { id: input.id }, data: { status: input.status } });
+    audit({ target: `${appointment.title}: ${input.status}`, entityId: input.id });
+    return { id: input.id, status: input.status };
+  },
 });
 
 export const deleteAppointmentOperation = defineOperation({

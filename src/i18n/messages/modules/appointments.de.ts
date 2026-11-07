@@ -64,6 +64,17 @@ export const appointmentsDe = {
   errors: {
     bayBusy: "Arbeitsplatz ist von {from|time} bis {to|time} belegt ({title}).",
     tireSetMismatch: "Der verknüpfte Reifensatz gehört nicht zu diesem Fahrzeug.",
+    statusStep: "Dieser Schritt ist von diesem Status aus nicht möglich.",
+  },
+  quickStatus: {
+    group: "Terminstatus",
+    start: "Starten",
+    startFor: "Starten: {title}",
+    finish: "Fertig",
+    finishFor: "Fertig: {title}",
+    startedMessage: "Termin gestartet.",
+    doneMessage: "Termin erledigt.",
+    open: "Termin öffnen",
   },
   widgets: {
     todayTitle: "Heutige Termine",

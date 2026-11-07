@@ -99,6 +99,7 @@ export const auditEn: typeof auditDe = {
     appointment: {
       create: "Appointment created",
       update: "Appointment changed",
+      status: "Appointment status changed",
       delete: "Appointment deleted",
     },
     customer: {
@@ -115,6 +116,8 @@ export const auditEn: typeof auditDe = {
     tires: {
       create: "Tyre set created",
       update: "Tyre set changed",
+      stock: "Tyre set booked in/out",
+      dispose: "Tyre set marked as disposed",
       delete: "Tyre set deleted",
     },
     invoice: {

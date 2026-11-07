@@ -65,6 +65,17 @@ export const appointmentsEn: typeof appointmentsDe = {
   errors: {
     bayBusy: "Bay is occupied from {from|time} to {to|time} ({title}).",
     tireSetMismatch: "The linked tire set does not belong to this vehicle.",
+    statusStep: "This step is not possible from the current status.",
+  },
+  quickStatus: {
+    group: "Appointment status",
+    start: "Start",
+    startFor: "Start: {title}",
+    finish: "Done",
+    finishFor: "Done: {title}",
+    startedMessage: "Appointment started.",
+    doneMessage: "Appointment done.",
+    open: "Open appointment",
   },
   widgets: {
     todayTitle: "Today's appointments",

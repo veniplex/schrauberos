@@ -48,7 +48,7 @@ export const DEFAULT_ROLES: Array<{
     description: "Kunden, Fahrzeuge, Termine und Reifenlager verwalten.",
     permissions: [
       "appointments.view", "appointments.create", "appointments.edit", "appointments.delete",
-      "tires.view", "tires.create", "tires.edit",
+      "tires.view", "tires.create", "tires.edit", "tires.stock",
       "customers.view", "customers.edit",
       "vehicles.view", "vehicles.edit",
       "handbook.view",
@@ -57,14 +57,16 @@ export const DEFAULT_ROLES: Array<{
   {
     key: "mechanic",
     name: "Mechaniker",
-    description: "Termine einsehen und Status pflegen, Reifenlager und Fahrzeuge einsehen, Handbuch lesen.",
-    permissions: ["appointments.view", "appointments.edit", "tires.view", "customers.view", "vehicles.view", "handbook.view"],
+    description: "Termine einsehen und Status pflegen, Reifensätze ein-/ausbuchen, Reifenlager und Fahrzeuge einsehen, Handbuch lesen.",
+    // `tires.stock` (Ein-/Ausbuchen) gehört ausdrücklich dazu: Wer den Wechsel am Fahrzeug macht, bucht den Satz um (Vorschlag nach dem erledigten Termin). Das ist kein
+    // sensibles/Export-/Verwaltungsrecht (Regel 9) und gibt nicht das Bearbeiten (`tires.edit`) oder Löschen von Sätzen frei.
+    permissions: ["appointments.view", "appointments.edit", "tires.view", "tires.stock", "customers.view", "vehicles.view", "handbook.view"],
   },
   {
     key: "warehouse",
     name: "Lager",
     description: "Reifenlager pflegen.",
-    permissions: ["tires.view", "tires.create", "tires.edit", "tires.delete", "customers.view", "vehicles.view", "appointments.view", "handbook.view"],
+    permissions: ["tires.view", "tires.create", "tires.edit", "tires.stock", "tires.delete", "customers.view", "vehicles.view", "appointments.view", "handbook.view"],
   },
   {
     key: "it_admin",

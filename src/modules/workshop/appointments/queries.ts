@@ -8,6 +8,10 @@ export const appointmentInclude = {
   customer: true,
   vehicle: { include: { customer: true } },
   assignee: { select: { id: true, name: true } },
+  // Verknüpfter Reifensatz: nur, was der Vorschlag „Satz ein-/ausbuchen?“ nach „Fertig“ braucht (Stand, Version, Bezeichnung)
+  tireSet: {
+    select: { id: true, status: true, season: true, brand: true, width: true, aspect: true, rim: true, loadIndex: true, speedIndex: true, updatedAt: true, vehicle: { select: { plate: true } } },
+  },
 } as const;
 
 export function appointmentsBetween(from: Date, to: Date) {

@@ -81,7 +81,7 @@ export async function TireSwapWidget() {
           <ul className="divide-y divide-line">
             {sets.slice(0, LIMIT).map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                <div className="min-w-0">
+                <Link href={`/tires/${s.id}`} className="block min-h-(--tap-row) min-w-0 flex-1 hover:underline">
                   <div className="flex items-center gap-2">
                     <Plate>{s.vehicle.plate}</Plate>
                     <span className="truncate text-sm">{customerDisplayName(s.vehicle.customer)}</span>
@@ -90,7 +90,7 @@ export async function TireSwapWidget() {
                     <SeasonBadge season={s.season} td={td} />
                     <span className="truncate">{s.storageLocation}</span>
                   </p>
-                </div>
+                </Link>
                 {canPlan ? (
                   <LinkButton size="sm" href={`/appointments?new=1&tireSet=${s.id}`}>
                     {t("tires.planChange")}
@@ -105,8 +105,51 @@ export async function TireSwapWidget() {
   );
 }
 
+/** Montierte Sätze, die nicht zur Jahreszeit passen (Winterreifen im Sommer und umgekehrt) – Ganzjahressätze nie. */
+export async function TireWrongSeasonWidget() {
+  const { t, tp, td } = await getI18n();
+  const sets = (await listTireSets({ status: "mounted" })).filter((s) => s.wrongSeason);
+
+  return (
+    <Card headingLevel={3}
+      title={t("tires.widgets.wrongTitle")}
+      actions={
+        <TextLink href="/tires?wrong=1" className="text-sm">
+          {t("common.showAll")}
+        </TextLink>
+      }
+      padded={false}
+    >
+      {sets.length === 0 ? (
+        <EmptyState title={t("tires.widgets.wrongEmpty")} />
+      ) : (
+        <>
+          <p className="px-5 pt-3 text-sm text-ink-muted">{tp("tires.widgets.wrongCount", sets.length)}</p>
+          <ul className="divide-y divide-line">
+            {sets.slice(0, LIMIT).map((s) => (
+              <li key={s.id}>
+                <Link href={`/tires/${s.id}`} className="flex min-h-(--tap-row) items-center justify-between gap-3 px-5 py-3 hover:bg-surface-hover">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Plate>{s.vehicle.plate}</Plate>
+                      <span className="truncate text-sm">{customerDisplayName(s.vehicle.customer)}</span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-ink-muted">{[s.brand, formatTireSize(s)].filter((part) => part && part !== "–").join(" · ")}</p>
+                  </div>
+                  <SeasonBadge season={s.season} td={td} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Card>
+  );
+}
+
 /** Dashboard-Bausteine dieser Funktion (von der Registry eingesammelt). */
 export const widgets: WidgetDef[] = [
   { id: "tire-attention", feature: "workshop.tires", permission: "tires.view", span: 1, order: 20, Component: TireAttentionWidget },
   { id: "tire-swap", feature: "workshop.tires", permission: "tires.view", span: 1, order: 21, Component: TireSwapWidget },
+  { id: "tire-wrong-season", feature: "workshop.tires", permission: "tires.view", span: 1, order: 22, Component: TireWrongSeasonWidget },
 ];

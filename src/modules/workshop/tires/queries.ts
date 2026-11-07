@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/server/db";
 import { getTireRules } from "./settings";
-import { minTread, setHealth, wantedSeason, type Health, type TireHealth } from "@/modules/workshop/tires/domain";
+import { isWrongSeason, minTread, setHealth, wantedSeason, type Health, type TireHealth } from "@/modules/workshop/tires/domain";
 
 const OPEN_APPOINTMENT = { notIn: ["cancelled", "done", "no_show"] };
 
@@ -10,6 +10,8 @@ export type TireSetRow = Awaited<ReturnType<typeof loadSets>>[number] & {
   minTreadMm: number | null;
   /** Lagert und die aktuell passende Saison – Wechsel steht an */
   swapDue: boolean;
+  /** Montiert (beim Kunden), aber zur Jahreszeit passt der andere Satz – Hinweis in Liste und Übersicht */
+  wrongSeason: boolean;
   nextAppointment: { id: string; startsAt: Date } | null;
 };
 
@@ -32,8 +34,8 @@ function loadSets(where: object = {}) {
 /** Reifensätze inkl. berechnetem Zustand (Profil/Alter/Zustand) und Wechsel-Hinweis. */
 export async function listTireSets(where: object = {}): Promise<TireSetRow[]> {
   const [sets, rules] = await Promise.all([loadSets(where), getTireRules()]);
-  const season = wantedSeason();
   const now = new Date();
+  const season = wantedSeason(now, rules);
   return sets.map((s) => {
     const nextAppointment = s.appointments[0] ?? null;
     return {
@@ -41,6 +43,7 @@ export async function listTireSets(where: object = {}): Promise<TireSetRow[]> {
       health: setHealth(s.tires, rules, now),
       minTreadMm: minTread(s.tires),
       swapDue: s.status === "stored" && s.season === season && !nextAppointment,
+      wrongSeason: isWrongSeason(s, season),
       nextAppointment,
     };
   });

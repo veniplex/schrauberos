@@ -2,20 +2,22 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Pencil } from "lucide-react";
-import { Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
+import { Alert, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
-import { formatTireSize, setHealth, tireHealth } from "@/modules/workshop/tires/domain";
+import { formatTireSize, isWrongSeason, pendingStockBooking, setHealth, tireHealth, wantedSeason } from "@/modules/workshop/tires/domain";
 import { getTireRules } from "@/modules/workshop/tires/settings";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { deleteTireSet, setTireSetStatus } from "@/modules/workshop/tires/actions";
+import { deleteTireSet, disposeTireSet, setTireSetStatus } from "@/modules/workshop/tires/actions";
+import { versionOf } from "@/lib/concurrency";
+import { AppointmentQuickStatus } from "@/modules/workshop/appointments/public";
 import { HealthBadge, SeasonBadge } from "@/modules/workshop/tires/ui";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
-import { TIRE_SET_STATUS_TONE } from "@/modules/workshop/tires/status-tone";
+import { TIRE_SET_STATUS_TONE, WRONG_SEASON_TONE } from "@/modules/workshop/tires/status-tone";
 import type { TireSetStatus } from "@/modules/workshop/tires/constants";
 import { toDateInput } from "@/lib/dates";
 
@@ -53,7 +55,12 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
   const byPos = new Map(set.tires.map((x) => [x.position, x]));
   const spare = byPos.get("SPARE");
   const canEdit = session.can("tires.edit");
+  const canStock = session.can("tires.stock");
   const storedDays = daysSince(set.storedAt);
+  const now = new Date();
+  const wrongSeason = isWrongSeason(set, wantedSeason(now, tireRules));
+  const pending = canStock ? pendingStockBooking(set, set.appointments, now) : null;
+  const version = versionOf(set);
 
   const tile = (pos: string) => {
     const tire = byPos.get(pos);
@@ -99,6 +106,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
             <SeasonBadge season={set.season} td={td} />
             <span className="tabular">{formatTireSize(set)}</span>
             <StatusBadge tone={TIRE_SET_STATUS_TONE[set.status as TireSetStatus] ?? "neutral"}>{td(`enums.tireSetStatus.${set.status}`, set.status)}</StatusBadge>
+            {wrongSeason ? <StatusBadge tone={WRONG_SEASON_TONE}>{t("tires.wrongSeason.badge")}</StatusBadge> : null}
             <HealthBadge health={overall.health} t={t} />
           </span>
         }
@@ -117,6 +125,12 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
           </>
         }
       />
+
+      {pending ? (
+        <Alert tone="info" className="mb-5">
+          {t("tires.stock.pending", { date: date(pending.startsAt, { dateStyle: "medium" }) })}
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="flex flex-col gap-5 md:col-span-2">
@@ -141,7 +155,10 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
                       <span className="tabular font-medium">{date(a.startsAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                       <span className="ml-2">{a.title}</span>
                     </Link>
-                    <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
+                    <span className="flex flex-wrap items-center justify-end gap-2">
+                      <AppointmentQuickStatus a={{ ...a, tireSet: set }} canEdit={session.can("appointments.edit")} canStock={canStock} i18n={i18n} />
+                      <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -185,27 +202,29 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
             {set.vehicle.customer?.phone ? <p className="mt-1 text-sm">{set.vehicle.customer.phone}</p> : null}
           </Card>
 
-          {canEdit ? (
+          {canStock || canEdit ? (
             <Card title={t("common.actions")}>
               <div className="flex flex-wrap gap-2">
-                {canEdit && set.status === "stored" ? (
+                {canStock && set.status === "stored" ? (
                   <form action={setTireSetStatus}>
                     <input type="hidden" name="id" value={set.id} />
+                    <input type="hidden" name="version" value={version} />
                     <input type="hidden" name="status" value="mounted" />
                     <SubmitButton variant="secondary" size="sm">{t("tires.actions.handOut")}</SubmitButton>
                   </form>
                 ) : null}
-                {canEdit && set.status === "mounted" ? (
+                {canStock && set.status === "mounted" ? (
                   <form action={setTireSetStatus}>
                     <input type="hidden" name="id" value={set.id} />
+                    <input type="hidden" name="version" value={version} />
                     <input type="hidden" name="status" value="stored" />
                     <SubmitButton variant="secondary" size="sm">{t("tires.actions.store")}</SubmitButton>
                   </form>
                 ) : null}
                 {canEdit && set.status !== "disposed" ? (
-                  <form action={setTireSetStatus}>
+                  <form action={disposeTireSet}>
                     <input type="hidden" name="id" value={set.id} />
-                    <input type="hidden" name="status" value="disposed" />
+                    <input type="hidden" name="version" value={version} />
                     <ConfirmSubmitButton message={t("tires.actions.disposeConfirm")} variant="secondary">{t("tires.actions.dispose")}</ConfirmSubmitButton>
                   </form>
                 ) : null}

@@ -281,6 +281,7 @@ export const en: Messages = {
       view: "View tyre storage",
       create: "Store tyre sets",
       edit: "Edit tyre sets",
+      stock: "Book tyre sets in and out",
       delete: "Delete tyre sets",
     },
     customers: {
@@ -426,7 +427,7 @@ export const en: Messages = {
     },
     appointmentKind: { general: "General", tire_change: "Tyre change (tyre list)" },
     season: { summer: "Summer", winter: "Winter", allseason: "All-season" },
-    tireSetStatus: { stored: "Stored", mounted: "Handed out", disposed: "Disposed" },
+    tireSetStatus: { stored: "Stored", mounted: "Checked out (mounted at customer)", disposed: "Disposed" },
     rimType: { none: "No rims", steel: "Steel rims", alloy: "Alloy rims" },
     position: { FL: "Front left", FR: "Front right", RL: "Rear left", RR: "Rear right", SPARE: "Spare wheel" },
     condition: { new: "New", good: "Good", fair: "Fair", worn: "Worn", damaged: "Damaged" },

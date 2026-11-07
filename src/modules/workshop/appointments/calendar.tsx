@@ -13,6 +13,7 @@ import { weekdayKey, type OpeningHours } from "@/lib/opening-hours";
 import type { AppointmentRow } from "./queries";
 import { assignLanes } from "./calendar-layout";
 import { LinkButton } from "@/components/ui/buttons";
+import { AppointmentQuickStatus } from "./appointment-quick-status";
 
 export type CalendarView = "week" | "day" | "list";
 
@@ -23,6 +24,8 @@ type Ctx = {
   date: Date;
   canCreate: boolean;
   canEdit: boolean;
+  /** Darf Reifensätze ein-/ausbuchen (Recht `tires.stock`, nur bei aktiver Reifenfunktion): Vorschlag nach „Fertig“ */
+  canStock: boolean;
   hours: OpeningHours;
   dayStartHour: number;
   dayEndHour: number;
@@ -383,7 +386,10 @@ export function ListView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
                     <td className="text-ink-muted">{a.bay?.name}</td>
                     <td className="text-ink-muted">{a.assignee?.name}</td>
                     <td className="text-right">
-                      <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
+                      <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                        <AppointmentQuickStatus a={a} canEdit={ctx.canEdit} canStock={ctx.canStock} i18n={ctx.i18n} />
+                        <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
+                      </span>
                     </td>
                   </tr>
                 ))}

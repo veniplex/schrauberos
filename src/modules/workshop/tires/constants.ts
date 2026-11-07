@@ -1,6 +1,10 @@
 export const TIRE_SEASONS = ["summer", "winter", "allseason"] as const;
 export type TireSeason = (typeof TIRE_SEASONS)[number];
 
+/**
+ * Zustand eines Satzes: `stored` = im Lager; `mounted` = **ausgelagert, beim Kunden montiert** (der Satz ist am Fahrzeug, nicht im Lager); `disposed` = entsorgt.
+ * Der Wert `mounted` ist Teil der API und bleibt; „Ausgelagert (beim Kunden montiert)“ ist nur seine eindeutige Benennung (i18n `enums.tireSetStatus`).
+ */
 export const TIRE_SET_STATUSES = ["stored", "mounted", "disposed"] as const;
 export type TireSetStatus = (typeof TIRE_SET_STATUSES)[number];
 

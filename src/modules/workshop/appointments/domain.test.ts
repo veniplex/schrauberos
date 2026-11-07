@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { appointmentWindow, BAY_FREE_STATUSES, findBayClash, intervalsOverlap, occupiesBay, type BayBooking } from "./domain";
+import { APPOINTMENT_STATUSES } from "./constants";
+import { appointmentWindow, BAY_FREE_STATUSES, findBayClash, intervalsOverlap, occupiesBay, quickStatusOptions, type BayBooking } from "./domain";
 
 /** Terminkonflikt-Logik (reine Funktionen): Zeitfenster aus Formularwerten und Doppelbelegung eines Arbeitsplatzes. */
 const at = (hhmm: string) => new Date(`2030-05-06T${hhmm}:00`);
@@ -122,5 +123,19 @@ describe("Zeitumstellung (Europe/Berlin)", () => {
     const w = appointmentWindow("2030-03-31", "01:30", 120)!;
     assert.equal(w.endsAt.getHours(), 4, "120 echte Minuten ab 01:30 (MEZ) sind 04:30 MESZ");
     assert.equal(w.endsAt.getMinutes(), 30);
+  });
+});
+
+describe("quickStatusOptions (Schnellstatus)", () => {
+  it("Geplant/Bestätigt: Starten oder gleich Fertig; In Arbeit: Fertig", () => {
+    assert.deepEqual(quickStatusOptions("scheduled"), ["in_progress", "done"]);
+    assert.deepEqual(quickStatusOptions("confirmed"), ["in_progress", "done"]);
+    assert.deepEqual(quickStatusOptions("in_progress"), ["done"]);
+  });
+  it("Erledigt, Storniert, Nicht erschienen und Unbekanntes haben keinen Schnellschritt", () => {
+    for (const status of ["done", "cancelled", "no_show", "irgendwas"]) assert.deepEqual(quickStatusOptions(status), [], status);
+  });
+  it("jeder Zustand ist bedacht: Schritte führen nie in einen Zustand, der sie wieder anbietet", () => {
+    for (const status of APPOINTMENT_STATUSES) for (const next of quickStatusOptions(status)) assert.notEqual(next, status);
   });
 });

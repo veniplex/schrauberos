@@ -7,6 +7,7 @@ POST /appointments appointments.create appointments.create body=title,typeId,veh
 GET /appointments/{id} appointments.get appointments.view
 PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId,vehicleId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
 DELETE /appointments/{id} appointments.delete appointments.delete
+POST /appointments/{id}/status appointments.status appointments.edit body=status
 GET /customers customers.list customers.view query=q,city sort=lastName,customerNumber,city,createdAt,updatedAt
 POST /customers customers.create customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
 GET /customers/{id} customers.get customers.view
@@ -83,7 +84,8 @@ POST /tire-sets tire-sets.create tires.create body=vehicleId,season,status,brand
 GET /tire-sets/{id} tire-sets.get tires.view
 PATCH /tire-sets/{id} tire-sets.update tires.edit body=vehicleId,season,status,brand,model,width,aspect,rim,loadIndex,speedIndex,rimType,storageLocation,storedAt,notes,spare,tires
 DELETE /tire-sets/{id} tire-sets.delete tires.delete
-POST /tire-sets/{id}/status tire-sets.status tires.edit body=status
+POST /tire-sets/{id}/dispose tire-sets.dispose tires.edit
+POST /tire-sets/{id}/status tire-sets.status tires.stock body=status
 GET /vehicles vehicles.list vehicles.view query=q,customerId sort=plate,make,year,createdAt,updatedAt
 POST /vehicles vehicles.create vehicles.edit body=customerId,plate,make,model,vin,year,notes
 GET /vehicles/{id} vehicles.get vehicles.view

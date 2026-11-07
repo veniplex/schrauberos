@@ -60,6 +60,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
     date,
     canCreate,
     canEdit,
+    canStock: session.can("tires.stock"),
     hours: workshop.hours,
     dayStartHour: settings.dayStartHour,
     dayEndHour: settings.dayEndHour,

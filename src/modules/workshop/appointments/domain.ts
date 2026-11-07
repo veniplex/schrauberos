@@ -1,4 +1,5 @@
 import { parseLocalDateTime } from "@/lib/dates";
+import type { QuickStatus } from "./constants";
 
 /**
  * Reine Terminlogik (ohne Datenbank, deshalb gezielt testbar): Zeitfenster aus Formularwerten und Doppelbelegung eines Arbeitsplatzes.
@@ -9,6 +10,16 @@ export const BAY_FREE_STATUSES: readonly string[] = ["cancelled", "no_show"];
 
 /** Belegt ein Termin mit diesem Status seinen Arbeitsplatz? */
 export const occupiesBay = (status: string): boolean => !BAY_FREE_STATUSES.includes(status);
+
+/**
+ * Welche Schnellstatus-Schritte sind von diesem Zustand aus möglich? Geplant/Bestätigt → „Starten“ (In Arbeit) oder gleich „Fertig“, In Arbeit → „Fertig“;
+ * erledigte, stornierte und nicht erschienene Termine haben keinen Schnellschritt (Korrektur nur über das Bearbeiten).
+ */
+export function quickStatusOptions(status: string): QuickStatus[] {
+  if (status === "scheduled" || status === "confirmed") return ["in_progress", "done"];
+  if (status === "in_progress") return ["done"];
+  return [];
+}
 
 export type Interval = { startsAt: Date; endsAt: Date };
 

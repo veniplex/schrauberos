@@ -88,7 +88,16 @@ describe("Termine", () => {
     assert.equal(clash.json.fields.bayId.code, "appointments.errors.bayBusy");
     // direkt anschließend ist frei; abgesagte Termine geben den Arbeitsplatz frei
     assert.equal((await api("POST", "/appointments", { body: { ...body, title: "Danach", time: "10:00" } })).status, 201);
-    assert.equal((await api("PATCH", `/appointments/${appt.id}`, { body: { status: "cancelled" }, headers: ifMatch(appt) })).status, 200);
+    // Schnellstatus: Starten/Fertig mit If-Match, nur diese beiden Schritte
+    assert.equal((await api("POST", `/appointments/${appt.id}/status`, { body: { status: "in_progress" } })).status, 428);
+    assert.equal((await api("POST", `/appointments/${appt.id}/status`, { body: { status: "cancelled" }, headers: ifMatch(appt) })).status, 422);
+    const started = await api("POST", `/appointments/${appt.id}/status`, { body: { status: "in_progress" }, headers: ifMatch(appt) });
+    assert.equal(started.status, 200);
+    assert.equal(started.json.data.status, "in_progress");
+    assert.equal((await api("POST", `/appointments/${appt.id}/status`, { body: { status: "done" }, headers: ifMatch(appt) })).status, 412, "veralteter Stand");
+    const finished = await api("POST", `/appointments/${appt.id}/status`, { body: { status: "done" }, headers: ifMatch(started.json.data) });
+    assert.equal(finished.json.data.status, "done");
+    assert.equal((await api("PATCH", `/appointments/${appt.id}`, { body: { status: "cancelled" }, headers: ifMatch(finished.json.data) })).status, 200);
     assert.equal((await api("POST", "/appointments", { body: { ...body, title: "Frei", time: "09:00" } })).status, 201);
 
     const invalid = await api("POST", "/appointments", { body: { ...body, durationMinutes: 1 } });
@@ -138,10 +147,20 @@ describe("Reifensätze", () => {
     assert.equal(withSpare.json.data.tires.length, 5);
     assert.equal(withSpare.json.data.tires[0].treadDepthMm, 7.5, "bestehende Werte bleiben beim Teil-Update");
 
-    const mounted = await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "mounted" } });
+    // Ein-/Ausbuchen verlangt den ETag (If-Match) – wie das Ändern; Entsorgen ist eine eigene Aktion
+    const current = withSpare.json.data as Json;
+    assert.equal((await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "mounted" } })).status, 428);
+    assert.equal((await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "mounted" }, headers: { "if-match": '"1"' } })).status, 412);
+    assert.equal((await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "kaputt" }, headers: ifMatch(current) })).status, 422);
+    assert.equal((await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "disposed" }, headers: ifMatch(current) })).status, 422, "Entsorgen ist kein Buchen");
+    const mounted = await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "mounted" }, headers: ifMatch(current) });
+    assert.equal(mounted.status, 200);
     assert.equal(mounted.json.data.status, "mounted");
-    assert.equal((await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "kaputt" } })).status, 422);
+    assert.equal((await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "mounted" }, headers: ifMatch(current) })).status, 412, "derselbe Stand nochmals: veraltet");
     assert.equal((await api("GET", `/tire-sets?vehicleId=${vehicle.id}&status=mounted`)).json.page.total, 1);
+    const disposed = await api("POST", `/tire-sets/${set.id}/dispose`, { headers: ifMatch(mounted.json.data) });
+    assert.equal(disposed.json.data.status, "disposed");
+    assert.equal((await api("POST", `/tire-sets/${set.id}/status`, { body: { status: "stored" }, headers: ifMatch(disposed.json.data) })).status, 422, "entsorgt: nicht buchbar");
     assert.equal((await api("DELETE", `/tire-sets/${set.id}`)).status, 204);
     assert.equal(await env.db.tire.count(), 0);
   });

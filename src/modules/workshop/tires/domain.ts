@@ -1,17 +1,23 @@
-import { TIRE_CONDITIONS, TIRE_POSITIONS, type TireCondition, type TirePosition } from "./constants";
+import { TIRE_CONDITIONS, TIRE_POSITIONS, type TireCondition, type TirePosition, type TireSetStatus } from "./constants";
 
-export type TireRules = {
+/** Winterfenster in Kalendermonaten (1–12), beide einschließlich. Liegt der Beginn nach dem Ende, geht das Fenster über den Jahreswechsel (Standard: Oktober bis März). */
+export type SeasonWindow = { winterStartMonth: number; winterEndMonth: number };
+
+export type TireRules = SeasonWindow & {
   treadWarnMm: number;
   treadReplaceMm: number;
   tireAgeWarnYears: number;
   tireAgeReplaceYears: number;
 };
 
+export const DEFAULT_SEASON_WINDOW: SeasonWindow = { winterStartMonth: 10, winterEndMonth: 3 };
+
 export const DEFAULT_TIRE_RULES: TireRules = {
   treadWarnMm: 4,
   treadReplaceMm: 3,
   tireAgeWarnYears: 6,
   tireAgeReplaceYears: 10,
+  ...DEFAULT_SEASON_WINDOW,
 };
 
 /** "2321" -> Woche 23 / Jahr 2021. Liefert null bei ungültigem DOT-Kürzel. */
@@ -126,10 +132,56 @@ export function minTread(tires: { treadDepthMm: number | null }[]): number | nul
   return values.length ? Math.min(...values) : null;
 }
 
-/** Welche Saison sollte jetzt montiert sein? Okt–Mär Winter, sonst Sommer. */
-export function wantedSeason(now = new Date()): "summer" | "winter" {
-  const m = now.getMonth(); // 0 = Jan
-  return m >= 9 || m <= 2 ? "winter" : "summer";
+/** Welche Saison sollte jetzt montiert sein? Im Winterfenster (Standard Okt–Mär) Winter, sonst Sommer. */
+export function wantedSeason(now = new Date(), window: SeasonWindow = DEFAULT_SEASON_WINDOW): "summer" | "winter" {
+  const month = now.getMonth() + 1; // 1 = Jan
+  const { winterStartMonth: from, winterEndMonth: to } = window;
+  const winter = from <= to ? month >= from && month <= to : month >= from || month <= to;
+  return winter ? "winter" : "summer";
+}
+
+/**
+ * Ist ein Fenster zulässig? Beginn und Ende sind Monate 1–12; das Fenster darf nicht das ganze Jahr umfassen (Beginn = Ende + 1), sonst gäbe es nie Sommer.
+ * Beginn = Ende ist ein einzelner Monat.
+ */
+export function isValidSeasonWindow({ winterStartMonth: from, winterEndMonth: to }: SeasonWindow): boolean {
+  const month = (m: number) => Number.isInteger(m) && m >= 1 && m <= 12;
+  return month(from) && month(to) && from !== (to % 12) + 1;
+}
+
+/**
+ * Montiert, aber zur Jahreszeit passt der andere Satz? Nur Sommer-/Winter-Sätze beim Kunden (`mounted`) zählen – Ganzjahressätze passen immer, gelagerte
+ * und entsorgte Sätze sind kein Thema.
+ */
+export function isWrongSeason(set: { status: string; season: string }, wanted: "summer" | "winter"): boolean {
+  return set.status === "mounted" && (set.season === "summer" || set.season === "winter") && set.season !== wanted;
+}
+
+/** So lange nach dem Erledigen eines Wechseltermins mahnt der Satz noch, dass er nicht gebucht wurde. */
+export const PENDING_STOCK_DAYS = 30;
+
+/**
+ * Ist ein Wechseltermin erledigt, ohne dass der verknüpfte Satz danach gebucht wurde? Der jüngste erledigte Termin der letzten `PENDING_STOCK_DAYS` Tage zählt; „nicht gebucht“
+ * heißt: Der Satz wurde seit dem Erledigen nicht mehr angefasst (`updatedAt` des Satzes vor dem des Termins) und ist buchbar (nicht entsorgt). Eine Näherung – jede spätere
+ * Änderung am Satz nimmt den Hinweis zurück.
+ */
+export function pendingStockBooking<A extends { status: string; startsAt: Date; updatedAt: Date }>(
+  set: { status: string; updatedAt: Date },
+  appointments: readonly A[],
+  now = new Date(),
+): A | null {
+  if (suggestedStockStatus(set.status) === null) return null;
+  const since = now.getTime() - PENDING_STOCK_DAYS * 86_400_000;
+  const done = appointments.filter((a) => a.status === "done" && a.updatedAt.getTime() >= since).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())[0];
+  return done && set.updatedAt.getTime() < done.updatedAt.getTime() ? done : null;
+}
+
+/**
+ * Was schlägt „Satz jetzt ein-/ausbuchen?“ nach einem erledigten Wechseltermin vor? Ein gelagerter Satz wird ausgebucht (`mounted`: geht ans Fahrzeug),
+ * ein ausgelagerter wieder eingebucht (`stored`: kommt zurück ins Lager); ein entsorgter Satz lässt sich nicht buchen (null).
+ */
+export function suggestedStockStatus(status: string): Extract<TireSetStatus, "stored" | "mounted"> | null {
+  return status === "stored" ? "mounted" : status === "mounted" ? "stored" : null;
 }
 
 export function formatTireSize(s: {

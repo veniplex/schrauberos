@@ -59,7 +59,7 @@ export async function seedDemo(db: PrismaClient) {
 
   // Reifensätze – bewusst mit unterschiedlichem Zustand, damit Warnungen sichtbar werden
   const sets: Array<{
-    plate: string; season: string; brand: string; model: string; w: number; a: number; r: number; rim: string; loc: string;
+    plate: string; season: string; brand: string; model: string; w: number; a: number; r: number; rim: string; loc: string; status?: string;
     tires: Array<{ pos: string; week: number; year: number; tread: number; cond: string }>;
   }> = [
     { plate: "B-AB 1234", season: "winter", brand: "Continental", model: "WinterContact TS 870", w: 205, a: 55, r: 16, rim: "alloy", loc: "Halle A / Regal 1 / Fach 3",
@@ -73,6 +73,9 @@ export async function seedDemo(db: PrismaClient) {
       tires: ["FL", "FR", "RL", "RR"].map((pos) => ({ pos, week: 41, year: 2016, tread: 2.6, cond: "worn" })) },
     { plate: "B-EY 2020", season: "winter", brand: "Bridgestone", model: "Blizzak LM005", w: 205, a: 60, r: 16, rim: "none", loc: "Halle B / Regal 5 / Fach 2",
       tires: ["FL", "FR", "RL", "RR"].map((pos) => ({ pos, week: 44, year: 2023, tread: 7.4, cond: "new" })) },
+    // Sommersatz, der gerade am Fahrzeug montiert ist (ausgelagert): im Winter zeigt er den Hinweis „Falsche Saison“, nach dem Wechsel liegt er wieder im Lager
+    { plate: "B-AB 1234", season: "summer", brand: "Pirelli", model: "Cinturato P7", w: 205, a: 55, r: 16, rim: "steel", loc: "beim Kunden montiert", status: "mounted",
+      tires: ["FL", "FR", "RL", "RR"].map((pos) => ({ pos, week: 18, year: 2022, tread: 5.2, cond: "good" })) },
     { plate: "B-AN 100", season: "allseason", brand: "Vredestein", model: "Quatrac Pro", w: 235, a: 65, r: 16, rim: "steel", loc: "Halle B / Regal 1 / Fach 1",
       tires: ["FL", "FR", "RL", "RR"].map((pos) => ({ pos, week: 8, year: 2020, tread: 4.4, cond: "good" })) },
     { plate: "HVL-JK 77", season: "summer", brand: "Hankook", model: "Ventus Prime 3", w: 205, a: 55, r: 16, rim: "alloy", loc: "Halle A / Regal 3 / Fach 2",
@@ -89,7 +92,7 @@ export async function seedDemo(db: PrismaClient) {
       data: {
         vehicleId: vehicleIds[s.plate],
         season: s.season, brand: s.brand, model: s.model, width: s.w, aspect: s.a, rim: s.r, rimType: s.rim,
-        storageLocation: s.loc, status: "stored", storedAt: addDays(new Date(), -120),
+        storageLocation: s.loc, status: s.status ?? "stored", storedAt: addDays(new Date(), -120),
         tires: {
           create: s.tires.map((t) => ({
             position: t.pos, ...dot(t.week, t.year), treadDepthMm: t.tread, condition: t.cond, measuredAt: addDays(new Date(), -120),
@@ -119,6 +122,8 @@ export async function seedDemo(db: PrismaClient) {
   for (const a of appts) {
     const start = at(a.day, a.h, a.m);
     const vehicle = await db.vehicle.findUniqueOrThrow({ where: { id: vehicleIds[a.plate] } });
+    // Reifenwechsel hängen am eingelagerten Satz des Fahrzeugs (zeigt nach „Fertig“ den Vorschlag „Satz ausbuchen?“)
+    const tireSet = a.type === "Reifenwechsel" ? await db.tireSet.findFirst({ where: { vehicleId: vehicle.id, status: "stored" } }) : null;
     await db.appointment.create({
       data: {
         title: type(a.type).name,
@@ -129,6 +134,7 @@ export async function seedDemo(db: PrismaClient) {
         bayId: bays[a.bay]?.id,
         vehicleId: vehicle.id,
         customerId: vehicle.customerId,
+        tireSetId: tireSet?.id,
       },
     });
   }

@@ -5,7 +5,7 @@ import { dateOnly, day, iso, nullableString, oneOf, requiredRef } from "@/server
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "./constants";
-import { createTireSetOperation, deleteTireSetOperation, setStatusOperation, updateTireSetOperation } from "./operations";
+import { createTireSetOperation, deleteTireSetOperation, disposeOperation, setStatusOperation, STOCK_STATUSES, updateTireSetOperation } from "./operations";
 
 /**
  * API-Ressource „Reifensätze“ (`/api/v1/tire-sets`). Die Einzelreifen stecken im Satz (`tires`, je Position ein Eintrag; `SPARE` nur mit `spare: true`);
@@ -163,11 +163,20 @@ export const endpoints = defineResource({
   actions: [
     {
       name: "status",
-      summary: "Set the status of a tire set (stored, mounted, disposed)",
-      permission: "tires.edit",
+      summary: "Book a tire set in or out (stored = back in storage, mounted = checked out, mounted at the customer; send the current ETag in If-Match)",
+      permission: "tires.stock",
       operation: setStatusOperation,
-      body: z.strictObject({ status: z.enum(TIRE_SET_STATUSES) }),
-      toInput: (id, b) => ({ id, status: b.status }),
+      body: z.strictObject({ status: z.enum(STOCK_STATUSES) }),
+      ifMatch: true,
+      toInput: (id, b, { version }) => ({ id, status: b.status, version }),
+    },
+    {
+      name: "dispose",
+      summary: "Mark a tire set as disposed (send the current ETag in If-Match)",
+      permission: "tires.edit",
+      operation: disposeOperation,
+      ifMatch: true,
+      toInput: (id, _b, { version }) => ({ id, version }),
     },
   ],
 });

@@ -4,7 +4,7 @@ import { formObject } from "@/lib/forms";
 import { TIRE_POSITIONS } from "@/modules/workshop/tires/constants";
 import type { RawTireRow } from "@/modules/workshop/tires/domain";
 import { defineAction } from "@/server/operations";
-import { createTireSetOperation, deleteTireSetOperation, saveSettingsOperation, setStatusOperation, updateTireSetOperation } from "./operations";
+import { createTireSetOperation, deleteTireSetOperation, disposeOperation, saveSettingsOperation, setStatusOperation, updateTireSetOperation } from "./operations";
 
 /** Formular → Eingabe: die Einzelreifen werden aus den flachen Feldnamen gesammelt. */
 function tireSetForm(fd: FormData): unknown {
@@ -26,7 +26,13 @@ export const createTireSet = defineAction(createTireSetOperation, afterSave);
 /** Reifensatz ändern (Formular mit `id` und `version`). */
 export const updateTireSet = defineAction(updateTireSetOperation, afterSave);
 
-export const setTireSetStatus = defineAction(setStatusOperation, { revalidate: ({ id }) => ["/tires", "/", `/tires/${id}`], message: "common.saved" });
+const afterStatus = { revalidate: ({ id }: { id: string }) => ["/tires", "/", `/tires/${id}`, "/appointments"], message: "common.saved" } as const;
+
+/** Satz ein-/ausbuchen (Recht `tires.stock`, Formular mit `id`, `version`, `status`): auch als Vorschlag nach einem erledigten Wechseltermin. */
+export const setTireSetStatus = defineAction(setStatusOperation, afterStatus);
+
+/** Satz als entsorgt markieren (Recht `tires.edit`, Formular mit `id` und `version`). */
+export const disposeTireSet = defineAction(disposeOperation, afterStatus);
 
 export const deleteTireSet = defineAction(deleteTireSetOperation, { revalidate: ["/tires", "/"], redirect: "/tires", message: "common.deleted" });
 

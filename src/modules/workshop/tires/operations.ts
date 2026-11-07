@@ -2,7 +2,7 @@ import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { RIM_TYPES, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
-import { parseTireRows, type RawTireRow } from "@/modules/workshop/tires/domain";
+import { isValidSeasonWindow, parseTireRows, type RawTireRow } from "@/modules/workshop/tires/domain";
 import { defineOperation, fail, failFields, type RunContext } from "@/server/operations";
 
 const optInt = (min: number, max: number) => z.coerce.number().int().min(min).max(max).optional();
@@ -93,19 +93,45 @@ export const updateTireSetOperation = defineOperation({
   run: saveTireSetRun,
 });
 
+/** Die beiden Buchungen des Lagers: `stored` = wieder einbuchen, `mounted` = ausbuchen (geht beim Kunden ans Fahrzeug). Entsorgen ist ein eigener Vorgang. */
+export const STOCK_STATUSES = ["stored", "mounted"] as const;
+
+/**
+ * Satz ein-/ausbuchen (Lager ↔ beim Kunden montiert). Eigenes Recht `tires.stock` – **bewusst nicht** `tires.edit`: Die Werkstatt bucht Sätze am Fahrzeug um (Mechaniker
+ * in den Standardrollen), ohne den Satz selbst (Größe, Zustand, Lagerort, Löschen) bearbeiten zu dürfen. `version` ist Pflicht (Konfliktprüfung): Wer eine Buchung
+ * bestätigt, die ein anderer inzwischen schon vorgenommen hat, bekommt den Konflikt statt einer stillen Doppelbuchung. Ein entsorgter Satz lässt sich nicht buchen
+ * (nur über das vollständige Bearbeiten, `tires.edit`), ebenso wenig wie in den Zustand zu buchen, in dem er schon ist.
+ */
 export const setStatusOperation = defineOperation({
   name: "tires.setStatus",
-  permission: "tires.edit",
-  input: z.object({ id: z.string().min(1), status: z.enum(TIRE_SET_STATUSES) }),
-  audit: "tires.update",
+  permission: "tires.stock",
+  input: z.object({ id: z.string().min(1), version: z.string().min(1), status: z.enum(STOCK_STATUSES) }),
+  audit: "tires.stock",
   run: async ({ input, tx, audit }) => {
-    const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { vehicle: { select: { plate: true } } } });
+    const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { status: true, vehicle: { select: { plate: true } } } });
     if (!set) fail("notFound");
-    await tx.tireSet.update({
-      where: { id: input.id },
-      // Beim erneuten Einlagern beginnt die Lagerzeit neu
-      data: { status: input.status, ...(input.status === "stored" ? { storedAt: new Date() } : {}) },
-    });
+    if (set.status === "disposed") fail("invalid", "tires.errors.disposed");
+    if (set.status === input.status) fail("conflict");
+    if (!(await claimRow(tx.tireSet, input.id, input.version))) fail("conflict");
+    // Beim erneuten Einlagern beginnt die Lagerzeit neu
+    await tx.tireSet.update({ where: { id: input.id }, data: { status: input.status, ...(input.status === "stored" ? { storedAt: new Date() } : {}) } });
+    audit({ target: `${set.vehicle.plate}: ${input.status}`, entityId: input.id });
+    return { id: input.id, status: input.status };
+  },
+});
+
+/** Satz als entsorgt markieren: wie das Bearbeiten ein Recht `tires.edit` (nicht das Ein-/Ausbuchen) und mit Versionsprüfung. */
+export const disposeOperation = defineOperation({
+  name: "tires.dispose",
+  permission: "tires.edit",
+  input: z.object({ id: z.string().min(1), version: z.string().min(1) }),
+  audit: "tires.dispose",
+  run: async ({ input, tx, audit }) => {
+    const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { status: true, vehicle: { select: { plate: true } } } });
+    if (!set) fail("notFound");
+    if (set.status === "disposed") fail("conflict");
+    if (!(await claimRow(tx.tireSet, input.id, input.version))) fail("conflict");
+    await tx.tireSet.update({ where: { id: input.id }, data: { status: "disposed" } });
     audit({ target: set.vehicle.plate, entityId: input.id });
     return { id: input.id };
   },
@@ -133,8 +159,11 @@ const settingsInput = z
     treadReplaceMm: z.coerce.number().min(1).max(10),
     tireAgeWarnYears: z.coerce.number().int().min(1).max(20),
     tireAgeReplaceYears: z.coerce.number().int().min(1).max(25),
+    winterStartMonth: z.coerce.number().int().min(1).max(12),
+    winterEndMonth: z.coerce.number().int().min(1).max(12),
   })
   .superRefine((d, ctx) => {
+    if (!isValidSeasonWindow(d)) ctx.addIssue({ code: "custom", message: "tires.settings.errors.seasonWindow", path: ["winterEndMonth"] });
     if (d.treadReplaceMm > d.treadWarnMm) ctx.addIssue({ code: "custom", message: "tires.settings.errors.treadOrder", path: ["treadReplaceMm"] });
     if (d.tireAgeWarnYears > d.tireAgeReplaceYears) ctx.addIssue({ code: "custom", message: "tires.settings.errors.ageOrder", path: ["tireAgeWarnYears"] });
   });
@@ -146,7 +175,7 @@ export const saveSettingsOperation = defineOperation({
   audit: "settings.tires",
   run: async ({ input: d, tx, audit }) => {
     await tx.tireSettings.upsert({ where: { id: "default" }, update: d, create: { id: "default", ...d } });
-    audit({ target: `${d.treadWarnMm}/${d.treadReplaceMm} mm, ${d.tireAgeWarnYears}/${d.tireAgeReplaceYears} a`, entityId: "default" });
+    audit({ target: `${d.treadWarnMm}/${d.treadReplaceMm} mm, ${d.tireAgeWarnYears}/${d.tireAgeReplaceYears} a, Winter ${d.winterStartMonth}–${d.winterEndMonth}`, entityId: "default" });
     return {};
   },
 });

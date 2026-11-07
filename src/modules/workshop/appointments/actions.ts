@@ -2,7 +2,7 @@
 
 import { formObject, safeReturn } from "@/lib/forms";
 import { defineAction } from "@/server/operations";
-import { type AppointmentInput, createAppointmentOperation, deleteAppointmentOperation, deleteBayOperation, deleteTypeOperation, saveBayOperation, saveSettingsOperation, saveTypeOperation, updateAppointmentOperation } from "./operations";
+import { type AppointmentInput, createAppointmentOperation, deleteAppointmentOperation, deleteBayOperation, deleteTypeOperation, saveBayOperation, saveSettingsOperation, saveTypeOperation, setAppointmentStatusOperation, updateAppointmentOperation } from "./operations";
 
 const refresh = ["/appointments", "/", "/tires"] as const;
 
@@ -17,6 +17,16 @@ export const createAppointment = defineAction(createAppointmentOperation, afterS
 
 /** Bestehenden Termin ändern (Formular mit `id` und `version`). */
 export const updateAppointment = defineAction(updateAppointmentOperation, afterSave);
+
+/**
+ * Schnellstatus „Starten“/„Fertig“ (Formular mit `id`, `version`, `status`). Die Antwort trägt den neuen Status (`status`): Die Karte zeigt daran, ob sie nach „Fertig“ den
+ * Vorschlag „Reifensatz ein-/ausbuchen?“ stellt.
+ */
+export const setAppointmentStatus = defineAction(setAppointmentStatusOperation, {
+  revalidate: [...refresh, ["/tires/[id]", "page"]],
+  message: (_data, input) => (input.status === "done" ? "appointments.quickStatus.doneMessage" : "appointments.quickStatus.startedMessage"),
+  state: (data) => ({ status: data.status }),
+});
 
 export const deleteAppointment = defineAction(deleteAppointmentOperation, {
   revalidate: [...refresh],
