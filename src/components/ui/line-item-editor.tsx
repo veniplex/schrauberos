@@ -151,7 +151,7 @@ export function LineItemEditor({
     const issue = (evaluation.rows[index]?.issues as Record<string, string | undefined> | undefined)?.[field];
     const row = state.rows[index];
     const shown = touched.has(`${key}:${field}`) || (row && row[field].trim() !== "");
-    return issue && shown ? t("ui.lineItems.invalidField") : undefined;
+    return issue && shown ? t(issue === "tooLarge" ? "ui.lineItems.tooLargeField" : "ui.lineItems.invalidField") : undefined;
   };
 
   const grossText = money(totals.grossCents);
@@ -260,7 +260,7 @@ export function LineItemEditor({
         {state.rows.length >= MAX_LINES ? <p className="text-sm text-ink-muted">{t("ui.lineItems.limit", { max: MAX_LINES })}</p> : null}
         {!evaluation.valid ? (
           <p role="status" className="text-sm text-danger-ink">
-            {t("ui.lineItems.invalid")}
+            {t(evaluation.tooLarge ? "ui.lineItems.tooLarge" : "ui.lineItems.invalid")}
           </p>
         ) : null}
       </div>

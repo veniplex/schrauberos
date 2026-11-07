@@ -1,5 +1,8 @@
 // Geldbeträge werden überall als ganze Cent (Int) gespeichert – keine Rundungsfehler, portabel und exakt.
 
+/** Größter Betrag in Cent, den eine `Int`-Spalte (32 Bit, Prisma) aufnimmt: 21.474.836,47 €. Jeder gespeicherte oder berechnete Betrag bleibt darunter – sonst Fehler an der Eingabe statt Datenbankfehler beim Schreiben. */
+export const MAX_MONEY_CENTS = 2_147_483_647;
+
 /**
  * Eingabe wie "1.234,56", "1234,5", "12.50", "1 234,56 €" oder "-20" -> Cent. null bei ungültiger Eingabe.
  * Ein einzelner Punkt mit genau drei Nachkommastellen ("1.234") gilt als Tausendertrenner.

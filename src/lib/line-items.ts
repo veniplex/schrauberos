@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { centsToInput, parseMoneyToCents } from "./money";
+import { centsToInput, MAX_MONEY_CENTS, parseMoneyToCents } from "./money";
 
 /**
  * Positionen für Angebote, Aufträge und Rechnungen: **die** Rechenregel der Anwendung (reine Funktionen, ganze Cent, keine Gleitkomma-Rundung). Der Positionen-Editor
@@ -12,6 +12,9 @@ import { centsToInput, parseMoneyToCents } from "./money";
  *    So stimmen Summenblock, Rechnung und XRechnung überein (EN 16931 verlangt Steuerbasis und -betrag je Kategorie und Satz).
  *  - **Steuerfrei** (`exempt`, Kleinunternehmer nach § 19 UStG): keine Steuer, eine Gruppe mit Satz 0 und Steuerbetrag 0; Brutto = Netto.
  *  - Negative Mengen und Preise sind erlaubt (Gutschriftspositionen); Grenzen: Menge ± 1.000.000, Preis ± 10.000.000,00 €, Rabatt 0 … 100 %, Steuersatz 0 … 100 %.
+ *  - **Überlaufschutz:** Jeder Betrag (Position vor Rabatt, Summen, Steuer, Brutto) bleibt unter `MAX_MONEY_CENTS` (21.474.836,47 €, die Grenze einer `Int`-Spalte). Eine Position, die darüber liegt, ist ungültig
+ *    (Editor: Fehler an der Zeile, Server: `validation.tooLarge` an der Position), ebenso eine zu große Summe (`Totals.exceedsLimit`). Unterhalb der Grenze ist jede Rechnung exakt (höchstens 200 Positionen);
+ *    oberhalb sind die Summen nicht mehr verlässlich – die Aufrufer prüfen `exceedsLimit`, bevor sie Summen anzeigen oder speichern.
  */
 
 export const QUANTITY_DECIMALS = 3;
@@ -44,6 +47,8 @@ export type Totals = {
   taxGroups: TaxGroup[];
   taxCents: number;
   grossCents: number;
+  /** Ein Betrag liegt über `MAX_MONEY_CENTS` (Positionen, Summen, Steuer oder Brutto): die Werte sind dann nicht verlässlich und dürfen nicht gespeichert werden */
+  exceedsLimit: boolean;
 };
 
 /** `a × b ÷ d`, exakt (BigInt) und kaufmännisch gerundet (halbe Einheit weg von null). */
@@ -65,7 +70,10 @@ export function lineResult(line: ParsedLine): LineResult {
   return { baseCents, discountCents, netCents: baseCents - discountCents };
 }
 
-/** Summen eines Beleges. `exempt`: steuerfrei (Kleinunternehmer) – alle Sätze zählen als 0. */
+/** Liegt eine Position vor Rabatt über der Betragsgrenze? (Menge × Preis kann bis 10^15 Cent erreichen.) */
+export const lineExceedsLimit = (line: ParsedLine): boolean => Math.abs(lineResult(line).baseCents) > MAX_MONEY_CENTS;
+
+/** Summen eines Beleges. `exempt`: steuerfrei (Kleinunternehmer) – alle Sätze zählen als 0. Setzt `exceedsLimit`, wenn ein Betrag die Grenze übersteigt. */
 export function computeTotals(lines: readonly ParsedLine[], options: { exempt?: boolean } = {}): Totals {
   const results = lines.map(lineResult);
   const groups = new Map<number, number>();
@@ -79,7 +87,12 @@ export function computeTotals(lines: readonly ParsedLine[], options: { exempt?: 
   const sum = (pick: (r: LineResult) => number) => results.reduce((total, r) => total + pick(r), 0);
   const netCents = sum((r) => r.netCents);
   const taxCents = taxGroups.reduce((total, g) => total + g.taxCents, 0);
-  return { lines: results, baseCents: sum((r) => r.baseCents), discountCents: sum((r) => r.discountCents), netCents, taxGroups, taxCents, grossCents: netCents + taxCents };
+  const baseCents = sum((r) => r.baseCents);
+  const discountCents = sum((r) => r.discountCents);
+  const grossCents = netCents + taxCents;
+  // Positionen zuerst: Liegt keine darüber, sind alle Summen exakt (höchstens 200 × 2,1 Mrd. Cent, weit unter 2^53)
+  const exceedsLimit = results.some((r) => Math.abs(r.baseCents) > MAX_MONEY_CENTS) || [baseCents, discountCents, netCents, taxCents, grossCents, ...taxGroups.flatMap((g) => [g.netCents, g.taxCents])].some((value) => !Number.isSafeInteger(value) || Math.abs(value) > MAX_MONEY_CENTS);
+  return { lines: results, baseCents, discountCents, netCents, taxGroups, taxCents, grossCents, exceedsLimit };
 }
 
 /* ------------------------------------------------------------------ Eingabetexte */
@@ -225,7 +238,7 @@ export function parseDraft(text: string): EditorRowDraft[] {
 
 /* ------------------------------------------------------------------ Auswertung */
 
-export type RowIssue = Partial<Record<"quantity" | "unitPrice" | "taxRate" | "discount", "invalid">>;
+export type RowIssue = Partial<Record<"quantity" | "unitPrice" | "taxRate" | "discount", "invalid" | "tooLarge">>;
 export type RowEvaluation = { parsed: ParsedLine | null; issues: RowIssue };
 
 /** Prüft eine Zeile des Editors: alle Felder lesbar? Leerer Rabatt ist 0 %; Menge und Preis sind Pflicht. */
@@ -240,16 +253,20 @@ export function evaluateRow(row: Pick<EditorRow, "quantity" | "unitPrice" | "tax
   if (taxBp === null) issues.taxRate = "invalid";
   if (discountBp === null) issues.discount = "invalid";
   if (quantityMilli === null || unitCents === null || taxBp === null || discountBp === null) return { parsed: null, issues };
-  return { parsed: { quantityMilli, unitCents, taxBp, discountBp }, issues };
+  const parsed = { quantityMilli, unitCents, taxBp, discountBp };
+  // Menge × Preis über der Betragsgrenze: Fehler an Menge und Preis (der Betrag ist zu groß, nicht eines der Felder für sich)
+  if (lineExceedsLimit(parsed)) return { parsed: null, issues: { quantity: "tooLarge", unitPrice: "tooLarge" } };
+  return { parsed, issues };
 }
 
-export type EditorEvaluation = { rows: RowEvaluation[]; totals: Totals; valid: boolean };
+export type EditorEvaluation = { rows: RowEvaluation[]; totals: Totals; valid: boolean; /** die Summen (nicht eine einzelne Zeile) übersteigen die Betragsgrenze */ tooLarge: boolean };
 
 /** Alle Zeilen auswerten; die Summen zählen nur gültige Zeilen (`valid` sagt, ob alle gültig sind). */
 export function evaluateRows(rows: readonly EditorRow[], options: { exempt?: boolean } = {}): EditorEvaluation {
   const evaluated = rows.map(evaluateRow);
   const parsed = evaluated.flatMap((e) => (e.parsed ? [e.parsed] : []));
-  return { rows: evaluated, totals: computeTotals(parsed, options), valid: evaluated.every((e) => e.parsed !== null) };
+  const totals = computeTotals(parsed, options);
+  return { rows: evaluated, totals, valid: evaluated.every((e) => e.parsed !== null) && !totals.exceedsLimit, tooLarge: totals.exceedsLimit };
 }
 
 /** Wert des Absendefeldes: die Positionen als Zahlen (ungültige Felder als `null` – der Server lehnt sie ab und meldet den Fehler an die Zeile). */
@@ -326,4 +343,15 @@ export const lineItemsSchema = (options: { max?: number } = {}) =>
         refId: z.string().max(64).optional(),
       }),
     )
-    .max(options.max ?? MAX_LINES);
+    .max(options.max ?? MAX_LINES)
+    .superRefine((items, ctx) => {
+      // Betragsgrenze (Int-Spalten, exakte Summen): erst jede Position, dann die Summen – nie ein stiller Überlauf
+      let lineIssue = false;
+      items.forEach((item, index) => {
+        if (!lineExceedsLimit(item)) return;
+        lineIssue = true;
+        ctx.addIssue({ code: "custom", path: [index, "unitCents"], message: "validation.tooLarge" });
+      });
+      // schlimmster Fall (Steuer nicht ausgenommen): Brutto ist am größten
+      if (!lineIssue && computeTotals(items).exceedsLimit) ctx.addIssue({ code: "custom", message: "validation.tooLarge" });
+    });

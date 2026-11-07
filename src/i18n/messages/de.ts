@@ -285,6 +285,7 @@ export const de = {
     integer: "Bitte eine ganze Zahl eingeben.",
     numberMin: "Der Wert muss mindestens {min} sein.",
     numberMax: "Der Wert darf höchstens {max} sein.",
+    tooLarge: "Der Betrag ist zu groß (höchstens 21.474.836,47 €).",
   },
   dashboard: {
     welcome: "Hallo, {name}",

@@ -27,6 +27,8 @@ export const uiDe = {
     gross: "Brutto",
     invalid: "Bitte die markierten Angaben prüfen.",
     invalidField: "Ungültige Angabe.",
+    tooLargeField: "Der Betrag ist zu groß.",
+    tooLarge: "Der Gesamtbetrag ist zu groß (höchstens 21.474.836,47 €).",
     totalBar: "Brutto {gross}",
     count_one: "{count} Position",
     count_other: "{count} Positionen",

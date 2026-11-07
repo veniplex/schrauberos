@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { MAX_MONEY_CENTS } from "./money";
+import { moneyCents } from "./zod-fields";
 import {
   computeTotals,
   createEditorState,
   editorReducer,
   evaluateRow,
   evaluateRows,
+  lineExceedsLimit,
   lineItemsInput,
   lineResult,
   mulDiv,
@@ -270,5 +273,71 @@ describe("Auswertung und Übergabe an den Server", () => {
     // auch der Entwurf trägt die Zusätze
     const restored = editorReducer(createEditorState([]), { type: "replace", rows: parseDraft(serializeDraft(rows)) }).rows[0];
     assert.deepEqual([restored.kind, restored.refType, restored.refId], ["part", "article", "abc"]);
+  });
+});
+
+describe("Überlaufschutz (Int-Spalten, exakte Summen)", () => {
+  const submit = (items: Array<Record<string, unknown>>) => JSON.stringify(items.map((i) => ({ description: "x", unit: "", taxBp: 1900, discountBp: 0, ...i })));
+
+  it("eine Position über der Betragsgrenze wird erkannt (Menge × Preis kann bis 10^15 Cent erreichen)", () => {
+    assert.equal(lineExceedsLimit(line(1_000_000_000, 1_000_000_000)), true);
+    assert.equal(lineExceedsLimit(line(-1_000_000_000, 1_000_000_000)), true);
+    assert.equal(lineExceedsLimit(line(1000, MAX_MONEY_CENTS)), false);
+    assert.equal(lineExceedsLimit(line(1001, MAX_MONEY_CENTS)), true);
+    assert.equal(computeTotals([line(1_000_000_000, 1_000_000_000)]).exceedsLimit, true);
+    assert.equal(computeTotals([line(1500, 8500)]).exceedsLimit, false);
+  });
+
+  it("200 Maximalpositionen: das Schema lehnt jede einzelne und die Summe ab – kein stiller Überlauf", () => {
+    const max = Array.from({ length: 200 }, () => ({ quantityMilli: 1_000_000_000, unitCents: 1_000_000_000 }));
+    const result = lineItemsInput().safeParse(submit(max));
+    assert.equal(result.success, false);
+    const issues = result.success ? [] : result.error.issues;
+    assert.equal(issues.length, 200, "eine Meldung je Position");
+    assert.ok(issues.every((issue) => issue.message === "validation.tooLarge" && issue.path[1] === "unitCents"));
+    assert.equal(computeTotals(max.map((m) => line(m.quantityMilli, m.unitCents))).exceedsLimit, true);
+  });
+
+  it("jede Position für sich gültig, aber die Summe über der Grenze: Fehler an der Gesamtliste", () => {
+    // 200 × 100.000,00 € = 20 Mio. netto, brutto mit 19 % über der Grenze von 21,47 Mio.
+    const many = Array.from({ length: 200 }, () => ({ quantityMilli: 1000, unitCents: 10_000_000 }));
+    const result = lineItemsInput().safeParse(submit(many));
+    assert.equal(result.success, false);
+    const issues = result.success ? [] : result.error.issues;
+    assert.deepEqual(issues.map((i) => [i.path.length, i.message]), [[0, "validation.tooLarge"]]);
+    // knapp darunter geht es
+    const fine = Array.from({ length: 200 }, () => ({ quantityMilli: 1000, unitCents: 5_000_000 }));
+    const parsed = lineItemsInput().parse(submit(fine));
+    const totals = computeTotals(parsed);
+    assert.equal(totals.exceedsLimit, false);
+    assert.equal(totals.netCents, 1_000_000_000);
+    assert.equal(totals.grossCents, 1_190_000_000);
+    assert.ok(Number.isSafeInteger(totals.grossCents));
+  });
+
+  it("Gutschriften heben sich auf: große Positionen mit Gegenposition bleiben gültig, solange jede unter der Grenze liegt", () => {
+    const items = [{ quantityMilli: 1000, unitCents: 1_000_000_000 }, { quantityMilli: -1000, unitCents: 1_000_000_000 }];
+    const totals = computeTotals(lineItemsInput().parse(submit(items)));
+    assert.deepEqual([totals.netCents, totals.grossCents, totals.exceedsLimit], [0, 0, false]);
+  });
+
+  it("der Editor markiert Menge und Preis einer zu großen Position, rechnet sie nicht mit und meldet zu große Summen", () => {
+    const big = evaluateRow({ quantity: "1.000.000".replace(".", ""), unitPrice: "10000000", taxRate: "19", discount: "" });
+    assert.equal(big.parsed, null);
+    assert.deepEqual([big.issues.quantity, big.issues.unitPrice], ["tooLarge", "tooLarge"]);
+    const rows = createEditorState(Array.from({ length: 200 }, () => ({ description: "x", quantity: "1", unitPrice: "100000", taxRate: "19" }))).rows;
+    const result = evaluateRows(rows);
+    assert.equal(result.tooLarge, true);
+    assert.equal(result.valid, false);
+    assert.ok(result.rows.every((row) => row.parsed !== null), "jede Zeile für sich ist gültig");
+    assert.equal(evaluateRows(rows.slice(0, 100)).valid, true);
+  });
+
+  it("Geldbeträge in Formularen (moneyCents) sind auf die Int-Spalte begrenzt", () => {
+    const schema = moneyCents("x");
+    assert.equal(schema.safeParse("21474836,47").success, true);
+    assert.equal(schema.safeParse("21474836,48").success, false);
+    assert.equal(schema.safeParse("-21474836,48").success, false);
+    assert.equal(schema.safeParse("99999999999999").success, false);
   });
 });

@@ -28,6 +28,8 @@ export const uiEn: typeof uiDe = {
     gross: "Gross",
     invalid: "Please check the marked entries.",
     invalidField: "Invalid entry.",
+    tooLargeField: "The amount is too large.",
+    tooLarge: "The total is too large (at most 21,474,836.47 €).",
     totalBar: "Gross {gross}",
     count_one: "{count} item",
     count_other: "{count} items",

@@ -284,6 +284,7 @@ export const en: Messages = {
     integer: "Please enter a whole number.",
     numberMin: "The value must be at least {min}.",
     numberMax: "The value must be at most {max}.",
+    tooLarge: "The amount is too large (at most 21,474,836.47 €).",
   },
   dashboard: {
     welcome: "Hello, {name}",

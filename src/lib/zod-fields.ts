@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isCalendarDay } from "./dates";
-import { parseMoneyToCents } from "./money";
+import { MAX_MONEY_CENTS, parseMoneyToCents } from "./money";
 
 /**
  * Wiederverwendbare Feldschemas für die Eingabe von Operationen. Fehler tragen Meldungsschlüssel (siehe `fieldErrors` in
@@ -14,7 +14,7 @@ export const moneyCents = (invalidKey: string, max = 20) =>
     .max(max)
     .transform((value, ctx) => {
       const cents = parseMoneyToCents(value);
-      if (cents === null) {
+      if (cents === null || Math.abs(cents) > MAX_MONEY_CENTS) {
         ctx.addIssue({ code: "custom", message: invalidKey });
         return z.NEVER;
       }
