@@ -30,8 +30,8 @@ export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
   "appointments.archiveType": "Terminarten sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /appointment-types, Feld active).",
   "appointments.saveType": "Terminarten sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /appointment-types).",
   "appointments.deleteType": "Terminarten sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /appointment-types).",
-  "docs.savePage": "Dokumentationsseiten (Handbuch, IT-Dokumentation: Markdown mit Versionen und Bildern, Lese-/Schreibrecht je Bereich und Kapitel) sind redaktionelle Inhalte für Menschen, kein Datenaustausch – bewusst keine API-Ressource (Entscheid F11); sie können Zugangswissen enthalten, das nicht über ein Token abfließen soll.",
-  "docs.deletePage": "Dokumentationsseiten (Rechte je Bereich und Kapitel, Versionsverlauf) sind bewusst keine API-Ressource (Entscheid F11, siehe docs.savePage).",
+  "docs.savePage": "Dokumentationsseiten (Handbuch, IT-Dokumentation: Markdown mit Versionen und Bildern, Kapitel mit Sichtbarkeit je Rolle) sind redaktionelle Inhalte für Menschen, kein Datenaustausch – Schreiben gibt es bewusst nicht über die API (Entscheid des Entwicklungsteams, vom Nutzer zu bestätigen). Das **Handbuch** ist lesend verfügbar (GET /manual-pages, nur Seiten ohne Rollenbeschränkung); die **IT-Dokumentation** nie, denn sie kann Zugangswissen enthalten, das nicht über ein Token abfließen soll.",
+  "docs.deletePage": "Dokumentationsseiten (Rechte je Bereich und Kapitel, Versionsverlauf) werden nur in der Oberfläche gepflegt; über die API ist nur das Handbuch lesbar (Entscheid des Entwicklungsteams, siehe docs.savePage).",
   "docs.togglePin": "Anheften ist eine Ansichtsfunktion der Dokumentation, kein Datenaustausch.",
   "docs.restoreVersion": "Versionsverlauf der Dokumentation: Wiederherstellen ist eine Redaktionsaufgabe in der Oberfläche.",
   "docs.saveCategory": "Kapitel der Dokumentation (Sichtbarkeit je Rolle) sind Konfiguration in der Oberfläche.",
@@ -49,4 +49,26 @@ export const NOT_API_OPERATIONS: Readonly<Record<string, string>> = {
   "vehicles.import": "CSV-Import der Fahrzeuge (Datenaustausch): nur mit Sitzung und eigenem Recht vehicles.import; keine API-Ressource.",
   "tires.import": "CSV-Import der Reifensätze (Datenaustausch): nur mit Sitzung und eigenem Recht tires.import; keine API-Ressource.",
   "invoices.import": "CSV-Import ins Rechnungsarchiv (Datenaustausch): nur mit Sitzung und eigenem Recht invoices.import; keine API-Ressource.",
+};
+
+/**
+ * **Datei-Wege der Oberfläche** (Routen unter `src/app/api`, die Dateien annehmen oder ausliefern – Teilfähigkeiten Upload/Download neben den Operationen): jede steht entweder mit ihrem API-Pendant
+ * (`api`: Operations-IDs der Endpunkte, der Vertragstest `src/modules/api.test.ts` prüft, dass es sie gibt) oder mit Begründung (`reason`) hier. Eine neue Route mit Schreibmethode oder Dateiauslieferung, die nicht
+ * hier steht, bricht den Test. Die Liste darf nur schrumpfen (ein Eintrag ohne solche Route bricht ihn ebenfalls).
+ */
+export type FileRouteEntry = { api: readonly string[]; reason?: undefined } | { api?: undefined; reason: string };
+export const FILE_ROUTES: Readonly<Record<string, FileRouteEntry>> = {
+  "api/files": { api: ["files.upload"] },
+  "api/files/[id]": { api: ["files.content"] },
+  "api/invoices/[id]/file": { api: ["invoices.fileDownload"] },
+  "api/billing/[id]/xml": { api: ["billing-documents.xml"] },
+  "api/docs/images": { reason: "Bilder der Dokumentation (Handbuch, IT-Dokumentation) gehören zu den redaktionellen Seiten, die bewusst nicht beschreibbar über die API sind (Entscheid des Entwicklungsteams, vom Nutzer zu bestätigen, siehe docs.savePage); das Handbuch ist lesend verfügbar, Bilder darin nur im Browser." },
+  "api/docs/images/[id]": { reason: "Bilder der Dokumentation werden nur im Browser mit den Seiten der Dokumentation ausgeliefert (Rechte je Bereich und Kapitel); die API bietet das Handbuch als Text, die IT-Dokumentation gar nicht (siehe docs.savePage)." },
+  "api/invoices/e-invoice": { reason: "Liest eine hochgeladene E-Rechnung (XML) nur aus und liefert Felder für das Formular zurück – schreibt nichts; eine Integration legt Rechnungen mit ihren Feldern über POST /invoices an." },
+  "api/checklists/[id]/signature": { reason: "Die Unterschrift am Tablet ist ein personenbezogenes Beweismittel und wird nur in der Oberfläche mit Rechteprüfung ausgeliefert; die API meldet nur den Zustand der Checkliste." },
+  "api/orders/approvals/[id]/signature": { reason: "Die Unterschrift einer Freigabe ist ein personenbezogenes Beweismittel und wird nur in der Oberfläche ausgeliefert; die API zeigt das Protokoll der Freigabe (GET /order-approvals) ohne Bild." },
+  "api/logo": { reason: "Das Werkstatt-Logo ist Plattform (Werkstattprofil, öffentlich für Anmeldeseite und Belege): Einstellung der Verwaltung, nie API-Ressource." },
+  "api/backups/upload": { reason: "Backups einspielen ist Verwaltung (Plattform): nie API-Ressource." },
+  "api/setup/restore": { reason: "Wiederherstellung in der Einrichtung (Plattform, mit Einrichtungs-Token): nie API-Ressource." },
+  "api/exchange/[kind]/import": { reason: "CSV-Import (Datenaustausch): nur mit Sitzung und eigenem Recht je Datenart, siehe NOT_API_OPERATIONS." },
 };

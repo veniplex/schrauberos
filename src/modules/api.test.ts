@@ -4,7 +4,7 @@ import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { isApiForbidden, isPlatformFeature } from "@/lib/api/scope";
 import { createTestEnv, type TestEnv } from "@/test/harness";
-import { API_EXCEPTIONS, NOT_API_OPERATIONS } from "./api-exceptions";
+import { API_EXCEPTIONS, FILE_ROUTES, NOT_API_OPERATIONS } from "./api-exceptions";
 import { FEATURES, featureOfPermission, fullFeatureId } from "./catalog";
 
 /**
@@ -118,6 +118,25 @@ describe("API: Registrierung und Ausnahmeliste", () => {
       assert.ok(!endpoints.some((e) => e.permission === def.permission), `${def.permission}: ein Endpunkt verlangt ein Datenaustausch-Recht`);
       assert.ok(isApiForbidden(def.permission), `${def.permission}: darf in keinem Token-Scope stehen`);
     }
+  });
+
+  it("Teilfähigkeiten Upload/Download: jede Route der Oberfläche, die Dateien annimmt (Schreibmethode) oder ausliefert (deliveryHeaders), hat ein API-Pendant oder eine Begründung – und die Liste führt keine Route, die es nicht mehr gibt", () => {
+    const routes = walk(path.join(SRC, "app", "api"), (n) => n === "route.ts").filter((f) => !rel(f).startsWith("app/api/v1/"));
+    const key = (file: string) => rel(file).replace(/^app\//, "").replace(/\/route\.ts$/, "");
+    const needs = routes.filter((f) => /export\s+(async\s+)?function\s+(POST|PUT|PATCH|DELETE)\b/.test(readFileSync(f, "utf8")) || /deliveryHeaders/.test(readFileSync(f, "utf8"))).map(key);
+    assert.ok(needs.length >= 10, `nur ${needs.length} Datei-Routen gefunden`);
+    const operationIds = new Set(endpoints.map((e) => e.operationId));
+    const problems: string[] = [];
+    for (const route of needs) {
+      const entry = FILE_ROUTES[route];
+      if (!entry) problems.push(`${route}: weder API-Pendant noch Begründung in FILE_ROUTES`);
+      else if (entry.api) for (const id of entry.api) if (!operationIds.has(id)) problems.push(`${route}: Endpunkt ${id} gibt es nicht`);
+    }
+    for (const [route, entry] of Object.entries(FILE_ROUTES)) {
+      if (!needs.includes(route)) problems.push(`${route}: keine solche Datei-Route mehr`);
+      if (entry.reason !== undefined && entry.reason.length < 30) problems.push(`${route}: Begründung fehlt`);
+    }
+    assert.deepEqual(problems, []);
   });
 
   it("jeder Endpunkt, der Operationen nennt, nennt nur bekannte", () => {

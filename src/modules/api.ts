@@ -1,4 +1,5 @@
 import type { ApiEndpoint } from "@/server/api/types";
+import { endpoints as manual } from "./handbook/manual/api";
 import { endpoints as network } from "./it/network/api";
 import { endpoints as employees } from "./office/employees/api";
 import { endpoints as fleet } from "./office/fleet/api";
@@ -21,4 +22,4 @@ import { endpoints as vehicles } from "./workshop/vehicles/api";
  * Recht sind erreichbar (ausgeschaltet = 404). Plattform-/Verwaltungsfunktionen (Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit,
  * API selbst) sind nie API-Ressourcen – `src/modules/api.test.ts` erzwingt das.
  */
-export const apiEndpoints: readonly ApiEndpoint[] = [...customers, ...vehicles, ...appointments, ...orders, ...parts, ...files, ...checklists, ...tires, ...invoices, ...billing, ...reports, ...employees, ...time, ...fleet, ...network];
+export const apiEndpoints: readonly ApiEndpoint[] = [...customers, ...vehicles, ...appointments, ...orders, ...parts, ...files, ...checklists, ...tires, ...invoices, ...billing, ...reports, ...employees, ...time, ...fleet, ...network, ...manual];
