@@ -87,6 +87,9 @@ function toInput(b: Record<string, unknown>): Record<string, unknown> {
   return { ...b, tires, spare: b.spare === true };
 }
 
+/** Reifensätze an Fahrzeugen von Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) gibt es für die API nicht (404); Fahrzeuge ohne Halter bleiben sichtbar. */
+const UNRESTRICTED = { vehicle: { is: { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] } } };
+
 export const endpoints = defineResource({
   feature: "workshop.tires",
   tag: "Tires",
@@ -95,6 +98,7 @@ export const endpoints = defineResource({
   path: "/tire-sets",
   read: "tires.view",
   model: db.tireSet as unknown as Delegate<Row>,
+  scope: UNRESTRICTED,
   include: { tires: true },
   item,
   version: versionOf,

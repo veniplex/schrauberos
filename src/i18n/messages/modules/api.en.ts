@@ -115,6 +115,7 @@ export const apiEn: typeof apiDe = {
       reset: "Connection aborted",
       config: "Target set up incorrectly",
       secret: "Secret missing",
+      restricted: "Processing restricted (Art. 18)",
     },
     events: {
       order: {

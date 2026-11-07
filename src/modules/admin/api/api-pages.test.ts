@@ -24,6 +24,9 @@ async function login(roleInput: { isAdmin?: boolean; permissions?: readonly stri
   return user;
 }
 const admin = () => login({ isAdmin: true });
+async function unmountView() {
+  await unmountView();
+}
 async function render(node: ReactNode) {
   const { I18nProvider } = await import("@/i18n/client");
   const { ToastProvider } = await import("@/components/ui/toast");
@@ -127,8 +130,7 @@ describe("Seiten", () => {
     assert.match(text, /Abgelaufen/);
     assert.match(text, /Passwortwechsel, Notzugang/);
     assert.ok(!root.innerHTML.includes("h".repeat(64)));
-    await view?.unmount();
-    view = null;
+    await unmountView();
 
     await login({ permissions: ["customers.view", "settings.manage"] });
     assert.equal(await redirectOf(() => Page()), "/forbidden");
@@ -173,8 +175,7 @@ describe("Seiten", () => {
     assert.match(text, /Webhook löschen/);
     assert.ok(!root.innerHTML.includes(created.created?.secret ?? "?"), "das Geheimnis steht nie im Dokument");
     assert.equal((root.querySelector('input[name="url"]') as HTMLInputElement).value, "https://hook.example.org/x?token=GEHEIM");
-    await view?.unmount();
-    view = null;
+    await unmountView();
 
     await login({ permissions: ["customers.view"] });
     assert.equal(await redirectOf(async () => Detail({ params: Promise.resolve({ id }) })), "/forbidden");
@@ -221,14 +222,12 @@ describe("Seiten", () => {
     assert.match(code, /If-Match: "<etag>"/);
     assert.ok(!/sos_[A-Za-z0-9_-]{43}/.test(resource.innerHTML), "kein echtes Token in der Doku");
     assert.ok(resource.querySelector('input[name="x"]') === null);
-    await view?.unmount();
-    view = null;
+    await unmountView();
 
     // unbekannte Ressource: wie der Überblick, kein Fehler
     const unknown = await render(await Page({ searchParams: Promise.resolve({ tag: "Gibt es nicht" }) }));
     assert.match(plain(unknown.textContent), /Überblick/);
-    await view?.unmount();
-    view = null;
+    await unmountView();
 
     await login({ permissions: ["customers.view"] });
     assert.equal(await redirectOf(async () => Page({ searchParams: Promise.resolve({}) })), "/forbidden");

@@ -169,6 +169,7 @@ export const appointmentsDe = {
   errors: {
     bayBusy: "Arbeitsplatz ist von {from|time} bis {to|time} belegt ({title}).",
     tireSetMismatch: "Der verknüpfte Reifensatz gehört nicht zu diesem Fahrzeug.",
+    customerRestricted: "Die Verarbeitung der Daten des Kunden dieses Fahrzeugs ist eingeschränkt – es lässt sich nicht neu verknüpfen.",
     bayInUse: "An diesem Arbeitsplatz hängen Termine ({count}). Er lässt sich nicht löschen, aber archivieren: Die Termine behalten ihn, er ist nur nicht mehr wählbar.",
     typeInUse: "Diese Terminart verwenden Termine ({count}). Sie lässt sich nicht löschen, aber archivieren: Die Termine behalten sie, sie ist nur nicht mehr wählbar.",
     customerMismatch: "Dieses Fahrzeug gehört einem anderen Kunden. Bitte den Kunden leer lassen – es gilt der Halter des Fahrzeugs.",

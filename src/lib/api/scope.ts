@@ -14,9 +14,18 @@ import type { Actor } from "@/lib/rbac";
 
 /**
  * Rechte, die kein Token tragen darf, obwohl sie nicht `adminOnly` sind: sensible Mitarbeiterdaten (Notfallkontakt, Krankheit) und die Arbeitszeiten **aller** Mitarbeiter ansehen bzw. nachtragen/korrigieren
- * (`time.viewAll`, `time.correctAll`: personenbezogen, Anwesenheit). Ein Token liest und schreibt über die Zeiterfassung nur die Zeiten seines Besitzers.
+ * (`time.viewAll`, `time.correctAll`: personenbezogen, Anwesenheit). Ein Token liest und schreibt über die Zeiterfassung nur die Zeiten seines Besitzers. Dazu die Rechte, die nur eine Person in der Oberfläche ausübt (siehe unten).
  */
-export const API_NEVER: ReadonlySet<string> = new Set(["employees.sensitive", "time.viewAll", "time.correctAll"]);
+export const API_NEVER: ReadonlySet<string> = new Set([
+  "employees.sensitive",
+  "time.viewAll",
+  "time.correctAll",
+  // Datenschutzvorgänge (Einschränken, Anonymisieren) und das Wiederöffnen abgeschlossener Aufträge/Checklisten sind bewusste Handlungen einer Person in der Oberfläche – ein Token trägt sie nie
+  // (es gibt dafür keine Endpunkte, `api-exceptions.ts`; das Recht in einem Token wäre nur eine offene Tür, falls je ein Endpunkt hinzukäme)
+  "customers.privacy",
+  "orders.reopen",
+  "checklists.reopen",
+]);
 
 /** Rechte der Plattform-/Verwaltungsfunktionen (Pflichtfunktionen oder Funktionen eines Pflichtmoduls). */
 const PLATFORM_PERMISSIONS: ReadonlySet<string> = new Set(

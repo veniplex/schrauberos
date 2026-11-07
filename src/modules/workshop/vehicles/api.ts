@@ -62,6 +62,9 @@ const item = z.object({
   updatedAt: z.string(),
 });
 
+/** Fahrzeuge von Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) gibt es für die API nicht (404 wie beim Kunden selbst); Fahrzeuge ohne Halter bleiben sichtbar. */
+const UNRESTRICTED = { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+
 export const endpoints = defineResource({
   feature: "workshop.vehicles",
   tag: "Vehicles",
@@ -70,6 +73,7 @@ export const endpoints = defineResource({
   path: "/vehicles",
   read: "vehicles.view",
   model: db.vehicle as unknown as Delegate<Vehicle>,
+  scope: UNRESTRICTED,
   item,
   version: versionOf,
   toItem: (v): z.input<typeof item> => ({

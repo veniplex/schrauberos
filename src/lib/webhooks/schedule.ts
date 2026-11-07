@@ -28,7 +28,7 @@ export const GLOBAL_CONCURRENCY = 4;
 export const CLAIM_LEASE_MS = 2 * 60_000;
 
 /** Fehlercodes eines Versuchs (kein Text des Empfängers, nie Teile der Antwort). */
-export const DELIVERY_ERRORS = ["http", "redirect", "dns", "forbiddenHost", "connect", "tls", "timeout", "reset", "config", "secret"] as const;
+export const DELIVERY_ERRORS = ["http", "redirect", "dns", "forbiddenHost", "connect", "tls", "timeout", "reset", "config", "secret", "restricted"] as const;
 export type DeliveryError = (typeof DELIVERY_ERRORS)[number];
 
 /** Was folgt auf eine Antwort mit diesem Statuscode? */

@@ -113,6 +113,7 @@ export const apiDe = {
       reset: "Verbindung abgebrochen",
       config: "Ziel falsch eingerichtet",
       secret: "Geheimnis fehlt",
+      restricted: "Verarbeitung eingeschränkt (Art. 18)",
     },
     events: {
       order: {

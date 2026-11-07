@@ -64,8 +64,10 @@ export function tireSetRecord(d: TireSetInput, vehicleId: string) {
 /** Gemeinsamer Ablauf von Anlegen und Ändern (je ein eigenes Recht, daher zwei Operationen). */
 async function saveTireSetRun({ input: d, tx, audit }: RunContext<TireSetInput, undefined>): Promise<{ id: string }> {
   const { tires } = parseTireRows(d.tires as Partial<Record<TirePosition, RawTireRow>>, d.spare);
-  const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true } });
+  const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true, customer: { select: { processingRestrictedAt: true } } } });
   if (!vehicle) failFields({ vehicleId: { key: "validation.required" } });
+  // Neue Verknüpfung mit dem Fahrzeug eines Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO): nein – ein bestehender Satz bleibt bearbeitbar (er behält sein Fahrzeug)
+  if (vehicle.customer?.processingRestrictedAt && (!d.id || (await tx.tireSet.findUnique({ where: { id: d.id }, select: { vehicleId: true } }))?.vehicleId !== vehicle.id)) failFields({ vehicleId: { key: "tires.errors.customerRestricted" } });
 
   const data = tireSetRecord(d, vehicle.id);
 

@@ -68,6 +68,14 @@ const dayStart = (value: string, field: string): Date => {
   return start;
 };
 
+/** Termine eines Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) – direkt oder über das Fahrzeug – gibt es für die API nicht (404). */
+const UNRESTRICTED = {
+  AND: [
+    { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] },
+    { OR: [{ vehicleId: null }, { vehicle: { is: { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] } } }] },
+  ],
+};
+
 export const appointmentEndpoints = defineResource({
   feature: "workshop.appointments",
   tag: "Appointments",
@@ -76,6 +84,7 @@ export const appointmentEndpoints = defineResource({
   path: "/appointments",
   read: "appointments.view",
   model: db.appointment as unknown as Delegate<Appointment>,
+  scope: UNRESTRICTED,
   item,
   version: versionOf,
   toItem: (a): z.input<typeof item> => ({

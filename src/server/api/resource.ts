@@ -267,7 +267,8 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       operations: [remove.operation.name],
       status: 204,
       handler: async (call) => {
-        if (!ID_SHAPE.test(call.params.id) || (cfg.visible && !(await find(call.params.id)))) throw notFound();
+        // Auch Löschen kennt nur, was die Ressource zeigt: Zeilen außerhalb von `scope`/`visible` (z. B. Kunden mit eingeschränkter Verarbeitung) gibt es hier nicht (404 statt Löschversuch)
+        if (!ID_SHAPE.test(call.params.id) || ((cfg.visible || cfg.scope) && !(await find(call.params.id)))) throw notFound();
         await runApiOperation(remove.operation, call.principal, remove.toInput ? remove.toInput(call.params.id) : { id: call.params.id });
         return { status: 204 };
       },

@@ -147,6 +147,7 @@ export const tiresEn: typeof tiresDe = {
     storedAt: "Stored on",
   },
   errors: {
+    customerRestricted: "Processing of this vehicle’s customer data is restricted – it cannot be linked anew.",
     dot: "Four digits WWYY, e.g. 2321 (week 23, year 2021) – not in the future.",
     tread: "A value between 0 and 15 mm.",
     disposed: "A disposed tyre set cannot be booked in or out.",

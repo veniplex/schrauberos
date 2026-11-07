@@ -35,7 +35,7 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
   if (!window) failField("date", "validation.invalid");
   const { startsAt, endsAt } = window;
 
-  const vehicle = d.vehicleId ? await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true, archivedAt: true } }) : null;
+  const vehicle = d.vehicleId ? await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true, archivedAt: true, customer: { select: { processingRestrictedAt: true } } } }) : null;
   if (d.vehicleId && !vehicle) failField("vehicleId", "validation.invalid");
 
   // Alle Verweise müssen existieren (statt eines Datenbankfehlers); Terminart, Arbeitsplatz, Mitarbeiter, Fahrzeug und Kunde müssen aktiv (nicht archiviert) sein –
@@ -43,6 +43,8 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
   const current = d.id ? await tx.appointment.findUnique({ where: { id: d.id }, select: { typeId: true, bayId: true, assigneeId: true, vehicleId: true, customerId: true } }) : null;
   if (d.id && !current) fail("notFound");
   if (vehicle?.archivedAt && vehicle.id !== current?.vehicleId) failField("vehicleId", "validation.invalid");
+  // Neue Verknüpfung mit dem Fahrzeug eines Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO): nein – ein bestehender Termin behält sein Fahrzeug
+  if (vehicle?.customer?.processingRestrictedAt && vehicle.id !== current?.vehicleId) failField("vehicleId", "appointments.errors.customerRestricted");
 
   // Kunde: Hat das Fahrzeug einen Halter, ist der Termin dessen Kunde (ein anderer wäre ein Widerspruch). Sonst gilt der gewählte Kunde – auch ohne Fahrzeug.
   let customerId: string | null = vehicle?.customerId ?? null;

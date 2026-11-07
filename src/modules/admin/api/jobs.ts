@@ -1,5 +1,6 @@
 import { deliverDue, fanOutEvent, hasDueDeliveries, pruneWebhookDeliveries } from "@/server/webhooks/deliver";
 import { WEBHOOK_EVENTS } from "@/modules/catalog";
+import { isRestrictedEntity } from "./restriction";
 import type { JobDef, OutboxHandlerDef } from "@/server/jobs/types";
 
 /**
@@ -15,7 +16,7 @@ export const outboxHandlers: OutboxHandlerDef[] = [
     feature: "admin.api",
     types: [...new Set(WEBHOOK_EVENTS.map((event) => event.type))],
     handle: async (message) => {
-      await fanOutEvent(message);
+      await fanOutEvent(message, { isRestricted: isRestrictedEntity });
     },
   },
 ];
@@ -29,7 +30,7 @@ export const jobs: JobDef[] = [
     timeoutMs: 5 * 60_000,
     shouldRun: ({ now }) => hasDueDeliveries(now),
     run: async ({ now, signal }) => {
-      const s = await deliverDue({ now, signal });
+      const s = await deliverDue({ now, signal, isRestricted: isRestrictedEntity });
       const parts = [s.sent && `${s.sent} zugestellt`, s.retried && `${s.retried} wiederholt`, s.failed && `${s.failed} aufgegeben`, s.gone && `${s.gone} Ziel meldet 410`].filter(Boolean);
       return parts.length ? parts.join(", ") : undefined;
     },

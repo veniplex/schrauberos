@@ -146,6 +146,7 @@ export const tiresDe = {
     storedAt: "Eingelagert am",
   },
   errors: {
+    customerRestricted: "Die Verarbeitung der Daten des Kunden dieses Fahrzeugs ist eingeschränkt – es lässt sich nicht neu verknüpfen.",
     dot: "Vierstellig WWJJ, z. B. 2321 (Woche 23, Jahr 2021) – nicht in der Zukunft.",
     tread: "Wert zwischen 0 und 15 mm.",
     disposed: "Ein entsorgter Satz lässt sich nicht ein- oder ausbuchen.",

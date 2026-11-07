@@ -29,8 +29,14 @@ export function webhookBody(d: { eventId: string; type: string; entityId: string
 
 export const parseEvents = (text: string): string[] => text.split(",").map((e) => e.trim()).filter(Boolean);
 
+/**
+ * Gehört die Sache zu einem Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO)? Dann geht **nichts** hinaus (weder Ereignis noch Wiederholung). Die Prüfung liefert die Verwaltung der API
+ * (`modules/admin/api/restriction.ts`) – die Plattform kennt die Tabellen der Funktionen nicht.
+ */
+export type RestrictionCheck = (resource: string, entityId: string) => Promise<boolean>;
+
 export type AttemptOutcome = "sent" | "retry" | "failed" | "gone" | "skipped";
-export type AttemptOptions = { now?: Date; /** Test-Ereignis: ein Versuch, keine Wiederholung; auch für ein ausgeschaltetes Ziel */ manual?: boolean; signal?: AbortSignal; deps?: SendDeps };
+export type AttemptOptions = { now?: Date; isRestricted?: RestrictionCheck; /** Test-Ereignis: ein Versuch, keine Wiederholung; auch für ein ausgeschaltetes Ziel */ manual?: boolean; signal?: AbortSignal; deps?: SendDeps };
 
 /** Ein Versuch für eine Zustellung (übernimmt sie zuerst atomar; wer sie nicht bekommt, sendet nichts). */
 export async function attemptDelivery(id: string, options: AttemptOptions = {}): Promise<AttemptOutcome> {
@@ -43,6 +49,12 @@ export async function attemptDelivery(id: string, options: AttemptOptions = {}):
   const delivery = await db.webhookDelivery.findUnique({ where: { id }, include: { webhook: true } });
   if (!delivery) return "skipped";
   const { webhook } = delivery;
+  const resource = resourceOf(delivery.type);
+  if (options.isRestricted && resource && delivery.entityId && (await options.isRestricted(resource, delivery.entityId))) {
+    // Verarbeitung eingeschränkt (Art. 18): nicht senden, aufgeben – sichtbar im Protokoll
+    await db.webhookDelivery.updateMany({ where: { id, status: "pending" }, data: { status: "failed", lastError: "restricted", completedAt: now } });
+    return "failed";
+  }
 
   let status: number | null = null;
   let error: DeliveryError | null = null;
@@ -113,7 +125,7 @@ export async function hasDueDeliveries(now = new Date()): Promise<boolean> {
 }
 
 /** Stellt fällige Zustellungen zu: je Ziel nacheinander, verschiedene Ziele gleichzeitig (höchstens `GLOBAL_CONCURRENCY`). */
-export async function deliverDue(options: { now?: Date; limit?: number; signal?: AbortSignal; deps?: SendDeps } = {}): Promise<DeliverySummary> {
+export async function deliverDue(options: { now?: Date; limit?: number; signal?: AbortSignal; deps?: SendDeps; isRestricted?: RestrictionCheck } = {}): Promise<DeliverySummary> {
   const now = options.now ?? new Date();
   const summary: DeliverySummary = { sent: 0, retried: 0, failed: 0, gone: 0, skipped: 0 };
   const due = await db.webhookDelivery.findMany({
@@ -131,7 +143,7 @@ export async function deliverDue(options: { now?: Date; limit?: number; signal?:
       for (const id of ids) {
         if (options.signal?.aborted) return;
         try {
-          const outcome = await attemptDelivery(id, { now, signal: options.signal, deps: options.deps });
+          const outcome = await attemptDelivery(id, { now, signal: options.signal, deps: options.deps, isRestricted: options.isRestricted });
           if (outcome === "retry") summary.retried++;
           else summary[outcome]++;
         } catch (error) {
@@ -148,8 +160,10 @@ export async function deliverDue(options: { now?: Date; limit?: number; signal?:
  * Outbox-Abnehmer: legt für ein Ereignis die Zustellungen an – `pending` für eingeschaltete, `held` (bis zu 14 Tage zurückgestellt) für ausgeschaltete Ziele. Idempotent über die Ereignis-ID
  * (eindeutig je Ziel und Ereignis). Ereignisse außerhalb des Katalogs gibt es für Webhooks nicht.
  */
-export async function fanOutEvent(message: { id: string; type: string; entityId: string | null; createdAt: Date }): Promise<number> {
+export async function fanOutEvent(message: { id: string; type: string; entityId: string | null; createdAt: Date }, options: { isRestricted?: RestrictionCheck } = {}): Promise<number> {
   if (!WEBHOOK_EVENTS.some((event) => event.type === message.type)) return 0;
+  const resource = resourceOf(message.type);
+  if (options.isRestricted && resource && message.entityId && (await options.isRestricted(resource, message.entityId))) return 0;
   const webhooks = await db.webhook.findMany({ select: { id: true, events: true, enabled: true } });
   let created = 0;
   for (const webhook of webhooks) {
