@@ -253,8 +253,12 @@ export async function verifyVersion(options: VerifyOptions): Promise<VerifySucce
     if (!folder) return fail(VERIFY_EXIT.version, "folder-name");
     if (floor && enforce && !exceedsFloor(folder, floor)) return fail(VERIFY_EXIT.outdated, "floor");
 
+    // Setuid, Setgid und Sticky sind überall verboten – auch am Wurzelordner und an den beiden Dateien, die nicht in der Liste stehen
+    const rootStat = await options.fs.lstat("");
+    if (rootStat && rootStat.mode & 0o7000) return fail(VERIFY_EXIT.differs, "setid", "");
     const sealStat = await options.fs.lstat(SEAL_FILE);
     if (!sealStat || sealStat.kind !== "file") return fail(VERIFY_EXIT.sealMissing, "seal-missing");
+    if (sealStat.mode & 0o7000) return fail(VERIFY_EXIT.differs, "setid", SEAL_FILE);
     const sealBytes = await options.fs.readFile(SEAL_FILE, SEAL_MAX_BYTES);
     if (!sealBytes) return fail(VERIFY_EXIT.sealMissing, "too-large");
     const sealResult = verifySeal(sealBytes, options.trust, options.checkExpiry ?? null);
@@ -266,6 +270,7 @@ export async function verifyVersion(options: VerifyOptions): Promise<VerifySucce
 
     const treeStat = await options.fs.lstat(TREE_FILE);
     if (!treeStat || treeStat.kind !== "file") return fail(VERIFY_EXIT.treeHash, "tree-missing");
+    if (treeStat.mode & 0o7000) return fail(VERIFY_EXIT.differs, "setid", TREE_FILE);
     if (treeStat.size !== seal.treeSize) return fail(VERIFY_EXIT.treeHash, "tree-size");
     const treeBytes = await options.fs.readFile(TREE_FILE, seal.treeSize);
     if (!treeBytes || treeBytes.length !== seal.treeSize || sha512Hex(treeBytes) !== seal.treeSha512) return fail(VERIFY_EXIT.treeHash, "tree-hash");

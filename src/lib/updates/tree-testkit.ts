@@ -11,6 +11,8 @@ export class MemoryFs implements FsLike {
   nodes = new Map<string, MemNode>();
   /** Ausfallsimulation: diese Pfade melden beim Zugriff einen Ein-/Ausgabefehler */
   failing = new Set<string>();
+  /** Modus des Wurzelordners */
+  rootMode = 0o755;
 
   file(path: string, content: Buffer | string, mode = 0o644): this {
     this.nodes.set(path, { kind: "file", content: Buffer.from(content), mode });
@@ -34,6 +36,7 @@ export class MemoryFs implements FsLike {
   }
   clone(): MemoryFs {
     const copy = new MemoryFs();
+    copy.rootMode = this.rootMode;
     for (const [key, node] of this.nodes) copy.nodes.set(key, node.kind === "file" ? { ...node, content: Buffer.from(node.content) } : { ...node });
     return copy;
   }
@@ -44,7 +47,7 @@ export class MemoryFs implements FsLike {
 
   async lstat(rel: string): Promise<FsStat | null> {
     this.check(rel);
-    if (rel === "") return { kind: "dir", size: 0, mode: 0o755 };
+    if (rel === "") return { kind: "dir", size: 0, mode: this.rootMode };
     const node = this.nodes.get(rel);
     if (!node) return null;
     if (node.kind === "file") return { kind: "file", size: node.content.length, mode: node.mode };

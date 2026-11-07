@@ -14,6 +14,7 @@ export function caseToMemoryFs(c: CorpusCase): MemoryFs {
   const prefix = `app/versions/${c.args.version}/`;
   const fs = new MemoryFs();
   for (const e of c.entries) {
+    if (e.path === prefix.slice(0, -1)) fs.rootMode = e.mode;
     if (!e.path.startsWith(prefix)) continue;
     const rel = e.path.slice(prefix.length);
     if (e.type === "f") fs.file(rel, Buffer.from(e.b64 ?? "", "base64"), e.mode);

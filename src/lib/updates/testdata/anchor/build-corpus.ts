@@ -261,6 +261,24 @@ export async function buildCorpus(): Promise<Corpus> {
     add("sticky-dir", "Sticky-Bit an einem Ordner.", fs, neg(16, "setid", "public"));
   }
 
+  {
+    const fs = await fresh();
+    const seal = fs.nodes.get(SEAL_FILE) as { content: Buffer };
+    fs.nodes.set(SEAL_FILE, { kind: "file", content: seal.content, mode: 0o4644 });
+    add("setuid-seal", "Setuid-Bit am Siegel (steht nicht in der Liste, ist aber ebenso verboten).", fs, neg(16, "setid", SEAL_FILE));
+  }
+  {
+    const fs = await fresh();
+    const list = fs.nodes.get(TREE_FILE) as { content: Buffer };
+    fs.nodes.set(TREE_FILE, { kind: "file", content: list.content, mode: 0o2644 });
+    add("setgid-tree", "Setgid-Bit an der Dateiliste.", fs, neg(16, "setid", TREE_FILE));
+  }
+  {
+    add("sticky-root", "Sticky-Bit am Versionsordner selbst.", await fresh(), neg(16, "setid", ""), {}, []);
+    const c = cases[cases.length - 1];
+    c.entries.find((e) => e.path === `app/versions/${VERSION}`)!.mode = 0o1755;
+  }
+
   // ───── Siegel ─────
   {
     const fs = await fresh();
