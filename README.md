@@ -75,7 +75,7 @@ Container muss nichts mehr angefasst werden. Alle Daten liegen im Volume `app-da
 ## Inhalt dieser README
 
 0. [Schnell starten (Docker)](#schnell-starten-docker) · 1. [Schnellstart Entwicklung](#schnellstart-lokale-entwicklung) · 2. [Befehle](#befehle) · 3. [Architektur](#architektur) ·
-4. [Datenhaltung](#datenhaltung) · 5. [Container, Starter und Updates](#container-starter-und-updates) (mit Backups, [Job-Runner](#job-runner-srcserverjobs), [Uploads und Archive](#uploads-und-archive)) ·
+4. [Datenhaltung](#datenhaltung) · 5. [Container, Starter und Updates](#container-starter-und-updates) (mit [Starter-Vertrauensanker](#starter-vertrauensanker-p1b-6), Backups, [Job-Runner](#job-runner-srcserverjobs), [Uploads und Archive](#uploads-und-archive)) ·
 6. [Neue Funktion anlegen](#eine-neue-funktion-anlegen) · 7. [Konventionen](#konventionen) · 8. [Tests](#tests) ·
 9. [Browser-CI](#browser-ci-playwright) · [Release und Signaturschlüssel](#release-und-signaturschlüssel) · 10. [Betrieb](#betrieb) · 11. [Grenzen](#bekannte-grenzen)
 
@@ -635,7 +635,7 @@ Paket** und bringt alles andere mit:
 
 | Bestandteil | Wo | Aktualisierung |
 | --- | --- | --- |
-| **Starter** (`docker/bootstrap.c`, statisch, ~150 Zeilen) | Image | praktisch nie (nur bei geändertem Vertrag: `docker/BASE_VERSION`) |
+| **Starter** (`docker/bootstrap.c`, statisch; ab P1b-6 mit Prüfer für Siegel und Dateiliste, siehe „Starter-Vertrauensanker“) | Image | praktisch nie (nur bei geändertem Vertrag: `docker/BASE_VERSION`) |
 | **Launcher** (`src/launcher/main.ts` verdrahtet Prozess/Netz/Zeit, der Ablauf steht in `src/launcher/launcher.ts` und ist mit Fake-Prozess getestet; mit esbuild zu `launcher.mjs`) | Paket | mit jedem Update |
 | **Node** und **Systembibliotheken** (glibc, libstdc++, nss, Lader) | Paket (`runtime/`) | mit jedem Update |
 | **Anwendung** samt `node_modules`, Migrationen, Hilfe | Paket | mit jedem Update |
@@ -643,13 +643,15 @@ Paket** und bringt alles andere mit:
 Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
 (`runtime/<lader> --library-path runtime/lib runtime/node …`).
 
-* **Starter:** wählt das Verzeichnis der aktiven Version (Zeiger `<DATA_DIR>/app/active`, sonst `/app`) und startet dessen
-  Launcher. Exit-Code 42 des Launchers = neu auswählen; stürzt der Launcher einer installierten Version zweimal kurz hintereinander
-  ab, nimmt er die eingebaute Version und vermerkt das in `<DATA_DIR>/app/launcher-crash`. Er beantwortet auch den Docker-Healthcheck
-  (`/bootstrap --healthcheck`).
-* **Launcher:** startet nur die App seiner eigenen Version, spielt vorgemerkte Datenbank-Wiederherstellungen ein und macht
+* **Starter:** wählt das Verzeichnis der aktiven Version (Zeiger `<DATA_DIR>/app/active`, sonst `/app`), **prüft eine installierte Version vollständig** (Siegel + Dateiliste, Mengengleichheit; Abschnitt „Starter-Vertrauensanker“; die
+  eingebaute Version ist die Vertrauensbasis und wird nicht geprüft) und startet dessen Launcher. Exit-Code 42 des Launchers = neu prüfen und auswählen — **jeder** Neustart der App geht über den Starter; stürzt der Launcher einer installierten
+  Version zweimal kurz hintereinander ab, nimmt er die eingebaute Version und vermerkt das in `<DATA_DIR>/app/launcher-crash`. Besteht eine Version die Prüfung nicht, schreibt er einen Marker (`verify-failed`/`inconclusive`) und startet die eingebaute
+  Version. Er beantwortet auch den Docker-Healthcheck (`/bootstrap --healthcheck`).
+  *Stand Teil 1 des Pakets:* Die TypeScript-Seite (Formate, Referenzprüfer, Launcher, Installer, Pipeline) steht; der C-Prüfer im Starter, `BASE_VERSION` 4 und die Starter-Tests folgen in Teil 2.
+* **Launcher:** startet nur die App seiner eigenen Version — **genau einmal je Aufruf** —, spielt vorgemerkte Datenbank-Wiederherstellungen ein und macht
   Rückfälle (frische Version nicht gesund → Zeiger auf die Vorversion + Code 42; wiederhergestellte Datenbank nicht gesund →
-  vorherige zurück). Eine installierte Version verwirft sich selbst, wenn die eingebaute neuer ist (neues Image gezogen).
+  vorherige zurück + Code 42). Eine installierte Version verwirft sich selbst, wenn die eingebaute neuer ist (neues Image gezogen). Der Launcher der eingebauten Version wertet die Marker des Starters aus und
+  hat die Kompatibilitätsschranke (siehe „Starter-Vertrauensanker“).
 * **Die App migriert sich selbst:** `src/instrumentation.ts` → `src/server/startup.ts`: Sicherung vor Migrationen, Migrationen,
   Basisdaten, Zeitzone, Job-Runner. `/api/health` meldet erst danach „ok“; scheitert etwas, beendet sich der Prozess.
   **Der Start läuft im Hintergrund** (`register()` wartet nicht darauf, `src/server/startup-launch.ts`). Grund (Next-16-Quellen: `next-server.js` `prepareImpl` → `runInstrumentationHookIfAvailable`,
@@ -660,8 +662,8 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
   Der Job-Runner startet erst nach erfolgreichem Start und nie bei „Neuinstallation nötig“.
 * **Keine Fremdprogramme:** Archive bearbeitet die npm-Bibliothek `tar` – es gibt kein System-`tar`.
 * **Die eingebaute App ist `root:root` und für den Betriebsbenutzer (1000) nicht schreibbar** (`COPY` ohne `--chown`): Geschrieben wird nur nach `/data`
-  (Datenbank, Dateien, Backups, installierte Versionen) und `/tmp`. Wer die laufende Anwendung kompromittiert, kann den eingebauten Code nicht
-  ändern. Der Smoke-Test der Pipeline prüft Besitzer und Start (`scripts/smoke-image.sh`).
+  (Datenbank, Dateien, Backups, installierte Versionen) und `/tmp` — **nie in ein Paketverzeichnis** (`process.cwd()`): Installierte Versionen sind nach der Prüfung schreibgeschützt und werden bei jedem Start gegen ihre Dateiliste geprüft.
+  Wer die laufende Anwendung kompromittiert, kann den eingebauten Code nicht ändern. Der Smoke-Test der Pipeline prüft Besitzer, Modus-Bits, Dateiliste und Start (`scripts/smoke-image.sh`).
 * **Zustand:** `<DATA_DIR>/app/state.json` (+ Zeiger `active`); reine, getestete Logik in `src/lib/updates` (`state.ts`, `store.ts`,
   `restore.ts`). `writeState` schreibt immer auch den Zeiger.
 * `docker/BASE_VERSION` nur erhöhen, wenn sich der Vertrag des Starters ändert (Zeiger-Format, Exit-Codes, Aufruf der Laufzeit)
@@ -670,10 +672,11 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
 ### Update-Ablauf (Funktion `admin.updates`)
 
 1. Backup anlegen („Vor Update“; scheitert es, wird abgebrochen).
-2. Neuestes GitHub-Release holen, **Ed25519-Signatur** des `manifest.json` prüfen (gegen den eingebauten öffentlichen Schlüssel),
-   Paket laden und **SHA-256/Größe** gegen das Manifest prüfen.
-3. Nach `<DATA_DIR>/app/versions/<version>` entpacken, `state.json`/`active` schreiben, Neustart (Exit-Code 42).
-4. Starter → Launcher der neuen Version → Gesundheitsprüfung oder Rückfall. Die Frist ist 90 s (`LAUNCHER_HEALTH_TIMEOUT_MS`) und **verlängert sich jedes Mal um ihre volle Länge**, wenn die App lebt und migriert:
+2. Neuestes GitHub-Release holen, **Ed25519-Signatur** des `manifest.json` prüfen (gegen den eingebauten öffentlichen Schlüssel bzw. die Schlüsselkette), das **Siegel** (`SOS-SEAL`) prüfen und mit dem Manifest abgleichen,
+   dann Paket laden und **SHA-256/Größe** gegen das Manifest prüfen.
+3. Nach `<DATA_DIR>/app/.partial-…` entpacken, Siegel ablegen, **dieselbe Prüfung wie der Starter** (Siegel, Dateiliste, Mengengleichheit, Vorfahrenregel, Untergrenze), `fsync`, schreibschützen, nach `<DATA_DIR>/app/versions/<version>`
+   verschieben, `state.json`/`active` schreiben, Neustart (Exit-Code 42). Scheitert die Prüfung, wird nichts aktiviert.
+4. Starter (prüft die Version erneut) → Launcher der neuen Version → Gesundheitsprüfung oder Rückfall. Die Frist ist 90 s (`LAUNCHER_HEALTH_TIMEOUT_MS`) und **verlängert sich jedes Mal um ihre volle Länge**, wenn die App lebt und migriert:
    entweder `/api/health` antwortet mit `503 { "status": "starting" }` (das tut es dank Start im Hintergrund auch während der Sicherung vor der Migration), **oder die Verbindung wird angenommen, aber es kommt innerhalb von 2 s
    keine HTTP-Antwort** (Event-Loop in einem synchronen Migrationsschritt blockiert – das erkennt der Kernel-Backlog, nicht die App; `probeHealth` in `src/lib/updates/health.ts`). Obergrenze: **harte** 15 Minuten ab Start
    (`LAUNCHER_HEALTH_MAX_MS`). Wer die Verbindung verweigert oder 503 `error` meldet, hält die Grundfrist ein. Ein hängender Prozess, der den Port offen hält, wird so erst nach der Obergrenze verworfen (bewusster Kompromiss).
@@ -685,6 +688,196 @@ Standard `https://api.github.com`); eine Asset-Adresse auf anderem Host wird gar
 geprüft gegen die Antwort der API und `GET /meta`, `domains.actions`). Weiterleitungen werden **von Hand** verfolgt (höchstens 5), nur auf HTTPS und nur auf diese Hosts, und tragen **nie** ein `Authorization`
 (Ausnahme: Metadaten-Abfragen der API selbst behalten es bei einem Ziel auf derselben Herkunft). `UPDATE_API_URL` und `UPDATE_REDIRECT_HOSTS` (Hosts, kommagetrennt) sind nur für Spiegel und Tests gedacht,
 keine Betriebseinstellung. Das Paket wird mit `lib/archive.ts` entpackt (Abschnitt „Uploads und Archive“).
+
+### Starter-Vertrauensanker (P1b-6)
+
+Der Starter (`/bootstrap`, PID 1, im Image, `root`-eigen, nicht per Web-Update erneuerbar) startet eine **installierte** Version nur, wenn sie genau dem entspricht, was der Release-Schlüssel signiert hat.
+Code, den die App (uid 1000) nach `/data/app/versions/…` schreibt, überlebt damit **keinen Neustart** des Containers und keinen Neustart der App. **Dieser Abschnitt ist die Spezifikation** für Prüfer und
+Starter in C (Teil 2 des Pakets): Der TypeScript-Referenzprüfer (`src/lib/updates/seal.ts`, `tree.ts`) und der **Goldkorpus** (`src/lib/updates/testdata/anchor/cases.json`) legen Format und Urteile fest.
+
+#### Vertrauenskette und Grenzen
+
+```text
+ IM IMAGE (root:root, /bootstrap statisch)                                   IN /data (für uid 1000 beschreibbar = NICHT vertraut)
+ ROOT_KEY     Wurzelschlüssel (privat OFFLINE)  ──beglaubigt──┐
+ RELEASE_KEY  Release-Schlüssel (privat = Secret)             ▼
+ FLOOR        = eingebaute Version                    Beglaubigung (118 Bytes, Wurzel-signiert; steckt IM Siegel)
+ BASE, ARCH                                                   │
+        akzeptiert Signaturschlüssel K ∈ {RELEASE_KEY} ∪ {K mit gültiger Beglaubigung}
+                                              ▼
+        SOS-SEAL  (versions/<v>/SOS-SEAL, signiert mit K)   { version, base, arch, tree-sha512, tree-size, tree-entries, tree-bytes }
+                                              ▼ SHA-512
+        SOS-TREE  (versions/<v>/SOS-TREE, im Paket)          je Pfad: Typ, Ausführbit, Größe, SHA-512 | Symlink-Ziel
+                                              ▼ Mengengleichheit
+        Dateien, Ordner, Links des Verzeichnisses /data/app/versions/<x.y.z>/
+```
+
+* **Schützt vor:** Code-Ausführung in der App, die sich über Neustarts festsetzen will (Hintertür im Paketcode, Austausch von Launcher/Node/Bibliothek/`.next/static`), Manipulation des Volumes von außen ohne Schlüssel,
+  untergeschobenen Paketen (zusätzliche Tiefe zu Manifest-Signatur und SHA-256).
+* **Schützt NICHT vor:** Laufzeit-Manipulation (wer als uid 1000 läuft, kann bis zum nächsten Neustart alles); Persistenz auf Datenebene (Datenbank, `files`, Backups, `secret.key`, Einstellungen);
+  Diebstahl des Release-Schlüssels (Gegenmittel: neues Image mit neuem Wurzel-/Release-Schlüssel); kompromittierter Build-/Release-Pipeline; dem **Wiedereinspielen einer echten, alten, signierten Version
+  oberhalb der Untergrenze** (die Untergrenze ist nur die eingebaute Version; ein Dieb mit Schreibzugriff kann eine ältere, bekannt verwundbare Version oberhalb davon wieder einspielen — Gegenmittel ist ein neues
+  Image); Host-root/`docker`-Gruppe; Container-Ausbruch; einem **gleichzeitig laufenden** Angreifer, der Dateien zwischen Prüfung und Start tauscht (Ruhezustand, siehe unten – ohne Rechtetrennung gibt es keine
+  echte Unveränderlichkeit). Verwerfen ist die sichere Richtung: A1/A2 können einen Rückfall auf die eingebaute Version erzwingen (Verfügbarkeit), nie das Laden fremden Codes.
+* **Der Baum ist der gesamte Code, den Node lädt.** Darum gilt: **kein `node_modules` in einem Vorfahrenordner** der Version (`versions/`, `app/`, `DATA_DIR`): Node löst `require()` aufwärts auf (Next lädt
+  optionale Pakete wie `@opentelemetry/api` mit `try { require(…) }`), und alles dort wäre ungeprüfter Code. Der Prüfer lehnt das mit Code 18 ab (Datei, Ordner oder Link). Next-Konfigs und `.env*` im Arbeitsverzeichnis
+  liegen im Baum. Nichts wird aus `/tmp` geladen; `enableCompileCache` gibt es in Next nicht.
+
+#### Formate (alle zeilenbasiert, UTF-8, nur `\n`, kleine Hexziffern, ohne JSON)
+
+**Kanonische Regeln für alle Formate:** keine Leerzeichen am Zeilenende, kein `\r`, kein BOM, keine Leerzeilen, keine Kommentare; Zahlen sind Dezimalzahlen ohne führende Nullen (`0` ist erlaubt) und ohne Vorzeichen;
+Hex nur `[0-9a-f]`; unbekannte oder doppelte Zeilen sind Fehler; Reihenfolge der Zeilen ist fest. Jeder Parser prüft Länge **und** Inhalt vollständig, bevor er etwas weiterverwendet. Ganzzahlen werden überlaufgeprüft gelesen
+(Grenzen unten).
+
+**`SOS-TREE`** (Datei im Paket, Wurzel des Versionsordners; Grenze 48 MiB, ≤ 200 000 Einträge):
+
+```text
+schrauberos-tree 1\n
+hash sha512\n
+<Typ>\t<Ausführbit>\t<Größe>\t<Hash|Ziel|->\t<Pfad>\n        (ein Eintrag je Zeile, genau fünf TAB-getrennte Felder, Pfad ist das letzte Feld)
+```
+
+* **Typ** `d` Ordner · `f` reguläre Datei · `l` Symlink (andere Arten gibt es nicht). **Ausführbit** `x` oder `-`; `x` nur bei Dateien, die ein Ausführbit tragen (`mode & 0111 != 0`), sonst `-` (auch bei `d` und `l`).
+  Volle Modi sind **nicht** Teil der Aussage (`tar.x` entpackt sie mit der Umask). Setuid, Setgid und Sticky (`mode & 07000`) sind verboten (Generator, Prüfer).
+* **Größe** Dezimalzahl, höchstens 13 Ziffern (≤ 2^40); bei `d` und `l` immer `0`. **Hash** (nur `f`) = SHA-512 des Inhalts, 128 Hexziffern; **Ziel** (nur `l`) = Linkinhalt; bei `d` steht `-`.
+* **Pfad:** relativ zur Wurzel, `/`-getrennt, ohne führendes `/` oder `./`, ohne leere, `.`- oder `..`-Teile; keine Steuerzeichen (< 0x20, 0x7f), kein `\`, kein U+FFFD, gültiges UTF-8; ≤ 1024 Bytes, ≤ 48 Ebenen.
+  `SOS-TREE` und `SOS-SEAL` im Wurzelverzeichnis stehen **nicht** in der Liste (der Prüfer verlangt sie als reguläre Dateien); in Unterordnern gibt es keine Sonderbehandlung.
+* **Sortierung:** streng aufsteigend nach den **Bytes** des Pfads (`memcmp`, kürzer vor länger; kein `localeCompare`). Dadurch eindeutig und per Binärsuche prüfbar; `a`, `a.b`, `a.b/c`, `a/d` ist die richtige Reihenfolge (`.` < `/`).
+  Jeder Elternordner steht als `d` in der Liste (er steht wegen der Reihenfolge davor); unter Dateien und Symlinks gibt es keine Einträge.
+* **Symlink-Ziele:** relativ, kanonisch (`..` nur am Anfang, keine `.`-Teile, keine leeren Teile, mindestens ein Name), das Ziel bleibt im Baum, und der lexikalisch aufgelöste Weg führt nicht über einen weiteren Symlink
+  (so ist die Auflösung im geprüften Baum eindeutig). Das Ziel muss nicht existieren.
+* Der Generator (`scripts/gen-tree.mjs`) bricht laut ab bei Sonderdateien (Sockets, FIFOs, Geräte), Setid, unzulässigen Namen und Links aus dem Baum. Die Linux-Pakete von Next enthalten relative Symlinks (`.next/node_modules/<name>-<hash>`,
+  erzeugt in `next/dist/build/utils.js` `createTracedSymlink`); die absoluten Ziele eines lokalen Windows-Builds sind ein Artefakt der Junction-Ersatzlösung und treten im Docker-Build nicht auf.
+
+**`SOS-SEAL`** (Release-Asset **und** Datei im Versionsordner; ≤ 8 KiB):
+
+```text
+schrauberos-seal 1\n
+version <x.y.z>\n  base <n>\n  arch <a>\n  tree-sha512 <128 Hex>\n  tree-size <n>\n  tree-entries <n>\n  tree-bytes <n>\n        ← Rumpf (7 Zeilen nach der Kopfzeile)
+signing-key <64 Hex: roher Ed25519-Schlüssel>\n                                                                                    ← Schwanz, Form A (216 Bytes)
+signature <128 Hex>\n
+```
+
+oder, wenn der Signaturschlüssel **nicht** der einkompilierte Release-Schlüssel ist, der Schwanz in Form B (610 Bytes):
+
+```text
+signing-key <64 Hex>\n  endorsement <236 Hex: die 118 Bytes der Beglaubigungs-Aussage>\n  endorsement-sig <128 Hex>\n  signature <128 Hex>\n
+```
+
+* `version`: `x.y.z` ohne führende Nullen, jede Zahl ≤ 9 Ziffern (keine Vorabversionen: nur Veröffentlichungen sind installierbar). `base` ≥ 1, ≤ 6 Ziffern. `arch`: `[a-z0-9_]{1,16}`. Zahlen der Felder `tree-*` ≤ 15 Ziffern,
+  `tree-size` ≤ 48 MiB, `tree-entries` ≤ 200 000.
+* **Signierte Bytes:** `"schrauberos-seal-v1\n"` + alle Bytes der Datei bis einschließlich des `\n` **vor** `signature ` (also Rumpf und Schwanz ohne die letzte Zeile).
+* **Erst prüfen, dann lesen (authenticate-then-parse):** Der Schwanz hat feste Länge. Der Prüfer stellt die Form an festen Positionen vom Dateiende fest (Form B, wenn 610 Bytes vor dem Ende `signing-key ` und an der festen
+  Stelle danach `endorsement ` stehen, sonst Form A), prüft Schwanz und Signatur und liest den Rumpf **erst danach**. Form A verlangt `signing-key == RELEASE_KEY` (Bytevergleich); Form B verlangt `signing-key != RELEASE_KEY`
+  (sonst Code 11, `endorsement-for-release-key`), eine Aussage, die zu `signing-key` gehört, und eine gültige Wurzel-Signatur (Beglaubigung, nächster Abschnitt).
+* Dateigröße ≤ 8192 und nichts nach der `signature`-Zeile außer ihrem `\n`; jede Abweichung der Form ist Code 10, ein Signatur-/Kettenfehler Code 11 (Gründe als Text in der JSON-Zeile: `bad-signature`, `unknown-key`,
+  `endorsement-invalid`, `endorsement-expired`, `endorsement-other-key`, `endorsement-for-release-key`).
+
+**Beglaubigung, Format 2** (118 Bytes, `src/lib/updates/keychain.ts`): `schrauberos-endorsement 2\n` `key <64 Hex>\n` `valid-until <JJJJ-MM-TT>\n`. Der Prüfer **parst nicht**, sondern baut die Bytes aus `signing-key` und dem
+Datum (10 Bytes ab Offset 107 der Aussage; echtes Kalenderdatum) nach und vergleicht. Die Wurzel signiert `"schrauberos-release-key-endorsement-v2\n"` + Aussage. **Der Starter prüft den Ablauf nicht** (eine ordentlich
+installierte Version würde nach dem Stichtag sonst still auf eine ältere zurückfallen, ohne Sicherheitsgewinn gegen Diebstahl); nur `--check-expiry JJJJ-MM-TT` prüft ihn (Installer/App/Echtprobe; gültig bis zum Ende des Tages UTC).
+Das Manifest wird mit dem Kontext `"schrauberos-manifest-v1\n"` + Manifest signiert (Domänentrennung zu Siegel und Beglaubigung). PEM ↔ roh: Ed25519-SPKI mit dem Präfix `302a300506032b6570032100`.
+
+**Ablaufregeln:** `scripts/endorse-release-key.mjs` verlangt `--valid-until` (≤ 5 Jahre); `scripts/make-seal.mjs` verweigert ein Siegel, wenn die eingebettete Beglaubigung in < 90 Tagen abläuft (Warnung < 180 Tage);
+die Update-Seite warnt 90 Tage vor Ablauf. Widerruf eines beglaubigten Schlüssels gibt es nur über ein neues Image (eine Sperrliste im Image ist nicht Teil dieses Pakets).
+
+#### Prüfablauf, Fehlercodes und Klassen
+
+`/bootstrap --verify DIR [--expect-version V] [--no-floor] [--check-expiry JJJJ-MM-TT]` (Teil 2) prüft in dieser Reihenfolge; der Referenzprüfer ist `verifyVersion` in `src/lib/updates/seal.ts`:
+
+1. **Vorfahren:** in `DIR/..`, `DIR/../..` … bis einschließlich `$DATA_DIR` (nur wenn `DIR` darunter liegt) darf es keinen Eintrag `node_modules` geben (`fstatat`, jede Art) → **18**.
+2. **Untergrenze:** der Ordnername muss `x.y.z` sein (sonst 12); `exceedsFloor(version, FLOOR)` – gleich oder darunter → **19** (`floor`). Mit `--no-floor` nur gemeldet. `FLOOR` = eingebaute Version
+   (Tripel + Vorabflag aus `scripts/gen-trust-header.mjs`; `0.2.0` liegt über `0.2.0-dev.x`). Der Vergleich in C ist nur `exceedsFloor` in Zahlen — die SemVer-Logik bleibt einmal in TypeScript (`semver.ts`, Differentialtest).
+3. **Siegel:** `SOS-SEAL` regulär (nicht Link, nicht FIFO), ≤ 8 KiB, → Form, Signatur, Kette (Code 10/11). Dann `version == Ordnername/--expect-version` (**12**), `base == SOS_BASE` und `arch == SOS_ARCH` (**19**, `base`/`arch`).
+4. **Liste:** `SOS-TREE` regulär, `st_size == tree-size`, SHA-512 == `tree-sha512` (sonst **13**), erst dann parsen (Format, Sortierung, Eltern, Links; sonst 13), `tree-entries`/`tree-bytes` müssen stimmen (13).
+5. **Baum (Mengengleichheit):** jeder Eintrag der Liste existiert mit gleichem Typ; Dateien: Größe, SHA-512 (über denselben geöffneten Dateideskriptor, gelesene Bytes == Größe), Ausführbit (nur `x`-markierte müssen `x` haben; zusätzliche
+   Ausführbits sind gleichgültig — Bind-Mounts mit festen Modi), kein Setuid/Setgid/Sticky; Symlinks: `readlinkat` gleich Ziel. Jeder vorhandene Name (auch versteckte Dateien, leere Ordner, Sockets/FIFOs) steht in der Liste, sonst
+   **15** (`extra`) mit Pfad; fehlende → **14**; Abweichungen → **16** (`type`, `size`, `hash`, `exec`, `setid`, `target`). **Kein Ignorierbereich** (auch `public/`, `.next/static/`, `docs/`, `prisma/migrations/`, `node_modules`).
+   Bei mehreren Abweichungen ist nur gesichert, dass abgelehnt wird (der gemeldete Fund hängt von der Verzeichnisreihenfolge ab). Alle Öffnungen: `openat` mit `O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK` + `fstat`/`S_ISREG`; kein Pfad wird als Ganzes aufgelöst.
+6. Ausgabe von `--verify`: **eine JSON-Zeile** auf stdout `{"ok":true,"version":"…","files":N,"bytes":M,"ms":T,"floor":"above|equal|below|none"}` bzw. `{"ok":false,"code":15,"reason":"extra","path":"…","ms":T}` (Pfade und Texte ohne
+   Steuerzeichen); Text für Menschen auf stderr.
+
+| Code | Bedeutung | Klasse |
+| --- | --- | --- |
+| 0 | geprüft | **ok** |
+| 2 | Aufruf fehlerhaft | unklar |
+| 10 | Siegel fehlt, ist kein Siegel oder formal fehlerhaft | **negativ** |
+| 11 | Signatur, Kette oder Schlüssel ungültig (`--check-expiry`: Beglaubigung abgelaufen) | negativ |
+| 12 | Version im Siegel ≠ Ordnername / `--expect-version` | negativ |
+| 13 | `SOS-TREE` passt nicht zum Siegel (Hash, Größe, Format, Zähler) | negativ |
+| 14 | Eintrag der Liste fehlt im Baum | negativ |
+| 15 | zusätzliche Datei, Ordner, Link oder Sonderdatei im Baum | negativ |
+| 16 | Eintrag weicht ab (Typ, Größe, Inhalt, Ausführbit, Setuid/Setgid/Sticky, Linkziel) | negativ |
+| 17 | Ein-/Ausgabefehler | **unklar** |
+| 18 | `node_modules` in einem Vorfahrenordner | negativ |
+| 19 | veraltet oder unverträglich: Version ≤ Untergrenze, `base` oder `arch` passen nicht | **veraltet** (kein Alarm) |
+| Signal, Zeitüberschreitung, jeder andere Code | Prüfung nicht abgeschlossen | unklar |
+
+* **negativ** (10–16, 18): Integritätsbefund. Der Starter schreibt `<DATA_DIR>/app/verify-failed`, nimmt für diesen Durchlauf die eingebaute Version; der Launcher der eingebauten Version sperrt die Version (`state.failed`), trägt
+  `last = { status: "rolled-back", reason: "integrity:<Code>", detail: <Pfad, bereinigt> }` ein und fällt **zuerst auf die Vorversion** zurück (Exit 42 ohne App-Start: der Starter prüft sie selbst), erst danach auf die eingebaute.
+* **unklar** (alles andere, besonders Signal/Zeitüberschreitung/17): kein Befund über den Inhalt. Marker `inconclusive`, **kein** Eintrag in `failed`; für diesen Durchlauf die eingebaute Version, der nächste Start prüft erneut;
+  nach 3 unklaren Läufen in Folge derselben Version (`state.inconclusive.count`) gilt sie als negativ (`integrity:17`). Zeitüberschreitung des Prüfkinds: `alarm(300)`.
+* **veraltet** (19): keine Marke, kein Alarm — der Starter nimmt die eingebaute Version und loggt nur. Der Launcher der eingebauten Version gleicht den Zustand ab (`chooseStart`): ist der Eintrag nicht mehr startbar (neues,
+  neueres Image; anderer Starter-Vertrag), verfällt er; die Oberfläche bleibt sauber.
+
+**Marker** unter `<DATA_DIR>/app/` (alle sind Daten: nur Version als `x.y.z`-Basisname, Codes aus fester Liste, Pfade ≤ 200 Zeichen ohne Steuerzeichen, `lib/updates/markers.ts`): `verify-failed` (`<Version>\n<Code>\n<Pfad>\n`),
+`inconclusive` (`<Version>\n<signal|timeout|io|fork|other>\n`), `verify-ok` (vom Starter nach Erfolg: `<Version>\n<Dateien>\n<Bytes>\n<ms>\n<Unix-Sekunden>\n`; die Update-Seite zeigt „zuletzt geprüft“), `launcher-crash` (unverändert),
+`incompatible` (vom Launcher: `<Version>\n<Anzahl>\n`), `integrity-reported` (der App: Merker des einmaligen Audit-Eintrags `system.integrityFailed`). Lesen: nur reguläre Dateien, ≤ 4 KiB, nicht blockierend (`readSmallFile`).
+
+#### Starter (Teil 2): Pflichtenheft
+
+* **Zeiger** `<DATA_DIR>/app/active` streng: exakt `<DATA_DIR ohne Schrägstrich am Ende>/app/versions/<x.y.z>` (Ziffern ohne führende Nullen, ≤ 9 Stellen je Teil), eine Zeile; alles andere → eingebaute Version **ohne** Marker.
+  Öffnen mit `O_NONBLOCK|O_NOFOLLOW` + `S_ISREG` + Größenobergrenze (kein `mkfifo`-Aussperren).
+* **Prüfung im Kindprozess** (`fork`): Ein Speicherfehler im Prüfer darf den Start der eingebauten Version nie verhindern. Im Kind zuerst Signale auf `SIG_DFL` (`TERM`/`INT`/`HUP`/`QUIT`/`ALRM`), Signalmaske leeren, `alarm(300)`,
+  `PR_SET_NO_NEW_PRIVS`, `RLIMIT_CORE=0`, `PR_SET_PDEATHSIG`; Signale um `fork` + Zuweisung von `child` blockieren; `terminating` vor dem Launcherstart prüfen (heute geht ein SIGTERM zwischen zwei Durchläufen verloren).
+  `docker stop` bricht eine laufende Prüfung in < 1 s ab; Exit 0 = ok, 10–16/18 = negativ, 19 = veraltet, alles andere unklar. `prctl(PR_SET_DUMPABLE, 0)` im Starter.
+* **Ruhezustand:** Geprüft wird nur, wenn kein anderer Code der App läuft. Der Starter setzt `PR_SET_CHILD_SUBREAPER` und tötet vor jeder erneuten Prüfung **seine Nachfahren** (Suche über `/proc` nach `ppid == getpid()`;
+  `SIGKILL`, `waitpid(-1, WNOHANG)` bis `ECHILD`, bis 10 s; **nie** `kill(-1)`: das träfe `docker exec` und den Healthcheck). PID-1-unabhängig (Compose `init: true`/tini). Bleibt etwas übrig → „unklar“ für diesen Durchlauf (fail closed),
+  keine stille Ausnahme; ist weder PID 1 noch Subreaper-Wirkung gegeben, eine Warnzeile „Ruhezustand nicht erzwingbar“.
+* **Absturzfenster** (zwei Abstürze derselben Version innerhalb von 30 s → eingebaute Version): an der **Laufzeit des Launchers** festmachen, nicht an der Prüfzeit.
+* **Untergrenze** `FLOOR` = eingebaute Version (`SOS_FLOOR_*`), `docker/MIN_VERSION` entfällt. **`docker/BASE_VERSION` 3 → 4** (neue Pflichtdateien, Neustart immer über den Starter). Statisch mit `-fstack-protector-strong -D_FORTIFY_SOURCE=2
+  -static-pie -Wl,-z,relro,-z,now -Wformat=2 -Wconversion -Wshadow -Wall -Wextra -Werror`, `-O2`.
+* **Krypto:** vendortes Monocypher (Ed25519 + SHA-512), Version/Quelle/Prüfsummen festschreiben (Test unter `src/`, damit `npm test` ihn findet, `-text` in `.gitattributes`); RFC-8032-Vektoren, NIST-SHA-512-Vektoren, Wycheproof-Fälle
+  (S ≥ L, Kleine-Ordnung-Punkte, nicht-kanonische R/A), Differentialtest gegen `node:crypto`. Parser: überlaufgeprüfte Dezimalleser; pro Verzeichnis höchstens so viele Einträge puffern, wie die Liste dafür kennt + 1; `st_dev` darf sich im Baum
+  nicht ändern.
+* **Weitere Schnittstellen:** `--print-keys` (Zeilen `root <16 Hex>` / `release <16 Hex>`: erste 16 Hexziffern von SHA-256 über den rohen Schlüssel — `gen-trust-header.mjs --print-fingerprints` liefert die erwarteten Werte), `--verify DIR …` wie oben,
+  `--healthcheck` (unverändert). Header `docker/trust-keys.h` (Bau-Artefakt aus `scripts/gen-trust-header.mjs`): `SOS_BASE`, `SOS_ARCH`, `SOS_BUILTIN_VERSION`, `SOS_FLOOR_MAJOR/MINOR/PATCH/PRERELEASE`, `SOS_TAG_BUILD`, `SOS_ROOT_KEY[32]`,
+  `SOS_RELEASE_KEY[32]`, Fingerabdrücke. Testbinary mit den Testschlüsseln (`testdata/anchor/test-keys.ts`; `cases.json` → `trust.*`): Ein Tag-Build bricht ab, wenn ein Testschlüssel einkompiliert würde.
+* **Abnahme:** `cases.json` (alle Fälle: gleicher Exit-Code und gleicher Pfad wie der Referenzprüfer; `docker/test/run.mjs` legt die Fälle mit `materializeCorpusCase` als echte Verzeichnisse an), Mutationstest wie `anchor-corpus.test.ts`,
+  ASAN/UBSAN-Build, Fuzz-Ziele (Siegel, Liste, strukturierte Bäume), Differentialtest der Parser gegen die TS-Referenz, PID-Namespace-Test, `docker stop` während der Prüfung, Stufen L2/L3 der Teststrategie.
+
+#### Launcher, Installer, Update-Seite
+
+* **Der Launcher startet die App je Aufruf genau einmal** und gibt in **allen** Neustartpfaden `RESTART_EXIT_CODE` (42) zurück (Exit 42 der App, Rücknahme einer Wiederherstellung, Rückfall eines Updates): Jeder Neustart geht über den Starter,
+  der prüft. Ein Neustart im Launcher ließe veränderten Code ungeprüft laufen. Tests: `src/launcher/launcher.test.ts` (ein Spawn je Aufruf, Rückfallschleifen enden).
+* **Kompatibilitätsschranke** (`lib/updates/compat.ts`, im Launcher der eingebauten Version): Fällt der Starter von einer **bewährten** (nicht `pending`) Version zurück und kennt die Datenbank Migrationen, die der Code des Rückfallziels (Vorversion
+  oder eingebaute App, gelesen aus `prisma/migrations`) nicht kennt, startet der Launcher die App **nicht**: Meldung im Container-Log (DE/EN, „Image aktualisieren“), Marker `incompatible`, Exit 78. Die Rücknahme eines frischen, unbestätigten
+  Updates bleibt der vorgesehene Weg (Migrationen sind additiv zur Vorversion). Ist die Datenbank nicht lesbar, gibt es kein Urteil (kein Start wird verhindert, den die App selbst prüft).
+* **Installer** (`modules/admin/updates/install.ts`): Release-Siegel wird schon beim Prüfen des Releases verifiziert (vor dem Paket-Download) und mit dem Manifest abgeglichen; nach dem Entpacken: Siegel ablegen, **dieselbe Prüfung wie der Starter**
+  (`verify.ts`, einspritzbar: heute Referenzprüfer, Teil 2 ruft `/bootstrap --verify --expect-version V --check-expiry <heute>`) → bei Befund wird nichts aktiviert (`badTree`, `sealExpired`; 19 → `notNewer`/`needsImage`); dann `fsync` über den Baum,
+  **Schreibschutz** (`a-w`, Ordner 0555), erst danach `rename` und `writeState`. Löschen schreibgeschützter Bäume nur über `removeTreeSync` (`lib/updates/fs-tree.ts`). **Reparatur** = dieselbe Version erneut installieren.
+* **Schlüssel nur aus dem Build** (`release-key.ts`): keine Umgebungsvariable überschreibt sie (weder App noch Starter); Forks tragen ihre Schlüssel dort ein. Tests ersetzen sie über `setTrustAnchorsForTest` (wirft bei `NODE_ENV=production`).
+* **Das Paketverzeichnis ist zur Laufzeit schreibgeschützt:** Die App schreibt nur nach `/data` und `/tmp`. `next.config.ts`: `images.unoptimized` (sonst legt das unauthentifizierte `/_next/image` Dateien unter `.next/cache/images` ab und
+  die nächste Prüfung scheitert) und `experimental.isrFlushToDisk: false`; `src/next-config.test.ts` hält das fest.
+
+#### Pipeline
+
+* **Dockerfile:** `builder` stellt `/bundle` zusammen und ruft `scripts/gen-tree.mjs` (schlüsselfrei); Stufe `trust` erzeugt `trust-keys.h` und **bricht bei Tag-Builds ab** (Wurzel fehlt/gleich Release-Schlüssel/Testschlüssel), Stufe `bundle` kopiert `/bundle`.
+* **Job `publish`** (Tags): Image nur als `sha-…` pushen, Paket per `docker cp /app` aus dem **getesteten** Image (kein zweiter Build, `BUILD_ID` bleibt gleich), Referenzprüfung des Baums (`scripts/verify-tree.mjs`), Digest als Ausgabe.
+* **Job `release`** (Umgebung `release`): Paket auspacken → `make-seal.mjs` (prüft Baum ↔ Liste, signiert) → `make-release.mjs` → **Echtprobe** (`scripts/real-trial.sh`: Produktions-Image per Digest, `--print-keys` gegen die erwarteten
+  Fingerabdrücke, Testschlüssel-Negativprobe, `--verify … --no-floor --check-expiry`, drei Manipulationen) → Release als **Entwurf** → `docker buildx imagetools create` für `X.Y.Z`, `X.Y`, `latest` (Vorabversionen nur den vollen Namen) → Entwurf veröffentlichen.
+  Fehlt dem Image der Prüfer, scheitert die Echtprobe (fail closed). **Generalprobe** (`workflow_dispatch` `rehearsal`): nur Testschlüssel, kein Secret (`scripts/rehearse-release.mjs`); `check_signing_key`: Schlüsselpaar-Konsistenz in der Umgebung `release`.
+* **Smoke-Test** (`scripts/smoke-image.sh`): zusätzlich Modus-Bits unter `/app` (kein `g+w`/`o+w`, kein Setid/Sticky), `SOS-TREE` vorhanden und gegen den Baum geprüft.
+
+#### Befunde der Bestandsaufnahme (WP1, statisch)
+
+* Das Paket besteht aus `.next/standalone` (Server, `node_modules`, `.next` ohne `cache`), `.next/static`, `public`, `docs`, `prisma/migrations`, `version.json`, `launcher.mjs` und `runtime/` (Node, glibc, libstdc++, nss, Lader). Ein veralteter lokaler
+  Standalone-Build hat 3 046 Dateien, 630 Ordner, 47 MB (ohne `runtime/`; darunter 74 `.map`-Dateien); Schätzung für das Paket: 200–300 MB, 4 000–10 000 Dateien. **Echte Zahlen am Image messen (Teil 2).**
+* `sharp` samt `@img` liegt im Standalone-`node_modules`, obwohl die Bildoptimierung aus ist (`images.unoptimized`): eine Baumdiät (Entfernen) ist ein möglicher Nebennutzen, kein Muss.
+* **Laufzeit-Schreibpfade im Code:** `/data` (Datenbank, `files`, `backups`, `restore`, `app/`, `secret.key`, `setup-token`, `secret-reset`), `/tmp` (SQLite-Temp, Uploads). Im Paketverzeichnis schrieb nur Next selbst
+  (`.next/cache/images` bei `/_next/image`, `.next/cache/fetch-cache`, ISR-Rückschreiben bei `isrFlushToDisk`) — die ersten beiden sind abgeschaltet (`images.unoptimized`, `isrFlushToDisk: false`), `fetch-cache` ist nicht gemessen. Weitere Kandidaten in Teil 2 am
+  laufenden Container messen (`lockDistDir`, Coredumps mit relativem `core_pattern`, SQLite-Temp-Rückfall auf `.` bei unbeschreibbarem `/tmp`): Nachlaufprüfung gegen die **installierte** Kopie (uid 1000) nach der Routen-Inventur.
+* `@opentelemetry/api` ist nicht im Bundle (Next lädt es optional per `require` in `try`): die Vorfahrenregel (Code 18) ist die Absicherung gegen das Nachladen aus `/data/app/versions/node_modules` & Co.
 
 ### Backups und Wiederherstellung (Funktion `admin.backup`)
 
@@ -863,7 +1056,7 @@ Fake-Browser, `server-only`/`next/cache` sind leer). Der zu testende Code wird *
 `env.signIn()`, `form({...})` und `redirectOf(() => action(...))` bilden Formulare und Sitzungen nach (Beispiele: `src/modules/admin/users/actions.test.ts`,
 `src/server/auth/login.test.ts`). Der **Aktions-Rahmen** hat einen generierten Berechtigungs-Matrixtest (`src/server/operations/matrix.test.ts`) und Architekturregeln (`architecture.test.ts`: jede Action benutzt `defineAction`, `run` bleibt transportneutral). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden), Architekturregeln, Migrations-Läufer (inkl. Verträglichkeit mit der Prisma-CLI), Backups/Restore (echte
-SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle.
+SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle. **Starter-Vertrauensanker:** `src/lib/updates/{tree,seal,keychain,markers,compat,fs-tree}.test.ts`, der Goldkorpus (`anchor-corpus.test.ts` gegen `testdata/anchor/cases.json`, erzeugt mit `npm run anchor:corpus`, `npm run anchor:corpus:check` prüft die Aktualität; Mutationstests mit Bitflips und Abschneiden), die Pipeline-Skripte als Kindprozesse (`anchor-scripts.test.ts`, Generalprobe `npm run anchor:rehearse`), Launcher (`src/launcher/launcher.test.ts`) und Installer (`install.test.ts`). Tests, die Ausführbit, Setuid oder Symlinks brauchen, laufen nur unter Linux (Windows: übersprungen); die Linux-Pipeline führt sie aus. Die nativen Tests des C-Prüfers (Teil 2) laufen mit `REQUIRE_NATIVE=1` in der CI als Fehler, wenn der Compiler fehlt.
 **Komponententests** rendern wirklich (`src/test/dom.ts`: `components/ui/data-table.test.ts` für `DataTable`/`Pagination`/`FilterBar` – Server-Komponenten werden aufgerufen und ihr Ergebnis im DOM gerendert; happy-dom + `react-dom/client`; `installDom()`, `mount()`, `act()`; `src/test/router.ts` liefert `usePathname`/`useRouter` für Komponenten, die sie brauchen): Fokus und Referenzen der Eingabebausteine (`components/ui/form.test.ts`), Formular-Rahmen (`form-frame.test.ts`: Eingabe bleibt bei Fehlern, Fehlerzusammenfassung, Netzwerkfehler, Entwurf; `form-draft.test.ts`: Entwurf bei gesteuerten, abhängigen und nachrückenden Feldern und der Kundenauswahl, Lebensdauer (Fehler/Erfolg/Weiterleitung), Bindung an den Benutzer, Vorbelegung, Enter, Navigationsbremse, Toast-Hub), `ConfirmDialog`/`SubmitSwitch`, `SearchCombobox`, `Menu`, die Navigation und Schnellsuche (`components/shell/sidebar.test.ts`, `quick-search.test.ts`), die Fehlergrenze der
 Dashboard-Bausteine (`components/shell/widget-boundary.test.ts`), Status- und Fehlerseiten (`components/ui/status.test.ts`, `components/shell/error-view.test.ts`). Quelltext-Muster-Tests gelten nur für echte Architekturregeln, nicht für Verhalten.
 
@@ -922,8 +1115,8 @@ abweicht.
 | **privat** | GitHub-Repository-Secret **`RELEASE_SIGNING_KEY`** (nie im Repo, nie im Image) | signiert in der Pipeline das Manifest |
 | **öffentlich** | `src/modules/admin/updates/release-key.ts` (`RELEASE_PUBLIC_KEY`, im Code und damit im Image) | die App prüft damit jedes Release |
 
-Forks können einen eigenen öffentlichen Schlüssel über die Umgebungsvariable `UPDATE_PUBLIC_KEY` (PEM) setzen (zugleich Wurzel, siehe unten;
-getrennt: `UPDATE_ROOT_PUBLIC_KEY`).
+Die Schlüssel kommen **nur aus dem Build** (`release-key.ts`); keine Umgebungsvariable überschreibt sie, weder in der App noch im Starter (`scripts/gen-trust-header.mjs` erzeugt den Header des Starters aus derselben Datei).
+Forks tragen ihre Schlüssel in `release-key.ts` ein. Neben dem Manifest signiert derselbe Schlüssel das **Siegel** `SOS-SEAL` jeder Version (Abschnitt „Starter-Vertrauensanker“; das Manifest mit dem Kontext `schrauberos-manifest-v1`).
 
 ### Schlüsselkette: Wurzelschlüssel → Release-Schlüssel
 
@@ -937,8 +1130,8 @@ braucht, gibt es zwei Ebenen (`src/lib/updates/keychain.ts`, getestet):
 
 Die App vertraut dem eingebauten Release-Schlüssel **und** jedem Schlüssel mit einer gültigen Beglaubigung des Wurzelschlüssels
 (`release-keys.json`, wird dem Release beigelegt und unter `<DATA_DIR>/app/release-keys.json` gemerkt; bei jeder Verwendung erneut
-gegen die Wurzel geprüft). **Jede Beglaubigung trägt ein Ablaufdatum (`--valid-until`, Pflicht)**; eine unbefristete wird von der App abgelehnt und vom
-Skript gar nicht erst erzeugt. Nicht beglaubigte Schlüssel werden abgelehnt.
+gegen die Wurzel geprüft) und **die Beglaubigung steckt im Siegel jeder installierten Version** (Format 2, 118 Bytes), sodass der Starter sie ohne diese Datei prüfen kann. **Jede Beglaubigung trägt ein Ablaufdatum (`--valid-until`, Pflicht, höchstens 5 Jahre)**; eine unbefristete wird von der App abgelehnt und vom
+Skript gar nicht erst erzeugt. Nicht beglaubigte Schlüssel werden abgelehnt. Der Ablauf wird nur von der App geprüft (Installieren), **nie vom Starter beim Start**; `make-seal.mjs` verweigert Siegel mit < 90 Tagen Restlaufzeit, die Update-Seite warnt 90 Tage vorher.
 
 **Grenze der Kette (wichtig):** Der im Image eingebaute Release-Schlüssel bleibt für diese Installationen **immer vertraut**. Die Kette hilft bei
 *Verlust* des privaten Schlüssels – **nicht** bei *Diebstahl* oder Kompromittierung: Wer das Secret `RELEASE_SIGNING_KEY` gestohlen hat, kann weiter
@@ -1006,21 +1199,22 @@ veröffentlichen, Installationen einmal per `docker compose pull && docker compo
 2. Tag setzen und pushen: `git tag v0.2.0 && git push origin v0.2.0`.
 3. Die GitHub-Action (`.github/workflows/docker-publish.yml`) prüft bei einem Tag zuerst, dass der **getaggte Commit auf `main` liegt** (Job *guard*: Vorfahre von `origin/main`), dann
    Typen/Lint/Tests, den Produktions-Build (`npm run build`) und die Laufzeit-Abhängigkeiten (`npm audit --omit=dev --audit-level=high`: nur hohe und kritische Funde brechen ab, damit ein
-   gemeldeter Fund niedriger Schwere keinen Hotfix blockiert). Das Image wird **einmal gebaut**, genau dieses Image **startet vor dem Veröffentlichen** (`scripts/smoke-image.sh`,
-   siehe unten) und wird erst danach unverändert nach `ghcr.io` gepusht (`0.2.0`, `0.2`, `latest`) – kein zweiter Build, der vom getesteten abweichen könnte. Das Paket (`--target bundle`)
-   entsteht im selben Job aus demselben Build-Cache; eine Gegenprobe vergleicht `version.json`, `launcher.mjs` und `server.js` byte-genau mit dem getesteten Image. Danach – Job *Release*, hängt am
-   erfolgreichen Veröffentlichen – erzeugt sie `manifest.json` samt Signatur (`scripts/make-release.mjs`) und legt das GitHub-Release mit Paket, Manifest und Signatur an (Änderungen aus den Commits).
+   gemeldeter Fund niedriger Schwere keinen Hotfix blockiert). Der Image-Bau bricht ab, wenn der Wurzelschlüssel fehlt, gleich dem Release-Schlüssel ist oder ein Testschlüssel wäre (Stufe `trust`). Das Image wird **einmal gebaut**,
+   genau dieses Image **startet vor dem Veröffentlichen** (`scripts/smoke-image.sh`, siehe unten) und wird erst danach unverändert nach `ghcr.io` gepusht — **bei Tags nur als `sha-…`**. Das Paket ist ein **Auszug des getesteten Images** (`docker cp /app`, kein
+   zweiter Build). Danach – Job *release* in der Umgebung `release`, Freigabe des Reviewers – entstehen `SOS-SEAL` (`scripts/make-seal.mjs`) und `manifest.json` samt Signatur (`scripts/make-release.mjs`), dann die **Echtprobe** (`scripts/real-trial.sh`: Produktions-Image per Digest, echte
+   Schlüssel, Manipulationen), das GitHub-Release als **Entwurf**, der **Retag** desselben Digests als `X.Y.Z`, `X.Y` und `latest` (`docker buildx imagetools create`) und zuletzt das Veröffentlichen des Entwurfs. Scheitert die Echtprobe, gibt es weder `latest` noch ein Release.
+   Proben ohne Veröffentlichung: `workflow_dispatch` mit `rehearsal` (nur Testschlüssel, `scripts/rehearse-release.mjs`) und `check_signing_key` (Umgebung `release`).
    Tags mit `-` (`v0.2.0-rc1`) sind **Vorabversionen**: kein `latest`-Image, keine Signatur (installierbar sind nur `x.y.z`), das Release wird als `--prerelease --latest=false` markiert (Web-Updates fragen `releases/latest`).
    **Auch ein `-rc`-Tag läuft durch `db:release-check` und erzwingt damit das Einfrieren der Migrationen** (`npm run db:freeze`) – wer nur testen will, baut über `main` (`edge`) oder startet den Workflow von Hand.
 
 **Einstellungen auf GitHub, die der Betreiber selbst vornehmen muss** (im Repository nicht abbildbar, die Pipeline setzt sie voraus):
 
 * **Tag-Schutz für `v*`** (Settings → Rules → Rulesets → Tag: Muster `v*`, Erstellen/Ändern/Löschen nur für wenige Personen): sonst kann jede Person mit Schreibrecht einen Versions-Tag setzen und damit Image und Release anstoßen. Die Prüfung `guard` fängt Tags auf fremden Commits ab, ersetzt den Tag-Schutz aber nicht.
-* **Umgebung `release`** (Settings → Environments → New environment): mit **Pflicht-Reviewer** (Required reviewers) einrichten und das Secret `RELEASE_SIGNING_KEY` dorthin verschieben (als *Environment secret*, nicht mehr als Repository-Secret). Der Job *Release* läuft in dieser Umgebung; ohne Freigabe kommt der Signaturschlüssel nicht in einen Lauf, auch nicht bei einem gepushten Tag. Auch das Veröffentlichen des Images (`latest`) läuft vor dieser Freigabe – der Schutz dafür ist der Tag-Schutz.
+* **Umgebung `release`** (Settings → Environments → New environment): mit **Pflicht-Reviewer** (Required reviewers) einrichten und das Secret `RELEASE_SIGNING_KEY` dorthin verschieben (als *Environment secret*, nicht mehr als Repository-Secret). Der Job *Release* läuft in dieser Umgebung; ohne Freigabe kommt der Signaturschlüssel nicht in einen Lauf, auch nicht bei einem gepushten Tag. `latest` und die Versions-Tags des Images entstehen erst im Job *release*, also erst nach dieser Freigabe und der Echtprobe.
 
 Die Pipeline bricht ab, wenn Tag und `package.json` nicht übereinstimmen. Nur Versionen der Form `x.y.z` sind installierbar.
 **Ein Push auf `main` veröffentlicht nur `edge` (und `sha-…`), nie `latest`** – `latest` und die Versions-Tags gibt es erst mit dem Tag (Vorabversionen wie `v0.2.0-rc1`
-bekommen kein `latest`). Der Inhalt von `main` heißt `x.y.z-dev.<sha>` und wird von Web-Updates nie angeboten.
+bekommen kein `latest`, nur ihren vollen Namen). Der Inhalt von `main` heißt `x.y.z-dev.<sha>` und wird von Web-Updates nie angeboten.
 
 **Lieferkette:** Alle Actions in der Pipeline sind auf einen Commit-SHA festgelegt (Version im Kommentar, per `gh api` gegen den Tag aufgelöst); das Basisimage im
 `Dockerfile` ist per Digest festgelegt. Dependabot (`.github/dependabot.yml`: npm, Actions, Docker, Compose) schlägt Updates als Pull Requests vor – nichts wird
@@ -1029,15 +1223,16 @@ lesen und im `Dockerfile` ersetzen.
 
 **Smoke-Test des Images** (`bash scripts/smoke-image.sh <lokales-image>`, lokal mit Docker ebenso): prüft den Besitzer im Image (`/app` root, `/data` 1000), startet
 es mit `docker-compose.yml` **und** mit `docker-compose.hardened.yml` und verlangt je: gesund, `/api/health` ok, `/login` mit erzwungener CSP, Weiterleitung ohne Anmeldung,
-Einrichtungs-Token im Log (die App hat in `/data` geschrieben). Schlägt er fehl, wird nichts veröffentlicht.
+Einrichtungs-Token im Log (die App hat in `/data` geschrieben); außerdem Modus-Bits unter `/app` und die Dateiliste `SOS-TREE` gegen den Baum. Schlägt er fehl, wird nichts veröffentlicht.
 
 Lokal ein Paket bauen und signieren (zum Testen):
 
 ```bash
-docker build --target bundle --build-arg APP_VERSION=0.2.0 --output type=tar,dest=bundle.tar .
-tar -xf bundle.tar version.json && gzip -c bundle.tar > schrauberos-0.2.0.tar.gz
+docker build --target bundle --build-arg APP_VERSION=0.2.0 --output type=local,dest=pkg .     # enthält SOS-TREE
+tar --sort=name --owner=0 --group=0 --numeric-owner -czf schrauberos-0.2.0.tar.gz -C pkg .
+RELEASE_SIGNING_KEY="$(cat release-signing-key.pem)" node scripts/make-seal.mjs --bundle pkg --out .
 RELEASE_SIGNING_KEY="$(cat release-signing-key.pem)" node scripts/make-release.mjs \
-  --archive schrauberos-0.2.0.tar.gz --bundle . --out .
+  --archive schrauberos-0.2.0.tar.gz --bundle pkg --out .
 ```
 
 ### Update-Token in der App
@@ -1075,7 +1270,7 @@ Wiederherstellung schreiben nur nach `/data` und funktionieren unverändert. In 
 /data/schrauberos.db (+ -wal, -shm)   Datenbank
 /data/files/                          Belege und Bilder, lesbare Pfade (rechnungen/<Jahr>/<eingang|ausgang>/…, doku/<bereich>/…)
 /data/backups/<name>/                 Backups (database.db.gz, files/ als Hardlinks, info.json); Aufbewahrung je Art einstellbar
-/data/app/                            state.json, active, versions/<version>/ (installierte Pakete), launcher-crash
+/data/app/                            state.json, active, versions/<version>/ (installierte Pakete, schreibgeschützt, mit SOS-SEAL/SOS-TREE), Marker: launcher-crash, verify-failed, inconclusive, verify-ok, incompatible, integrity-reported
 /data/restore/                        vorgemerkte/ersetzte Daten während einer Wiederherstellung (auch pending-secret.key/replaced-secret.key)
 /data/secret.key                      Schlüssel für verschlüsselte Einstellungen (nicht in Backups; eine mit dem Wiederherstellungsschlüssel umhüllte Kopie steckt in der Datenbank)
 /data/secret-reset/                   Sicherung der verschlüsselten Zeilen vor jedem Zurücksetzen nicht lesbarer Geheimnisse (0600, nicht in Backups)
@@ -1145,7 +1340,8 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
   `src/server/auth/providers.ts` vorgesehen.
 * Werbas-Anbindung (später): Kunden/Fahrzeuge tragen `externalSource`/`externalId`/`syncedAt`; `src/server/integrations/werbas/`
   enthält Austauschformat und Abgleichslogik, offen ist nur `client.ts`.
-* Gebaut wird `linux/amd64`.
+* Gebaut wird `linux/amd64` (das Siegel trägt `arch`; weitere Architekturen bräuchten ein Siegel je Architektur).
+* **Starter-Vertrauensanker:** schützt vor dem Überleben fremden Codes über Neustarts, nicht vor Laufzeit-Manipulation, Daten-Persistenz, gestohlenem Release-Schlüssel oder dem Wiedereinspielen einer echten alten signierten Version oberhalb der eingebauten (Details im Abschnitt „Starter-Vertrauensanker“). Zusätzliche Dateien von NAS-Diensten im Versionsordner (`@eaDir`, `.DS_Store`, `Thumbs.db`) führen zur Ablehnung der Version (Meldung nennt den Pfad); „unhealthy“ während eines App-Neustarts ist kosmetisch.
 
 ## Technik
 
