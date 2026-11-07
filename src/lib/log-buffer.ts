@@ -23,7 +23,8 @@ const globalForLogs = globalThis as unknown as { __logBuffer?: Store };
 const store = (): Store => (globalForLogs.__logBuffer ??= { entries: [], installed: false });
 
 // Zugangsdaten in Klartext: „Bearer abc…“, „token=abc…“, „password: abc“ (mit Doppelpunkt oder Gleichheitszeichen) und lange Zeichenketten ohne Leerzeichen aus Schlüsselzeichen (Tokens, Hashes, Schlüssel)
-const CREDENTIAL = /\b(bearer)\s+\S+|\b(token|secret|password|passwort|authorization|api[-_]?key)\s*[:=]\s*(?:(?:bearer|basic)\s+)?\S+/gi;
+// Auch JSON-artig: `"password":"x y"` (Schlüssel in Anführungszeichen, Wert in Anführungszeichen – ein ganzer Wert mit Leerzeichen wird mit entfernt)
+const CREDENTIAL = /\b(bearer)\s+\S+|\b(token|secret|password|passwort|authorization|api[-_]?key)["']?\s*[:=]\s*(?:"[^"\n]*"|'[^'\n]*'|(?:(?:bearer|basic)\s+)?\S+)/gi;
 const LONG_TOKEN = /[A-Za-z0-9+/_=-]{32,}/g;
 
 /** Entfernt, was nach Zugangsdaten aussieht. Fehlalarme sind in Kauf genommen (lieber ein `[…]` zu viel). */

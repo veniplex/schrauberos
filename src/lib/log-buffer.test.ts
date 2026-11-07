@@ -46,6 +46,24 @@ describe("Ringpuffer der Warn-/Fehlerzeilen (Systemstatus)", () => {
     assert.equal(formatLogArgs(["setup-token ", "a".repeat(64)]).includes("aaaa"), false);
   });
 
+  it("ZP5-12: auch JSON-artige Zuweisungen (Schlüssel und Wert in Anführungszeichen, Werte mit Leerzeichen)", () => {
+    const cases: Array<[string, RegExp]> = [
+      [`{"password":"geheim wort 1"}`, /geheim|wort/],
+      [`{"password": "hunter2", "user": "anna"}`, /hunter2/],
+      [`{'token':'abc def'}`, /abc|def/],
+      [`{"Authorization":"Bearer abc.def-ghi"}`, /abc/],
+      [`{"api_key":"k-123456"}`, /k-123456/],
+      [`passwort = "mein geheimes passwort"`, /mein|geheimes/],
+      [`password=abc&x=1`, /abc/],
+    ];
+    for (const [input, secret] of cases) {
+      const out = redactSecrets(input);
+      assert.doesNotMatch(out, secret, input);
+      assert.match(out, /\[…\]/, input);
+    }
+    assert.match(redactSecrets(`{"password":"x","user":"anna"}`), /"user":"anna"/, "Übriges bleibt lesbar");
+  });
+
   it("leere Zeilen werden nicht aufgenommen", () => {
     recordLog("warn", ["   "]);
     recordLog("warn", []);
