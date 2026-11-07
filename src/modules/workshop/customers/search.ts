@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/server/db";
 import type { SearchProviderDef } from "@/modules/types";
 import { customerDisplayName } from "./domain";
-import { customerSearchFields } from "./queries";
+import { customerSearchFields, searchableCustomerWhere } from "./queries";
 
 /** Schnellsuche: Kunden nach Name, Firma, Kundennummer, Ort, Telefon und E-Mail (Kontaktdaten sind mit `customers.view` sichtbar, das der Anbieter verlangt). */
 export const searchProviders: SearchProviderDef[] = [
@@ -14,7 +14,7 @@ export const searchProviders: SearchProviderDef[] = [
     order: 30,
     async search(q, { limit }) {
       const rows = await db.customer.findMany({
-        where: { archivedAt: null, OR: customerSearchFields.map((f) => f.where(q)) },
+        where: { ...searchableCustomerWhere, OR: customerSearchFields.map((f) => f.where(q)) },
         orderBy: { lastName: "asc" },
         take: limit,
         select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true, city: true },

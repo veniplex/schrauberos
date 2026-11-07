@@ -1,5 +1,6 @@
 "use client";
 
+import { DuplicateNotice } from "@/components/ui/duplicate-notice";
 import { Field, FormActions, FormCard, Input, Textarea } from "@/components/ui/form";
 import { useI18n } from "@/i18n/client";
 import { saveCustomer } from "./actions";
@@ -44,6 +45,13 @@ export function CustomerForm({ initial, cancelHref, canAddVehicle = false }: { i
         <Field label={t("customers.fields.customerNumber")} htmlFor="customerNumber" name="customerNumber">
           <Input id="customerNumber" name="customerNumber" defaultValue={initial.customerNumber} autoComplete="off" />
         </Field>
+        <DuplicateNotice
+          title={t("customers.duplicate.title")}
+          message={(data) => t("customers.duplicate.message", { number: data.duplicateNumber ?? "", name: data.duplicateName ?? "" })}
+          openLabel={t("customers.duplicate.open")}
+          openHref={(id) => `/customers/${id}`}
+          anywayLabel={initial.id ? t("customers.duplicate.anywaySave") : t("customers.duplicate.anywayCreate")}
+        />
         <Field label={t("customers.fields.phone")} htmlFor="phone" name="phone">
           <Input id="phone" name="phone" type="tel" defaultValue={initial.phone} autoComplete="off" />
         </Field>

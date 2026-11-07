@@ -12,6 +12,7 @@ import { toDateInput } from "@/lib/dates";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { customerTitle, getCustomerDetail } from "@/modules/workshop/customers/queries";
 import { archiveCustomer, deleteCustomer, unarchiveCustomer } from "@/modules/workshop/customers/actions";
+import { PrivacyNotice, PrivacyPanel } from "@/modules/workshop/customers/privacy-panel";
 import { HealthBadge, SeasonBadge, formatTireSize, getTireRules, setHealth } from "@/modules/workshop/tires/public";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
 
@@ -47,6 +48,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <span className="flex flex-wrap items-center gap-2">
             {customer.customerNumber ? <span className="tabular">#{customer.customerNumber}</span> : null}
             {customer.archivedAt ? <Badge>{t("archive.badge")}</Badge> : null}
+            {customer.processingRestrictedAt ? <StatusBadge tone="warning">{t("privacy.panel.restrictedBadge")}</StatusBadge> : null}
+            {customer.anonymizedAt ? <Badge>{t("privacy.panel.anonymizedBadge")}</Badge> : null}
           </span>
         }
         actions={
@@ -57,6 +60,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           ) : null
         }
       />
+
+      <PrivacyNotice restrictedAt={customer.processingRestrictedAt} anonymizedAt={customer.anonymizedAt} />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="min-w-0 flex flex-col gap-5 md:col-span-2">
@@ -155,9 +160,11 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 { label: t("customers.fields.email"), value: customer.email ? <TextLink external href={`mailto:${customer.email}`}>{customer.email}</TextLink> : null },
                 { label: t("customers.fields.address"), value: address },
                 { label: t("common.notes"), value: customer.notes },
+                { label: t("privacy.f.restrictionNote"), value: customer.processingRestrictedAt ? customer.restrictionNote : null },
               ]}
             />
           </Card>
+          <PrivacyPanel session={session} customer={customer} />
           <ArchivePanel
             id={customer.id}
             archived={Boolean(customer.archivedAt)}

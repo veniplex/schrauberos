@@ -1,4 +1,6 @@
 import { archivedWhere, parseArchiveFilter } from "@/lib/archive-filter";
+import { disclosureRows } from "@/lib/privacy";
+import { collectDisclosure, privacySubject } from "@/modules/privacy";
 import { formatDay } from "@/server/csv/format";
 import { columnSpecs } from "@/server/csv/columns";
 import { defineImport } from "@/server/csv/define-import";
@@ -8,6 +10,7 @@ import type { ExportDef } from "@/server/csv/types";
 import { db } from "@/server/db";
 import { CUSTOMER_COLUMNS } from "./exchange-columns";
 import { customerInput, customerRecord, type CustomerFields } from "./operations";
+import { unrestrictedCustomerWhere } from "./queries";
 
 /**
  * Export und Import der Kunden (`customers.export` / `customers.import`, nie in Standardrollen). Der Export enthält personenbezogene Daten (Name, Anschrift, Telefon, E-Mail)
@@ -22,12 +25,13 @@ export const customersExport: ExportDef = {
   filename: () => `kunden-${formatDay(new Date())}.csv`,
   // Standard nur aktive Kunden; `archived=1` nur archivierte, `archived=all` alle (P4b-2)
   open: async ({ query }) => {
-    const where = archivedWhere(parseArchiveFilter(query.get("archived")));
+    // Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) gehören nie in einen Export
+    const where = { ...archivedWhere(parseArchiveFilter(query.get("archived"))), ...unrestrictedCustomerWhere };
     return { columns: CUSTOMER_COLUMNS, count: await db.customer.count({ where }), target: "", rows: rows(where) };
   },
 };
 
-async function* rows(where: ReturnType<typeof archivedWhere>) {
+async function* rows(where: ReturnType<typeof archivedWhere> & typeof unrestrictedCustomerWhere) {
   for await (const c of paged((page) => db.customer.findMany({ ...pageArgs(page), where, orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }] }))) {
     yield [c.customerNumber, c.firstName, c.lastName, c.company, c.email, c.phone, c.street, c.zip, c.city, c.notes];
   }
@@ -75,3 +79,32 @@ export const customersImport = defineImport<CustomerFields>({
     for (let i = 0; i < rows.length; i += 500) await tx.customer.createMany({ data: rows.slice(i, i + 500).map(customerRecord) });
   },
 });
+
+/**
+ * Auskunft über einen Kunden als CSV (Art. 15 DSGVO, `customers.disclose` und `customers.view`): alle gespeicherten Daten aus allen aktiven Funktionen – Stammdaten, Fahrzeuge und
+ * Halterhistorie, Termine, Reifensätze, Rechnungen und Fundstellen in der Dokumentation – samt Freitexten, als flache Tabelle *Bereich · Nr. · Feld · Wert*. Zellen, die mit `=`, `+`, `-`
+ * oder `@` beginnen, schützt der CSV-Schreiber vor Formeln. Auswahl: `customer=<Kennung>`. Das Recht ist gekennzeichnet (kein Token, keine Standardrolle); das Audit hält Kunden und Zeilenzahl fest.
+ */
+export const disclosureExport: ExportDef = {
+  id: "customer-disclosure",
+  feature: "workshop.customers",
+  permission: "customers.disclose",
+  also: ["customers.view"],
+  audit: "customer.disclose",
+  filename: () => `auskunft-${formatDay(new Date())}.csv`,
+  open: async ({ session, query, t }) => {
+    const subject = await privacySubject(query.get("customer") ?? "");
+    if (!subject) return { error: "common.errors.notFound" };
+    const sections = await collectDisclosure(session.features, subject);
+    const table = disclosureRows(sections, (key) => t(key));
+    async function* rows() {
+      for (const row of table) yield row;
+    }
+    return {
+      columns: [{ labelKey: "privacy.cols.section" }, { labelKey: "privacy.cols.record" }, { labelKey: "privacy.cols.field" }, { labelKey: "privacy.cols.value" }],
+      count: table.length,
+      target: subject.id,
+      rows: rows(),
+    };
+  },
+};

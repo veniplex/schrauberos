@@ -10,6 +10,7 @@ import { Pagination } from "@/components/ui/pagination";
 import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { archivedWhere, archiveParam, parseArchiveFilter } from "@/lib/archive-filter";
+import { unrestrictedCustomerWhere } from "@/modules/workshop/customers/queries";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
 import { countCustomers, customerSearchFields, listCustomers } from "@/modules/workshop/customers/queries";
@@ -31,7 +32,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const [{ t, tp }, sp] = await Promise.all([getI18n(), searchParams]);
   const q = (sp.q ?? "").trim();
   const plate = normalizePlate(q);
-  const archived = parseArchiveFilter(sp.archived);
+  // „Eingeschränkt“ (Art. 18 DSGVO) ist ein eigener Listenfilter: Standardliste, Archiv und Auswahl zeigen eingeschränkte Kunden nie, „Alle“ schon
+  const restrictedOnly = sp.archived === "restricted";
+  const archived = parseArchiveFilter(restrictedOnly ? undefined : sp.archived);
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT });
 
   // Wörterbuch pro Berechtigung: Kennzeichen nur durchsuchbar, wer Fahrzeuge sehen darf
@@ -40,15 +43,18 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       ...customerSearchFields,
       { permission: "vehicles.view", where: () => (plate ? { vehicles: { some: { plateNorm: { contains: plate } } } } : { id: "" }) },
     ]) ?? {};
-  const where: Prisma.CustomerWhereInput = { ...text, ...archivedWhere(archived) };
+  const where: Prisma.CustomerWhereInput = restrictedOnly
+    ? { ...text, processingRestrictedAt: { not: null } }
+    : { ...text, ...archivedWhere(archived), ...(archived === "all" ? {} : unrestrictedCustomerWhere) };
 
   const total = await countCustomers(session, where);
   const page = clampPage(list.page, total, list.pageSize);
   const orderBy = list.sort === "city" ? [{ city: list.dir }, { lastName: "asc" as const }] : [{ lastName: list.dir }, { firstName: list.dir }, { company: list.dir }];
   const customers = await listCustomers(session, { where, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("customers.edit");
-  const links = listLinks("/customers", { q: q || undefined, ...archiveParam(archived) }, list, DEFAULT);
-  const exportQuery = new URLSearchParams(archiveParam(archived)).toString();
+  const filterParam = restrictedOnly ? { archived: "restricted" } : archiveParam(archived);
+  const links = listLinks("/customers", { q: q || undefined, ...filterParam }, list, DEFAULT);
+  const exportQuery = new URLSearchParams(restrictedOnly ? {} : archiveParam(archived)).toString();
 
   return (
     <>
@@ -71,14 +77,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       <FilterBar
         columns="sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
         keep={sortFields(list, DEFAULT)}
-        active={Boolean(q) || archived !== "active"}
-        extrasOpen={archived !== "active"}
+        active={Boolean(q) || archived !== "active" || restrictedOnly}
+        extrasOpen={archived !== "active" || restrictedOnly}
         resetHref="/customers"
         search={<SearchInput name="q" defaultValue={q} placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />}
       >
-        <Select name="archived" defaultValue={archived === "active" ? "" : archived === "all" ? "all" : "1"} aria-label={t("archive.filter.label")}>
+        <Select name="archived" defaultValue={restrictedOnly ? "restricted" : archived === "active" ? "" : archived === "all" ? "all" : "1"} aria-label={t("archive.filter.label")}>
           <option value="">{t("archive.filter.active")}</option>
           <option value="1">{t("archive.filter.archived")}</option>
+          <option value="restricted">{t("customers.filterRestricted")}</option>
           <option value="all">{t("archive.filter.all")}</option>
         </Select>
       </FilterBar>
@@ -101,10 +108,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             sort: "name",
             cell: (c) => customerDisplayName(c),
             sub: (c) =>
-              c.customerNumber || c.archivedAt ? (
+              c.customerNumber || c.archivedAt || c.processingRestrictedAt ? (
                 <span className="flex flex-wrap items-center gap-2">
                   {c.customerNumber ? <span className="tabular">#{c.customerNumber}</span> : null}
                   {c.archivedAt ? <Badge>{t("archive.badge")}</Badge> : null}
+                  {c.processingRestrictedAt ? <Badge>{t("privacy.panel.restrictedBadge")}</Badge> : null}
                 </span>
               ) : null,
           },

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { MessageKey } from "@/i18n/translate";
+import type { PrivacySection, PrivacySubject, RetentionItem } from "@/lib/privacy";
 import type { AppSession } from "@/server/auth/session";
 import type { FeatureId, Permission } from "./catalog";
 
@@ -146,4 +147,18 @@ export type SeedDef = {
   order: number;
   base?: (db: PrismaClient) => Promise<void>;
   demo?: (db: PrismaClient) => Promise<void>;
+};
+
+/**
+ * Beitrag einer Funktion zum Datenschutz (P4b-5, `privacy.ts` der Funktion, eingesammelt in `src/modules/privacy.ts`): **alle Daten dieser Funktion zu einem Kunden** für die Auskunft
+ * (Art. 15 DSGVO) und die Belege, deren Aufbewahrungsfrist eine Anonymisierung sperrt. Die Anonymisierung selbst läuft über transaktionale Hooks auf `customers.anonymize`
+ * (`operation-hooks.ts`). Der Anbieter läuft nur, wenn die Funktion aktiv ist; die Auskunft liefert bewusst alles zum Kunden, unabhängig von den Leserechten der Person
+ * (das Recht `customers.disclose` ist das Sonderrecht dafür).
+ */
+export type PrivacyProviderDef = {
+  id: string;
+  feature: FeatureId;
+  order: number;
+  collect(subject: PrivacySubject): Promise<PrivacySection[]>;
+  retention?(subject: PrivacySubject): Promise<RetentionItem[]>;
 };

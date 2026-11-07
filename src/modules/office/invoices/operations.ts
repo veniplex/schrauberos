@@ -104,13 +104,14 @@ export const saveInvoiceOperation = defineOperation({
     const outgoingKey = outgoingKeyOf(d.direction, d.number);
     if (outgoingKey && (await tx.invoice.findFirst({ where: { outgoingKey, ...(d.id ? { id: { not: d.id } } : {}) }, select: { id: true } }))) failField("number", "invoices.errors.numberTaken");
 
-    if (d.customerId && !(await tx.customer.findUnique({ where: { id: d.customerId }, select: { id: true } }))) failField("customerId", "validation.invalid");
+    const current = d.id ? await tx.invoice.findUnique({ where: { id: d.id }, select: { finalizedAt: true, customerId: true } }) : null;
+    // Ein Kunde mit eingeschränkter Verarbeitung (Art. 18 DSGVO) lässt sich nicht neu verknüpfen; eine bestehende Verknüpfung bleibt
+    if (d.customerId && !(await tx.customer.findFirst({ where: { id: d.customerId, OR: [{ processingRestrictedAt: null }, { id: current?.customerId ?? "" }] }, select: { id: true } }))) failField("customerId", "validation.invalid");
 
     const data = invoiceRecord(d, d.customerId ?? null);
 
     if (d.id) {
       // Festgeschriebene Rechnungen (und Gegenbelege) sind unveränderlich; korrigiert wird per Gegenbeleg
-      const current = await tx.invoice.findUnique({ where: { id: d.id }, select: { finalizedAt: true } });
       if (!current) fail("notFound");
       if (isFinalized(current)) fail("inUse", "invoices.errors.finalized");
     }

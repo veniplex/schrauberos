@@ -21,6 +21,8 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     view: "View customers with address, phone and email.",
     edit: "Create and change customers.",
     delete: "Delete customers as long as nothing is linked to them.",
+    disclose: "Export all data stored on a customer as access information (CSV/JSON, with free texts). Never granted automatically.",
+    privacy: "Restrict the processing of a customer and anonymize the master record once the retention period has ended. Never granted automatically.",
     export: "Download all customers with contact details as a CSV file (personal data).",
     import: "Create customers from a CSV file.",
   },

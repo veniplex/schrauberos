@@ -309,6 +309,11 @@ model Customer {
   phoneKey       String    @default("")
   // Archiviert (P4b-2): aus Auswahlfeldern, Suche und Neu-Formularen ausgeblendet, per Filter auffindbar, wieder aktivierbar; Verknüpfungen bleiben
   archivedAt     DateTime?
+  // Datenschutz (P4b-5): Verarbeitung eingeschränkt (Art. 18 DSGVO) – aus Suche, Auswahl, Schnellsuche, API/Webhooks und iCal ausgeblendet, im Detail sichtbar mit Hinweis; mit kurzer Notiz zum Anlass
+  processingRestrictedAt DateTime?
+  restrictionNote        String?
+  // Stammsatz anonymisiert (nach Ablauf der Aufbewahrungsfrist): alle personenbezogenen Felder sind geleert, die Verknüpfungen zu Rechnungen bleiben
+  anonymizedAt   DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -319,6 +324,20 @@ model Customer {
 
   @@index([lastName])
   @@index([archivedAt])
+  @@index([processingRestrictedAt])
+}
+
+// Datenschutz-Einstellungen (Singleton): Aufbewahrungsfristen in Jahren je Belegart und die Bestätigung durch einen Administrator. Die Standardwerte sind Platzhalter – erst nach der
+// Bestätigung (`retentionConfirmedAt`, am besten nach Rückfrage beim Steuerberater) darf ein Kunde anonymisiert werden. Eine Änderung der Fristen nimmt die Bestätigung zurück.
+model PrivacySettings {
+  id                       String    @id @default("default")
+  // Rechnungen und Stornorechnungen (Buchungsbelege)
+  retentionInvoiceYears    Int       @default(8)
+  // festgeschriebene Rechnungen (als Teil der Bücher geführt)
+  retentionBooksYears      Int       @default(10)
+  retentionConfirmedAt     DateTime?
+  retentionConfirmedByName String?
+  updatedAt                DateTime  @updatedAt
 }
 
 model Vehicle {

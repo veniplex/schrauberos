@@ -9,9 +9,9 @@ PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId
 DELETE /appointments/{id} appointments.delete appointments.delete
 POST /appointments/{id}/status appointments.status appointments.edit body=status
 GET /customers customers.list customers.view query=q,city,archived sort=lastName,customerNumber,city,createdAt,updatedAt
-POST /customers customers.create customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
+POST /customers customers.create customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes,allowDuplicate
 GET /customers/{id} customers.get customers.view
-PATCH /customers/{id} customers.update customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
+PATCH /customers/{id} customers.update customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes,allowDuplicate
 DELETE /customers/{id} customers.delete customers.delete
 POST /customers/{id}/archive customers.archive customers.edit
 POST /customers/{id}/unarchive customers.unarchive customers.edit

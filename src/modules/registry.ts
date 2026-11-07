@@ -12,6 +12,7 @@ import { widgets as tiresWidgets } from "./workshop/tires/widgets";
 import { widgets as vehiclesWidgets } from "./workshop/vehicles/widgets";
 import { settingsTabs as tiresSettings } from "./workshop/tires/settings-tab";
 import { settingsTabs as employeesSettings } from "./office/employees/settings-tab";
+import { settingsTabs as customersSettings } from "./workshop/customers/settings-tab";
 import { widgets as invoicesWidgets } from "./office/invoices/widgets";
 import { widgets as employeesWidgets } from "./office/employees/widgets";
 import { widgets as fleetWidgets } from "./office/fleet/widgets";
@@ -70,7 +71,7 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...handbookSearch,
 ];
 
-const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...employeesSettings, ...backupSettings, ...updatesSettings];
+const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...backupSettings, ...updatesSettings];
 
 /** Punkte der Einrichtungs-Checkliste (Administration). Neue Funktion mit Einrichtungsschritten: `setup-checks.ts` anlegen und hier eintragen. */
 const ALL_SETUP_CHECKS: SetupCheckDef[] = [...settingsChecks, ...usersChecks, ...backupChecks, ...appointmentsChecks, ...employeesChecks];

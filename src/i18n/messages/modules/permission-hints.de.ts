@@ -20,6 +20,8 @@ export const permissionHintsDe = {
     view: "Kunden mit Adresse, Telefon und E-Mail ansehen.",
     edit: "Kunden anlegen und ändern.",
     delete: "Kunden löschen, soweit nichts mehr mit ihnen verknüpft ist.",
+    disclose: "Alle zu einem Kunden gespeicherten Daten als Auskunft exportieren (CSV/JSON, mit Freitexten). Wird nie automatisch vergeben.",
+    privacy: "Die Verarbeitung eines Kunden einschränken und seinen Stammsatz nach Ablauf der Aufbewahrungsfrist anonymisieren. Wird nie automatisch vergeben.",
     export: "Alle Kunden samt Kontaktdaten als CSV-Datei herunterladen (personenbezogene Daten).",
     import: "Kunden aus einer CSV-Datei neu anlegen.",
   },

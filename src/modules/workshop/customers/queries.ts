@@ -28,9 +28,22 @@ const CUSTOMER = {
   city: true,
   notes: true,
   archivedAt: true,
+  processingRestrictedAt: true,
+  restrictionNote: true,
+  anonymizedAt: true,
   createdAt: true,
   updatedAt: true,
 } as const satisfies Prisma.CustomerSelect;
+
+/**
+ * **Die eine Bedingung für „Kunde ist verwendbar“** (P4b-5): nicht archiviert und die Verarbeitung nicht eingeschränkt. Sie gilt für alles, was Kunden zur Auswahl oder Suche anbietet –
+ * Auswahlfelder (`/api/customers/search`), Schnellsuche, Standardliste, die API-Ressource und später Webhooks und iCal (sie erben die Bedingung hier, statt eine eigene zu bauen). Ein
+ * eingeschränkter Kunde bleibt im Detail sichtbar (mit Hinweis) und über den Listenfilter „Eingeschränkt“ auffindbar.
+ */
+export const searchableCustomerWhere = { archivedAt: null, processingRestrictedAt: null } as const satisfies Prisma.CustomerWhereInput;
+
+/** Nur Verarbeitung nicht eingeschränkt (für Stellen, die archivierte Kunden weiter zeigen, aber nie eingeschränkte). */
+export const unrestrictedCustomerWhere = { processingRestrictedAt: null } as const satisfies Prisma.CustomerWhereInput;
 
 /**
  * Suchfelder der Kundenliste, der Schnellsuche und der API (Wörterbuch pro Berechtigung, `searchWhere`): Name und Firma über die normalisierte Spalte `nameKey`, Kundennummer,

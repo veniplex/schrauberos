@@ -103,7 +103,8 @@ export const saveVehicleOperation = defineOperation({
       );
     }
 
-    if (customerId && !(await tx.customer.findUnique({ where: { id: customerId }, select: { id: true } }))) failField("customerId", "validation.invalid");
+    // Ein Kunde mit eingeschränkter Verarbeitung (Art. 18 DSGVO) lässt sich nicht neu verknüpfen; das Fahrzeug, das er schon hält, bleibt bearbeitbar
+    if (customerId && !(await tx.customer.findFirst({ where: { id: customerId, OR: [{ processingRestrictedAt: null }, ...(id ? [{ vehicles: { some: { id } } }] : [])] }, select: { id: true } }))) failField("customerId", "validation.invalid");
 
     const data = vehicleRecord({ plate, ...d });
 
@@ -153,7 +154,7 @@ export const transferVehicleOperation = defineOperation({
     if (!vehicle) fail("notFound");
     const newId = d.newCustomerId ?? null;
     if (newId === vehicle.customerId) failField("newCustomerId", "vehicles.errors.sameOwner");
-    if (newId && !(await tx.customer.findUnique({ where: { id: newId }, select: { id: true } }))) failField("newCustomerId", "validation.invalid");
+    if (newId && !(await tx.customer.findFirst({ where: { id: newId, processingRestrictedAt: null }, select: { id: true } }))) failField("newCustomerId", "validation.invalid");
 
     const when = noon(d.date);
     await tx.vehicleOwnership.updateMany({ where: { vehicleId: vehicle.id, toDate: null }, data: { toDate: when } });

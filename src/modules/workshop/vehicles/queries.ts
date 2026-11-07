@@ -16,7 +16,7 @@ import { INSPECTION_SOON_MONTHS } from "./domain";
  */
 export function vehicleTextWhere(term: string): Prisma.VehicleWhereInput[] {
   const plate = normalizePlate(term);
-  return [...(plate ? [{ plateNorm: { contains: plate } }] : []), keyContains("searchKey", term), { customer: { is: keyContains("nameKey", term) } }];
+  return [...(plate ? [{ plateNorm: { contains: plate } }] : []), keyContains("searchKey", term), { customer: { is: { ...keyContains("nameKey", term), processingRestrictedAt: null } } }];
 }
 
 /** Filter der Fahrzeugliste – dieselben für die Liste und die Druckliste. */

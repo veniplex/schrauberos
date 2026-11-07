@@ -60,7 +60,16 @@ export const customersDe = {
   },
   errors: {
     nameRequired: "Nachname oder Firma angeben.",
+    numberExists: "Diese Kundennummer hat schon {name}.",
     inUse: "Dieser Kunde kann nicht gelöscht werden: {vehicles} Fahrzeuge, {former} frühere Halterschaften (die Halter-Historie bleibt auch nach einem Halterwechsel bestehen), {invoices} Rechnungen. Stattdessen archivieren: Der Kunde bleibt erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
   },
+  duplicate: {
+    title: "Diese Kundennummer gibt es schon",
+    message: "Die Kundennummer {number} ist bereits vergeben an {name}. Dubletten sind möglich, aber meist ein Versehen.",
+    open: "Vorhandenen Kunden öffnen",
+    anywayCreate: "Trotzdem anlegen",
+    anywaySave: "Trotzdem speichern",
+  },
+  filterRestricted: "Eingeschränkt",
   deleteBlocked: "Löschen nicht möglich, solange Fahrzeuge, Halter-Historie oder Rechnungen mit diesem Kunden verknüpft sind: {vehicles} Fahrzeuge, {ownerships} Halter-Einträge (auch frühere Halterschaft), {invoices} Rechnungen.",
 };

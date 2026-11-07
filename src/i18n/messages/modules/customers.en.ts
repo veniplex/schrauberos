@@ -60,8 +60,17 @@ export const customersEn: typeof customersDe = {
     },
   },
   errors: {
+    numberExists: "This customer number already belongs to {name}.",
     nameRequired: "Enter a last name or a company.",
     inUse: "This customer cannot be deleted: {vehicles} vehicles, {former} former keeperships (the keeper history stays even after a change of keeper), {invoices} invoices. Archive instead: the customer is kept but no longer appears in selection fields and search.",
   },
+  duplicate: {
+    title: "This customer number already exists",
+    message: "Customer number {number} is already assigned to {name}. Duplicates are possible but usually a mistake.",
+    open: "Open existing customer",
+    anywayCreate: "Create anyway",
+    anywaySave: "Save anyway",
+  },
+  filterRestricted: "Restricted",
   deleteBlocked: "Cannot be deleted while vehicles, owner history or invoices are linked to this customer: {vehicles} vehicles, {ownerships} owner entries (including past ownership), {invoices} invoices.",
 };

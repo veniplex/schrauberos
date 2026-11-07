@@ -7,7 +7,7 @@ import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { keyContains } from "@/server/search";
 import { archiveCustomerOperation, deleteCustomerOperation, saveCustomerOperation, unarchiveCustomerOperation } from "./operations";
-import { customerSearchFields } from "./queries";
+import { customerSearchFields, unrestrictedCustomerWhere } from "./queries";
 
 /**
  * API-Ressource „Kunden“ (`/api/v1/customers`). Schreiben läuft über dieselben Operationen wie die Oberfläche (Prüfung der Sache, Audit); Kunden mit
@@ -26,6 +26,8 @@ const body = z.strictObject({
   zip: text(12),
   city: text(80),
   notes: text(2000),
+  /** Kundennummer trotz vorhandener Dublette speichern (Warnung bestätigt) */
+  allowDuplicate: z.boolean().optional(),
 });
 
 const item = z.object({
@@ -55,6 +57,8 @@ export const endpoints = defineResource({
   path: "/customers",
   read: "customers.view",
   model: db.customer as unknown as Delegate<Customer>,
+  // eingeschränkte Kunden (Art. 18 DSGVO) gibt es für die API nicht: weder lesen noch ändern (404)
+  scope: unrestrictedCustomerWhere,
   item,
   version: versionOf,
   toItem: (c): z.input<typeof item> => ({

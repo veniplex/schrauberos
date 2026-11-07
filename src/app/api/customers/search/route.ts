@@ -3,6 +3,7 @@ import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
 import { contains, keyContains } from "@/server/search";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { searchableCustomerWhere } from "@/modules/workshop/customers/queries";
 
 const ALLOWED = ["customers.view", "customers.edit", "invoices.edit"] as const;
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   const withAddress = session.can("customers.view");
   const customers = await db.customer.findMany({
     // archivierte Kunden sind nicht wählbar (P4b-2)
-    where: { archivedAt: null, OR: [keyContains("nameKey", q), { customerNumber: contains(q) }, ...(withAddress ? [keyContains("cityKey", q)] : [])] },
+    where: { ...searchableCustomerWhere, OR: [keyContains("nameKey", q), { customerNumber: contains(q) }, ...(withAddress ? [keyContains("cityKey", q)] : [])] },
     select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true, ...(withAddress ? { city: true } : {}) },
     orderBy: { lastName: "asc" },
     take: 8,

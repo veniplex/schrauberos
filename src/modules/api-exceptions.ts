@@ -7,6 +7,9 @@
  * Anzeigeeinstellungen). Beides sind nie API-Ressourcen.
  */
 export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
+  "customers.restrict": "Datenschutzvorgang (Art. 18 DSGVO) mit Sonderrecht customers.privacy: nur in der Oberfläche; eingeschränkte Kunden gibt es für die API nicht (404).",
+  "customers.unrestrict": "Datenschutzvorgang (Art. 18 DSGVO) mit Sonderrecht customers.privacy: nur in der Oberfläche; eingeschränkte Kunden gibt es für die API nicht (404).",
+  "customers.anonymize": "Unumkehrbarer Datenschutzvorgang (Art. 17 DSGVO) mit Sonderrecht customers.privacy und Rückfrage: nur in der Oberfläche.",
   "appointments.saveSettings": "Kalender-Konfiguration (Zeitraster, Tagesgrenzen) – Einstellung der Oberfläche, keine Stammdaten zum Austausch.",
   "appointments.saveBay": "Arbeitsplätze sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /bays), damit Termine darauf verweisen können.",
   "appointments.deleteBay": "Arbeitsplätze sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /bays).",

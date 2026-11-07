@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
-import { defineOperation, fail } from "@/server/operations";
+import { anonymizeBlock, type RetentionItem } from "@/lib/privacy";
+import { collectRetention, privacySubject } from "@/modules/privacy";
+import { defineOperation, fail, failFields } from "@/server/operations";
 import { customerDisplayName, customerHasLinks, customerSearchKeys, formerOwnerships } from "./domain";
+import { numberKey } from "./lookup";
+
+const flag = z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean());
 
 /** Eingabe eines Kunden – auch die Prüfung der Zeilen des CSV-Imports (`exchange.ts`). */
 export const customerInput = z
@@ -18,6 +23,8 @@ export const customerInput = z
     zip: z.string().max(12).optional(),
     city: z.string().max(80).optional(),
     notes: z.string().max(2000).optional(),
+    /** Kundennummer trotz vorhandener Dublette speichern (Warnung bestätigt) */
+    allowDuplicate: flag.optional(),
   })
   .superRefine((d, ctx) => {
     if (!d.lastName && !d.company) ctx.addIssue({ code: "custom", message: "customers.errors.nameRequired", path: ["lastName"] });
@@ -49,8 +56,18 @@ export const saveCustomerOperation = defineOperation({
   permission: "customers.edit",
   input: customerInput,
   audit: (input) => (input.id ? "customer.update" : "customer.create"),
-  run: async ({ input: { id, version, ...d }, tx, audit }) => {
+  run: async ({ input: { id, version, allowDuplicate, ...d }, tx, audit }) => {
     const data = customerRecord(d);
+    // Kundennummer doppelt vergeben: eine Warnung mit Bestätigung, keine Sperre (wie beim Kennzeichen). Verglichen wird ohne Leerraum und Groß-/Kleinschreibung.
+    if (d.customerNumber && !allowDuplicate) {
+      const key = numberKey(d.customerNumber);
+      const candidates = await tx.customer.findMany({
+        where: { customerNumber: { contains: d.customerNumber.trim() }, ...(id ? { id: { not: id } } : {}) },
+        select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true },
+      });
+      const twin = candidates.find((c) => numberKey(c.customerNumber ?? "") === key);
+      if (twin) failFields({ customerNumber: { key: "customers.errors.numberExists", params: { name: customerDisplayName(twin) } } }, { duplicateId: twin.id, duplicateName: customerDisplayName(twin), duplicateNumber: d.customerNumber });
+    }
     if (id && !(await claimRow(tx.customer, id, version))) fail("conflict");
     const saved = id ? await tx.customer.update({ where: { id }, data }) : await tx.customer.create({ data });
     audit({ target: customerDisplayName(saved), entityId: saved.id });
@@ -109,3 +126,129 @@ export const deleteCustomerOperation = defineOperation({
   },
 });
 
+
+/* ───────────── Datenschutz (P4b-5) ───────────── */
+
+/**
+ * Verarbeitung einschränken (Art. 18 DSGVO, `customers.privacy`): Der Kunde bleibt mit allen Daten erhalten, verschwindet aber aus Suche, Auswahl, Schnellsuche, API/Webhooks, Exporten und
+ * iCal (`searchableCustomerWhere` in `queries.ts` ist die eine Bedingung dafür) und lässt sich nicht neu verknüpfen. Im Detail bleibt er mit Hinweis sichtbar.
+ */
+export const restrictCustomerOperation = defineOperation({
+  name: "customers.restrict",
+  permission: "customers.privacy",
+  input: z.object({ id: z.string().min(1), note: z.string().trim().max(300).optional() }),
+  audit: "customer.restrict",
+  run: async ({ input, tx, audit }) => {
+    const customer = await tx.customer.findUnique({ where: { id: input.id } });
+    if (!customer) fail("notFound");
+    if (customer.processingRestrictedAt) fail("conflict", "privacy.errors.alreadyRestricted");
+    await tx.customer.update({ where: { id: input.id }, data: { processingRestrictedAt: new Date(), restrictionNote: input.note ?? null } });
+    // Das Audit-Log nennt den Kunden, nie die Notiz zum Anlass
+    audit({ target: customerDisplayName(customer), entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const unrestrictCustomerOperation = defineOperation({
+  name: "customers.unrestrict",
+  permission: "customers.privacy",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "customer.unrestrict",
+  run: async ({ input, tx, audit }) => {
+    const customer = await tx.customer.findUnique({ where: { id: input.id } });
+    if (!customer) fail("notFound");
+    if (!customer.processingRestrictedAt) fail("conflict", "privacy.errors.notRestricted");
+    await tx.customer.update({ where: { id: input.id }, data: { processingRestrictedAt: null, restrictionNote: null } });
+    audit({ target: customerDisplayName(customer), entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+/**
+ * Stammsatz anonymisieren (`customers.privacy`): nur nach Bestätigung der Aufbewahrungsfristen durch einen Administrator **und** erst, wenn die Fristen aller Rechnungen des Kunden abgelaufen
+ * sind (`anonymizeBlock`, `src/lib/privacy.ts`). Der Stammsatz wird geleert (Name, Firma, Kontakt, Anschrift, Notizen, Kundennummer, Suchspalten); die Verknüpfungen zu Rechnungen
+ * bleiben (der Empfänger steht weiter auf der Rechnung). Fahrzeuge, Termine und Reifen bereinigen transaktionale Hooks anderer Funktionen (`operation-hooks.ts`), in derselben Transaktion.
+ * Backups enthalten die Daten weiterhin. Die Belege mit Aufbewahrungsfrist werden vorab gelesen (`prepare`): Innerhalb der Transaktion gibt es nur `tx`.
+ */
+export const anonymizeCustomerOperation = defineOperation({
+  name: "customers.anonymize",
+  permission: "customers.privacy",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "customer.anonymize",
+  prepare: async ({ input, principal }) => {
+    const subject = await privacySubject(input.id);
+    const items: RetentionItem[] = subject ? await collectRetention(principal.features, subject) : [];
+    return { items };
+  },
+  run: async ({ input, prepared, tx, audit }) => {
+    const customer = await tx.customer.findUnique({ where: { id: input.id } });
+    if (!customer) fail("notFound");
+    const settings = await tx.privacySettings.findUnique({ where: { id: "default" } });
+    const block = anonymizeBlock({
+      anonymizedAt: customer.anonymizedAt,
+      confirmed: Boolean(settings?.retentionConfirmedAt),
+      items: prepared.items,
+      rules: { invoiceYears: settings?.retentionInvoiceYears ?? 8, booksYears: settings?.retentionBooksYears ?? 10 },
+    });
+    if (block?.reason === "already") fail("conflict", "privacy.errors.anonymizeAlready");
+    if (block?.reason === "unconfirmed") fail("inUse", "privacy.errors.anonymizeUnconfirmed");
+    if (block?.reason === "running") fail("inUse", "privacy.errors.anonymizeRunning", { date: block.until });
+    const now = new Date();
+    await tx.customer.update({
+      where: { id: input.id },
+      data: {
+        customerNumber: null,
+        firstName: null,
+        lastName: "Anonymisiert",
+        company: null,
+        email: null,
+        phone: null,
+        street: null,
+        zip: null,
+        city: null,
+        notes: null,
+        nameKey: "",
+        cityKey: "",
+        phoneKey: "",
+        restrictionNote: null,
+        anonymizedAt: now,
+        archivedAt: customer.archivedAt ?? now,
+      },
+    });
+    // Der Name steht danach nirgends mehr: das Audit-Log nennt nur die Kennung
+    audit({ target: "Kunde anonymisiert", entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+/* ───────────── Aufbewahrungsfristen (Einstellungen) ───────────── */
+
+const years = z.coerce.number({ error: "privacy.errors.years" }).int({ error: "privacy.errors.years" }).min(1, { error: "privacy.errors.years" }).max(30, { error: "privacy.errors.years" });
+
+/** Fristen in Jahren je Belegart (`settings.manage`, nur Administratoren). Eine Änderung nimmt die Bestätigung zurück. */
+export const savePrivacySettingsOperation = defineOperation({
+  name: "customers.savePrivacySettings",
+  permission: "settings.manage",
+  input: z.object({ retentionInvoiceYears: years, retentionBooksYears: years }),
+  audit: "settings.privacy",
+  run: async ({ input: d, tx, audit }) => {
+    const data = { ...d, retentionConfirmedAt: null, retentionConfirmedByName: null };
+    await tx.privacySettings.upsert({ where: { id: "default" }, update: data, create: { id: "default", ...data } });
+    audit({ target: `${d.retentionInvoiceYears}/${d.retentionBooksYears} Jahre`, entityId: "default" });
+    return {};
+  },
+});
+
+/** Bestätigung der Fristen durch einen Administrator (`confirmed=true`) bzw. Rücknahme; erst mit Bestätigung lässt sich ein Kunde anonymisieren. */
+export const confirmRetentionOperation = defineOperation({
+  name: "customers.confirmRetention",
+  permission: "settings.manage",
+  input: z.object({ confirmed: flag }),
+  audit: "settings.privacyConfirm",
+  run: async ({ input, principal, tx, audit }) => {
+    const data = input.confirmed ? { retentionConfirmedAt: new Date(), retentionConfirmedByName: principal.user.name.slice(0, 120) } : { retentionConfirmedAt: null, retentionConfirmedByName: null };
+    await tx.privacySettings.upsert({ where: { id: "default" }, update: data, create: { id: "default", ...data } });
+    audit({ target: input.confirmed ? "bestätigt" : "Bestätigung zurückgenommen", entityId: "default" });
+    return {};
+  },
+});

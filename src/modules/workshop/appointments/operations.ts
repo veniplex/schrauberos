@@ -47,7 +47,7 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
   if (vehicle?.customerId) {
     if (d.customerId && d.customerId !== vehicle.customerId) failField("customerId", "appointments.errors.customerMismatch");
   } else if (d.customerId) {
-    const customer = await tx.customer.findFirst({ where: { id: d.customerId, OR: [{ archivedAt: null }, { id: current?.customerId ?? "" }] }, select: { id: true } });
+    const customer = await tx.customer.findFirst({ where: { id: d.customerId, OR: [{ archivedAt: null, processingRestrictedAt: null }, { id: current?.customerId ?? "" }] }, select: { id: true } });
     if (!customer) failField("customerId", "validation.invalid");
     customerId = customer.id;
   }

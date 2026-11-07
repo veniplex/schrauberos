@@ -1,0 +1,44 @@
+# Datenschutz bei Kunden
+
+Die Anwendung speichert personenbezogene Daten von Kunden (Name, Anschrift, Telefon, E-Mail, Fahrzeuge, Termine, Rechnungen, Notizen). Für Anfragen von Kunden gibt es auf der **Kundenseite** die Karte **Datenschutz**. Sie ist nur sichtbar, wenn Sie die zugehörigen Sonderrechte haben (*Auskunft über einen Kunden exportieren* und *Datenschutz: Verarbeitung einschränken und Kunden anonymisieren*); beide stehen in keiner mitgelieferten Rolle und lassen sich nicht an eine Programmierschnittstelle vergeben. Alles, was dort geschieht, steht im Audit-Log.
+
+## Auskunft (Art. 15 DSGVO)
+
+**Auskunft exportieren** liefert alle zu einem Kunden gespeicherten Daten – als **CSV** (Excel) oder als **JSON**:
+
+* Stammdaten mit allen Feldern, auch Notizen,
+* Fahrzeuge, die der Kunde hält, und die **Halterhistorie** (auch frühere Fahrzeuge),
+* Termine mit Titel und Notizen,
+* Reifensätze seiner Fahrzeuge mit Notizen,
+* Rechnungen, die mit dem Kunden verknüpft sind (Empfänger, Beträge, Daten, Notizen),
+* **Fundstellen in der Dokumentation**: Seiten (und frühere Versionen), auf denen Name, Firma, Kundennummer oder E-Mail-Adresse vorkommen – nur mit Titel und Datum, nicht mit dem Inhalt.
+
+Die Auskunft enthält nur, was in der Anwendung steht. Rechnungen ohne Verknüpfung zum Kunden (nur der Name als Text) erscheinen nicht; Daten in ausgeschalteten Funktionen ebenfalls nicht. In der CSV-Datei beginnen Zellen, die mit `=`, `+`, `-` oder `@` anfangen, mit einem vorangestellten `'`, damit Excel sie nie als Formel ausführt. Die Datei enthält personenbezogene Daten: nur an den Betroffenen übergeben, nicht unverschlüsselt mailen.
+
+## Verarbeitung einschränken (Art. 18 DSGVO)
+
+**Verarbeitung einschränken** sperrt den Kunden, ohne etwas zu löschen. Danach
+
+* erscheint er nicht mehr in Suche, Auswahlfeldern (Termin, Fahrzeug, Rechnung), Schnellsuche, der Standard-Kundenliste und in den CSV-Exporten, und die Programmierschnittstelle (und spätere Webhooks) kennt ihn nicht mehr,
+* lässt er sich nicht mehr neu verknüpfen (neuer Termin mit diesem Kunden, Halterwechsel auf ihn, neue Rechnung an ihn); bestehende Verknüpfungen bleiben,
+* bleibt er auf seiner **Kundenseite** sichtbar – mit einem Hinweis, seit wann die Verarbeitung eingeschränkt ist, und der Notiz zum Anlass.
+
+Auffindbar ist er über den Listenfilter **Eingeschränkt** (und „Alle“). Nutzen dürfen Sie die Daten nur mit Einwilligung, zur Geltendmachung von Rechtsansprüchen oder aus anderen gesetzlich erlaubten Gründen. **Einschränkung aufheben** macht den Kunden wieder normal verwendbar. Hinweis: Bereits angelegte Termine und Fahrzeuge des Kunden bleiben in ihren Listen und im Kalender stehen.
+
+## Aufbewahrungsfristen und Anonymisierung (Art. 17 DSGVO)
+
+Rechnungen müssen aufbewahrt werden. Ein Kunde mit Rechnungen lässt sich deshalb nicht löschen. Stattdessen **anonymisiert** die Anwendung nach Ablauf der Frist den **Stammsatz**:
+
+* Name, Firma, Kundennummer, Anschrift, Telefon, E-Mail und Notizen werden gelöscht; der Kunde heißt danach „Anonymisiert“ und ist archiviert.
+* **Fahrzeuge** verlieren den Halter und ihre Notiz (Kennzeichen und FIN bleiben), die Halterhistorie bleibt ohne Namen; **Termine** verlieren den Kunden, ihre Notizen werden gelöscht und der Titel wird neutral; die **Notizen der Reifensätze und Reifen** werden gelöscht.
+* **Rechnungen** behalten ihren Empfänger (das Feld *Rechnungsempfänger*) und ihre Beträge – sie sind Buchungsbelege.
+* **Dokumentation:** Texte in Handbuch und IT-Dokumentation werden nicht angefasst. Die Fundstellen der Auskunft zeigen, wo der Kunde erwähnt ist – bitte vorher prüfen und die Seiten (auch ihre früheren Versionen) bereinigen.
+* **Backups** enthalten die Daten weiterhin, bis sie nach ihrer Aufbewahrung gelöscht werden; wird ein älteres Backup wiederhergestellt, ist der Kunde dort noch nicht anonymisiert – die Anonymisierung dann wiederholen. Auch Dateien, die Sie außerhalb der Anwendung aufbewahren (Exporte, versendete Rechnungen), gehören dazu.
+
+**Wann ist die Anonymisierung möglich?** Erst wenn (1) ein **Administrator** unter *Verwaltung → Einstellungen → Datenschutz* die Aufbewahrungsfristen **bestätigt** hat und (2) die Frist **aller** Rechnungen des Kunden abgelaufen ist. Die Frist beginnt mit dem **Ablauf des Kalenderjahres der Rechnung**: Eine Rechnung vom 14.03.2026 mit 8 Jahren Frist ist bis zum **31.12.2034** aufzubewahren und ab 01.01.2035 freigegeben (das Jahr zählt in der Zeitzone der Werkstatt). Das Feld auf der Kundenseite sagt, bis wann gesperrt ist. Kunden ohne Rechnungen lassen sich sofort anonymisieren, sobald die Fristen bestätigt sind.
+
+**Die Fristen** stellt der Administrator unter *Einstellungen → Datenschutz* ein: **Rechnungen und Stornorechnungen** (Standard 8 Jahre) und **festgeschriebene Rechnungen** als Teil der Bücher (Standard 10 Jahre). **Diese Werte sind Platzhalter.** Bitte klären Sie die Fristen mit Ihrem Steuerberater und bestätigen Sie sie erst danach; solange die Bestätigung fehlt – und nach jeder Änderung der Fristen – bleibt die Anonymisierung gesperrt. Die Anwendung ersetzt keine Rechts- oder Steuerberatung.
+
+## Kundennummern
+
+Eine Kundennummer kann doppelt vergeben werden, ist aber meist ein Versehen: Beim Speichern erscheint eine **Warnung** mit Verweis auf den Kunden, der die Nummer schon hat. Mit **Trotzdem speichern** bleibt die Dublette erlaubt (Leerraum und Groß-/Kleinschreibung zählen nicht als Unterschied).

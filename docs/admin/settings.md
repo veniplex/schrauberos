@@ -33,6 +33,7 @@ ihre eigenen Einstellungen mit.
   steht im Audit-Log). Danach bitte wieder erzwingen lassen.
 * **Backups:** Zeitplan der automatischen Backups und die Aufbewahrung je Art von Backup (siehe Hilfe „Backups“).
 * **Updates:** Zugang für die Update-Prüfung (siehe Hilfe „Updates“).
+* **Datenschutz:** Die **Aufbewahrungsfristen** in Jahren (Rechnungen und Stornorechnungen, festgeschriebene Rechnungen) und ihre **Bestätigung** – beschrieben im Kapitel *Datenschutz bei Kunden*. Die Standardwerte sind Platzhalter; erst nach Abstimmung mit dem Steuerberater bestätigen. Bis zur Bestätigung (und nach jeder Änderung der Fristen) bleibt die Anonymisierung von Kunden gesperrt.
 * **Mitarbeiter:** Der **Stichtag**, an dem der Resturlaub des Vorjahres verfällt (Standard 31. März) – beschrieben in der Hilfe *Mitarbeiter*.
 * **Termine** und **Reifenlager:** Kalender-Raster, Arbeitsplätze, Terminarten bzw. Ampel-Grenzwerte und Winterfenster – beschrieben in der Hilfe
   der jeweiligen Funktion im Bereich Werkstatt. Den Reiter **Termine** sieht, wer das Recht „Arbeitsplätze, Terminarten und Kalender

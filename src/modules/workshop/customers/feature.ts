@@ -7,11 +7,11 @@ export const customersFeature = defineFeature({
   descriptionKey: "customers.feature.description",
   order: 30,
   uses: ["workshop.vehicles", "workshop.tires", "workshop.appointments"],
-  permissions: { group: "customers", keys: ["customers.view", "customers.edit", "customers.delete", "customers.export", "customers.import"], marked: { export: ["customers.export"], import: ["customers.import"] } },
+  permissions: { group: "customers", keys: ["customers.view", "customers.edit", "customers.delete", "customers.disclose", "customers.privacy", "customers.export", "customers.import"], marked: { sensitive: ["customers.privacy"], export: ["customers.export", "customers.disclose"], import: ["customers.import"] } },
   nav: [
     { id: "customers", href: "/customers", labelKey: "nav.customers", icon: "customers", permission: "customers.view", order: 30 },
   ],
   quickActions: [{ id: "customers.new", labelKey: "customers.quick.new", href: "/customers/new", icon: "customers", permission: "customers.edit", order: 30 }],
   routes: ["customers", "api/customers"],
-  auditActions: ["customer.create", "customer.update", "customer.archive", "customer.unarchive", "customer.delete", "customer.export", "customer.import"],
+  auditActions: ["customer.create", "customer.update", "customer.archive", "customer.unarchive", "customer.restrict", "customer.unrestrict", "customer.anonymize", "customer.disclose", "customer.delete", "customer.export", "customer.import", "settings.privacy", "settings.privacyConfirm"],
 });

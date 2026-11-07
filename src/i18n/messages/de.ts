@@ -21,12 +21,14 @@ import { backupDe } from "./modules/backup.de";
 import { systemDe } from "./modules/system.de";
 import { holidaysDe } from "./modules/holidays.de";
 import { archiveDe } from "./modules/archive.de";
+import { privacyDe } from "./modules/privacy.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
   security: securityDe,
   holidays: holidaysDe,
   archive: archiveDe,
+  privacy: privacyDe,
   docs: docsDe,
   invoices: invoicesDe,
   fleet: fleetDe,
@@ -346,6 +348,8 @@ export const de = {
       view: "Kunden ansehen",
       edit: "Kunden bearbeiten",
       delete: "Kunden löschen",
+      disclose: "Auskunft über einen Kunden exportieren (alle gespeicherten Daten)",
+      privacy: "Datenschutz: Verarbeitung einschränken und Kunden anonymisieren",
       export: "Kunden exportieren (CSV, personenbezogene Daten)",
       import: "Kunden importieren (CSV, legt neue Kunden an)",
     },

@@ -22,10 +22,12 @@ import { backupEn } from "./modules/backup.en";
 import { systemEn } from "./modules/system.en";
 import { holidaysEn } from "./modules/holidays.en";
 import { archiveEn } from "./modules/archive.en";
+import { privacyEn } from "./modules/privacy.en";
 
 export const en: Messages = {
   holidays: holidaysEn,
   archive: archiveEn,
+  privacy: privacyEn,
   docs: docsEn,
   invoices: invoicesEn,
   fleet: fleetEn,
@@ -346,6 +348,8 @@ export const en: Messages = {
       view: "View customers",
       edit: "Edit customers",
       delete: "Delete customers",
+      disclose: "Export access information on a customer (all stored data)",
+      privacy: "Data protection: restrict processing and anonymize customers",
       export: "Export customers (CSV, personal data)",
       import: "Import customers (CSV, creates new customers)",
     },

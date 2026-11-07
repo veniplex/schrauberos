@@ -222,7 +222,20 @@ CREATE TABLE "Customer" (
     "cityKey" TEXT NOT NULL DEFAULT '',
     "phoneKey" TEXT NOT NULL DEFAULT '',
     "archivedAt" DATETIME,
+    "processingRestrictedAt" DATETIME,
+    "restrictionNote" TEXT,
+    "anonymizedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "PrivacySettings" (
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "retentionInvoiceYears" INTEGER NOT NULL DEFAULT 8,
+    "retentionBooksYears" INTEGER NOT NULL DEFAULT 10,
+    "retentionConfirmedAt" DATETIME,
+    "retentionConfirmedByName" TEXT,
     "updatedAt" DATETIME NOT NULL
 );
 
@@ -805,6 +818,9 @@ CREATE INDEX "Customer_lastName_idx" ON "Customer"("lastName");
 
 -- CreateIndex
 CREATE INDEX "Customer_archivedAt_idx" ON "Customer"("archivedAt");
+
+-- CreateIndex
+CREATE INDEX "Customer_processingRestrictedAt_idx" ON "Customer"("processingRestrictedAt");
 
 -- CreateIndex
 CREATE INDEX "Vehicle_plateNorm_idx" ON "Vehicle"("plateNorm");
