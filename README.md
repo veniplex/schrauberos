@@ -137,7 +137,7 @@ src/
     define.ts             Typen und defineModule()/defineFeature()
     features.ts           Aktivierung: Schalter lesen/schreiben (Datenbank)
     seed.ts               sammelt die Start- und Demo-Daten der Funktionen (`<funktion>/seed.ts`, `SeedDef`) ein; `src/server/seed` führt sie nur der Reihe nach aus
-    registry.ts           sammelt Dashboard-Bausteine, Einstellungs-Reiter und Suchanbieter (`<funktion>/search.ts`) der Funktionen ein; `quickActionsFor` (Neu-Menü) liest die `quickActions` der `feature.ts`
+    registry.ts           sammelt Dashboard-Bausteine, Einstellungs-Reiter, Abschnitte für Seiten anderer Funktionen (`<funktion>/sections.tsx`, `sectionsFor`) und Suchanbieter (`<funktion>/search.ts`) der Funktionen ein; `quickActionsFor` (Neu-Menü) liest die `quickActions` der `feature.ts`
     jobs.ts               sammelt die geplanten Jobs und Outbox-Abnehmer der Funktionen (`<funktion>/jobs.ts`) ein
     api.ts                sammelt die API-Endpunkte der Funktionen (`<funktion>/api.ts`) ein; api-exceptions.ts: UI-Aktionen ohne API-Pendant
     default-roles.ts      mitgelieferte Rollen
@@ -229,6 +229,41 @@ Hilfsfunktionen der Tests in `src/test/ui.ts` (`mountI18n`, `type`, `click`). Re
 | `PdfPreview` | – | siehe „PDF-Erzeugung“. |
 
 Offen für die Browser-CI (kommt mit den ersten Seiten, die die Bausteine nutzen, F2/F7): Unterschreiben, Positionen-Editor und Foto-Galerie auf iPhone/WebKit 390 × 844 und Tablet; die Komponententests ersetzen das nicht (kein echtes Canvas, kein Touch).
+
+### Aufträge und Lager (F2/F4)
+
+Zwei neue Funktionen, beide `defaultEnabled: false` (Preset „Mit Aufträgen und Lager“, sonst unter „Module & Funktionen“): **`workshop.orders`** (Werkstattaufträge/Arbeitskarten) und **`workshop.parts`** (Teile & Lager).
+`orders` ist der Kern und kennt weder Lager noch Zeiten noch Rechnungen; die hängen sich an. Kommunikation nur über `public.ts`, Hooks und Erweiterungspunkte.
+
+* **Kette:** Termin → Auftrag (Knopf „Auftrag aus Termin“ im Termin, Auftrag legt Fahrzeug/Anliegen vor) → später Rechnung (F3). Status (`constants.ts`, API-Vertrag): `accepted` → `in_progress` → `ready` → `picked_up` (+ `cancelled`).
+  Schritte (`domain.ts`, `STATUS_STEPS`): vor, einen zurück, stornieren, ein stornierter lässt sich wieder aufnehmen. **`picked_up` entsteht nur durch `orders.close`**, verlassen wird es nur durch `orders.reopen`; Aufträge werden nie gelöscht
+  (Fahrzeug/Kunde `Restrict`). Jeder Wechsel steht in `OrderEvent` (Verlauf mit `Timeline`); `Stepper` zeigt den Stand. Der Kunde kommt aus dem Halter des Fahrzeugs (ohne Halter: Auftrag ohne Kunde, `customerDisplayName`/Null-Prüfung);
+  archivierte Fahrzeuge und Kunden mit eingeschränkter Verarbeitung (Art. 18) nehmen keinen neuen Auftrag an (`createOrderRun`).
+* **Nummer = Zählertabelle:** `Counter { key, year }` + `nextCounterValue(tx, key, year)` (`src/server/counters.ts`): ein atomarer `upsert … increment` **in der Transaktion, die die Nummer verbraucht** – scheitert sie, rollt der Zähler mit zurück (lückenlos,
+  gleichzeitig getestet). Auftragsnummer `A-JJJJ-NNNN` (Jahr in der Werkstatt-Zone; festes Muster, das Muster des Werkstattprofils gilt den Rechnungen). F3 nimmt dieselbe Tabelle mit einem eigenen Schlüssel.
+* **Kilometerstand bei Annahme** (`mileageDecision`): höher als im Fahrzeug (oder dort leer) → wird **in derselben Transaktion** ins Fahrzeug geschrieben; niedriger → Fahrzeug bleibt, Hinweis statt Fehler (`orders.notices.mileageKept`).
+* **Positionen** (`OrderItem`): Art (`labor|part|other`), Menge in Tausendsteln, Netto-Einzelpreis in Cent, Steuersatz/Rabatt in Basispunkten, optional `refType`/`refId` (Verweis einer anderen Funktion; der Auftrag deutet ihn nicht). `orders.saveItems` ersetzt alle Positionen
+  (Formular wie API: `lineItemsInput()` → Server). **Preise** (Einzelpreis, Steuersatz, Rabatt, Summen, Beträge der Freigaben) liest und schreibt nur, wer `orders.prices` hat (`queries.ts`: die Spalten werden ohne das Recht nicht aus der Datenbank gelesen, am SQL getestet);
+  Mechaniker haben es standardmäßig nicht und sehen Positionen ohne Preise. Der `LineItemEditor` bekam dafür **optionale** Zusätze: `kinds` (Auswahl „Art“ je Position, Absendefeld `kind`), `refType`/`refId` je Zeile und das Fensterereignis
+  `LINE_ITEM_ADD_EVENT` (`lib/line-items.ts`), mit dem eine andere Funktion eine Position einfügt, ohne dass der Editor sie kennt. Ohne diese Zusätze bleibt das Absendefeld unverändert.
+* **Kundenfreigabe bei Mehrarbeit** (`OrderApproval`, unveränderlich: nur anlegen, es gibt keine Änderungs-/Löschoperation): Betrag (brutto, Cent), Begründung, freigebende Person, Art (`signature` = gezeichnet, `typed` = getippter Name mit Bestätigung, `phone`), erfassende Person;
+  Unterschrift als PNG-Datei unter `/data/files/auftraege/freigaben` (`parseSignatureValue`, `storeFile` in `prepare`, Datei wird in `finish` entfernt, wenn die Transaktion scheitert), ausgeliefert nur über `/api/orders/approvals/[id]/signature` (Route in `ROUTE_OWNED_PATHS`,
+  Recht `orders.view` + `orders.prices`). Über die API nur telefonisch/getippt.
+* **Abschluss atomar – Hooks:** `orders.close`, `orders.reopen` und `orders.setStatus` liefern als **Ergebnis** einen `OrderChange` (Nummer, Status, Termin, Positionen **ohne Preise**); Abonnenten (`hooks.ts` ihrer Funktion, `operation-hooks.ts`) laufen **in derselben Transaktion** und lesen nur dieses Ergebnis, keine Tabelle des Auftrags.
+  Wirft einer, bleibt der Auftrag offen, nichts ist gebucht (Test: `orders.test.ts`, `parts.test.ts`). Aktuelle Abonnenten: **Termine** (Terminstatus folgt: In Arbeit → Termin „In Arbeit“, Abschluss → „Erledigt“, Wiederöffnen → wieder „In Arbeit“, Stornieren sagt den Termin nie ab; `appointments/order-sync.ts`),
+  **Teile & Lager** (`parts/hooks.ts`: `orders.close` bucht je Artikel der Teile-Positionen ab, `orders.reopen` bucht den Saldo der Bewegungen dieses Auftrags zurück – bei mehrfachem Schließen/Öffnen nie doppelt –, `orders.saveItems` prüft Artikelverweise) und die Anonymisierung (`customers.anonymize`).
+  F5 (Zeiten als Positionen) und F3 (Rechnung) hängen sich genauso an. **Hooks importieren zur Laufzeit nichts, was `@/server/operations` lädt** (die Hooks werden vom Rahmen geladen → Importzirkel): `bookMovement` liegt deshalb in `parts/stock.ts`, Fehler kommen aus `@/server/operations/errors`.
+  Bewusst nicht über Hooks: das Audit (steht beim Auftrag), Ereignisse (`order.created|status|closed|reopened|approved` in der Outbox, ohne Preise).
+* **Wieder öffnen** (`orders.reopen`, gekennzeichnet `sensitive`, in keiner Standardrolle, **nie API**): setzt auf `ready`, Audit, die Abonnenten buchen zurück. Nur so ändert sich ein abgeschlossener Auftrag. Eine Stornorechnung bucht den Bestand nicht zurück (Hilfe sagt das).
+* **Erweiterungspunkte der Registry** (`SectionDef`, `sections.tsx` der Funktion → `registry.ts`, `sectionsFor(session, host)`, gerendert von `PageSections` in je eigener Fehlergrenze): `orders/detail` (Karte auf der Auftragsseite: Teile & Lager „Verbrauchte Teile“), `orders/items` (Werkzeug über dem Editor: „Artikel einfügen“),
+  `appointments/detail` (Aufträge: „Auftrag aus Termin“). Der Gastgeber kennt seine Gäste nicht; Funktion aktiv + Recht + weiche Abhängigkeiten werden geprüft. Neue Hosts: in `SectionHost` eintragen.
+* **Teile & Lager:** `Article` (Nummer normalisiert/eindeutig, Bestand und Mindestbestand in Tausendsteln, `archivedAt`), `StockMovement` (unveränderlich: `receipt|order|correction|reversal`, mit Stand danach, Auftrag ohne Fremdschlüssel, Lieferschein/Rechnungsnummer als Text). **Der Bestand ändert sich nur über `bookMovement`**
+  (atomarer Zuwachs). Negativer Bestand ist erlaubt (Warnung in Artikelliste/-seite, Übersicht, Auftrag), nie ein harter Fehler. Inventur = Differenz zum Stand **in der Transaktion** als Korrektur. Preise nur mit `parts.prices` (nicht gekennzeichnet: Standardrollen Geschäftsführung, Serviceberater, Lager haben es, Mechaniker nicht);
+  Preise im Artikelformular nur mit dem Recht, `pricesShown` unterscheidet „leer = löschen“ von „Feld gab es nicht“. Kundenreifen sind keine Handelsware und haben keine Verbindung.
+* **Rechte:** `orders.view|create|edit|close|reopen*|prices`, `parts.view|edit|stock|prices` (* gekennzeichnet). Standardrollen in `default-roles.ts`. Export/Import (CSV) für Artikel gibt es noch nicht.
+* **API:** `/orders` (ohne Preise; `status`, `close`, `items` – ersetzen, `orders.prices` –, `findings`), `/order-items` und `/order-approvals` (`orders.prices`; Freigaben nur lesen/anlegen), `/articles` (ohne Preise; Preise im Körper nur mit `parts.prices`), `/article-prices`, `/stock-movements` (lesen; anlegen = Wareneingang).
+  Nicht über die API (`api-exceptions.ts`): `orders.reopen`, `orders.removeFinding`, `parts.count`. Aufträge eingeschränkter Kunden sind 404. Die Matrix-Tests schalten Funktionen mit `defaultEnabled: false` selbst ein (`enableDefaultOff`).
+* **Tests:** `orders/orders.test.ts`, `orders/api.test.ts`, `orders/pages.test.ts` (Seiten wirklich gerendert über `src/test/server-tree.ts`: löst async Server-Komponenten auf), `orders/forms.test.ts`, `orders/domain.test.ts`, `parts/parts.test.ts`, `parts/api.test.ts`, `parts/pages.test.ts`, `parts/domain.test.ts`, `server/counters.test.ts`.
 
 ### Werkstatt-Alltag: Schnellstatus und Reifenwechsel-Kreis
 
@@ -1336,6 +1371,7 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
     am Fahrzeug, Auftrag bzw. der IT-Dokumentation). Das Symbol des Eintrags steht in `src/components/shell/nav-icons/<modul>.ts` (je Gruppe geladen, keine gemeinsame Tabelle).
 6c. **Daten:** `queries.ts` für alle Lesezugriffe der Seiten, Bausteine, Suche und API (explizites `select`, Betrachter-Parameter, sensible Spalten nur mit Recht – siehe „Datenzugriff“); `seed.ts` (`export const seeds: SeedDef[]` mit `base` = Grunddaten einer frischen Installation
     und/oder `demo` = Beispieldaten, die jede `[id]`-Seite der `pages.ts` bedienen) und Eintrag in `src/modules/seed.ts`. Tage und Uhrzeiten nur über `lib/dates.ts`/`lib/zone.ts` (siehe „Zeitzone“).
+6d. Beiträge zu Seiten **anderer** Funktionen (Abschnitt auf der Auftragsseite, Knopf im Termin): `sections.tsx` (`export const sections: SectionDef[]`, `host` aus `SectionHost`), eingetragen in `ALL_SECTIONS` der `registry.ts`; Reaktionen auf Operationen anderer Funktionen (Abbuchen beim Abschluss): `hooks.ts` – siehe „Aufträge und Lager (F2/F4)“.
 6a. Hintergrundarbeit (Aufräumen, regelmäßige Prüfungen, Zustellung von Ereignissen): `jobs.ts` (`export const jobs: JobDef[]`, `feature` ist die eigene Funktion; Abnehmer für Outbox-Ereignisse als `OutboxHandlerDef`),
     eingetragen in `src/modules/jobs.ts` – siehe „Job-Runner“. Der Job muss wiederholbar sein; ein Beschriftungsschlüssel `system.names.<bereich>.<name>` zeigt ihn im Systemstatus.
 7. Soll eine andere Funktion etwas nutzen, exportiert `public.ts` genau das – und die andere deklariert `requires`/`uses`.
