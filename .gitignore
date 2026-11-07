@@ -61,3 +61,7 @@ next-env.d.ts
 
 # Bau-Artefakt des Starters (scripts/gen-trust-header.mjs)
 /docker/trust-keys.h
+
+# Starter: Bau-Artefakte (Header der Vertrauensanker aus scripts/gen-trust-header.mjs, Testbauten)
+/docker/trust-keys.h
+/docker/test/build/
