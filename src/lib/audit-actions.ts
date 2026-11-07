@@ -41,6 +41,8 @@ export const PLATFORM_AUDIT_ACTIONS = [
   "apiToken.restoreRevoked",
   "setup.complete",
   "setup.restore",
+  "setup.checklistHide",
+  "setup.checklistShow",
   "system.integrityFailed",
   "system.auditPruned",
 ] as const;

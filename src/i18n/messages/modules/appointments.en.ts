@@ -1,8 +1,11 @@
 import type { appointmentsDe } from "./appointments.de";
 
 export const appointmentsEn: typeof appointmentsDe = {
+  checklist: {
+    baysTypes: { label: "Set up workstations and appointment types", hint: "The calendar plans on workstations (lifts, parking spots) with appointment types and their duration." },
+  },
   search: { group: "Appointments" },
-  quick: { new: "New appointment" },
+  quick: { new: "New appointment", today: "Calendar today" },
   feature: {
     name: "Appointments",
     description: "Workshop calendar with day, week and list views, bays and appointment types.",
@@ -92,10 +95,16 @@ export const appointmentsEn: typeof appointmentsDe = {
     open: "Open appointment",
   },
   widgets: {
-    todayTitle: "Today's appointments",
+    todayTitle: "Today and tomorrow",
     toCalendar: "Open calendar",
-    todayEmpty: "No appointments today.",
-    todayCount_one: "{count} appointment today",
-    todayCount_other: "{count} appointments today",
+    todayEmpty: "No appointments today or tomorrow.",
+    today: "Today",
+    tomorrow: "Tomorrow",
+    todayNone: "No appointments today.",
+    tomorrowNone: "No appointments tomorrow.",
+    todayCount_one: "{count} appointment",
+    todayCount_other: "{count} appointments",
+    tomorrowCount_one: "{count} appointment",
+    tomorrowCount_other: "{count} appointments",
   },
 };

@@ -1,5 +1,11 @@
 # Einstellungen
 
+> **Einrichtungs-Checkliste:** Auf der **Übersicht** zeigt sich Administratoren eine Karte „Einrichtung“ mit den Schritten, die für einen sicheren Betrieb noch offen sind: Werkstattprofil und Öffnungszeiten, Arbeitsplätze
+> und Terminarten, Wiederherstellungs-Code und Wiederherstellungsschlüssel gesichert, automatisches Backup und Off-Site-Sicherung, ersten Mitarbeiter und weitere Benutzer anlegen, HTTPS und Zwei-Faktor-Anmeldung. Jede
+> Funktion bringt ihre Schritte selbst mit – ausgeschaltete Funktionen fragt die Checkliste nicht ab. Die Punkte **haken sich von selbst ab**, sobald der Datenstand es hergibt (nichts wird von Hand bestätigt); „empfohlen“
+> markiert Punkte, die sich ruhiger anmahnen. **Checkliste ausblenden** (oder, wenn alles erledigt ist, **Fertig – Checkliste ausblenden**) blendet die Karte für die ganze Werkstatt aus und steht im Audit-Log; unten auf der Übersicht
+> bringt **Einrichtungs-Checkliste wieder einblenden** sie zurück.
+
 Die **Einstellungen** sind in Reiter gegliedert. Welche Reiter es gibt, hängt von den aktiven Funktionen ab: Jede Funktion bringt
 ihre eigenen Einstellungen mit.
 

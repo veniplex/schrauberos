@@ -24,7 +24,7 @@ export type WidgetDef = {
   /** Überschrift des Bausteins: Vorschau „Was sieht diese Rolle?“ der Rollenmaske und Liste der zugeklappten Bausteine (die Karte selbst zeigt ihren Titel weiterhin selbst) */
   titleKey: MessageKey;
   /**
-   * Wichtigkeit, **kleiner = wichtiger**. Das Dashboard zeigt je Person die `DASHBOARD_VISIBLE` (4) wichtigsten Bausteine offen, den Rest zugeklappt (`pickWidgets` in `dashboard-logic.ts`);
+   * Wichtigkeit, **kleiner = wichtiger**. Das Dashboard zeigt je Person die `DASHBOARD_VISIBLE` (4) wichtigsten Bausteine offen, den Rest zugeklappt (`pickWidgets` in `src/lib/dashboard.ts`);
    * dort erscheint nur, was Funktion und Recht der Person ergeben – so bekommt jede Rolle ihre eigene Auswahl.
    */
   priority: number;
@@ -45,6 +45,32 @@ export type HelpTopicDef = {
   /** Wer die Funktion nutzen darf, bekommt auch ihre Hilfe (Recht muss zur Funktion gehören) */
   permission: Permission;
   doc: string;
+};
+
+/**
+ * Kontext eines Punktes der Einrichtungs-Checkliste: die Sitzung der Administration und ob die Anfrage über HTTPS kam.
+ */
+export type SetupCheckContext = { session: AppSession; secure: boolean };
+
+/**
+ * Punkt der Einrichtungs-Checkliste auf der Übersicht der Administration (P2b-4, `setup-checks.ts` der Funktion, eingesammelt in `registry.ts`). Jede Funktion bringt ihre Punkte selbst mit; die
+ * Plattform aggregiert nur: Der Punkt erscheint nur, wenn die Funktion aktiv ist und die Person `permission` hat (so fragt die Checkliste **nur aktive Funktionen** ab). `done` rechnet aus dem
+ * tatsächlichen Datenstand – nichts wird von Hand abgehakt. Ein Fehler in `done` lässt den Punkt weg und stört die übrigen nicht.
+ */
+export type SetupCheckDef = {
+  id: string;
+  feature: FeatureId;
+  /** Recht, das man zum Erledigen braucht (und damit zum Sehen des Punktes) */
+  permission: Permission;
+  labelKey: MessageKey;
+  /** Ein Satz, warum und was zu tun ist */
+  hintKey: MessageKey;
+  /** Wohin der Punkt führt */
+  href: string;
+  order: number;
+  /** Empfehlung statt Pflicht: gleich behandelt, aber als „empfohlen“ gekennzeichnet */
+  recommended?: boolean;
+  done: (context: SetupCheckContext) => Promise<boolean>;
 };
 
 /** Ein Treffer der Schnellsuche. `href` ist die Seite, auf der der Treffer geöffnet wird. */

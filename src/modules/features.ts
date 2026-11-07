@@ -4,6 +4,7 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { FEATURES, MODULES, featureById } from "./catalog";
 import { effectiveFeatureIds, type Overrides } from "./catalog-logic";
+import { PRESETS, planPreset, type PresetPlan } from "./presets";
 
 /** Gespeicherte Schalter (nur Abweichungen vom Standard der Funktion, `defaultEnabled`), pro Request gecacht. */
 export const getOverrides = cache(async (): Promise<Overrides> => {
@@ -13,6 +14,18 @@ export const getOverrides = cache(async (): Promise<Overrides> => {
 
 /** IDs aller tatsächlich nutzbaren Funktionen (Schalter + Abhängigkeiten aufgelöst), pro Request gecacht. */
 export const getActiveFeatureIds = cache(async (): Promise<Set<string>> => effectiveFeatureIds(MODULES, FEATURES, await getOverrides()));
+
+/**
+ * Wendet ein Preset der Einrichtung an (`presets.ts`): setzt die Schalter der genannten Funktionen samt Abhängigkeiten und Modulen. `null` bei unbekanntem Preset; sonst der Plan
+ * (`skipped` nennt übersprungene IDs – unbekannte stoppen nichts). Läuft in der Transaktion des Aufrufers.
+ */
+export async function applyPreset(presetId: string, updatedByName: string, client: Pick<PrismaClient | Prisma.TransactionClient, "featureSetting"> = db): Promise<PresetPlan | null> {
+  const preset = PRESETS.find((p) => p.id === presetId);
+  if (!preset) return null;
+  const plan = planPreset(preset, MODULES, FEATURES);
+  for (const key of Object.keys(plan.overrides)) await setFeatureOverride(key, true, updatedByName, client);
+  return plan;
+}
 
 export type SetResult = "ok" | "unknown" | "required";
 

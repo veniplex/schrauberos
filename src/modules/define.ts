@@ -63,6 +63,8 @@ export type NavDef = {
  */
 export type QuickActionDef = {
   id: string;
+  /** `create` (Standard): legt etwas an und gehört ins „Neu“-Menü. `open`: öffnet eine Ansicht (Kalender heute, Reifen ein-/ausbuchen) – nur als Schnellaktion der Übersicht, füllt dort auf, wenn eine Rolle weniger als drei Anlegen-Aktionen hat. */
+  kind?: "create" | "open";
   labelKey: MessageKey;
   href: string;
   icon: IconName;

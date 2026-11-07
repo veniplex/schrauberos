@@ -1,6 +1,10 @@
 import type { usersDe } from "./users.de";
 
 export const usersEn: typeof usersDe = {
+  checklist: {
+    recoveryCode: { label: "Save the recovery code", hint: "The emergency access if the password is lost: print it and keep it safe – or generate a new one under “My account”." },
+    moreUsers: { label: "Create more users", hint: "Every person gets their own account with a suitable role." },
+  },
   feature: {
     name: "Users",
     description: "Manage user accounts and assign roles.",

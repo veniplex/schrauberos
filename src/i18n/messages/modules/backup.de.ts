@@ -1,4 +1,9 @@
 export const backupDe = {
+  checklist: {
+    auto: { label: "Automatisches Backup einschalten", hint: "Täglich ein Backup der Daten, damit nach einem Defekt nichts verloren ist." },
+    key: { label: "Wiederherstellungsschlüssel sichern", hint: "Ohne ihn lassen sich verschlüsselte Backups nach einem Serverausfall nicht mehr lesen. Erzeugen, ausdrucken und als gesichert bestätigen." },
+    offsite: { label: "Off-Site-Sicherung einrichten", hint: "Backups zusätzlich verschlüsselt auf einen anderen Speicher legen – ein Brand oder Diebstahl trifft sonst Server und Backups gemeinsam." },
+  },
   feature: {
     name: "Backups",
     description: "Datenbank sichern, herunterladen, hochladen und wiederherstellen – automatisch und per Klick.",

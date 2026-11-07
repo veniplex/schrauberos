@@ -136,6 +136,16 @@ describe("completeSetup", () => {
     assert.equal(await env.db.user.count(), 1);
   });
 
+  it("Funktionsumfang (Preset): eine erfundene ID ist ein Feldfehler ohne Wirkung; das Standard-Preset wird angenommen und ändert keinen Schalter", async () => {
+    const token = tokenMod.ensureSetupToken(true, { log: () => {} })!;
+    const bad = await actions.completeSetup({}, setupForm(token, { preset: "gibtesnicht" }));
+    assert.ok(bad.fieldErrors?.preset);
+    assert.equal(await env.db.user.count(), 0);
+    assert.equal(await env.db.featureSetting.count(), 0);
+    assert.equal((await actions.completeSetup({}, setupForm(token, { preset: "basic" }))).ok, true);
+    assert.equal(await env.db.featureSetting.count(), 0, "Standard: keine Abweichung gespeichert");
+  });
+
   it("paralleles Setup legt genau einen Administrator an", async () => {
     const token = tokenMod.ensureSetupToken(true, { log: () => {} })!;
     const results = await Promise.allSettled(

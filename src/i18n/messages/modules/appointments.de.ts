@@ -1,7 +1,10 @@
 export const appointmentsDe = {
+  checklist: {
+    baysTypes: { label: "Arbeitsplätze und Terminarten einrichten", hint: "Der Kalender plant auf Arbeitsplätzen (Hebebühnen, Stellplätze) mit Terminarten und ihrer Dauer." },
+  },
   /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
   search: { group: "Termine" },
-  quick: { new: "Neuer Termin" },
+  quick: { new: "Neuer Termin", today: "Kalender heute" },
   feature: {
     name: "Termine",
     description: "Werkstattkalender mit Tages-, Wochen- und Listenansicht, Arbeitsplätzen und Terminarten.",
@@ -91,10 +94,16 @@ export const appointmentsDe = {
     open: "Termin öffnen",
   },
   widgets: {
-    todayTitle: "Heutige Termine",
+    todayTitle: "Heute und morgen",
     toCalendar: "Zum Kalender",
-    todayEmpty: "Heute stehen keine Termine an.",
-    todayCount_one: "{count} Termin heute",
-    todayCount_other: "{count} Termine heute",
+    todayEmpty: "Heute und morgen stehen keine Termine an.",
+    today: "Heute",
+    tomorrow: "Morgen",
+    todayNone: "Heute stehen keine Termine an.",
+    tomorrowNone: "Morgen stehen keine Termine an.",
+    todayCount_one: "{count} Termin",
+    todayCount_other: "{count} Termine",
+    tomorrowCount_one: "{count} Termin",
+    tomorrowCount_other: "{count} Termine",
   },
 };

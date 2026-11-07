@@ -262,6 +262,20 @@ Seiten, Dashboard-Bausteine, Suche, API und Austausch lesen Daten mit sensiblen 
 * **Neue Funktion mit sensiblen Daten:** `queries.ts` anlegen (Spaltenmengen als Konstanten, Funktion mit Betrachter, sensible Spalten in eigener Abfrage oder bedingtem `select`), Seiten/Bausteine/Suche/API darauf umstellen, Test mit SQL-Protokoll nach dem Muster oben, Modell in die Liste des Architekturtests aufnehmen.
   Noch nicht umgestellt (kein sensibles Feld, nur `include`s mit Fachdaten): Listen und Details von Rechnungen, Reifen, Termin-Modal; sie bekommen ihr `queries.ts` mit dem nächsten Eingriff.
 
+### Übersicht, Einrichtungs-Checkliste und Presets (P2b-4)
+
+* **Bausteine** (`WidgetDef`): zusätzlich `titleKey` (Überschrift für Rollenvorschau), `priority` (**kleiner = wichtiger**) und optional `uses` (Funktionen, ohne die der Baustein entfällt). `src/lib/dashboard.ts` (rein, getestet): `pickWidgets` zeigt die **4 wichtigsten** (`DASHBOARD_VISIBLE`, Anzeige nach `order`) offen,
+  den Rest zugeklappt („Weitere Bausteine“, `Disclosure`; die Bausteine darin rendern trotzdem, nur ausgeblendet). Was in Frage kommt, bestimmen Funktion + Recht + `uses` (`widgetsFor`) – daher hat jede Rolle ihre eigene Auswahl (Test `dashboard-widgets.test.ts`: Mechaniker, Büro).
+  „Heute und morgen“ ist der Baustein `today-appointments` (Schnellstatus nur für heute). Neue Funktion: `priority` vergeben (Termine 10, Prüfungen 20, Reifen 22–35, Rechnungen 25, Mitarbeiter 40 …).
+* **Schnellaktionen der Übersicht** (`shortcutsFor`, 3 je Person): erst die Anlegen-Aktionen (`quickActions`, nach `order`), dann Ansichten (`kind: "open"` in der `feature.ts`: Kalender heute, Reifen ein-/ausbuchen, Fahrzeuge), die das „Neu“-Menü (`quickActionsFor`) nicht zeigt.
+* **Einrichtungs-Checkliste:** Beitragsart `setupChecks` (`SetupCheckDef` in `types.ts`; Datei `<funktion>/setup-checks.ts`, eingesammelt in `registry.ts`, `setupChecksFor`): `feature`, `permission` (Recht zum Erledigen = Recht zum Sehen), `labelKey`/`hintKey`, `href`, `recommended`, `done(context)` – **gerechnet aus dem Datenstand**
+  (kein Abhaken von Hand). Die Plattform (`platform/dashboard/setup-checklist.tsx`) aggregiert nur und zeigt sie Administratoren, offene zuerst; nur aktive Funktionen werden abgefragt, ein scheiternder Punkt fehlt (protokolliert). Heute: Profil, Öffnungszeiten, HTTPS, 2FA (`admin.settings`); Wiederherstellungs-Code, weitere Benutzer (`admin.users`);
+  Backup, Wiederherstellungsschlüssel (`recoveryKeyConfirmed`), Off-Site (`admin.backup`); Arbeitsplätze/Terminarten (Termine); erster Mitarbeiter (Mitarbeiter). Ausblenden/Einblenden: Einstellung `dashboard.setupChecklistHidden` (AppSetting, ganze Werkstatt), Operation `dashboard.setSetupChecklist` (`settings.manage` – Plattform, deshalb nicht in `API_EXCEPTIONS`),
+  Audit `setup.checklistHide`/`setup.checklistShow`.
+* **Presets der Einrichtung** (`src/modules/presets.ts`, getestet): Ein Preset ist eine Liste von Funktions-IDs (`enable`), die zusätzlich zu den `defaultEnabled`-Standards eingeschaltet werden (samt harten Abhängigkeiten und ausgeschaltetem Modul); unbekannte oder nicht schaltbare IDs werden übersprungen und gemeldet (`planPreset`: `skipped`).
+  `applyPreset` (`features.ts`) schreibt die Schalter in der Transaktion der Einrichtung (`src/app/setup/actions.ts`, Feld `preset`). Ausgeliefert: `basic` (Standard) und `orders` („mit Aufträgen und Rechnungen“, **leer bis Block 12**: dort nur Einträge in `enable` ergänzen). `presetChoices` bietet die Auswahl nur an, wenn ein Preset wirklich etwas
+  einschaltet – solange nicht, fragt die Einrichtung nicht. Leertext: `dashboard.askAdmin` („Bitte bei der Administration nachfragen …“).
+
 ### Rollenmaske und Module-Seite (P2b-3)
 
 * **Rollenmaske** (`admin/roles`): `forms.tsx` (Name/Beschreibung, `RoleForm`) und `role-mask.tsx` (`RoleMask`: Auswahl, Suche, Vorlagen, Vorschau; Test `role-mask.test.ts`). Die reine Logik steht in `src/lib/role-mask.ts` (`togglePermission`, `filterMask`, `rolePreview`).
@@ -332,7 +346,7 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
   Ziffern mit +49/+43/+41 → 0; Kennzeichen wie bisher über `plateNorm`). Die Suche geht über `keyContains`/`phoneContains` (`src/server/search.ts`: jedes Wort muss vorkommen, Reihenfolge egal; Telefon erst ab 3 Ziffern ohne Buchstaben); die
   Bedingungen stehen je Funktion in `queries.ts` (`customerSearchFields`, `vehicleTextWhere`, `invoiceTextWhere`) und gelten für Liste, Schnellsuche, Auswahlfelder und API gleich. **Wer eine Zeile dieser Tabellen schreibt (Operation, Import, Seed), setzt die Spalten mit**
   (`customerRecord`/`vehicleRecord`/`invoiceRecord`); Tests, die Zeilen direkt anlegen und dann suchen, tragen sie selbst ein. **Live-Filter:** `FilterBar` enthält `LiveFilter` (`components/ui/live-filter.tsx`): Es hört auf das GET-Formular und ruft nach
-  350 ms Tipppause (Auswahlfelder sofort) `router.replace` mit derselben Adresse wie das Absenden auf – keine zweite Filterlogik im Browser, Wartezustand per `useTransition`; `ResetFilterButton` lädt die ungefilterte Liste und setzt danach die Felder zurück.
+  350 ms Tipppause (Auswahlfelder sofort) `router.replace` mit derselben Adresse wie das Absenden auf – keine zweite Filterlogik im Browser, Wartezustand per `useTransition`; `ResetFilterButton` leert die Felder sofort (Text, Kontrollkästchen, Auswahl auf den neutralen Eintrag) und lädt die ungefilterte Liste – `form.reset()` wäre zu früh bzw. stellte Auswahlfelder auf den Stand des ersten Aufrufs.
 * **Geld** als ganze Cent (`Int`), Eingabe über `parseMoneyToCents`.
 * **Dateien** (Rechnungsbelege, Doku-Bilder) liegen als normale Dateien unter `/data/files` (`src/server/files.ts`) mit lesbaren
   ASCII-Pfaden, z. B. `rechnungen/2026/eingang/2026-03-14_Lieferant_RE-1234.pdf`; die Datenbank hält nur den relativen `path`

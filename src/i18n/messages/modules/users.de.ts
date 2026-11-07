@@ -1,4 +1,8 @@
 export const usersDe = {
+  checklist: {
+    recoveryCode: { label: "Wiederherstellungs-Code sichern", hint: "Der Notzugang, falls das Passwort verloren geht: ausdrucken und sicher aufbewahren – oder unter „Mein Konto“ einen neuen erzeugen." },
+    moreUsers: { label: "Weitere Benutzer anlegen", hint: "Jede Person bekommt ein eigenes Konto mit passender Rolle." },
+  },
   feature: {
     name: "Benutzer",
     description: "Benutzerkonten verwalten und Rollen zuweisen.",

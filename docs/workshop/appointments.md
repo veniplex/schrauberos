@@ -11,7 +11,7 @@ Der Werkstattkalender zeigt die Termine als **Woche**, **Tag** (mit einer Spalte
 * **Doppelbelegung:** Ein Arbeitsplatz lässt sich nicht zur selben Zeit zweimal belegen; die Anwendung sagt, wer den Platz
   schon hat.
 * **Status:** Geplant, Bestätigt, In Arbeit, Erledigt, Storniert oder Nicht erschienen. Stornierte Termine blockieren keinen Platz.
-* **Schnellstatus:** Auf den **Karten** (Liste, Handy-Ansicht von Woche und Tag), im **Raster** (die Knöpfe erscheinen, wenn man mit der Maus über einen Termin fährt oder ihn per Tab erreicht), auf der **Übersicht** („Heutige Termine“) und auf der Seite eines Reifensatzes stehen am Termin die Knöpfe **Starten**
+* **Schnellstatus:** Auf den **Karten** (Liste, Handy-Ansicht von Woche und Tag), im **Raster** (die Knöpfe erscheinen, wenn man mit der Maus über einen Termin fährt oder ihn per Tab erreicht), auf der **Übersicht** („Heute und morgen“) und auf der Seite eines Reifensatzes stehen am Termin die Knöpfe **Starten**
   (In Arbeit) und **Fertig** (Erledigt) – ohne den Termin zu öffnen. Geplant/Bestätigt bieten beide, In Arbeit nur „Fertig“; erledigte, stornierte und nicht
   erschienene Termine haben keinen Schnellschritt (Korrekturen über **Bearbeiten**). Dafür genügt das Recht „Termine bearbeiten“ (bei den mitgelieferten Rollen auch
   der Mechaniker); es ändert sich nur der Status. Hat jemand den Termin inzwischen geändert, meldet die Anwendung einen Konflikt, statt zu überschreiben.

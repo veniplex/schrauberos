@@ -2,7 +2,7 @@ import type { vehiclesDe } from "./vehicles.de";
 
 export const vehiclesEn: typeof vehiclesDe = {
   search: { group: "Vehicles" },
-  quick: { new: "New vehicle" },
+  quick: { new: "New vehicle", list: "Vehicles" },
   feature: {
     name: "Vehicles",
     description: "Vehicle register with ownership history – usable without customers.",

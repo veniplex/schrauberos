@@ -8,6 +8,8 @@ import { ensureSetupToken } from "@/server/setup-token";
 import { SetupForm } from "./setup-form";
 import { SetupRestore } from "./setup-restore";
 import { Card } from "@/components/ui/layout";
+import { FEATURES, MODULES } from "@/modules/catalog";
+import { PRESETS, presetChoices } from "@/modules/presets";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -27,6 +29,9 @@ export default async function SetupPage() {
     ensureSetupToken(true); // falls die Datei fehlt (z. B. Entwicklung): neu anlegen und loggen
   }
   const { t } = await getI18n();
+  // Funktionsumfang nur anbieten, wenn es eine echte Wahl gibt (mindestens ein Preset schaltet etwas ein)
+  const choices = presetChoices(PRESETS, MODULES, FEATURES);
+  const presets = choices.length > 1 ? choices.map((p) => ({ id: p.id, name: t(p.nameKey), description: t(p.descriptionKey) })) : [];
   const timezones = Intl.supportedValuesOf("timeZone");
 
   return (
@@ -42,7 +47,7 @@ export default async function SetupPage() {
           </div>
         </div>
         <Card as="div">
-          <SetupForm timezones={timezones.includes("Europe/Berlin") ? timezones : ["Europe/Berlin", ...timezones]} done={finished} />
+          <SetupForm timezones={timezones.includes("Europe/Berlin") ? timezones : ["Europe/Berlin", ...timezones]} presets={presets} done={finished} />
         </Card>
         {finished ? null : <SetupRestore />}
         <p className="mt-4 text-center text-xs text-ink-muted print:hidden">{t("setup.warning")}</p>

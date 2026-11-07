@@ -15,6 +15,9 @@ import { getI18n } from "@/i18n/server";
 import type { RecoveryActionState } from "@/lib/recovery-code";
 import { replaceRecoveryCode } from "@/server/auth/recovery";
 import { fieldErrors, formObject } from "@/lib/forms";
+import { applyPreset } from "@/modules/features";
+import { FEATURES, MODULES } from "@/modules/catalog";
+import { PRESETS, presetChoices } from "@/modules/presets";
 
 const schema = z.object({
   workshopName: z.string().trim().min(1).max(80),
@@ -28,6 +31,8 @@ const schema = z.object({
   confirm: z.string(),
   timezone: z.string().max(60),
   token: z.string().max(200),
+  /** Funktionsumfang (Preset); fehlt er, gilt der Standard */
+  preset: z.string().max(40).optional(),
 });
 
 /** Ersteinrichtung: legt den ersten Administrator an, solange es noch keinen Benutzer gibt. */
@@ -47,6 +52,9 @@ export async function completeSetup(_prev: RecoveryActionState, formData: FormDa
   if (problem === "long") return { fieldErrors: { password: t("account.errors.passwordLong", { max: MAX_PASSWORD_CHARS }) } };
   if (d.password !== d.confirm) return { fieldErrors: { confirm: t("account.errors.mismatch") } };
   if (!isValidTimezone(d.timezone)) return { fieldErrors: { timezone: t("validation.invalid") } };
+  // nur Presets, die die Einrichtung auch anbietet (ein Preset ohne Wirkung wird nicht angeboten, und eine erfundene ID nicht angenommen)
+  const preset = d.preset ? presetChoices(PRESETS, MODULES, FEATURES).find((p) => p.id === d.preset) : undefined;
+  if (d.preset && !preset) return { fieldErrors: { preset: t("setup.errors.preset") } };
 
   const adminRole = await db.role.findUnique({ where: { key: "admin" } });
   if (!adminRole) return { error: t("setup.errors.notReady") };
@@ -64,6 +72,11 @@ export async function completeSetup(_prev: RecoveryActionState, formData: FormDa
     if ((await tx.user.count()) > 0) return null;
     const admin = await tx.user.create({ data: { username: d.username, name: d.name, passwordHash, roles: { create: [{ roleId: adminRole.id }] } } });
     await tx.workshop.upsert({ where: { id: "default" }, update: { name: d.workshopName, timezone: d.timezone }, create: { id: "default", name: d.workshopName, timezone: d.timezone } });
+    // Funktionsumfang: Schalter des gewählten Presets (unbekannte IDs darin werden übersprungen und nur gemeldet)
+    if (preset) {
+      const plan = await applyPreset(preset.id, d.name, tx);
+      for (const skipped of plan?.skipped.filter((s) => s.reason === "unknown") ?? []) logError("setup:preset", new Error(`Preset ${preset.id}: unbekannte Funktion ${skipped.id}`));
+    }
     // Notzugang: Wiederherstellungs-Code des ersten Administrators (Klartext nur in der Antwort dieser Aktion)
     return replaceRecoveryCode(tx, admin.id);
   });

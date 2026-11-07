@@ -70,7 +70,7 @@ export function RoleMask({
     return (
       <div key={group.group} hidden={!shown}>
         <Disclosure
-          title={group.label}
+          title={<span className="text-sm font-semibold text-ink">{group.label}</span>}
           description={t("roles.mask.groupSelected", { selected: count, total: keys.length })}
           headingLevel={3}
           open={searching ? true : open.has(group.group)}

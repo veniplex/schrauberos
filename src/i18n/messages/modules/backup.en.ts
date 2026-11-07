@@ -1,6 +1,11 @@
 import type { backupDe } from "./backup.de";
 
 export const backupEn: typeof backupDe = {
+  checklist: {
+    auto: { label: "Switch on automatic backup", hint: "A backup of the data every day, so nothing is lost after a failure." },
+    key: { label: "Save the recovery key", hint: "Without it, encrypted backups cannot be read after a server failure. Generate it, print it and confirm it as saved." },
+    offsite: { label: "Set up off-site backup", hint: "Also store backups encrypted on another storage – a fire or theft would otherwise hit the server and the backups together." },
+  },
   feature: {
     name: "Backups",
     description: "Back up, download, upload and restore the database – automatically and on demand.",

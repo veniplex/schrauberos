@@ -24,12 +24,16 @@ function useBrowserTimezone(): string {
   );
 }
 
-export function SetupForm({ timezones, done = false }: { timezones: string[]; done?: boolean }) {
+export type SetupPreset = { id: string; name: string; description: string };
+
+export function SetupForm({ timezones, presets = [], done = false }: { timezones: string[]; presets?: SetupPreset[]; done?: boolean }) {
   const { t } = useI18n();
   const router = useRouter();
   const browserZone = useBrowserTimezone();
   const [chosen, setChosen] = useState<string | null>(null);
   const zone = chosen ?? (timezones.includes(browserZone) ? browserZone : DEFAULT_ZONE);
+  const [presetId, setPresetId] = useState(presets[0]?.id ?? "");
+  const preset = presets.find((p) => p.id === presetId);
 
   // Die Einrichtung ist abgeschlossen (Seite neu geladen): der Code wird nur einmal angezeigt
   if (done) {
@@ -66,6 +70,18 @@ export function SetupForm({ timezones, done = false }: { timezones: string[]; do
           ))}
         </Select>
       </Field>
+
+      {presets.length > 0 ? (
+        <Field label={t("setup.preset")} htmlFor="preset" name="preset" hint={[preset?.description, t("setup.presetHint")].filter(Boolean).join(" ")}>
+          <Select id="preset" name="preset" value={presetId} onChange={(e) => setPresetId(e.target.value)}>
+            {presets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
 
       <hr className="border-line" />
       <p className="text-sm font-medium">{t("setup.adminTitle")}</p>

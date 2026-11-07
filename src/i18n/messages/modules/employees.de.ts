@@ -1,4 +1,7 @@
 export const employeesDe = {
+  checklist: {
+    first: { label: "Ersten Mitarbeiter anlegen", hint: "Für Zuständigkeiten in Terminen, Abwesenheiten und Qualifikationen." },
+  },
   /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
   search: { group: "Mitarbeiter" },
   quick: { new: "Neuer Mitarbeiter" },

@@ -1,6 +1,9 @@
 import type { employeesDe } from "./employees.de";
 
 export const employeesEn: typeof employeesDe = {
+  checklist: {
+    first: { label: "Add the first employee", hint: "For responsibilities in appointments, absences and qualifications." },
+  },
   search: { group: "Employees" },
   quick: { new: "New employee" },
   feature: {

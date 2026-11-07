@@ -66,6 +66,8 @@ export const auditEn: typeof auditDe = {
     setup: {
       restore: "Restored from a backup (setup)",
       complete: "Initial setup completed",
+      checklistHide: "Setup checklist hidden",
+      checklistShow: "Setup checklist shown again",
     },
     system: {
       update: "Update installed",

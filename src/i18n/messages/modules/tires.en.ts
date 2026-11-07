@@ -2,7 +2,7 @@ import type { tiresDe } from "./tires.de";
 
 export const tiresEn: typeof tiresDe = {
   search: { group: "Tire sets" },
-  quick: { new: "Store tire set" },
+  quick: { new: "Store tire set", stock: "Check tire sets in/out" },
   feature: {
     name: "Tyre storage",
     description: "Digital tyre list with condition, age and storage location – including changeover hints.",

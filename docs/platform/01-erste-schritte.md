@@ -38,8 +38,10 @@ zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
   Wer sehr schnell sehr viele Suchen auslöst, bekommt kurz keine Treffer („Die Suche ist gerade nicht möglich“) und kann nach wenigen Sekunden weitersuchen.
   Rechts daneben legt **Neu** schnell etwas an (Kunde, Termin, Fahrzeug, Rechnung …) – es bietet nur an, was Sie anlegen dürfen.
 * **Tastatur:** Der erste Tabstopp auf jeder Seite ist **Zum Inhalt springen** (überspringt die Navigation).
-* **Übersicht:** Heute anstehende Termine (mit „Starten“/„Fertig“ direkt in der Zeile), einzulagernde oder zu prüfende Reifen, montierte Sätze der falschen Saison, offene Rechnungen, Fälligkeiten und angeheftete
-  Seiten aus Handbuch und IT-Dokumentation – je nachdem, was Sie sehen dürfen.
+* **Übersicht:** Ganz oben bis zu drei **Schnellaktionen** für Ihre Rolle (zum Beispiel „Neuer Termin“, „Reifensatz einlagern“, „Neuer Kunde“ – oder, wenn Ihre Rolle nichts anlegt, „Kalender heute“ und
+  „Reifensätze ein-/ausbuchen“). Darunter die **vier wichtigsten Bausteine** für Sie: Termine **heute und morgen** (mit „Starten“/„Fertig“ direkt in der Zeile), einzulagernde oder zu prüfende Reifen, fällige Prüfungen,
+  montierte Sätze der falschen Saison, offene Rechnungen, Fälligkeiten und angeheftete Seiten aus Handbuch und IT-Dokumentation – je nachdem, was Sie sehen dürfen. Weitere Bausteine stehen zugeklappt unter
+  **Weitere Bausteine**. Sehen Sie gar nichts, fehlen Ihrem Konto noch Rechte: Bitte bei der Administration nachfragen. Administratoren sehen oben zusätzlich die **Einrichtungs-Checkliste** (siehe „Einstellungen“).
 * **Unten in der Navigation:** Ihr Name und Ihre Rollen. Ein Klick öffnet das Benutzer-Menü: Sprache (Deutsch/Englisch),
   Darstellung (Hell, Dunkel oder wie das Gerät), **Mein Konto** und **Abmelden**. Beim Abmelden werden auch nicht gespeicherte
   Entwürfe von Formularen aus dem Browser gelöscht.

@@ -1,7 +1,7 @@
 export const tiresDe = {
   /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
   search: { group: "Reifensätze" },
-  quick: { new: "Reifensatz einlagern" },
+  quick: { new: "Reifensatz einlagern", stock: "Reifensätze ein-/ausbuchen" },
   feature: {
     name: "Reifenlager",
     description: "Digitale Reifenliste mit Zustand, Alter und Lagerort – inklusive Wechsel-Hinweisen.",

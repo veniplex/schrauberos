@@ -64,6 +64,8 @@ export const auditDe = {
     setup: {
       restore: "Aus einem Backup wiederhergestellt (Einrichtung)",
       complete: "Ersteinrichtung abgeschlossen",
+      checklistHide: "Einrichtungs-Checkliste ausgeblendet",
+      checklistShow: "Einrichtungs-Checkliste wieder eingeblendet",
     },
     system: {
       update: "Update installiert",
