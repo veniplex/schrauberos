@@ -115,7 +115,7 @@ export async function getOrderDetail(viewer: Viewer, id: string) {
         select: { id: true, kind: true, description: true, unit: true, quantityMilli: true, refType: true, refId: true, ...(prices ? { unitCents: true, taxBp: true, discountBp: true } : {}) },
       },
       findings: { orderBy: { createdAt: "asc" }, select: { id: true, text: true, authorName: true, createdAt: true } },
-      approvals: { orderBy: { createdAt: "asc" }, select: { id: true, reason: true, method: true, approverName: true, recordedByName: true, createdAt: true, ...(prices ? { amountCents: true } : {}) } },
+      approvals: { orderBy: { createdAt: "asc" }, select: { id: true, reason: true, method: true, approverName: true, signedName: true, recordedByName: true, createdAt: true, ...(prices ? { amountCents: true } : {}) } },
       events: { orderBy: { at: "asc" }, select: { id: true, kind: true, status: true, byName: true, note: true, at: true } },
     },
   });

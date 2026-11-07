@@ -34,3 +34,9 @@ export function mileageDecision(vehicleKm: number | null, orderKm: number | null
   if (vehicleKm == null || orderKm > vehicleKm) return "write";
   return orderKm === vehicleKm ? "none" : "keep";
 }
+
+/** Name zum Vergleichen: Unicode-Normalform (NFKC), Leerraum zusammengefasst und getrimmt, Groß-/Kleinschreibung egal. */
+export const nameKey = (value: string): string => value.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+
+/** Ist der getippte Name der freigebenden Person der Name im Feld „freigebende Person“? (Das Tippen des Namens ersetzt die Unterschrift – es muss dieselbe Person meinen.) */
+export const sameName = (typed: string, approver: string): boolean => nameKey(typed) !== "" && nameKey(typed) === nameKey(approver);

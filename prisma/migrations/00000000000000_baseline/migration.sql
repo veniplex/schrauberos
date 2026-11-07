@@ -859,6 +859,8 @@ CREATE TABLE "OrderApproval" (
     "method" TEXT NOT NULL,
     "approverName" TEXT NOT NULL,
     "signaturePath" TEXT,
+    "signatureHash" TEXT,
+    "signedName" TEXT,
     "recordedByName" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "OrderApproval_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -1192,6 +1194,9 @@ CREATE INDEX "OrderFinding_orderId_createdAt_idx" ON "OrderFinding"("orderId", "
 
 -- CreateIndex
 CREATE INDEX "OrderApproval_orderId_createdAt_idx" ON "OrderApproval"("orderId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "OrderApproval_signatureHash_idx" ON "OrderApproval"("signatureHash");
 
 -- CreateIndex
 CREATE INDEX "OrderEvent_orderId_at_idx" ON "OrderEvent"("orderId", "at");

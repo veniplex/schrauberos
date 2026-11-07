@@ -58,7 +58,7 @@ export const ordersDe = {
     backToWork: "Zurück in Arbeit",
     backToAccepted: "Zurück auf Angenommen",
     close: "Abschließen (abgeholt)",
-    closeConfirm: "Auftrag abschließen? Teile werden jetzt aus dem Lager gebucht. Geändert wird er danach nur noch über „Wieder öffnen“.",
+    closeConfirm: "Auftrag abschließen? Dabei erfolgen die Buchungen anderer Funktionen (z. B. Abgang aus dem Lager). Geändert wird er danach nur noch über „Wieder öffnen“.",
     cancel: "Stornieren",
     cancelConfirm: "Auftrag stornieren? Er bleibt als storniert erhalten und lässt sich wieder aufnehmen.",
     resume: "Wieder aufnehmen",
@@ -91,6 +91,7 @@ export const ordersDe = {
     save: "Freigabe protokollieren",
     recordedBy: "erfasst von {name}",
     viewSignature: "Unterschrift ansehen",
+    typedAs: "Name getippt: {name}",
   },
   timeline: {
     created: "Auftrag angenommen",
@@ -117,6 +118,8 @@ export const ordersDe = {
     appointmentCancelled: "Der Termin ist abgesagt.",
     appointmentTaken: "Zu diesem Termin gibt es schon einen Auftrag.",
     signatureMissing: "Bitte unterschreiben (oder den Namen tippen und bestätigen).",
+    approvalNameMismatch: "Der getippte Name muss dem Namen der freigebenden Person entsprechen.",
+    signatureReused: "Diese Unterschrift gehört schon zu einer anderen Freigabe. Bitte neu unterschreiben.",
   },
   widgets: {
     openTitle: "Offene Aufträge",

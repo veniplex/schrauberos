@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { currentYear } from "@/lib/dates";
@@ -6,9 +7,11 @@ import { moneyCents } from "@/lib/zod-fields";
 import { parseSignatureValue } from "@/lib/signature";
 import { nextCounterValue } from "@/server/counters";
 import { removeFile, storeFile } from "@/server/files";
-import { defineOperation, fail, failField, type RunContext, type Tx } from "@/server/operations";
+import { writeAudit } from "@/server/audit";
+import { auditActorName, defineOperation, fail, failField, fieldErrors, OperationError, type Principal, type RunContext, type Tx } from "@/server/operations";
+import { runOperationHooks } from "@/server/operations/hooks";
 import { ORDER_COUNTER, ORDER_ITEM_KINDS, type ApprovalMethod, type OrderEventKind, type OrderStatus } from "./constants";
-import { CLOSABLE, canStep, formatOrderNumber, isOpen, mileageDecision } from "./domain";
+import { CLOSABLE, canStep, formatOrderNumber, isOpen, mileageDecision, sameName } from "./domain";
 
 /**
  * Operationen der Werkstattaufträge. Kette: Anlegen → Status (In Arbeit, Fertig, zurück, Storniert) → **Abschließen** („Abgeholt“) → ggf. **Wieder öffnen**.
@@ -66,13 +69,13 @@ export const createOrderInput = z.object({
 export type CreateOrderInput = z.output<typeof createOrderInput>;
 
 /**
- * Legt einen Auftrag an (Nummer aus dem Zähler in derselben Transaktion – lückenlos). Andere Funktionen (Angebot → Auftrag, F3) nutzen die Operation über `public.ts`
- * (`createOrderOperation`).
+ * Legt einen Auftrag an (Nummer aus dem Zähler in derselben Transaktion – lückenlos). Andere Funktionen (Angebot → Auftrag, F3) nutzen die Operation über `public.ts`:
+ * `createOrderOperation` (eigene Transaktion) oder – wenn das Anlegen mit dem eigenen Schreiben **atomar** sein muss – `createOrderInTx` (in der Transaktion des Aufrufers).
  */
 export async function createOrderRun({ input: d, principal, tx, audit, emit }: RunContext<CreateOrderInput, undefined>): Promise<{ id: string; number: string; mileage: "none" | "write" | "keep" }> {
   const vehicle = await tx.vehicle.findUnique({
     where: { id: d.vehicleId },
-    select: { id: true, plate: true, customerId: true, archivedAt: true, customer: { select: { archivedAt: true, processingRestrictedAt: true } } },
+    select: { id: true, plate: true, customerId: true, archivedAt: true, customer: { select: { processingRestrictedAt: true } } },
   });
   if (!vehicle || vehicle.archivedAt) failField("vehicleId", "validation.invalid");
 
@@ -89,6 +92,8 @@ export async function createOrderRun({ input: d, principal, tx, audit, emit }: R
 
   let appointmentId: string | null = null;
   if (d.appointmentId) {
+    // Weiche Abhängigkeit: ein Termin lässt sich nur verknüpfen, wenn die Terminfunktion aktiv ist und die Person Termine sehen darf (sonst verrieten die Meldungen Bestand und Status fremder Termine)
+    if (!principal.can("appointments.view")) failField("appointmentId", "validation.invalid");
     const appointment = await tx.appointment.findUnique({ where: { id: d.appointmentId }, select: { id: true, vehicleId: true, status: true } });
     if (!appointment) failField("appointmentId", "validation.invalid");
     if (appointment.vehicleId && appointment.vehicleId !== vehicle.id) failField("appointmentId", "orders.errors.appointmentVehicle");
@@ -107,8 +112,40 @@ export async function createOrderRun({ input: d, principal, tx, audit, emit }: R
   await addEvent(tx, order.id, "created", who);
   const mileage = await applyMileage(tx, vehicle.id, d.mileageKm);
   await emit("order.created", { number }, order.id);
-  audit({ target: `${number} · ${vehicle.plate}`, entityId: order.id });
+  // Der Kilometerstand geht ins Fahrzeug (nur aufwärts): das Audit-Log nennt es, denn am Fahrzeug selbst entsteht kein Eintrag
+  audit({ target: `${number} · ${vehicle.plate}${mileage === "write" ? ` · ${d.mileageKm} km → Fahrzeug` : ""}`, entityId: order.id });
   return { id: order.id, number, mileage };
+}
+
+/**
+ * Auftrag anlegen **in der Transaktion des Aufrufers** (Angebot → Auftrag, F3: Angebot annehmen und Auftrag anlegen gelingen nur gemeinsam). Gleiche Regeln wie `createOrderOperation`:
+ * Recht `orders.create` der handelnden Person, Eingabeprüfung, Zähler, Ereignis, Audit-Eintrag `orders.create` und die Hooks auf `orders.create` laufen mit – alles in `tx`; ein Fehler
+ * (`OperationError`) rollt mit der Transaktion des Aufrufers zurück. Der Aufrufer prüft sein eigenes Recht selbst und reicht `principal`, `tx` und `emit` seines `RunContext` durch.
+ */
+export async function createOrderInTx(
+  ctx: { principal: Principal; tx: Tx; emit: RunContext<unknown, unknown>["emit"] },
+  raw: z.input<typeof createOrderInput>,
+): Promise<{ id: string; number: string; mileage: "none" | "write" | "keep" }> {
+  const { principal, tx, emit } = ctx;
+  if (!principal.can("orders.create")) fail("forbidden");
+  const parsed = createOrderInput.safeParse(raw);
+  if (!parsed.success) throw new OperationError({ code: "invalid", fields: fieldErrors(parsed.error) });
+  let details: { target?: string | null; entityId?: string | null } = {};
+  const data = await createOrderRun({
+    name: "orders.create",
+    input: parsed.data,
+    principal,
+    prepared: undefined,
+    tx,
+    emit,
+    audit: (value) => {
+      details = value;
+    },
+    afterCommit: () => undefined,
+  });
+  await runOperationHooks({ operation: "orders.create", input: parsed.data, result: data, principal, tx });
+  await writeAudit(tx, "orders.create", { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } });
+  return data;
 }
 
 export const createOrderOperation = defineOperation({
@@ -159,6 +196,10 @@ export const setStatusOperation = defineOperation({
     if (!order) fail("notFound");
     if (order.status === d.status) fail("conflict");
     if (!canStep(order.status, d.status)) fail("invalid", "orders.errors.statusStep");
+    // Wiederaufnahme eines stornierten Auftrags: Hat der Termin inzwischen einen anderen (nicht stornierten) Auftrag, gäbe es zwei aktive Aufträge zu einem Termin
+    if (order.status === "cancelled" && order.appointmentId && (await tx.order.findFirst({ where: { appointmentId: order.appointmentId, status: { not: "cancelled" }, id: { not: d.id } }, select: { id: true } }))) {
+      fail("duplicate", "orders.errors.appointmentTaken");
+    }
     if (!(await claimRow(tx.order, d.id, d.version))) fail("conflict");
     await tx.order.update({ where: { id: d.id }, data: { status: d.status } });
     await addEvent(tx, d.id, "status", byName(principal), { status: d.status });
@@ -281,11 +322,12 @@ export const removeFindingOperation = defineOperation({
   input: z.object({ id: z.string().min(1), findingId: z.string().min(1) }),
   audit: "orders.findingRemove",
   run: async ({ input: d, tx, audit }) => {
-    const finding = await tx.orderFinding.findFirst({ where: { id: d.findingId, orderId: d.id }, select: { id: true, order: { select: { number: true, status: true } } } });
+    const finding = await tx.orderFinding.findFirst({ where: { id: d.findingId, orderId: d.id }, select: { id: true, authorName: true, createdAt: true, order: { select: { number: true, status: true } } } });
     if (!finding) fail("notFound");
     if (!isOpen(finding.order.status)) fail("invalid", "orders.errors.closed");
     await tx.orderFinding.delete({ where: { id: finding.id } });
-    audit({ target: finding.order.number, entityId: d.id });
+    // Befunde sind Aufzeichnungen: Das Audit-Log hält fest, wessen Befund (von wann) entfernt wurde – nicht den Text
+    audit({ target: `${finding.order.number} · ${finding.authorName}, ${finding.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC`, entityId: d.id });
     return { id: d.id };
   },
 });
@@ -306,8 +348,11 @@ export const approvalInput = z.object({
 });
 export type ApprovalInput = z.output<typeof approvalInput>;
 
-/** Gespeicherte Unterschrift, die `prepare` vor der Transaktion angelegt hat (die Datei wird wieder entfernt, wenn die Transaktion scheitert). */
-type PreparedApproval = { method: ApprovalMethod; path: string | null };
+/**
+ * Gespeicherte Unterschrift, die `prepare` vor der Transaktion angelegt hat (die Datei wird wieder entfernt, wenn die Transaktion scheitert): Datei und Prüfsumme des Bildes bei einer
+ * Zeichnung, der bestätigte Name beim Tippen.
+ */
+type PreparedApproval = { method: ApprovalMethod; path: string | null; hash: string | null; signedName: string | null };
 
 /**
  * Protokolliert die Freigabe einer Mehrarbeit: Betrag, Zeitpunkt, Art (Unterschrift/getippt/telefonisch), freigebende Person und wer erfasst hat. **Unveränderlich:** es gibt weder
@@ -321,25 +366,43 @@ export const approveOperation = defineOperation({
   prepare: async ({ input: d, principal }): Promise<PreparedApproval> => {
     if (!principal.can("orders.prices")) fail("forbidden");
     if (d.amount <= 0 || d.amount > MAX_APPROVAL_CENTS) failField("amount", "validation.invalid");
-    if (d.method === "phone") return { method: "phone", path: null };
+    if (d.method === "phone") return { method: "phone", path: null, hash: null, signedName: null };
     const value = parseSignatureValue(d.signature ?? "");
     if (!value) failField("signature", "orders.errors.signatureMissing");
-    if (value.kind === "typed") return { method: "typed", path: null };
+    if (value.kind === "typed") {
+      // Das Tippen des Namens ersetzt die Unterschrift – es muss die freigebende Person meinen (sonst bestätigte jemand mit einem anderen Namen)
+      if (!sameName(value.name, d.approverName)) failField("signature", "orders.errors.approvalNameMismatch");
+      return { method: "typed", path: null, hash: null, signedName: value.name };
+    }
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    return { method: "signature", path: await storeFile("auftraege/freigaben", `freigabe-${stamp}.png`, value.png) };
+    const hash = createHash("sha256").update(value.png).digest("hex");
+    return { method: "signature", path: await storeFile("auftraege/freigaben", `freigabe-${stamp}.png`, value.png), hash, signedName: null };
   },
   run: async ({ input: d, principal, prepared, tx, audit, emit }) => {
     const order = await tx.order.findUnique({ where: { id: d.id }, select: { number: true, status: true } });
     if (!order) fail("notFound");
     if (!isOpen(order.status)) fail("invalid", "orders.errors.closed");
+    // Eine Unterschrift gilt für genau eine Freigabe: dasselbe Bild nochmals (Zeichnung stehen geblieben, wieder abgeschickt) ist keine neue Unterschrift
+    if (prepared.hash && (await tx.orderApproval.findFirst({ where: { signatureHash: prepared.hash }, select: { id: true } }))) failField("signature", "orders.errors.signatureReused");
     const who = byName(principal);
     const approval = await tx.orderApproval.create({
-      data: { orderId: d.id, amountCents: d.amount, reason: d.reason, method: prepared.method, approverName: d.approverName, signaturePath: prepared.path, recordedByName: who },
+      data: {
+        orderId: d.id,
+        amountCents: d.amount,
+        reason: d.reason,
+        method: prepared.method,
+        approverName: d.approverName,
+        signaturePath: prepared.path,
+        signatureHash: prepared.hash,
+        signedName: prepared.signedName,
+        recordedByName: who,
+      },
       select: { id: true },
     });
     await addEvent(tx, d.id, "approval", who, { note: d.approverName });
     await emit("order.approved", { number: order.number }, d.id);
-    audit({ target: `${order.number} · ${d.approverName}`, entityId: d.id });
+    // Das Audit-Log nennt nur die Auftragsnummer, nie den Namen der freigebenden Person (er bliebe nach einer Anonymisierung sonst dort stehen)
+    audit({ target: order.number, entityId: d.id });
     return { id: approval.id, orderId: d.id };
   },
   finish: async (prepared, ok) => {

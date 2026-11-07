@@ -432,7 +432,7 @@ describe("Befunde und Kundenfreigabe", () => {
     assert.match(stored.signaturePath ?? "", /^auftraege\/freigaben\/freigabe-.*\.png$/);
     const { fileExists } = await import("@/server/files");
     assert.equal(fileExists(stored.signaturePath!), true);
-    const typed = await ops.approveOperation.execute(advisor, { ...base, method: "signature", signature: "typed:Hans Beispiel" });
+    const typed = await ops.approveOperation.execute(advisor, { ...base, approverName: "Hans Beispiel", method: "signature", signature: "typed:Hans Beispiel" });
     assert.ok(typed.ok);
     assert.equal((await env.db.orderApproval.findFirstOrThrow({ where: { method: "typed" } })).signaturePath, null);
     const missing = await ops.approveOperation.execute(advisor, { ...base, method: "signature" });
@@ -493,5 +493,207 @@ describe("Datenschutz", () => {
     assert.equal(order.approvals[0].amountCents, 10000, "der Betrag bleibt (Belegfristen)");
     assert.ok(order.events.filter((e) => e.kind === "approval").every((e) => e.note === null));
     assert.match(order.number, /^A-/);
+  });
+});
+
+describe("Freigabe: Unterschrift und getippter Name (Fix-Runde 12b: M3, M4)", () => {
+  const base = { amount: "50", reason: "Zusätzliche Reparatur" };
+
+  it("getippter Name muss zur freigebenden Person passen (Leerraum, Groß/Klein, Unicode-Normalform egal), sonst Feldfehler; der getippte Name steht im Protokoll", async () => {
+    const { id } = await created();
+    const mismatch = await ops.approveOperation.execute(advisor, { id, ...base, method: "signature", approverName: "Hans Beispiel", signature: "typed:Peter Anders" });
+    assert.ok(!mismatch.ok);
+    assert.equal(!mismatch.ok && mismatch.failure.fields?.signature?.key, "orders.errors.approvalNameMismatch");
+    assert.equal(await env.db.orderApproval.count(), 0);
+    assert.equal(await env.db.orderEvent.count({ where: { kind: "approval" } }), 0);
+    // „Müller“ einmal zusammengesetzt (NFC), einmal mit kombiniertem Umlaut (NFD); Mehrfach-Leerraum und Großschreibung
+    const typed = await ops.approveOperation.execute(advisor, { id, ...base, method: "signature", approverName: "  hans   MÜLLER ", signature: `typed:Hans  Müller` });
+    assert.ok(typed.ok, JSON.stringify(!typed.ok && typed.failure));
+    const row = await env.db.orderApproval.findFirstOrThrow();
+    assert.deepEqual([row.method, row.signedName, row.approverName, row.signaturePath, row.signatureHash], ["typed", "Hans Müller", "hans   MÜLLER", null, null]);
+    // nur Teilübereinstimmung zählt nicht
+    assert.ok(!(await ops.approveOperation.execute(advisor, { id, ...base, method: "signature", approverName: "Hans", signature: "typed:Hans Beispiel" })).ok);
+  });
+
+  it("dasselbe Unterschrift-Bild gilt nie für eine zweite Freigabe; die Datei der abgelehnten wird nicht behalten; eine neue Zeichnung geht", async () => {
+    const { id } = await created();
+    const { readdirSync, existsSync } = await import("node:fs");
+    const dir = `${env.dir}/files/auftraege/freigaben`;
+    const count = () => (existsSync(dir) ? readdirSync(dir).length : 0);
+    const png = (w: number) => `data:image/png;base64,${makePng(w, 24).toString("base64")}`;
+    const first = await ops.approveOperation.execute(advisor, { id, ...base, method: "signature", approverName: "Hans", signature: png(70) });
+    assert.ok(first.ok);
+    const stored = await env.db.orderApproval.findFirstOrThrow({ where: { method: "signature" } });
+    assert.match(stored.signatureHash ?? "", /^[0-9a-f]{64}$/);
+    const files = count();
+    const again = await ops.approveOperation.execute(advisor, { id, ...base, amount: "75", reason: "Zweite", method: "signature", approverName: "Hans", signature: png(70) });
+    assert.ok(!again.ok);
+    assert.equal(!again.ok && again.failure.fields?.signature?.key, "orders.errors.signatureReused");
+    assert.equal(await env.db.orderApproval.count(), 1);
+    assert.equal(count(), files, "die abgelehnte Freigabe hinterlässt keine Datei");
+    // auch an einem anderen Auftrag: das Bild gehört zur ersten Freigabe
+    const other = await created();
+    assert.ok(!(await ops.approveOperation.execute(advisor, { id: other.id, ...base, method: "signature", approverName: "Hans", signature: png(70) })).ok);
+    assert.ok((await ops.approveOperation.execute(advisor, { id, ...base, method: "signature", approverName: "Hans", signature: png(71) })).ok);
+  });
+
+  it("das Audit-Log der Freigabe nennt nur die Auftragsnummer, nie den Namen der freigebenden Person", async () => {
+    const { id, number } = await created();
+    await ops.approveOperation.execute(advisor, { id, ...base, method: "phone", approverName: "Erika Muster" });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "orders.approve" } });
+    assert.equal(entry.target, number);
+    assert.doesNotMatch(JSON.stringify(entry), /Erika|Muster/);
+  });
+
+  it("Auskunft nennt den getippten Namen und die gespeicherte Unterschrift-Bilddatei; die Anonymisierung nimmt den getippten Namen mit", async () => {
+    const { id } = await created();
+    await ops.approveOperation.execute(advisor, { id, ...base, method: "signature", approverName: "Hans Beispiel", signature: "typed:hans beispiel" });
+    await ops.approveOperation.execute(advisor, { id, ...base, method: "signature", approverName: "Erika", signature: `data:image/png;base64,${makePng(80, 24).toString("base64")}` });
+    const { privacyProviders } = await import("./privacy");
+    const record = (await privacyProviders[0].collect({ id: ownerId, terms: [] }))[0].records[0];
+    const approvals = String(record.find((f) => f.key === "approvals")?.value);
+    assert.match(approvals, /getippter Name: hans beispiel/);
+    assert.match(approvals, /Unterschrift als Bilddatei gespeichert/);
+    const { hooks: orderHooks } = await import("./hooks");
+    const hook = orderHooks.find((h) => h.operation === "customers.anonymize")!;
+    await env.db.$transaction(async (tx) => hook.run({ operation: "customers.anonymize", input: { id: ownerId }, result: {}, principal: admin, tx }));
+    const rows = await env.db.orderApproval.findMany();
+    assert.ok(rows.every((r) => r.approverName === "(anonymisiert)" && r.signedName === null));
+  });
+});
+
+describe("Aufträge: Fix-Runde 12b (N1, N2, N4, N5, N6)", () => {
+  beforeEach(async () => {
+    await env.db.outboxEvent.deleteMany();
+  });
+
+  it("N1: Fahrzeug und Kunde mit Aufträgen sind nicht löschbar – die Zählung nennt die Aufträge", async () => {
+    const { vehicleDeletable } = await import("@/modules/workshop/vehicles/domain");
+    const { customerHasLinks } = await import("@/modules/workshop/customers/domain");
+    assert.equal(vehicleDeletable({ appointments: 0, tireSets: 0, orders: 1, transfers: 0 }), false);
+    assert.equal(vehicleDeletable({ appointments: 0, tireSets: 0, orders: 0, transfers: 0 }), true);
+    assert.equal(customerHasLinks({ vehicles: 0, ownerships: 0, invoices: 0, orders: 2 }), true);
+    const lone = await env.db.vehicle.create({ data: { plate: "B LO 1", plateNorm: "BLO1" } });
+    assert.ok((await create({ vehicleId: lone.id })).ok);
+    const { deleteVehicleOperation } = await import("@/modules/workshop/vehicles/operations");
+    const refused = await deleteVehicleOperation.execute(admin, { id: lone.id });
+    assert.ok(!refused.ok);
+    assert.equal(!refused.ok && refused.failure.code, "inUse");
+    assert.equal(!refused.ok && refused.failure.key, "vehicles.errors.inUse");
+    assert.equal((!refused.ok && refused.failure.params?.orders) || 0, 1);
+    assert.ok(await env.db.vehicle.findUnique({ where: { id: lone.id } }));
+    // Kunde nur direkt am Auftrag (Fahrzeug ohne Halter)
+    const direct = await env.db.customer.create({ data: { lastName: "Laufkunde", nameKey: "laufkunde" } });
+    assert.ok((await create({ vehicleId: lone.id, customerId: direct.id })).ok);
+    const { deleteCustomerOperation } = await import("@/modules/workshop/customers/operations");
+    const customerRefused = await deleteCustomerOperation.execute(admin, { id: direct.id });
+    assert.equal(!customerRefused.ok && customerRefused.failure.code, "inUse");
+    assert.equal((!customerRefused.ok && customerRefused.failure.params?.orders) || 0, 1);
+  });
+
+  it("N2: ein stornierter Auftrag lässt sich nicht wieder aufnehmen, wenn der Termin inzwischen einen anderen aktiven Auftrag hat", async () => {
+    const appointment = await env.db.appointment.create({ data: { title: "HU", startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), vehicleId } });
+    const first = await create({ appointmentId: appointment.id });
+    assert.ok(first.ok);
+    assert.ok((await ops.setStatusOperation.execute(advisor, { id: first.data.id, version: await versionNow(first.data.id), status: "cancelled" })).ok);
+    const second = await create({ appointmentId: appointment.id });
+    assert.ok(second.ok, "nach dem Storno ist der Termin wieder frei");
+    const resume = await ops.setStatusOperation.execute(advisor, { id: first.data.id, version: await versionNow(first.data.id), status: "accepted" });
+    assert.ok(!resume.ok);
+    assert.equal(!resume.ok && resume.failure.code, "duplicate");
+    assert.equal(!resume.ok && resume.failure.key, "orders.errors.appointmentTaken");
+    assert.equal((await env.db.order.findUniqueOrThrow({ where: { id: first.data.id } })).status, "cancelled");
+    // ist der zweite Auftrag selbst storniert, geht die Wiederaufnahme
+    await ops.setStatusOperation.execute(advisor, { id: second.data.id, version: await versionNow(second.data.id), status: "cancelled" });
+    assert.ok((await ops.setStatusOperation.execute(advisor, { id: first.data.id, version: await versionNow(first.data.id), status: "accepted" })).ok);
+  });
+
+  it("N4: ein Termin lässt sich nur mit aktiver Terminfunktion und dem Recht appointments.view verknüpfen (sonst verrieten die Meldungen fremde Termine); der Kilometerstand steht im Audit", async () => {
+    const appointment = await env.db.appointment.create({ data: { title: "HU", startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), vehicleId } });
+    const blind = await sessionFor(["orders.view", "orders.create", "orders.edit"]);
+    const refused = await create({ appointmentId: appointment.id }, blind);
+    assert.ok(!refused.ok);
+    assert.equal(!refused.ok && refused.failure.fields?.appointmentId?.key, "validation.invalid");
+    assert.equal(await env.db.order.count(), 0);
+    const unknown = await create({ appointmentId: "gibtsnicht" }, blind);
+    assert.deepEqual(!unknown.ok && unknown.failure.fields?.appointmentId, !refused.ok ? refused.failure.fields?.appointmentId : undefined, "kein Unterschied zwischen vorhanden und unbekannt");
+    const ok = await create({ appointmentId: appointment.id, mileageKm: 120_000 });
+    assert.ok(ok.ok);
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "orders.create" } });
+    assert.match(entry.target ?? "", /120000 km → Fahrzeug/);
+  });
+
+  it("N5: createOrderInTx legt den Auftrag in der Transaktion des Aufrufers an (Zähler, Verlauf, Audit, Ereignis) und rollt mit ihr zurück", async () => {
+    const { createOrderInTx } = await import("./public");
+    const { db } = await import("@/server/db");
+    const { writeOutboxEvent } = await import("@/server/outbox");
+    const emitFor = (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => async (type: string, payload?: Record<string, unknown>, entityId?: string | null): Promise<void> => {
+      await writeOutboxEvent(tx, { type, payload, entityId: entityId ?? null, actorId: advisor.user.id });
+    };
+
+    // Erfolg: alles gemeinsam mit dem Schreiben des Aufrufers
+    const made = await db.$transaction(async (tx) => {
+      const order = await createOrderInTx({ principal: advisor, tx, emit: emitFor(tx) }, { vehicleId, request: "Aus Angebot", mileageKm: 101_000 });
+      await tx.auditLog.create({ data: { action: "orders.update", actorName: "Aufrufer", target: "Angebot angenommen" } });
+      return order;
+    });
+    assert.match(made.number, /^A-\d{4}-0001$/);
+    assert.equal((await env.db.order.findUniqueOrThrow({ where: { id: made.id } })).request, "Aus Angebot");
+    assert.equal(await env.db.orderEvent.count({ where: { orderId: made.id, kind: "created" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "orders.create", entityId: made.id } }), 1);
+    assert.equal((await env.db.vehicle.findUniqueOrThrow({ where: { id: vehicleId } })).mileageKm, 101_000);
+    assert.equal(await env.db.outboxEvent.count({ where: { type: "order.created" } }), 1);
+
+    // Fehler des Aufrufers danach: Auftrag, Nummer, Verlauf, Audit, Ereignis und Kilometerstand sind weg – die Nummer wird wieder vergeben (lückenlos)
+    await assert.rejects(() =>
+      db.$transaction(async (tx) => {
+        await createOrderInTx({ principal: advisor, tx, emit: emitFor(tx) }, { vehicleId, mileageKm: 150_000 });
+        throw new Error("Angebot nicht annehmbar");
+      }),
+    );
+    assert.equal(await env.db.order.count(), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "orders.create" } }), 1);
+    assert.equal(await env.db.outboxEvent.count({ where: { type: "order.created" } }), 1);
+    assert.equal((await env.db.vehicle.findUniqueOrThrow({ where: { id: vehicleId } })).mileageKm, 101_000);
+    const next = await db.$transaction(async (tx) => createOrderInTx({ principal: advisor, tx, emit: emitFor(tx) }, { vehicleId }));
+    assert.match(next.number, /^A-\d{4}-0002$/);
+
+    // Recht und Eingabe werden wie in der Operation geprüft
+    const { OperationError } = await import("@/server/operations");
+    await assert.rejects(() => db.$transaction(async (tx) => createOrderInTx({ principal: mechanic, tx, emit: emitFor(tx) }, { vehicleId })), (error: unknown) => error instanceof OperationError && error.failure.code === "forbidden");
+    await assert.rejects(() => db.$transaction(async (tx) => createOrderInTx({ principal: advisor, tx, emit: emitFor(tx) }, { vehicleId: "gibtsnicht" })), (error: unknown) => error instanceof OperationError && error.failure.code === "invalid");
+    await assert.rejects(() => db.$transaction(async (tx) => createOrderInTx({ principal: advisor, tx, emit: emitFor(tx) }, { vehicleId: "" })), (error: unknown) => error instanceof OperationError && error.failure.code === "invalid");
+  });
+
+  it("N5: die Hooks auf orders.create laufen auch über createOrderInTx", async () => {
+    const { createOrderInTx } = await import("./public");
+    const { db } = await import("@/server/db");
+    let seen = "";
+    hooks.setOperationHooksForTest([{ operation: "orders.create", feature: "workshop.orders", run: ({ result }) => void (seen = (result as { number: string }).number) }]);
+    const made = await db.$transaction(async (tx) => createOrderInTx({ principal: advisor, tx, emit: async () => undefined }, { vehicleId }));
+    assert.equal(seen, made.number);
+  });
+
+  it("N6: Befund entfernen protokolliert Verfasser und Zeitpunkt, nicht den Text", async () => {
+    const { id, number } = await created();
+    await ops.addFindingOperation.execute(mechanic, { id, text: "Geheimer Befundtext" });
+    const finding = await env.db.orderFinding.findFirstOrThrow();
+    await ops.removeFindingOperation.execute(mechanic, { id, findingId: finding.id });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "orders.findingRemove" } });
+    assert.ok((entry.target ?? "").startsWith(`${number} · ${finding.authorName},`));
+    assert.doesNotMatch(entry.target ?? "", /Geheimer/);
+  });
+
+  it("M2 (Oberfläche): bestehende Aufträge eines Kunden mit eingeschränkter Verarbeitung bleiben bearbeitbar (nur neue Verknüpfungen sind gesperrt, wie bei Termin, Fahrzeug und Rechnung)", async () => {
+    const { id } = await created();
+    await env.db.customer.update({ where: { id: ownerId }, data: { processingRestrictedAt: new Date() } });
+    try {
+      assert.ok(!(await create()).ok, "neuer Auftrag für das Fahrzeug des Kunden: gesperrt");
+      assert.ok((await ops.addFindingOperation.execute(advisor, { id, text: "weiter dokumentieren" })).ok);
+      assert.ok((await ops.setStatusOperation.execute(advisor, { id, version: await versionNow(id), status: "in_progress" })).ok);
+      assert.ok((await ops.closeOrderOperation.execute(advisor, { id, version: await versionNow(id) })).ok);
+    } finally {
+      await env.db.customer.update({ where: { id: ownerId }, data: { processingRestrictedAt: null } });
+    }
   });
 });

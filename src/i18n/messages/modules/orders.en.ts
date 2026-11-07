@@ -59,7 +59,7 @@ export const ordersEn: typeof ordersDe = {
     backToWork: "Back to in progress",
     backToAccepted: "Back to accepted",
     close: "Close (picked up)",
-    closeConfirm: "Close the order? Parts are now booked out of stock. Afterwards it can only be changed by reopening it.",
+    closeConfirm: "Close the order? Other functions book their entries now (e.g. issue from stock). Afterwards it can only be changed by reopening it.",
     cancel: "Cancel",
     cancelConfirm: "Cancel the order? It stays as cancelled and can be resumed.",
     resume: "Resume",
@@ -92,6 +92,7 @@ export const ordersEn: typeof ordersDe = {
     save: "Record approval",
     recordedBy: "recorded by {name}",
     viewSignature: "View signature",
+    typedAs: "Name typed: {name}",
   },
   timeline: {
     created: "Order accepted",
@@ -118,6 +119,8 @@ export const ordersEn: typeof ordersDe = {
     appointmentCancelled: "The appointment is cancelled.",
     appointmentTaken: "There is already an order for this appointment.",
     signatureMissing: "Please sign (or type the name and confirm).",
+    approvalNameMismatch: "The typed name must match the name of the approving person.",
+    signatureReused: "This signature already belongs to another approval. Please sign again.",
   },
   widgets: {
     openTitle: "Open orders",

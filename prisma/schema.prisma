@@ -1224,12 +1224,17 @@ model OrderApproval {
   approverName   String
   // relativer Pfad der Unterschrift (nur method = signature)
   signaturePath  String?
+  // SHA-256 des Unterschrift-Bildes (nur method = signature): dasselbe Bild gilt nie für eine zweite Freigabe (kein Wiederverwenden einer Zeichnung)
+  signatureHash  String?
+  // der getippte und bestätigte Name (nur method = typed); stimmt normalisiert mit approverName überein
+  signedName     String?
   recordedByName String
   createdAt      DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, createdAt])
+  @@index([signatureHash])
 }
 
 // Verlauf: Annahme, Statuswechsel, Wiedereröffnen, Freigaben (Timeline)

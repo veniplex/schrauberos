@@ -3,7 +3,7 @@ import { after, afterEach, before, describe, it } from "node:test";
 import { createElement } from "react";
 import { act, installDom, type MountedView, type TestDom } from "@/test/dom";
 import { createTestEnv, type TestEnv } from "@/test/harness";
-import { mountI18n as mountPlain, plain, type } from "@/test/ui";
+import { click, mountI18n as mountPlain, plain, type } from "@/test/ui";
 
 /** Formulare der Aufträge in einem echten Renderer: Freigabe (Art wechselt zwischen Unterschrift und Telefon), Positionen (Art je Position, Werkzeug-Platz), Auftrag annehmen. */
 let dom: TestDom;
@@ -92,5 +92,50 @@ describe("OrderForm", () => {
     assert.equal((root.querySelector("input[name='version']") as HTMLInputElement).value, "42");
     assert.equal((root.querySelector("input[name='vehicleId']") as HTMLInputElement).value, "v1");
     assert.match(plain(root.textContent), /VW Golf/);
+  });
+});
+
+describe("ApprovalForm: Unterschrift nach dem Absenden (Fix-Runde 12b: M3)", () => {
+  it("nach einem Fehler bleibt die Unterschrift stehen, nach dem Erfolg ist sie leer – die nächste Freigabe braucht eine neue", async () => {
+    const { ApprovalForm } = await import("./approval-form");
+    const { wait } = await import("@/test/ui");
+    let outcome: "error" | "ok" = "error";
+    const submitted: string[] = [];
+    const action = async (_previous: unknown, data: FormData) => {
+      submitted.push(String(data.get("signature")));
+      return outcome === "ok" ? { ok: true, message: "Freigabe protokolliert." } : { fieldErrors: { amount: "Betrag fehlt." } };
+    };
+    view = await mountI18n(createElement(ApprovalForm, { id: "o1", action: action as never }));
+    const root = view.container;
+    const signature = () => root.querySelector("input[name='signature']") as HTMLInputElement;
+    const fieldset = () => root.querySelector("[data-signature-canvas]")!.closest("fieldset") as HTMLFieldSetElement;
+    const nameInput = () => fieldset().querySelector("input:not([type])") as HTMLInputElement;
+    const submit = async () => {
+      await act(() => (root.querySelector("form") as HTMLFormElement).requestSubmit(root.querySelector("button[type='submit']:last-of-type") as HTMLButtonElement));
+      await wait(60);
+    };
+
+    // Namensweg: Name tippen und bestätigen (der Zeichenweg verhält sich gleich: Zustand des Bausteins)
+    await click(fieldset().querySelector("[role='radio']:last-child"));
+    await type(nameInput(), "Hans Beispiel");
+    await click(fieldset().querySelector("input[type='checkbox']"));
+    assert.equal(signature().value, "typed:Hans Beispiel");
+
+    await submit();
+    assert.equal(submitted.at(-1), "typed:Hans Beispiel");
+    assert.equal(signature().value, "typed:Hans Beispiel", "Fehler: die Eingabe geht nicht verloren");
+    assert.equal(nameInput().value, "Hans Beispiel");
+
+    outcome = "ok";
+    await submit();
+    assert.equal(submitted.at(-1), "typed:Hans Beispiel");
+    assert.equal(signature().value, "", "Erfolg: die Unterschrift ist weg");
+    assert.equal(nameInput().value, "", "und der getippte Name auch");
+    assert.equal((fieldset().querySelector("input[type='checkbox']") as HTMLInputElement).checked, false);
+    assert.ok(root.querySelector("canvas"), "die Zeichenfläche ist wieder da (neu, leer)");
+
+    // die nächste Freigabe geht ohne neue Unterschrift nicht mit dem alten Wert hinaus
+    await submit();
+    assert.equal(submitted.at(-1), "", "ohne neue Unterschrift wird nichts mitgeschickt");
   });
 });

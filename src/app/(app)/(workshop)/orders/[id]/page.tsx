@@ -263,15 +263,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <p className="mt-1 whitespace-pre-line break-words">{approval.reason}</p>
                     <p className="mt-1 text-xs text-ink-muted">
                       {td(`orders.approvals.methods.${approval.method}`, approval.method)} · {t("orders.approvals.recordedBy", { name: approval.recordedByName })} · {date(approval.createdAt, { dateStyle: "medium", timeStyle: "short" })}
-                      {approval.method === "signature" && prices ? (
-                        <>
-                          {" · "}
-                          <TextLink href={`/api/orders/approvals/${approval.id}/signature`} external target="_blank" rel="noopener">
-                            {t("orders.approvals.viewSignature")}
-                          </TextLink>
-                        </>
-                      ) : null}
+                      {approval.method === "typed" && approval.signedName ? ` · ${t("orders.approvals.typedAs", { name: approval.signedName })}` : ""}
                     </p>
+                    {approval.method === "signature" && prices ? (
+                      <p className="mt-1 text-sm">
+                        <TextLink href={`/api/orders/approvals/${approval.id}/signature`} external target="_blank" rel="noopener">
+                          {t("orders.approvals.viewSignature")}
+                        </TextLink>
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>

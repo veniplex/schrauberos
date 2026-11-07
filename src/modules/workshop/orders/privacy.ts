@@ -3,7 +3,7 @@ import { dayField, field } from "@/lib/privacy";
 import type { PrivacyProviderDef } from "@/modules/types";
 import { db } from "@/server/db";
 
-/** Auskunft: Aufträge des Kunden mit Kundenwunsch, Befunden und Freigaben (Beträge, freigebende Person). Die Auskunft liefert bewusst alles, unabhängig von den Leserechten. */
+/** Auskunft: Aufträge des Kunden mit Kundenwunsch, Befunden und Freigaben (Beträge, freigebende Person, getippter Name, Hinweis auf die gespeicherte Unterschrift-Bilddatei). Die Auskunft liefert bewusst alles, unabhängig von den Leserechten. */
 export const privacyProviders: PrivacyProviderDef[] = [
   {
     id: "orders",
@@ -21,7 +21,7 @@ export const privacyProviders: PrivacyProviderDef[] = [
           request: true,
           vehicle: { select: { plate: true } },
           findings: { orderBy: { createdAt: "asc" }, select: { text: true } },
-          approvals: { orderBy: { createdAt: "asc" }, select: { amountCents: true, reason: true, method: true, approverName: true, createdAt: true } },
+          approvals: { orderBy: { createdAt: "asc" }, select: { amountCents: true, reason: true, method: true, approverName: true, signedName: true, signaturePath: true, createdAt: true } },
         },
       });
       return [
@@ -39,7 +39,9 @@ export const privacyProviders: PrivacyProviderDef[] = [
             field(
               "approvals",
               "privacy.f.approvals",
-              o.approvals.map((a) => `${(a.amountCents / 100).toFixed(2)} EUR, ${a.approverName}, ${a.method}: ${a.reason}`).join("; ") || null,
+              o.approvals
+                .map((a) => `${(a.amountCents / 100).toFixed(2)} EUR, ${a.approverName}, ${a.method}${a.signedName ? ` (getippter Name: ${a.signedName})` : ""}${a.signaturePath ? " (Unterschrift als Bilddatei gespeichert)" : ""}: ${a.reason}`)
+                .join("; ") || null,
             ),
           ]),
         },
