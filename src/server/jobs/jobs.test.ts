@@ -874,9 +874,10 @@ describe("Automatisches Backup: Reihenfolge und Teilfehler (ZP3-A-12)", () => {
     const core = await import("@/server/backup/core");
     await settle("23", "14"); // Uhrzeit nicht erreicht
     try {
-      const { runner } = rig([job], new Date().toISOString(), { timeZone: () => "UTC" });
+      // feste Uhr (10 Uhr UTC), unabhängig von der echten Tageszeit – sonst schlüge der Test ab 23 Uhr UTC fehl, wenn die „nicht erreichte“ Uhrzeit erreicht ist
+      const { c, runner } = rig([job], "2026-06-01T10:00:00Z", { timeZone: () => "UTC" });
       await runner.sync();
-      await env.db.jobState.update({ where: { id: "backup.auto" }, data: { nextRunAt: new Date(Date.now() - 1000) } });
+      await env.db.jobState.update({ where: { id: "backup.auto" }, data: { nextRunAt: new Date(c.now().getTime() - 1000) } });
       const [idle] = await runner.tick();
       assert.equal(idle.message, "", "Uhrzeit nicht erreicht: nichts zu tun");
       assert.equal((await core.listBackups()).length, 0);
