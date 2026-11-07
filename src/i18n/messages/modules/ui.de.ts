@@ -109,6 +109,7 @@ export const uiDe = {
     progress: "Hochladen: {name}",
     summary: "{done} von {total} Fotos hochgeladen",
     tooMany: "Es sind höchstens {max} Fotos möglich.",
+    duplicate: "Ein Foto steht schon in der Liste und wurde nicht noch einmal aufgenommen.",
     errors: {
       network: "Keine Verbindung.",
       timeout: "Zeitüberschreitung.",

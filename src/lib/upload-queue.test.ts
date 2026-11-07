@@ -6,10 +6,10 @@ const file = (name: string, size = 100) => new File([new Uint8Array(size)], name
 
 /** Uploader, den der Test von Hand steuert: jeder Aufruf bleibt offen, bis `finish`/`fail` kommt. */
 function manual() {
-  const calls: Array<{ file: File; attempt: number; progress: (f: number) => void; signal: AbortSignal; finish: (value?: unknown) => void; fail: (error?: unknown) => void }> = [];
+  const calls: Array<{ file: File; attempt: number; key: string; progress: (f: number) => void; signal: AbortSignal; finish: (value?: unknown) => void; fail: (error?: unknown) => void }> = [];
   const uploader: Uploader = (f, ctx) =>
     new Promise((resolve, reject) => {
-      calls.push({ file: f, attempt: ctx.attempt, progress: ctx.onProgress, signal: ctx.signal, finish: (value) => resolve(value ?? { ok: true }), fail: (error) => reject(error ?? new Error("kaputt")) });
+      calls.push({ file: f, attempt: ctx.attempt, key: ctx.idempotencyKey, progress: ctx.onProgress, signal: ctx.signal, finish: (value) => resolve(value ?? { ok: true }), fail: (error) => reject(error ?? new Error("kaputt")) });
     });
   return { calls, uploader };
 }
@@ -183,7 +183,7 @@ describe("xhrUploader", () => {
     return create;
   }
 
-  const ctx = (signal = new AbortController().signal, onProgress: (f: number) => void = () => {}) => ({ onProgress, signal, attempt: 1 });
+  const ctx = (signal = new AbortController().signal, onProgress: (f: number) => void = () => {}) => ({ onProgress, signal, attempt: 1, idempotencyKey: "schluessel-1" });
 
   it("sendet Multipart mit Feld, Zusatzfeldern und dem Herkunftskopf; meldet Fortschritt; liefert die JSON-Antwort", async () => {
     let made: ReturnType<ReturnType<typeof fakeXhr>> | undefined;
@@ -201,6 +201,7 @@ describe("xhrUploader", () => {
     assert.equal(made!.sent.method, "POST");
     assert.equal(made!.sent.url, "/api/files/orders/o1");
     assert.equal(made!.sent.headers["X-Requested-With"], "schrauberos");
+    assert.equal(made!.sent.headers["Idempotency-Key"], "schluessel-1", "der Schlüssel der Datei geht als Kopfzeile mit");
     assert.equal(made!.sent.body!.get("kind"), "photo");
     assert.equal((made!.sent.body!.get("file") as File).name, "a.jpg");
   });
@@ -229,5 +230,77 @@ describe("xhrUploader", () => {
     let created = false;
     await assert.rejects(xhrUploader("/x", { createXhr: () => ((created = true), fakeXhr(() => {})() as never) })(file("a.jpg"), ctx(controller.signal)));
     assert.equal(created, false);
+  });
+});
+
+describe("Upload-Warteschlange: Dubletten und Schlüssel", () => {
+  it("jede Datei hat ihren Idempotenzschlüssel, der bei jedem Wiederholen gleich bleibt (verlorene Antwort → keine zweite Ablage)", async () => {
+    const { calls, uploader } = manual();
+    const queue = createUploadQueue({ uploader, concurrency: 2 });
+    queue.add([file("a.jpg"), file("b.jpg")]);
+    assert.notEqual(calls[0].key, calls[1].key);
+    assert.ok(calls[0].key.length >= 16);
+    calls[0].fail(new UploadError("timeout"));
+    await tick();
+    queue.retry(queue.items()[0].id);
+    assert.equal(calls.length, 3);
+    assert.equal(calls[2].file.name, "a.jpg");
+    assert.equal(calls[2].key, calls[0].key, "dieselbe Datei, derselbe Schlüssel");
+    calls[1].finish();
+    calls[2].finish();
+    await queue.idle();
+  });
+
+  it("dieselbe Datei (Name, Größe, Änderungszeit) lässt sich nicht zweimal einreihen", () => {
+    const { uploader } = manual();
+    const queue = createUploadQueue({ uploader });
+    const a = new File([new Uint8Array(10)], "a.jpg", { type: "image/jpeg", lastModified: 1000 });
+    const same = new File([new Uint8Array(10)], "a.jpg", { type: "image/jpeg", lastModified: 1000 });
+    const other = new File([new Uint8Array(10)], "a.jpg", { type: "image/jpeg", lastModified: 2000 });
+    assert.equal(queue.add([a]).added.length, 1);
+    const result = queue.add([same, other]);
+    assert.deepEqual(result.rejected, [{ name: "a.jpg", problem: "duplicate" }]);
+    assert.equal(result.added.length, 1);
+    // nach dem Entfernen darf sie wieder
+    const first = queue.items()[0];
+    queue.cancel(first.id);
+    queue.remove(first.id);
+    assert.equal(queue.add([same]).added.length, 1);
+  });
+
+  it("fertige Dateien zählen für die Höchstzahl nicht mit (sie stehen beim Aufrufer in dessen Liste)", async () => {
+    const { calls, uploader } = manual();
+    const queue = createUploadQueue({ uploader, maxFiles: 2, concurrency: 2 });
+    queue.add([file("a.jpg"), file("b.jpg")]);
+    assert.deepEqual(queue.add([file("c.jpg")]).rejected, [{ name: "c.jpg", problem: "tooMany" }]);
+    calls[0].finish();
+    await tick();
+    assert.equal(queue.add([file("c.jpg")]).added.length, 1, "a ist fertig: ein Platz ist frei");
+    calls[1].finish();
+    calls[2].finish();
+    await queue.idle();
+  });
+
+  it("Abbrechen nach Wiederholen wirkt: der Nachlauf des alten Versuchs löscht den Controller des neuen nicht", async () => {
+    const calls: Array<{ signal: AbortSignal; fail: () => void; finish: () => void }> = [];
+    // ein Uploader, der das Signal ignoriert (z. B. eine Bibliothek ohne Abbruch)
+    const uploader: Uploader = (_file, ctx) =>
+      new Promise((resolve, reject) => {
+        calls.push({ signal: ctx.signal, fail: () => reject(new Error("spät")), finish: () => resolve({}) });
+      });
+    const queue = createUploadQueue({ uploader, concurrency: 2 });
+    queue.add([file("a.jpg")]);
+    const id = queue.items()[0].id;
+    queue.cancel(id);
+    assert.equal(calls[0].signal.aborted, true);
+    queue.retry(id);
+    assert.equal(calls.length, 2, "neuer Versuch");
+    calls[0].fail(); // der alte Versuch endet jetzt
+    await tick();
+    queue.cancel(id);
+    assert.equal(calls[1].signal.aborted, true, "der zweite Versuch lässt sich noch abbrechen");
+    calls[1].finish();
+    await tick();
+    assert.equal(queue.items()[0].status, "cancelled");
   });
 });

@@ -110,6 +110,7 @@ export const uiEn: typeof uiDe = {
     progress: "Uploading: {name}",
     summary: "{done} of {total} photos uploaded",
     tooMany: "At most {max} photos are possible.",
+    duplicate: "A photo is already in the list and was not added again.",
     errors: {
       network: "No connection.",
       timeout: "Timed out.",

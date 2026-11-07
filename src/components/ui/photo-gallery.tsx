@@ -86,9 +86,10 @@ export function PhotoGallery({
     const files = Array.from(event.target.files ?? []);
     event.target.value = ""; // dieselbe Datei lässt sich danach noch einmal wählen
     if (files.length === 0) return;
-    const room = Math.max(0, maxFiles - photos.length - queue.items().length);
-    queue.add(files.slice(0, room));
-    setNotice(files.length > room ? t("ui.gallery.tooMany", { max: maxFiles }) : null);
+    // fertige Uploads stehen (nach `onUploaded` → neue Liste vom Server) schon in `photos`: nicht doppelt zählen
+    const room = Math.max(0, maxFiles - photos.length - queue.items().filter((item) => item.status !== "done").length);
+    const { rejected } = queue.add(files.slice(0, room));
+    setNotice(files.length > room ? t("ui.gallery.tooMany", { max: maxFiles }) : rejected.some((r) => r.problem === "duplicate") ? t("ui.gallery.duplicate") : null);
   }
 
   const done = items.filter((item) => item.status === "done").length;

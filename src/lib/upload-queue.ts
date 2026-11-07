@@ -1,6 +1,8 @@
 /**
  * Warteschlange für Mehrfach-Uploads (Foto-Galerie am Auftrag und am Fahrzeug): jede Datei einzeln mit Fortschritt, höchstens `concurrency` gleichzeitig, **Wiederholen bei Fehler**
- * und **Abbrechen** je Datei. Reine Logik ohne DOM – das Hochladen selbst steckt hinter `Uploader` (im Browser `xhrUploader`, im Test eine Attrappe). Die Warteschlange glaubt dem Server nichts
+ * und **Abbrechen** je Datei. **Keine Dubletten:** jede Datei bekommt beim Einreihen einen Idempotenzschlüssel (`UploadItem.key`), der bei jedem Wiederholen derselbe bleibt und mit jedem Versuch an den Uploader geht
+ * (`xhrUploader` sendet ihn als `Idempotency-Key`): ging die Antwort verloren, obwohl der Server das Foto schon abgelegt hat, erkennt die Upload-Route die Wiederholung – die Warteschlange selbst kann das nicht wissen.
+ * Dieselbe Datei (Name, Größe, Änderungszeit) lässt sich nicht zweimal einreihen (`duplicate`). Reine Logik ohne DOM – das Hochladen selbst steckt hinter `Uploader` (im Browser `xhrUploader`, im Test eine Attrappe). Die Warteschlange glaubt dem Server nichts
  * und dem Browser nur das Nötigste: Größe und Zahl werden vor dem Einreihen geprüft, der Server prüft alles noch einmal (Magic Bytes, Pixelgrenzen, EXIF, Recht).
  */
 
@@ -13,6 +15,8 @@ export type UploadItem = {
   status: UploadStatus;
   /** 0 … 1, wächst nur */
   progress: number;
+  /** Idempotenzschlüssel dieser Datei: bleibt bei jedem Wiederholen gleich */
+  key: string;
   /** Fehlercode des letzten Versuchs (`network`, `http_413`, `failed` …) */
   error?: string;
   /** Antwort des Servers nach Erfolg */
@@ -20,7 +24,8 @@ export type UploadItem = {
   attempts: number;
 };
 
-export type Uploader = (file: File, context: { onProgress: (fraction: number) => void; signal: AbortSignal; attempt: number }) => Promise<unknown>;
+export type UploadContext = { onProgress: (fraction: number) => void; signal: AbortSignal; attempt: number; idempotencyKey: string };
+export type Uploader = (file: File, context: UploadContext) => Promise<unknown>;
 
 export class UploadError extends Error {
   constructor(readonly code: string) {
@@ -32,7 +37,7 @@ export class UploadError extends Error {
 export type UploadQueueOptions = {
   uploader: Uploader;
   concurrency?: number;
-  /** höchstens so viele Dateien insgesamt in der Liste (fertige zählen mit) */
+  /** höchstens so viele Dateien in der Liste; **fertige zählen nicht mit** (sie stehen beim Aufrufer längst in dessen Liste, sonst würden sie doppelt gerechnet) */
   maxFiles?: number;
   /** Größe je Datei in Bytes (nach dem Verkleinern) */
   maxBytes?: number;
@@ -58,6 +63,8 @@ export function createUploadQueue(options: UploadQueueOptions): UploadQueue {
   const listeners = new Set<() => void>();
   const waiters = new Set<() => void>();
   let counter = 0;
+  const newKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${(++counter).toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -76,6 +83,7 @@ export function createUploadQueue(options: UploadQueueOptions): UploadQueue {
     try {
       const response = await options.uploader(item.file, {
         attempt: item.attempts + 1,
+        idempotencyKey: item.key,
         signal: controller.signal,
         onProgress: (fraction) => {
           if (controller.signal.aborted) return;
@@ -90,7 +98,8 @@ export function createUploadQueue(options: UploadQueueOptions): UploadQueue {
       if (controller.signal.aborted) return;
       patch(item.id, { status: "error", error: error instanceof UploadError ? error.code : "failed" });
     } finally {
-      controllers.delete(item.id);
+      // nur den eigenen Controller entfernen: ein neuer Lauf derselben Datei (Wiederholen nach Abbrechen) hat inzwischen einen eigenen
+      if (controllers.get(item.id) === controller) controllers.delete(item.id);
       pump();
     }
   }
@@ -110,13 +119,14 @@ export function createUploadQueue(options: UploadQueueOptions): UploadQueue {
         let problem: UploadProblem | null = null;
         if (options.accept && !options.accept(file)) problem = "type";
         else if (options.maxBytes !== undefined && file.size > options.maxBytes) problem = "tooLarge";
-        else if (options.maxFiles !== undefined && list.length >= options.maxFiles) problem = "tooMany";
+        else if (list.some((item) => sameFile(item.file, file))) problem = "duplicate";
+        else if (options.maxFiles !== undefined && list.filter((item) => item.status !== "done").length >= options.maxFiles) problem = "tooMany";
         if (problem) {
           rejected.push({ name: file.name, problem });
           continue;
         }
         const id = `u${++counter}`;
-        list = [...list, { id, file, status: "queued", progress: 0, attempts: 0 }];
+        list = [...list, { id, file, key: newKey(), status: "queued", progress: 0, attempts: 0 }];
         added.push(id);
       }
       if (added.length) {
@@ -182,10 +192,11 @@ type XhrLike = {
 /**
  * Lädt eine Datei als Multipart-Formular hoch (`fetch` kennt keinen Fortschritt beim Senden). Dieselbe Herkunft, mit `X-Requested-With: schrauberos` (Upload-Routen verlangen es,
  * `src/server/request-guard.ts`). Erfolg (2xx) liefert die JSON-Antwort (sonst den Text); alles andere wirft `UploadError("http_<Status>")`, ein Netzwerkfehler `UploadError("network")`.
+ * `Idempotency-Key` ist der Schlüssel der Datei (derselbe bei jedem Versuch): Die Upload-Route legt eine Datei mit bekanntem Schlüssel nicht noch einmal ab, sondern antwortet wie beim ersten Mal.
  * Der Server verlangt für Datei-Uploads `Content-Length` – ein `FormData`-Body bekommt sie vom Browser automatisch.
  */
 export function xhrUploader(url: string, options: { field?: string; fields?: Record<string, string>; timeoutMs?: number; createXhr?: () => XhrLike } = {}): Uploader {
-  return (file, { onProgress, signal }) =>
+  return (file, { onProgress, signal, idempotencyKey }) =>
     new Promise((resolve, reject) => {
       if (signal.aborted) return reject(new UploadError("aborted"));
       const xhr = options.createXhr ? options.createXhr() : (new XMLHttpRequest() as unknown as XhrLike);
@@ -194,6 +205,7 @@ export function xhrUploader(url: string, options: { field?: string; fields?: Rec
       form.append(options.field ?? "file", file, file.name);
       xhr.open("POST", url);
       xhr.setRequestHeader("X-Requested-With", "schrauberos");
+      xhr.setRequestHeader("Idempotency-Key", idempotencyKey);
       xhr.timeout = options.timeoutMs ?? 120_000;
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total);

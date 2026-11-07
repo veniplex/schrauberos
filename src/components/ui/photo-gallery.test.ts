@@ -4,7 +4,7 @@ import { createElement } from "react";
 import type { ImageEngine } from "@/lib/image-resize";
 import { UploadError, type Uploader } from "@/lib/upload-queue";
 import { act, installDom, type MountedView, type TestDom } from "@/test/dom";
-import { byText, click, mountI18n, plain } from "@/test/ui";
+import { byText, click, mountI18n, plain, rerenderI18n } from "@/test/ui";
 
 /**
  * Foto-Galerie: Mehrfachauswahl, Warteschlange mit Fortschritt je Foto, Wiederholen bei Fehler, Abbrechen, Grenzen. Der Foto-Baustein darunter verkleinert mit einer Attrappe der Bildverarbeitung
@@ -130,6 +130,22 @@ describe("PhotoGallery", () => {
     await choose([jpeg("a.jpg"), jpeg("b.jpg"), jpeg("c.jpg")]);
     assert.equal(rows().length, 2);
     assert.match(plain(root.querySelector("[role='alert']")?.textContent), /höchstens 3 Fotos/);
+  });
+
+  it("fertige Uploads zählen nicht doppelt: sobald die Seite sie als gespeicherte Fotos liefert, ist der Platz nur einmal belegt", async () => {
+    const { PhotoGallery } = await import("./photo-gallery");
+    const { choose, rows, calls, flush, uploader } = await mountGallery({ maxFiles: 3 });
+    await choose([jpeg("a.jpg"), jpeg("b.jpg")]);
+    await act(() => calls[0].finish());
+    await act(() => calls[1].finish());
+    await flush();
+    // die Seite hat neu geladen und liefert die zwei Fotos als gespeicherte; die „fertig“-Zeilen stehen noch in der Liste
+    const saved = [{ id: "p1", src: "/api/files/p1", name: "a.jpg" }, { id: "p2", src: "/api/files/p2", name: "b.jpg" }];
+    await rerenderI18n(view!, createElement(PhotoGallery, { uploader, imageEngine: small, maxFiles: 3, photos: saved } as never));
+    assert.equal(rows().length, 2);
+    await choose([jpeg("c.jpg")]);
+    assert.equal(rows().length, 3, "Platz für das dritte Foto (2 gespeichert + 1 neues = 3)");
+    assert.equal(document.querySelector("[role='alert']"), null);
   });
 
   it("schon gespeicherte Fotos stehen als Bildliste vor den Uploads, mit Aktionen der Funktion; ohne Fotos der Leerhinweis", async () => {
