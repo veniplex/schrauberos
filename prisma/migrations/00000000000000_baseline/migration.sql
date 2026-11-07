@@ -871,6 +871,8 @@ CREATE TABLE "ApiToken" (
     "lastUsedAt" DATETIME,
     "revokedAt" DATETIME,
     "rateLimitPerMinute" INTEGER NOT NULL DEFAULT 120,
+    "description" TEXT,
+    "allowedNets" TEXT,
     CONSTRAINT "ApiToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -881,6 +883,41 @@ CREATE TABLE "ApiTokenScope" (
 
     PRIMARY KEY ("tokenId", "permission"),
     CONSTRAINT "ApiTokenScope_tokenId_fkey" FOREIGN KEY ("tokenId") REFERENCES "ApiToken" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Webhook" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "events" TEXT NOT NULL,
+    "enabled" BOOLEAN NOT NULL DEFAULT false,
+    "allowPrivate" BOOLEAN NOT NULL DEFAULT false,
+    "previousSecretUntil" DATETIME,
+    "disabledReason" TEXT,
+    "createdByName" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "WebhookDelivery" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "webhookId" TEXT NOT NULL,
+    "eventId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "entityId" TEXT,
+    "eventAt" DATETIME NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "nextAttemptAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastAttemptAt" DATETIME,
+    "lastStatus" INTEGER,
+    "lastError" TEXT,
+    "lastDurationMs" INTEGER,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" DATETIME,
+    CONSTRAINT "WebhookDelivery_webhookId_fkey" FOREIGN KEY ("webhookId") REFERENCES "Webhook" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -1488,6 +1525,15 @@ CREATE INDEX "ApiToken_userId_idx" ON "ApiToken"("userId");
 
 -- CreateIndex
 CREATE INDEX "ApiToken_expiresAt_idx" ON "ApiToken"("expiresAt");
+
+-- CreateIndex
+CREATE INDEX "WebhookDelivery_status_nextAttemptAt_idx" ON "WebhookDelivery"("status", "nextAttemptAt");
+
+-- CreateIndex
+CREATE INDEX "WebhookDelivery_createdAt_idx" ON "WebhookDelivery"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "WebhookDelivery_webhookId_eventId_key" ON "WebhookDelivery"("webhookId", "eventId");
 
 -- CreateIndex
 CREATE INDEX "ApiIdempotencyKey_expiresAt_idx" ON "ApiIdempotencyKey"("expiresAt");

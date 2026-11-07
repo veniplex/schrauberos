@@ -17,6 +17,7 @@ export const auditDe = {
     calendarFeed: "Kalender-Abo",
     backup: "Backups",
     mail: "E-Mail",
+    webhook: "Webhooks",
     setup: "Einrichtung",
     secrets: "Geheimnisse",
     system: "System",
@@ -65,6 +66,15 @@ export const auditDe = {
       offsiteSettings: "Off-Site-Backup eingerichtet oder geändert",
       offsiteFailed: "Off-Site-Backup fehlgeschlagen",
       offsiteFetch: "Sicherung vom Off-Site-Ziel zurückgeholt",
+    },
+    webhook: {
+      create: "Webhook angelegt",
+      update: "Webhook geändert",
+      delete: "Webhook gelöscht",
+      test: "Webhook: Test-Ereignis gesendet",
+      redeliver: "Webhook: Zustellung erneut angestoßen",
+      secret: "Webhook: Signaturgeheimnis erneuert",
+      disabled: "Webhook automatisch ausgeschaltet",
     },
     mail: {
       settings: "E-Mail-Einstellungen geändert",

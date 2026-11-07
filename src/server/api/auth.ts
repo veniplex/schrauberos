@@ -1,4 +1,5 @@
 import "server-only";
+import { ipInNets, netsOf } from "@/lib/api/cidr";
 import { problemOf } from "@/lib/api/problem";
 import { effectivePermissions } from "@/lib/api/scope";
 import { bearerToken, hashApiToken, tokenHint } from "@/lib/api/token";
@@ -54,6 +55,12 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthR
   // Verlangt die Richtlinie den zweiten Faktor für Administratoren, gilt das auch für ihre Tokens: Ein Administrator-Konto, das ihn noch nicht eingerichtet hat, darf die Pflicht
   // nicht über die Programmierschnittstelle umgehen (die Sitzung kommt nur bis „Mein Konto“) – sein Token wird bis zur Einrichtung abgelehnt, nicht widerrufen.
   if (row.user.roles.some((r) => r.role.isAdmin) && !row.user.twoFactor?.enabledAt && (await authPolicy()).requireTwoFactorForAdmins) return reject(request);
+  // Optionale Beschränkung auf Adressbereiche: gilt nur mit der Einstellung „Hinter Reverse-Proxy“ (sonst kennen wir die Adresse des Aufrufers nicht, und der Header wäre fälschbar) – ohne bekannte
+  // Adresse bleibt ein beschränktes Token zu (fail-closed). Von außen sieht es aus wie jedes ungültige Token (401, Drosselung im Fehlerpfad).
+  if (row.allowedNets) {
+    const ip = clientIp(request.headers.get("x-forwarded-for"), await isBehindProxy());
+    if (!ipInNets(ip, netsOf(row.allowedNets))) return reject(request);
+  }
 
   if (!row.lastUsedAt || now - row.lastUsedAt.getTime() > LAST_USED_EVERY_MS) {
     // atomar und ohne updatedAt: gleichzeitige Anfragen schreiben höchstens einmal

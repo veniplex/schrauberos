@@ -38,6 +38,7 @@ export type IconName =
   | "updates"
   | "backup"
   | "system"
+  | "api"
   | "help";
 
 export type ModuleDef = {
@@ -125,6 +126,12 @@ export type FeatureDef = {
    * `audit.actions.<aktion>` und wird irgendwo verwendet (`audit-actions.test.ts`).
    */
   auditActions?: readonly string[];
+  /**
+   * Ereignisse, die diese Funktion **an Webhooks melden lässt** (Funktion `admin.api`): Typ wie in `ctx.emit` der Operationen, `resource` = Pfad der API-Ressource, unter der der Empfänger die Sache mit seinem eigenen Token abholt
+   * (`/api/v1/<resource>/<id>`). Die Nutzlast trägt nur Ereignis-ID, Typ, Zeitpunkt und diese ID – nie Fachdaten. Beschriftung unter `api.webhooks.events.<typ>`. Sensible Ressourcen (Mitarbeiter, Krankheit, Tresor, Konto/Verwaltung)
+   * melden nichts; `catalog.test.ts` und `webhooks.test.ts` prüfen, dass Typ und Ressource existieren.
+   */
+  webhookEvents?: readonly { type: string; resource: string }[];
   /** Querschnittsfunktion Dokumentation: Bereichs-ID, unter der die Doku dieser Funktion läuft */
   docsArea?: string;
 };

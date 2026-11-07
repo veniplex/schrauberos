@@ -150,6 +150,7 @@ export const en: Messages = {
   nav: {
     modules: "Modules & features",
     backup: "Backups",
+    api: "API & webhooks",
     updates: "Updates",
     audit: "Audit log",
     system: "System status",
@@ -361,6 +362,7 @@ export const en: Messages = {
     modules: "Modules & features",
     system: "System status",
     mail: "Email sending",
+    api: "API & webhooks",
   },
   permissionHints: permissionHintsEn,
   permissions: {
@@ -496,6 +498,9 @@ export const en: Messages = {
     mail: {
       manage: "Set up email sending and view the send log",
       send: "Send email from the application",
+    },
+    api: {
+      manage: "Manage API tokens and webhooks",
     },
     modules: {
       manage: "Switch modules and features on/off",

@@ -19,6 +19,7 @@ export const auditEn: typeof auditDe = {
     calendarFeed: "Calendar subscription",
     backup: "Backups",
     mail: "Email",
+    webhook: "Webhooks",
     setup: "Setup",
     secrets: "Secrets",
     system: "System",
@@ -67,6 +68,15 @@ export const auditEn: typeof auditDe = {
       offsiteSettings: "Off-site backup set up or changed",
       offsiteFailed: "Off-site backup failed",
       offsiteFetch: "Backup fetched back from the off-site target",
+    },
+    webhook: {
+      create: "Webhook created",
+      update: "Webhook changed",
+      delete: "Webhook deleted",
+      test: "Webhook: test event sent",
+      redeliver: "Webhook: delivery triggered again",
+      secret: "Webhook: signing secret renewed",
+      disabled: "Webhook switched off automatically",
     },
     mail: {
       settings: "Email settings changed",

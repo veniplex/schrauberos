@@ -29,6 +29,7 @@ import { updatesFeature } from "./admin/updates/feature";
 import { backupFeature } from "./admin/backup/feature";
 import { systemFeature } from "./admin/system/feature";
 import { mailFeature } from "./admin/mail/feature";
+import { apiAdminFeature } from "./admin/api/feature";
 import { featureKey } from "./catalog-logic";
 import type { FeatureDef, PermissionMark } from "./define";
 
@@ -65,6 +66,7 @@ export const FEATURES = [
   updatesFeature,
   backupFeature,
   mailFeature,
+  apiAdminFeature,
   systemFeature,
 ] as const;
 
@@ -110,6 +112,12 @@ export const featureById = (id: string) => FEATURES.find((f) => featureKey(f) ==
 
 /** Rechte-Gruppen eines Moduls (für die Rollenverwaltung). */
 export const groupsOfModule = (moduleId: string): PermissionGroup[] => featuresOfModule(moduleId).map((f) => f.permissions.group as PermissionGroup);
+
+/** Ereignisse, die Funktionen an Webhooks melden lassen (`webhookEvents` ihrer `feature.ts`), mit der Funktion, der sie gehören. */
+export type WebhookEvent = { type: string; resource: string; feature: FeatureId };
+export const WEBHOOK_EVENTS: readonly WebhookEvent[] = FEATURES.flatMap((f) =>
+  ((f as FeatureDef).webhookEvents ?? []).map((event) => ({ type: event.type, resource: event.resource, feature: featureKey(f) as FeatureId })),
+);
 
 /** Funktionen, die die Querschnittsfunktion Dokumentation nutzen (Bereichs-ID → Funktion). */
 export type DocFeature = Extract<FeatureDefinition, { docsArea: string }>;

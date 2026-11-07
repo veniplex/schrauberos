@@ -134,6 +134,9 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     manage: "Set up the email server, test it, and view the send log.",
     send: "Send email from the application (e.g. an invoice to a customer). Never assigned automatically.",
   },
+  api: {
+    manage: "Create and revoke API tokens, set up webhooks, read the API documentation. Opens data to the outside – administrators only.",
+  },
   modules: {
     manage: "Switch modules and features on and off.",
   },

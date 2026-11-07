@@ -1241,6 +1241,10 @@ model ApiToken {
   revokedAt          DateTime?
   // Anfragen pro Minute für dieses Token
   rateLimitPerMinute Int       @default(120)
+  // Beschreibung (wofür das Token gedacht ist; nur Anzeige)
+  description        String?
+  // Beschränkung auf Adressbereiche (CIDR, ein Eintrag je Zeile; null = keine). Wirkt nur mit der Einstellung „Hinter Reverse-Proxy“, sonst ist das Token unbrauchbar (fail-closed).
+  allowedNets        String?
 
   user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   scope ApiTokenScope[]
@@ -1257,6 +1261,55 @@ model ApiTokenScope {
   token ApiToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
 
   @@id([tokenId, permission])
+}
+
+// Webhook (F11): ein Ziel, an das die Anwendung Ereignisse meldet. Die Nutzlast trägt nur Ereignis-ID, Typ, Zeitpunkt und die ID der Sache – nie Fachdaten. Das Geheimnis der Signatur liegt
+// verschlüsselt in den Einstellungen (`webhook.secret.<id>`, `setSecret`), nicht hier.
+model Webhook {
+  id                  String            @id @default(cuid())
+  name                String
+  url                 String
+  // abonnierte Ereignistypen, durch Komma getrennt (Text, bewusst kein Json-Feld)
+  events              String
+  enabled             Boolean           @default(false)
+  // ausdrückliche Freigabe der Administration für ein Ziel im eigenen Netz (private Adressen, auch http)
+  allowPrivate        Boolean           @default(false)
+  // bis dahin signiert die Anwendung zusätzlich mit dem vorherigen Geheimnis (Rotation mit Überlappung)
+  previousSecretUntil DateTime?
+  // warum die Anwendung das Ziel selbst ausgeschaltet hat: "gone" (410) | "secret" (Geheimnis unlesbar)
+  disabledReason      String?
+  createdByName       String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  deliveries          WebhookDelivery[]
+}
+
+// Zustellprotokoll UND Warteschlange: eine Zeile je Ereignis und Ziel. Ohne Nutzlast und ohne Antworttext – gespeichert sind nur Zustand, Statuscode, Fehlercode und Dauer.
+model WebhookDelivery {
+  id             String    @id @default(cuid())
+  webhookId      String
+  webhook        Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  // Ereignis-ID (Outbox-Ereignis; Test: "test_…") – der Empfänger erkennt Wiederholungen daran
+  eventId        String
+  type           String
+  entityId       String?
+  eventAt        DateTime
+  // pending | held (Ziel ausgeschaltet, bis zu 14 Tage zurückgestellt) | sent | failed (aufgegeben) | gone (Empfänger meldete 410)
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  lastAttemptAt  DateTime?
+  // HTTP-Statuscode der letzten Antwort
+  lastStatus     Int?
+  // Fehlercode des letzten Versuchs (kein Text des Empfängers)
+  lastError      String?
+  lastDurationMs Int?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  @@unique([webhookId, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
 }
 
 // Idempotenz-Schlüssel (Header Idempotency-Key): je Token, Methode+Pfad und Schlüssel höchstens eine Zeile. status = null: Anfrage läuft noch.

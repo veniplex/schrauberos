@@ -151,6 +151,7 @@ export const de = {
   nav: {
     modules: "Module & Funktionen",
     backup: "Backups",
+    api: "API & Webhooks",
     updates: "Updates",
     audit: "Audit-Log",
     system: "Systemstatus",
@@ -361,6 +362,7 @@ export const de = {
     modules: "Module & Funktionen",
     system: "Systemstatus",
     mail: "E-Mail-Versand",
+    api: "API & Webhooks",
   },
   permissionHints: permissionHintsDe,
   permissions: {
@@ -496,6 +498,9 @@ export const de = {
     mail: {
       manage: "E-Mail-Versand einrichten und Sendeprotokoll ansehen",
       send: "E-Mails aus der Anwendung versenden",
+    },
+    api: {
+      manage: "API-Tokens und Webhooks verwalten",
     },
     modules: {
       manage: "Module und Funktionen ein-/ausschalten",

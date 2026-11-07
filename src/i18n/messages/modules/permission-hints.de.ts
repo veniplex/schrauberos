@@ -133,6 +133,9 @@ export const permissionHintsDe = {
     manage: "Den Mailserver einrichten, testen und das Sendeprotokoll ansehen.",
     send: "E-Mails aus der Anwendung versenden (z. B. eine Rechnung an einen Kunden). Wird nie automatisch vergeben.",
   },
+  api: {
+    manage: "API-Tokens anlegen und widerrufen, Webhooks einrichten, die Dokumentation der Programmierschnittstelle lesen. Gibt Daten nach außen frei – nur Administratoren.",
+  },
   modules: {
     manage: "Module und Funktionen ein- und ausschalten.",
   },
