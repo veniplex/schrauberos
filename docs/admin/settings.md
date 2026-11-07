@@ -9,7 +9,7 @@
 Die **Einstellungen** sind in Reiter gegliedert. Welche Reiter es gibt, hängt von den aktiven Funktionen ab: Jede Funktion bringt
 ihre eigenen Einstellungen mit.
 
-* **Werkstatt:** Name, Untertitel, Adresse, Logo, Akzentfarbe (eine frei gewählte Farbe, die als Schrift zu blass wäre, wird mit einem Hinweis markiert), **Zeitzone** (gilt sofort) und Öffnungszeiten. Alle Tage und Uhrzeiten der Anwendung – Termine und Kalender, Öffnungszeiten, Fristen, Rechnungsdaten, Abwesenheiten, die Saison im Reifenlager und die Uhrzeit der nächtlichen Sicherung – gelten in dieser Zeitzone, unabhängig von der Einstellung des Servers.
+* **Werkstatt:** Name, Untertitel, Adresse, Logo (PNG, JPEG oder WebP, höchstens 200 KB; es erscheint in Kopfzeile und Anmeldeseite, ein SVG-Logo wird aus Sicherheitsgründen nicht angenommen), Akzentfarbe (eine frei gewählte Farbe, die als Schrift zu blass wäre, wird mit einem Hinweis markiert), **Zeitzone** (gilt sofort) und Öffnungszeiten. Alle Tage und Uhrzeiten der Anwendung – Termine und Kalender, Öffnungszeiten, Fristen, Rechnungsdaten, Abwesenheiten, die Saison im Reifenlager und die Uhrzeit der nächtlichen Sicherung – gelten in dieser Zeitzone, unabhängig von der Einstellung des Servers.
 * **Sicherheit – Sitzungen:** **Abmelden nach Leerlauf (Stunden)**: Sitzungen enden, wenn so lange keine Seite aufgerufen wurde (auf etwa eine Minute genau; 0 = aus, Standard; höchstens 720). Wer sich dann
   neu anmeldet, landet auf derselben Seite, und nicht gespeicherte Eingaben bleiben im Browser erhalten. **Zwei-Faktor-Anmeldung für Administratoren verpflichtend** (Standard: aus): Administrator-Konten ohne
   eingerichteten zweiten Faktor erreichen dann nach der Anmeldung nur „Mein Konto“ und können ihn nicht ausschalten. Vorher sicherstellen, dass jeder Administrator ein Handy mit Authenticator-App hat; ein
@@ -25,7 +25,7 @@ ihre eigenen Einstellungen mit.
   ältere Einträge werden täglich gelöscht, Standard 730 Tage, mindestens 30; `0` = unbegrenzt (siehe Hilfe „Audit-Log“).
   Dazu zeigt der Reiter, ob die Seite **verschlüsselt (HTTPS)** geöffnet wurde: Bei HTTP erscheint ein Hinweis (im Werkstattnetz in Ordnung, für den Zugriff von außen nicht); bei HTTPS
   weist die Anwendung den Browser an, die Adresse künftig nur noch verschlüsselt aufzurufen. Steht „Hinter Reverse-Proxy“ an, die Anfrage kommt aber als HTTP an, sagt der Hinweis, dass der Proxy
-  `X-Forwarded-Proto: https` weitergeben muss.
+  `X-Forwarded-Proto: https` weitergeben muss. **Nur über HTTPS** lässt sich die Anwendung auf Handy und Tablet installieren und zeigt ohne Verbindung die Seite „Keine Verbindung“ (siehe Hilfe „Auf dem Handy installieren“).
   **Inhaltssicherheitsrichtlinie (CSP):** Die Anwendung erlaubt dem Browser nur Skripte und Inhalte, die sie selbst ausliefert. Zeigt eine Seite deswegen einmal nichts mehr an, kann ein
   Administrator die Richtlinie hier vorübergehend auf **„nur melden“** stellen: Der Browser blockiert dann nichts mehr und schreibt Verstöße nur in seine Konsole (Notbetrieb, gilt sofort für alle,
   steht im Audit-Log). Danach bitte wieder erzwingen lassen.

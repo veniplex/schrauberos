@@ -76,8 +76,8 @@ Container muss nichts mehr angefasst werden. Alle Daten liegen im Volume `app-da
 
 0. [Schnell starten (Docker)](#schnell-starten-docker) · 1. [Schnellstart Entwicklung](#schnellstart-lokale-entwicklung) · 2. [Befehle](#befehle) · 3. [Architektur](#architektur) ·
 4. [Datenhaltung](#datenhaltung) · 5. [Container, Starter und Updates](#container-starter-und-updates) (mit [Starter-Vertrauensanker](#starter-vertrauensanker-p1b-6), Backups, [Job-Runner](#job-runner-srcserverjobs), [Uploads und Archive](#uploads-und-archive), [Datenaustausch (CSV)](#datenaustausch-csv-export-und--import-p4a-2)) ·
-6. [Neue Funktion anlegen](#eine-neue-funktion-anlegen) · 7. [Konventionen](#konventionen) · 8. [Tests](#tests) ·
-9. [Browser-CI](#browser-ci-playwright) · [Release und Signaturschlüssel](#release-und-signaturschlüssel) · 10. [Betrieb](#betrieb) · 11. [Grenzen](#bekannte-grenzen)
+6. [Installierbare App (PWA)](#installierbare-app-pwa-p3-5) · [Neue Funktion anlegen](#eine-neue-funktion-anlegen) · 7. [Konventionen](#konventionen) · 8. [Tests](#tests) ·
+9. [Browser-CI](#browser-ci-playwright) · [Realgeräte-Checkliste](#realgeräte-checkliste-vor-jedem-release) · [Release und Signaturschlüssel](#release-und-signaturschlüssel) · 10. [Betrieb](#betrieb) · 11. [Grenzen](#bekannte-grenzen)
 
 ## Schnellstart (lokale Entwicklung)
 
@@ -568,7 +568,7 @@ Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen 
   Klartext-Cookie zählt nicht – Cookie Tossing; `src/lib/session-cookie.ts`, gilt auch im Proxy). Abmelden löscht den `__Host-`-Cookie mit
   `Secure`, Pfad `/` und `Max-Age=0` (`cookies().delete()` täte das nicht, der Browser verwürfe es). Der Proxy (`src/proxy.ts`) prüft nur, ob ein Cookie da ist, und leitet
   **nie von `/login` weg** – die Anmeldeseite prüft die Sitzung selbst (totes Cookie → Formular statt Schleife). Ausgenommen vom Proxy
-  (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons, `/api/health` und der **Upload von Sicherungen** `/api/backups/upload`. `/api/v1/*` (Bearer-Token) und `/api/ical/*`
+  (`config.matcher`, getestet): Statik, `manifest.webmanifest`, `sw.js`, Icons, `/api/health` und der **Upload von Sicherungen** `/api/backups/upload`. Ohne Sitzungs-Cookie erreichbar (`OPEN_PAGES`) sind außerdem die Anmeldeseiten, `/setup`, die Offline-Seite `/offline` und das Logo `/api/logo` (Abschnitt „Installierbare App (PWA)“). `/api/v1/*` (Bearer-Token) und `/api/ical/*`
   (Token in der URL) laufen durch den Proxy (wegen „Neuinstallation nötig“), brauchen aber kein Sitzungs-Cookie; übrige `/api/*` ohne Cookie antworten mit 401.
   **Warum der Upload nicht durch den Proxy läuft:** Next puffert den Request-Body für den Proxy im Speicher und **schneidet ihn bei `experimental.proxyClientMaxBodySize` (Standard 10 MiB) stumm ab** – eine größere Sicherung käme verstümmelt an (und ein Gigabyte läge im Speicher).
   `/api/backups/upload` ist deshalb aus dem Matcher genommen und prüft Sitzung, Recht, Herkunft und den Zustand „Neuinstallation nötig“ (503) selbst; sie streamt den Body auf die Platte (Tests: `files.test.ts` mit 11 MiB, `proxy.test.ts`, `next-config.test.ts`). Für die Server Actions
@@ -1128,6 +1128,48 @@ Kunden, Fahrzeuge, Rechnungsarchiv und Reifensätze lassen sich als CSV exportie
 * **Neue Datenart:** `exchange-columns.ts` + `exchange.ts` der Funktion (`ExportDef` bzw. `defineImport`), Eintrag in `src/modules/exchange.ts`, Rechte `…export`/`…import` mit `marked` in der `feature.ts` (+ Beschriftungen `permissions.*`), Audit-Aktionen (+ `audit.actions.*`), Texte `<funktion>.exchange.*`, Seiten in `pages.ts`, Eintrag in `NOT_API_OPERATIONS`, Hilfe; Tests in `src/server/csv/exchange.test.ts` (Rechte-Matrix, Dubletten, Rundlauf).
 * **Tests:** `src/server/csv/csv.test.ts` (Leser/Schreiber, Randfälle, Formelschutz, Rundlauf, Zeichensätze, Auswertung), `src/server/csv/exchange.test.ts` (Routen gegen echte SQLite: Rechte je Datenart, Herkunft, Limits, Dubletten, Fehlerzeilen, Formeln, Transaktion, Audit, Rundläufe), `src/components/exchange/*.test.ts`.
 
+## Installierbare App (PWA, P3-5)
+
+Die Anwendung lässt sich auf Handy und Tablet wie eine App installieren (eigenes Fenster, Symbol, Farbe der Statusleiste) und zeigt ohne Verbindung eine eigene Seite statt der Browserfehlerseite.
+**Es gibt keinen Offline-Betrieb**: Fachdaten werden nie auf dem Gerät gespeichert; der Service Worker kennt nur die Offline-Seite und gehashte Programmdateien. Anwenderdoku: Hilfe „Auf dem Handy installieren“
+(`docs/platform/05-…`), „Mobil und Tablet“ (`06-…`).
+
+* **Voraussetzung HTTPS.** Browser verlangen für Service Worker und Installation einen sicheren Kontext: `https://` oder `localhost`/`127.0.0.1`. Im Werkstattnetz über `http://192.168…` gibt es weder Service Worker
+  noch Installation (die Anwendung selbst läuft dort unverändert). Die Registrierung prüft `window.isSecureContext` und tut sonst nichts; sie läuft **nur im Betrieb** (`NODE_ENV=production`), nie in der Entwicklung
+  (dort sind die Dateinamen unter `_next/static` nicht gehasht, ein Zwischenspeicher lieferte veralteten Code). Reverse-Proxy mit Zertifikat: Abschnitt „Betrieb“.
+* **Manifest** (`src/app/manifest.ts`, `/manifest.webmanifest`): `display: standalone`, `start_url`/`scope`/`id` `/`, Symbole 192 und 512 (`any`) und 512 `maskable`. **Statisch, ohne Datenbank** – das Manifest liegt
+  außerhalb des Proxys (`PROXY_FREE_PATHS`/`config.matcher`) und wird auch beantwortet, solange die Datenbank migriert; der Werkstattname steht daher nicht darin (nur im Seitentitel und im Namen unter dem iOS-Symbol, `appleWebApp.title`).
+  Name und Farben in `src/lib/pwa.ts`: die Farben sind **Werte der Design-Tokens** (`--surface` hell/dunkel für `theme-color`, `--bg` für den Startbildschirm) als Hex; `lib/pwa.test.ts` rechnet sie aus `tokens.css` nach.
+  `theme-color` kommt als `viewport.themeColor` mit `prefers-color-scheme` (folgt dem Gerät, nicht der in der App gewählten Darstellung – bewusst, eine Metaangabe lässt sich nicht je Sitzung ändern).
+* **Symbole** (`public/icons/`): `icon-192.png`, `icon-512.png` (abgerundet, durchsichtige Ecken), `icon-maskable-512.png` und `apple-touch-icon.png` (randlos – iOS füllt Durchsichtiges schwarz). Sie sind **kein Fremdbild**,
+  sondern entstehen reproduzierbar aus einer Formel (`scripts/lib/pwa-icons.mjs`: derselbe Schraubenschlüssel in Weiß auf `#2459c9` wie die Standardmarke der Seitenleiste, 4 × 4 überabgetastet, eigener PNG-Schreiber);
+  `node scripts/gen-pwa-icons.mjs` schreibt sie, `--check` vergleicht die Bildpunkte, `lib/pwa.test.ts` tut dasselbe im Test. Das Werkstatt-Logo ist nicht Teil der Symbole (statisches Manifest).
+* **Registrierung** (`ServiceWorkerRegistrar` im Root-Layout innerhalb des `ToastProvider`, Logik in `src/lib/sw-client.ts`): Adresse `/sw.js?v=<Version>[+<Commit>]` (aus `version.json`, `src/server/app-version.ts`; Entwicklung `0.0.0-dev`),
+  Geltungsbereich `/`, `updateViaCache: "none"`. Ein Web-Update ändert die Version, damit die Adresse, damit installiert der Browser einen neuen Service Worker.
+* **Service Worker** (`public/sw.js`, klassische Skriptdatei **ohne Build-Stufe**, ausgeliefert wie eingecheckt; Besitzer der Header ist `next.config.ts`: `Cache-Control: no-cache` und `text/javascript`, die CSP ohne Nonce kommt über
+  `PROXY_FREE_PATHS` – `/sw.js` läuft nicht durch den Proxy). Er fasst **nur** an:
+  1. `mode === "navigate"` **und** `destination === "document"` (ein Seitenaufruf): übers Netz, bei Netzfehler (`fetch` verwirft – kein 4xx/5xx!) die zwischengespeicherte Offline-Seite. **Das ist die einzige, ausdrückliche Ausnahme
+     von „keine Seiten zwischenspeichern“**: gespeichert wird nur `/offline` (öffentliche, statische Seite, ohne Cookie mit `credentials: "omit"` geladen), nie eine Antwort der Anwendung.
+  2. `GET /_next/static/…` (gehashte Dateien): Zwischenspeicher zuerst, sonst Netz und speichern (nur `200`, `type: "basic"`; höchstens 300 Einträge).
+  **Unberührt** bleiben: alles unter `/api` (PDF-Vorschau im `iframe`, Downloads, iCal, Dateien, Suche, Health, `/api/logo`), Anfragen mit `Range`, alles außer `GET` (Formulare, Server Actions), `destination` `iframe`/`frame`/`object`,
+  fremde Herkünfte. **Wer eine Download- oder Dateiroute außerhalb von `/api` anlegt, muss `classify` in `public/sw.js` anpassen** (und `src/lib/sw.test.ts`) – sonst ersetzte bei Netzausfall die Offline-Seite den Download.
+  Zwischenspeicher heißen `sos-static-<v>` und `sos-offline-<v>`; `activate` löscht die anderer Versionen. **Kein `skipWaiting` beim Installieren:** Ein neuer Service Worker wartet, bis der Hinweis „Neue Version verfügbar – Neu laden“ bestätigt wird
+  (Nachricht `SKIP_WAITING`, danach `controllerchange` → einmal `location.reload()`); das erste Installieren meldet nichts. Nachrichten: `WARM` (Offline-Seite sicherstellen; die Seite sendet es nach jeder Registrierung), `CLEAR` (alle Zwischenspeicher aller Versionen).
+  Der Hinweis ist ein Toast mit `action` (`components/ui/toast.tsx`, bleibt stehen).
+* **Abmelden leert die Zwischenspeicher:** Das Abmelde-Formular (`components/shell/user-menu.tsx`) sendet `CLEAR` an den steuernden Service Worker und löscht die `sos-*`-Zwischenspeicher zusätzlich von der Seite aus (`clearOfflineCaches`);
+  die Offline-Seite kommt beim nächsten Seitenaufruf (Anmeldeseite) per `WARM` wieder. Im Zwischenspeicher liegt weder Cookie noch Sitzungs- oder Fachinhalt – es ist Hygiene, kein Schutz.
+* **Offline-Seite** `/offline` (`src/app/offline/route.ts`, Text und HTML in `src/lib/offline-text.ts`): ein Route Handler, kein `page.tsx` (eigenständiges HTML ohne Skript und ohne Nonce, Stile als `style`-Attribute, fest zweisprachig DE/EN, Weg zurück
+  ist ein Link auf `/`). Ohne Anmeldung erreichbar (`OPEN_PAGES` im Proxy). Sie läuft durch den Proxy (Zustand „startet“/„Neuinstallation“ antwortet 503 – der Service Worker speichert sie dann nicht und versucht es bei `WARM` erneut) und steht deshalb
+  **nicht** in `pages.ts` (die Inventur kennt nur `page.tsx`); geprüft in `lib/pwa.test.ts` und `e2e/tests/pwa.spec.ts`.
+* **Logo** (`/api/logo`, `src/app/api/logo/route.ts`, `src/lib/logo.ts`): Das Logo liegt weiter als Daten-URL in `Workshop.logoDataUrl`, wird aber nicht mehr in jede Seite eingebettet, sondern als Bild ausgeliefert: **öffentlich lesbar** (Anmeldeseite; `OPEN_PAGES`,
+  im Matrixtest `PUBLIC`), `ETag`, `Cache-Control: public, max-age=3600`, die Adresse trägt `?v=<updatedAt>`. **Kein SVG:** `LOGO_TYPES` sind PNG, JPEG, WebP; ein früher gespeichertes SVG wird nicht ausgeliefert (404) und nicht angezeigt (Standardmarke).
+  Auslieferung über `deliveryHeaders` (`nosniff`, `sandbox; default-src 'none'`, Dateiroute in `ROUTE_OWNED_PATHS`); Magic-Bytes-Prüfung beim Hochladen bleibt (`upload-sniff.ts`).
+* **Tests:** `src/lib/sw.test.ts` lädt **dieselbe Datei** `public/sw.js` in einen nachgebauten `ServiceWorkerGlobalScope` (Zwischenspeicher im Speicher): Entscheidungsmatrix, PDF-Vorschau und Download unberührt, Offline-Seite nur bei Netzfehler, nur `200`/`basic`,
+  Begrenzung, `activate`, `CLEAR` leert alles (nach Abmelden leer), `WARM`. `sw-client.test.ts` (Registrierung nur sicher+Betrieb, Update-Hinweis, Neu laden, Abmelden), `service-worker-registrar.test.ts` (Toast mit „Neu laden“), `user-menu.test.ts` (Abmelden sendet `CLEAR`),
+  `pwa.test.ts` (Manifest, Symbole = Formel, Farben = Tokens, Offline-Seite), `next-config.test.ts`/`csp.test.ts`/`proxy.test.ts` (Header, Zuständigkeit, offene Pfade), `e2e/tests/pwa.spec.ts` (Browser mit aktivem Service Worker; alle anderen
+  Browser-Tests laufen mit `serviceWorkers: "block"`, damit kein Zwischenspeicher Messungen verfälscht).
+* **Grenzen:** iOS im Standalone-Fenster: Ein PDF aus „Öffnen“ verlässt die App (Zurück über das System, steht in der Hilfe); `theme-color` folgt dem Gerät, nicht der in der App gewählten Darstellung; Push, Hintergrundsynchronisation und Offline-Eingabe gibt es nicht.
+
 ## Eine neue Funktion anlegen
 
 Beispiel: Funktion `warranty` im Modul `workshop`.
@@ -1229,6 +1271,7 @@ mit Beispieldaten; `e2e/global-setup.ts`), legt je Standardrolle ein Konto an un
 | `states.spec.ts` | Status- und Fehlerseiten (nicht gefunden, Fehler im Rahmen und im Vollbild, Neuinstallation, Kein Zugriff) durch axe/Touch/Überbreite, ihre Barrierefreiheit (Fokus, Titel, ein `<main>`, Live-Region) und **Selbsttests der Erkennung** (absichtliche Fehlerseite, CSP-Verstoß) |
 | `https.spec.ts` | HTTPS hinter einem TLS-Proxy mit selbstsigniertem Zertifikat (`e2e/support/https-proxy.ts`): `__Host-so_session` mit `Secure`, untergeschobenes Klartext-Cookie wirkungslos, Abmelden entfernt das Cookie |
 | `counter.spec.ts` | **Tresen-Durchlauf** Kunde → Fahrzeug → Termin → Reifen (iPhone und Desktop); später Termin → Auftrag → Rechnung → Mail/Druck |
+| `pwa.spec.ts` | **Installierbare App** (nur Desktop-Projekt; als einziger Test mit aktivem Service Worker – sonst `serviceWorkers: "block"` in `playwright.config.ts`): Manifest, Symbole, `sw.js`-Header, Offline-Seite und Logo ohne Anmeldung; im Browser Offline-Seite statt Browserfehler, `/api` unberührt, Zwischenspeicher nur Offline-Seite und Programmdateien |
 | `budget.spec.ts` | **JS-Budget** je Route (`e2e/baselines/js-budget.json`, Messung + 10 %, KB entpackt); Überschreitung bricht ab |
 | `screenshots.spec.ts` | Baseline-Screenshots der Schlüsselseiten (`key: true`) × Anzeigegröße × Hell/Dunkel – nur Linux (siehe unten) |
 | `pages-states.spec.ts` | 404-Seiten im Anwendungsrahmen, Wartezustand beim Navigieren |
@@ -1243,7 +1286,7 @@ aus dem Demo-Seed (fehlt eine Zeile, bricht die Inventur ab: der Demo-Seed muss 
 **Baseline-Listen bekannter Verstöße** (`e2e/baselines/known-violations.json`, je Projekt, Regel und Seite): ein Lauf schlägt bei **neuen** Verstößen fehl *und* bei Einträgen,
 die es nicht mehr gibt (die Liste muss mit jedem Paket schrumpfen). Neu schreiben: `E2E_UPDATE_BASELINE=1 npm run e2e` (immer mit vollständigem Lauf je Projekt). Die Listen für
 Eingabeschrift ist nach P1a-4 leer; bei Touch-Zielen standen zuletzt nur noch Einträge des Terminkalenders (mit dem Kalenderumbau, Block 6, entfallen – die Baseline-Datei wird erst mit dem ersten echten Lauf geleert); die Überbreiten-Liste der
-iPhone-Größe (vier Detailseiten) soll vor dem Release leer sein; axe-Verstöße bleiben bis zum Kontrast-/Beschriftungspaket (P2a-7) erlaubt.
+iPhone-Größe (Detailseiten Fuhrpark, Gerät, IP-Netz) ist mit P3-1 im Code behoben (Spalten des Detail-Rasters mit `min-w-0`, Netzwerk-Unterlisten als Karten) – die Baseline-Datei wird erst mit dem ersten echten Lauf geleert (ein erledigter Eintrag bricht den Lauf, bis er gestrichen ist); axe-Verstöße bleiben bis zum Kontrast-/Beschriftungspaket (P2a-7) erlaubt.
 **Die Listen dürfen nur schrumpfen – das wird beim Neuschreiben erzwungen** (`e2e/support/baseline-merge.ts`, Test `e2e/support/baseline-merge.test.ts`): Wächst eine Liste oder ein JS-Budget, bricht das Neuschreiben ab,
 außer `E2E_ALLOW_BASELINE_GROWTH="<Begründung>"` (mindestens 10 Zeichen) ist gesetzt – die Begründung wird ausgegeben und in `e2e/baselines/growth.log` festgehalten. Ein Teillauf schreibt nur die geprüften Seiten neu.
 
@@ -1252,6 +1295,32 @@ Hand mit `update_snapshots` starten (oder unter Linux/Docker `E2E_UPDATE_SNAPSHO
 werden die Screenshot-Tests übersprungen.
 
 **Pipeline:** Der Job `e2e` läuft **nicht** bei jedem Push auf `main` (Action-Minuten), sondern bei Versions-Tags (dort blockiert er Image und Release), Pull Requests und von Hand.
+
+**Lighthouse (mobil, P3-6):** Der Job `lighthouse` (gleiche Auslöser wie `e2e`, blockiert nichts) startet die gebaute App wie die Browser-CI und misst mit `@lhci/cli` (`lighthouserc.json`, gepinnte Version, über `npx` – keine Abhängigkeit im Projekt) die Seiten ohne Anmeldung `/setup` und `/offline`: Leistung, Zugänglichkeit, Best Practices, LCP/CLS/TBT, Installierbarkeit. **Alle Schwellen sind Platzhalter** (nur Warnungen), bis es die erste Messung gibt: danach die gemessenen Werte mit Abstand eintragen und die Stufe auf `error` heben (Bericht: Artefakt `lighthouse-report`). Angemeldete Seiten (Cookie über das Playwright-Setup) kommen erst danach dazu. Das JS-Budget je Route (`budget.spec.ts`) bleibt unverändert maßgeblich.
+
+## Realgeräte-Checkliste (vor jedem Release)
+
+Die Browser-CI (Playwright) deckt Chromium und WebKit am Rechner ab, **nicht** das, was nur ein echtes Gerät zeigt: Bildschirmtastatur, Kamera, Safe-Area, Installation, Systemschrift, Druckdialog. Vor jedem Versions-Tag
+(`vX.Y.Z`) geht eine Person die Liste mit dem **Release-Kandidaten** (Image `sha-…` aus dem Lauf, hinter HTTPS – sonst gibt es keine Installation) auf **drei Geräten** durch: **iPhone mit Safari**, **Android-Telefon mit Chrome**
+und **iPad mit Safari** (hoch und quer). Ergebnis (Gerät, iOS/Android-Version, Browser, je Zeile ✔/✖ mit Notiz) in die Release-Notizen des Tags; eine ✖-Zeile blockiert den Tag, bis sie behoben oder bewusst akzeptiert ist (mit Begründung).
+
+| # | Schritt | iPhone | Android | iPad | Worauf achten |
+| --- | --- | :-: | :-: | :-: | --- |
+| 1 | **Anmelden** (Passwortmanager, „Dieses Gerät merken“), Abmelden, erneut anmelden | ☐ | ☐ | ☐ | Eingabefeld zoomt nicht hinein (≥ 16 px), Autofill füllt, Tastatur verdeckt den Anmelden-Knopf nicht |
+| 2 | **Termin anlegen**: Kalender → Neuer Termin → Fahrzeug suchen (Kennzeichen tippen), Zeit, Speichern | ☐ | ☐ | ☐ | Kennzeichen wird groß geschrieben ohne Autokorrektur, Auswahlfeld mit Suche bedienbar, Speichern-Leiste (siehe 9) |
+| 3 | **Kalender**: Woche/Tag/Liste; Wochenstreifen antippen; Termin öffnen; Schnellstatus „Starten/Fertig“ auf der Karte | ☐ | ☐ | ☐ | Tageskopf/Wochenstreifen kleben unter der Kopfzeile (auch mit Notch), Raster ab Tablet (hoch und quer), Ziele mit dem Daumen treffbar |
+| 4 | **Foto aufnehmen / Beleg**: Rechnung anlegen → „Foto aufnehmen“ (Kamera) und „Datei wählen“ (Galerie), ein 6-MB-Foto | ☐ | ☐ | ☐ | Kamera-Erlaubnis, Foto wird verkleinert und hochgeladen, HEIC (iPhone) funktioniert, Chrome/Android lehnt HEIC mit Hinweis ab |
+| 5 | **Reifen ein-/ausbuchen**: Reifensatz öffnen → ein-/ausbuchen; aus einem erledigten Wechseltermin den Vorschlag bestätigen | ☐ | ☐ | ☐ | Positionen als Karten, Bestätigungsfenster als Blatt unten, Meldung (Toast) über Safe-Area und Speichern-Leiste |
+| 6 | **PWA installieren** (nur über HTTPS): iPhone/iPad „Zum Home-Bildschirm“, Android „App installieren“; Symbol starten | ☐ | ☐ | ☐ | Symbol (Schraubenschlüssel auf Blau, Android: maskiert ohne Rand), Name, Statusleistenfarbe passt zu Hell/Dunkel, Start landet auf der Übersicht/Anmeldung |
+| 7 | **Offline-Seite**: in der installierten App und im Browser Flugmodus an → Seite wechseln → „Keine Verbindung“ → Flugmodus aus → „Erneut versuchen“; **PDF-Beleg öffnen und herunterladen** (mit Netz) | ☐ | ☐ | ☐ | Offline-Seite statt Browserfehler; mit Netz laufen PDF-Öffnen und Download normal (iOS Standalone: Rückweg über das System); nach einem Update erscheint „Neue Version verfügbar“ |
+| 8 | **Druck**: Fahrzeug-Druckliste (Druckmenü des Geräts), Rechnungsansicht | ☐ | ☐ | ☐ | Navigation und Knöpfe fehlen auf dem Ausdruck, Tabelle passt auf die Seite |
+| 9 | **Tastatur-Verhalten Speichern-Leiste (`FormActions`)**: langes Formular (Kunde, Fahrzeug), Feld antippen, nach unten scrollen, Tastatur schließen | ☐ | ☐ | ☐ | Mit offener Tastatur verdeckt die Leiste kein Feld (rückt in den Fluss), danach klebt sie wieder am unteren Rand über dem Home-Balken |
+| 10 | **Dunkelmodus**: Gerät auf Dunkel, App „System“; dann in der App Hell/Dunkel umschalten; Anmeldeseite, Kalender, ein Formular | ☐ | ☐ | ☐ | Kontrast lesbar, kein weißes Aufblitzen, Statusleiste folgt dem Gerät |
+| 11 | **Schriftgröße 200 %** (iOS: Anzeige & Helligkeit → Textgröße / Bedienungshilfen → Größerer Text; Android: Schriftgröße und Anzeigegröße maximal) | ☐ | ☐ | ☐ | Nichts abgeschnitten, Knöpfe umbrechen statt zu sprengen, keine waagerechte Seitenverschiebung, Menü und Dialoge bedienbar |
+| 12 | **Querformat und Aussparung** (iPhone/Android mit Notch): eine Liste und ein Formular quer | ☐ | ☐ | ☐ | Inhalt neben der Aussparung, Toast und Blatt nicht verdeckt |
+
+Hinweise: Pro Release **mindestens einmal** je Gerätefamilie, auch wenn die Änderung „nur Backend“ war (Updates ändern die Programmdateien unter einer installierten App). Die Liste ist Teil des Release-Ablaufs (siehe „Eine Version veröffentlichen“);
+Neues im Mobilverhalten (Kalender, Foto, neue Formulare) kommt als Zeile dazu. Für die Anwender gibt es dazu die Hilfekapitel „Mobil und Tablet“ und „Auf dem Handy installieren“.
 
 ## Release und Signaturschlüssel
 
@@ -1348,6 +1417,7 @@ veröffentlichen, Installationen einmal per `docker compose pull && docker compo
 
 ### Eine Version veröffentlichen
 
+0. **Realgeräte-Checkliste** (Abschnitt „Realgeräte-Checkliste (vor jedem Release)“) mit dem Release-Kandidaten auf iPhone, Android und iPad durchgehen und das Ergebnis festhalten.
 1. `version` in `package.json` auf die neue Nummer setzen (z. B. `0.2.0`), committen, pushen.
 2. Tag setzen und pushen: `git tag v0.2.0 && git push origin v0.2.0`.
 3. Die GitHub-Action (`.github/workflows/docker-publish.yml`) prüft bei einem Tag zuerst, dass der **getaggte Commit auf `main` liegt** (Job *guard*: Vorfahre von `origin/main`), dann
@@ -1447,7 +1517,7 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
   Cookie-Flag „Secure“ selbst (Cookie dann `__Host-so_session`; erzwingen: `SESSION_COOKIE_SECURE=true|false`). Zusätzlich unter **Einstellungen →
   Sicherheit** „Hinter Reverse-Proxy“ einschalten, damit die Anmeldung die Client-Adresse auswertet (Proxy muss sie als letzten `X-Forwarded-For`-Eintrag anhängen). Erscheint beim Speichern „Invalid Server Actions
   request“, leitet der Proxy den öffentlichen Host nicht per `x-forwarded-host` weiter – dann die Domain in `next.config.ts` unter
-  `experimental.serverActions.allowedOrigins` eintragen.
+  `experimental.serverActions.allowedOrigins` eintragen. **Ohne HTTPS gibt es keine installierbare App und keine Offline-Seite** (Browser erlauben Service Worker nur in sicheren Kontexten, siehe „Installierbare App (PWA)“); der Proxy darf `/sw.js` nicht zwischenspeichern.
 * **Sicherheits-Header und Content-Security-Policy (P1b-1):** `next.config.ts` setzt auf **allen** Antworten `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` und
   `Permissions-Policy` (`camera=(self)` für „Foto aufnehmen“, sonst Mikrofon, Standort, Zahlung, USB … gesperrt – kein pauschales `camera=()`). Die **CSP wird erzwungen** (kein Meldeendpunkt, kleinere
   Angriffsfläche; die Absicherung ist die Browser-CI) und kommt aus `src/lib/csp.ts` – **von genau einer Stelle je Antwort**:
