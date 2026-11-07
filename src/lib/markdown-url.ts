@@ -16,7 +16,13 @@ export function isInternalHref(href: string | undefined): boolean {
   return href.startsWith("#") || LOCAL_PATH.test(href);
 }
 
-/** Bild von der eigenen Herkunft (Pfad, nie `//host`)? */
+/** Ein hochgeladenes Doku-Bild: `/api/docs/images/<Kennung>` – nur Buchstaben, Ziffern, `-` und `_`, keine Pfad- und Abfrageteile (kein `..`, kein `%2e`, kein Umweg über eine andere Route). */
+const DOC_IMAGE = /^\/api\/docs\/images\/[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * Bild aus dem Doku-Bildspeicher der eigenen Herkunft (`/api/docs/images/<id>`)? **Nur dieser Pfad** (ZP5-11): Jeder andere lokale Pfad (`/api/v1/…`, `/logout`, eine Aktion mit
+ * Nebenwirkung) wäre sonst als `<img>` aufrufbar – ein Bild in einer Seite würde dann beim bloßen Lesen eine Anfrage an die Anwendung auslösen.
+ */
 export function isLocalImageSrc(src: string | undefined): src is string {
-  return typeof src === "string" && LOCAL_PATH.test(src);
+  return typeof src === "string" && DOC_IMAGE.test(src);
 }
