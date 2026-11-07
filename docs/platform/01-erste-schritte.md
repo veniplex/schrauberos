@@ -10,11 +10,11 @@ Meldung nennt die Restzeit. Das gilt für jeden Namen gleich – die Anwendung v
 
 Die Wartezeit hängt **am Konto**, nicht an Ihnen persönlich: Versucht jemand anderes ständig, sich mit Ihrem Namen anzumelden, müssen
 auch Sie auf einem **neuen Gerät** warten – ein richtiges Passwort hebt die Wartezeit dort nicht auf, solange der Beschuss andauert
-(Abwarten, höchstens 90 Sekunden, oder der Wiederherstellungs-Code hilft). **Bekannte Geräte** sind davon ausgenommen: Nach einer
-erfolgreichen Anmeldung merkt sich die Anwendung den Browser in einem Cookie (180 Tage, nur für Ihr Konto, in der Datenbank nur als
-Prüfsumme). Von dort aus melden Sie sich auch während eines Angriffs mit dem richtigen Passwort an; für falsche Eingaben gilt dort ein
-eigenes Limit. Das Cookie ersetzt das Passwort nicht. Ändert eine Administratorin Ihr Passwort oder wird der Notzugang benutzt, gelten
-Ihre bekannten Geräte nicht mehr. Wer sein Passwort vergessen hat, bittet einen Administrator, es unter **Verwaltung → Benutzer**
+(Abwarten, höchstens 90 Sekunden, oder der Wiederherstellungs-Code hilft). **Bekannte Geräte** sind davon ausgenommen: Wenn Sie bei der Anmeldung
+**„Dieses Gerät merken“** ankreuzen (nur auf Ihren eigenen Geräten), merkt sich die Anwendung den Browser in einem Cookie (180 Tage, nur für Ihr Konto, in der
+Datenbank nur als Prüfsumme). Von dort aus melden Sie sich auch während eines Angriffs mit dem richtigen Passwort an; für falsche Eingaben gilt dort ein
+eigenes Limit. Das Cookie ersetzt weder das Passwort noch die Zwei-Faktor-Anmeldung. Sie sehen und widerrufen Ihre Geräte unter **Mein Konto** (siehe „Konto und Sicherheit“). Ändert
+eine Administratorin Ihr Passwort oder wird der Notzugang benutzt, gelten Ihre bekannten Geräte nicht mehr. Wer sein Passwort vergessen hat, bittet einen Administrator, es unter **Verwaltung → Benutzer**
 zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
 
 > **Erste Einrichtung:** Beim allerersten Aufruf einer neuen Installation erscheint statt der Anmeldung die Ersteinrichtung:
@@ -54,7 +54,7 @@ Installation eingeschaltet sind und die Ihre Rolle nutzen darf.
 ## Ihr Konto
 
 Im Benutzer-Menü (unten in der Navigation, am Handy in der Kopfzeile) finden Sie **Mein Konto**: Name und E-Mail-Adresse ändern, Passwort ändern, Sprache und Darstellung
-wählen. Beim Ändern des Passworts werden Sie auf allen anderen Geräten abgemeldet.
+wählen, die **Zwei-Faktor-Anmeldung** einrichten sowie Ihre Sitzungen und Geräte verwalten (Kapitel „Konto und Sicherheit“). Beim Ändern des Passworts werden Sie auf allen anderen Geräten abgemeldet.
 
 ## Zugang verloren: der Wiederherstellungs-Code
 
@@ -69,7 +69,8 @@ Jedes Administrator-Konto hat einen **Wiederherstellungs-Code** – Ihren Notzug
 * **Verwenden:** Auf der Anmeldeseite **Zugang verloren? Wiederherstellungs-Code verwenden** wählen, den Code (8 Gruppen zu je 5 Zeichen,
   Groß-/Kleinschreibung und Bindestriche egal) und ein neues Passwort eingeben. Ein Tippfehler wird schon beim Eingeben erkannt (das
   Prüfzeichen jeder Gruppe). Danach sind **alle Anmeldungen des Kontos beendet**, Sie melden sich mit dem neuen Passwort an, und der benutzte
-  Code ist ungültig – Sie bekommen sofort einen neuen, den Sie wieder sichern.
+  Code ist ungültig – Sie bekommen sofort einen neuen, den Sie wieder sichern. Hatte das Konto eine **Zwei-Faktor-Anmeldung, ist sie zurückgesetzt**: Der Notzugang umgeht sie,
+  deshalb richten Sie sie nach der Anmeldung neu ein (die Seite und ein Hinweis oben sagen es).
 * **Bei jeder Verwendung** sehen das betroffene Konto und alle Administratoren einen Hinweis (bis sie ihn bestätigen), und das Audit-Log
   hält es fest. Hat jemand den Code ohne Ihr Wissen benutzt, ändern Sie das Passwort und erzeugen einen neuen Code.
 * **Nach einer Backup-Wiederherstellung** kann ein gedruckter Code veraltet sein: Der Code gehört zu den Daten und gilt nur für den Stand

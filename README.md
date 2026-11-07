@@ -488,7 +488,10 @@ Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen 
 * **Passwörter:** scrypt aus `node:crypto` (`src/server/auth/scrypt.ts`, N=2^15, r=8, p=1, Kosten stehen im Hash). Anmeldungen: höchstens **2** Berechnungen
   gleichzeitig (`hashSemaphore`, teilt sich den libuv-Thread-Pool), Warteschlange begrenzt (voll → „bitte kurz warten“). Alles, was nicht hinter einer Flut
   fremder Anmeldungen warten darf – Passwort setzen, Passwortabfrage im Konto, das Hashen des neuen Passworts beim Notzugang und die Anmeldung von einem
-  bekannten Gerät –, läuft auf dem **eigenen Pfad** `ownerSemaphore` (1 gleichzeitig; zusammen bleibt ein Thread des Pools frei). **Unbekannte Namen rechnen
+  bekannten Gerät –, läuft auf dem **Eigentümer-Pfad** `ownerLane` (`FairLane`, `src/lib/semaphore.ts`): 1 gleichzeitig (zusammen bleibt ein Thread des Pools frei),
+  **je Konto/Vorgang höchstens eine laufende und eine wartende** Berechnung (`accountOwner(userId)`, "setup", "recovery"), insgesamt höchstens 32 Wartende, die Warteschlange
+  wird **reihum** über die Schlüssel abgearbeitet; darüber `QueueFullError` (Anmeldung: „busy“, Operationen: `busy`, Einrichtung: „bitte gleich noch einmal“). Eine Flut mit
+  einem gestohlenen Geräte-Cookie oder wiederholten Passwortabfragen belegt so nur die eigenen Plätze (R2-SEC-01). **Unbekannte Namen rechnen
   keinen Hash**: Die Antwort wird per Timer auf die gemessene typische Hash-Dauer aufgefüllt (`hashStats.typicalMs`), sonst ließen sich die Hash-Plätze mit
   erfundenen Namen belegen. Länge: 8–128 Zeichen, zusätzlich höchstens 512 Bytes (`src/lib/password-rules.ts`).
 * **Drosselung** (`src/lib/login-throttle.ts`, Zustand `src/server/auth/throttle.ts`): je Konto 3 freie Versuche, dann 2 s, 4 s, 8 s … höchstens
@@ -502,13 +505,20 @@ Webhooks, Datei-Upload (Belege) per Multipart und die Doku-Seite der Ressourcen 
   Audit-Einträge für Fehlversuche sind gedrosselt, unbekannte Namen stehen nur als Kürzel darin. Der Passwortwechsel im Konto hat ein eigenes Limit.
   Uhr/Warten sind in Tests über `authRuntime` (`src/server/auth/runtime.ts`) ersetzbar.
 * **Bekanntes Gerät** (`src/server/auth/devices.ts`, Tabelle `KnownDevice`): Gegen den **Dauerbeschuss eines Kontos** – wer ohne Pause auf einen Namen schießt,
-  gewinnt jedes frei werdende Zeitfenster der Konto-Wartezeit und sperrte so den Besitzer praktisch aus – setzt die App nach jeder erfolgreichen Anmeldung
-  ein zufälliges 256-Bit-Cookie (`so_device`, unter HTTPS `__Host-so_device`; HttpOnly, SameSite=Lax, 180 Tage, gleitend), in der Datenbank nur der SHA-256-Hash,
-  gebunden an das Konto (höchstens 10 je Konto). Eine Anmeldung **mit gültigem Cookie dieses Kontos** unterliegt nicht der Konto-Wartezeit (und nicht der
+  gewinnt jedes frei werdende Zeitfenster der Konto-Wartezeit und sperrte so den Besitzer praktisch aus – setzt die App **auf Wunsch** („Dieses Gerät merken“ bei der
+  Anmeldung, **Opt-in**, nie automatisch) nach der erfolgreichen Anmeldung ein zufälliges 256-Bit-Cookie (`so_device`, unter HTTPS `__Host-so_device`; HttpOnly, SameSite=Lax, 180 Tage, gleitend), in der Datenbank nur der SHA-256-Hash,
+  gebunden an das Konto (höchstens 10 je Konto; ein bekanntes Gerät wird bei jeder Anmeldung aufgefrischt, `useCount` zählt mit). Eine Anmeldung **mit gültigem Cookie dieses Kontos** unterliegt nicht der Konto-Wartezeit (und nicht der
   Datenbank-Sperre), sondern einer eigenen Drosselung je Gerät (`loginThrottle.devices`: 5 freie Versuche, dann 2 s … 90 s) und dem globalen Budget; ihre
-  Fehlversuche zählen nicht gegen das Konto. Ohne Cookie (neues Gerät, Angreifer) bleibt die Konto-Wartezeit, Ausweg: abwarten (≤ 90 s) oder der
-  Wiederherstellungs-Code. Das Cookie ersetzt nie das Passwort. Geräte werden vergessen bei Passwortänderung/Deaktivierung durch die Administration, beim
-  Passwortwechsel im Konto (andere Geräte) und beim Notzugang. **Restrisiko:** Wer das Geräte-Cookie *und* ein Ratefenster am selben Gerät hat, ist durch das
+  Fehlversuche zählen nicht gegen das Konto. **Die Fehlversuche vom Gerät stehen auch in der Datenbank** (`KnownDevice.failedLogins/lockedUntil`, R2-SEC-03): Ein Neustart
+  (leerer Speicher) hebt die Wartezeit eines Geräts nicht auf; `lockedUntil` ist der Zeitpunkt des letzten Fehlversuchs plus Wartezeit (daran erkennt die Zählung nach 15 Minuten
+  Ruhe, dass sie veraltet ist). **Ein Erfolg setzt die Zählung nicht zurück** (`devices.forgive`, `recordDeviceSuccess`: nur ein Fehlversuch weniger): Wer das Cookie gestohlen hat,
+  bekommt durch die Anmeldungen der Besitzerin keine neuen freien Versuche (Cookie-Dieb mit zwei Spuren). Ohne Cookie (neues Gerät, Angreifer) bleibt die Konto-Wartezeit, Ausweg: abwarten (≤ 90 s) oder der
+  Wiederherstellungs-Code. **Das Cookie ersetzt nie das Passwort und nie den zweiten Faktor** (R2-SEC-05, getestet): Hat das Konto eine Zwei-Faktor-Anmeldung, verlangt sie die Anmeldung
+  mit bekanntem Gerät trotzdem. Geräte werden vergessen bei Passwortänderung/Deaktivierung durch die Administration, beim Passwortwechsel im Konto (andere Geräte), beim Notzugang,
+  beim Abmelden auf Wunsch („Abmelden und Gerät vergessen“) und über die Geräteliste im Konto (einzeln widerrufen, grober Browser-/Zeit-/Adressteil, das eigene Gerät markiert).
+  **Platz:** Ein neues Gerät verdrängt nur ein Gerät, das nie wieder benutzt wurde (`useCount` 1, das älteste); sind alle 10 Plätze mit benutzten Geräten belegt, wird das neue
+  nicht gemerkt – private Sitzungen schieben ein echtes Gerät nicht per LRU hinaus (R2-SEC-02). `rememberDevice` läuft in **einer** Transaktion (`updateMany` statt `update`: ein
+  gleichzeitiges `revokeDevices` ist kein Fehler, R2-SEC-04) und ein Fehler darin macht eine geglückte Anmeldung nie zum Fehler (`rememberDeviceSafely`). **Restrisiko:** Wer das Geräte-Cookie *und* ein Ratefenster am selben Gerät hat, ist durch das
   Geräte-Limit gebremst, aber nicht durch die Konto-Wartezeit; ein gestohlenes Geräte-Cookie erleichtert Raten also nur im Rahmen des Geräte-Limits.
 * **Rücksprungziel** (`?next=`): `safeNext` (`src/lib/safe-next.ts`) löst per `new URL` auf und vergleicht den Origin.
 * **Rechte-Hierarchie** (`src/lib/rbac.ts`, DB-Teil `src/server/rbac/hierarchy.ts`): Ein Nicht-Admin ändert nur Konten, deren **Rohrechte**
@@ -525,16 +535,58 @@ Action** angezeigt (Einrichtung, Konto, Einlösen): eigene Seite mit Pflicht-Bes
 (`RecoveryCodeView`), nie in URL, Log oder Audit. Erzeugen/Neu-Erzeugen nur für Administrator-Konten und mit erneuter Passwortabfrage
 (`src/platform/account/recovery-actions.ts`, im Konto).
 
-**Einlösen** (`/login/recover`, `src/server/auth/recovery.ts`): eigener Pfad, **nicht** über die scrypt-Semaphore der Anmeldungen (das Hashen des neuen Passworts läuft auf `ownerSemaphore`, nie hinter einer Flut von Anmeldungen). SHA-256, Vergleich in
+**Einlösen** (`/login/recover`, `src/server/auth/recovery.ts`): eigener Pfad, **nicht** über die scrypt-Semaphore der Anmeldungen (das Hashen des neuen Passworts läuft auf dem Eigentümer-Pfad `ownerLane`, nie hinter einer Flut von Anmeldungen). SHA-256, Vergleich in
 konstanter Zeit über alle gespeicherten Hashes; Drosselung **ausschließlich global** (`loginThrottle.recovery`: Budget verlangsamt ab 10
 Versuchen/min um je 200 ms bis 5 s, weist nie ab) und je Adresse nur mit der Proxy-Einstellung – **nie pro Konto**. Alle Fehler (kein
 Code, falsch, Prüfsumme, benutzt, Konto inaktiv/kein Administrator) liefern dieselbe Meldung und werden per Timer auf eine feste Dauer
 (1,2–1,5 s) aufgefüllt, ebenso der Erfolg. Bei Erfolg in **einer Transaktion**: Code verbrauchen (Löschen der Zeile entscheidet bei
-Gleichzeitigkeit), neues Passwort, alle Sitzungen des Kontos löschen, `resetSecondFactor` (Erweiterungsstelle für 2FA, P1b-5), Hinweis
-anlegen, bekannte Geräte vergessen, **neuer Code** (der alte ist ungültig). Kein automatisches Anmelden. Der Hinweis „Notzugang wurde verwendet“ (`RecoveryNotice`;
+Gleichzeitigkeit), neues Passwort, alle Sitzungen des Kontos löschen, **zweiten Faktor zurücksetzen** (`resetSecondFactor(tx, id, "recovery")`: der Notzugang umgeht ihn, also
+wird er konservativ zurückgesetzt – die Antwort und das Konto zeigen das, siehe unten), Hinweis anlegen, bekannte Geräte vergessen, **neuer Code** (der alte ist ungültig). Kein automatisches Anmelden. Der Hinweis „Notzugang wurde verwendet“ (`RecoveryNotice`;
 überlebt das Löschen des Kontos, der Name steht in `userName`) erscheint als Banner (`RecoveryBanner` im Layout) beim Konto und bei allen Administratoren, bis sie ihn bestätigen; Audit
 `auth.recoveryCreated/Used/Failed` (Fehlversuche gedrosselt, ohne Code-Material). Der Code gehört zu den Daten: Nach einer
 Backup-Wiederherstellung kann ein gedruckter Code veraltet sein (Hinweis in Hilfe und Wiederherstellungs-Rückfrage).
+
+### Konto-Sicherheit: Zwei-Faktor-Anmeldung, Sitzungen, Geräte
+
+**Zwei-Faktor-Anmeldung (TOTP, optional)** – RFC 6238 mit SHA-1, 6 Stellen, 30 s (die Vorgabe der Authenticator-Apps; `src/lib/totp.ts`, mit den RFC-Testvektoren getestet), ±1 Zeitschritt
+Toleranz, Vergleich in konstanter Zeit über alle Kandidaten. Tabellen `TwoFactor` (je Konto eine Zeile) und `TwoFactorBackupCode`.
+* **Geheimnis:** Base32, **verschlüsselt** mit dem Mechanismus der Geheimnisse (`encryptSecret`: AES-256-GCM, Schlüssel `secret.key` außerhalb der Backups) – nie im Klartext in
+  Datenbank, Log oder Audit; der Klartext steht nur in der Antwort der Einrichtung (QR-Code und Textschlüssel). Einrichtung: Passwortabfrage → QR-Code (serverseitig als Matrix aus
+  `qrcode-generator` (MIT, ohne Abhängigkeiten, kein externer Dienst), im Browser als SVG gezeichnet – die CSP bleibt unberührt) + 10 **Sicherungscodes** → **Aktivieren** verlangt einen
+  Code der App **und** das Häkchen „Sicherungscodes gesichert“ (serverseitig erzwungen). Die Code-Eingabe dabei hat ein eigenes Limit (`loginThrottle.totpSetup`).
+* **Sicherungscodes:** 10 Einmalcodes zu 16 Zeichen (80 Bit, `src/lib/backup-codes.ts`), nur als SHA-256 gespeichert (an das Konto gebunden), Verbrauch per bedingtem Update. **Sie sind
+  nicht der Wiederherstellungs-Code des Notzugangs** (anderes Format, ersetzen nur den zweiten Faktor, nie das Passwort).
+* **Zeitschritt nicht wiederverwendbar:** `TwoFactor.lastStep`; das Setzen ist ein bedingtes Update (`lastStep < step`) – zwei gleichzeitige Eingaben desselben Codes: genau eine gewinnt.
+* **Anmeldung in zwei Schritten** (`login` → `verifySecondFactor`, `src/server/auth/session.ts`): Nach dem richtigen Passwort entsteht **keine Sitzung und kein Sitzungs-Cookie**; der
+  Zwischenzustand liegt **nur im Speicher des Servers** (`src/server/auth/pending.ts`, 5 Minuten, höchstens 5 falsche Codes, begrenzte Größe) und der Browser bekommt nur eine zufällige Kennung
+  (`so_2fa`, unter HTTPS `__Host-so_2fa`, HttpOnly). Es gibt kein Benutzerorakel: Den zweiten Schritt erreicht nur, wer das richtige Passwort kannte (unbekannter Name, falsches
+  Passwort und Konto mit/ohne zweiten Faktor antworten vorher gleich). Hier – und nur hier – entsteht die Sitzung (`completeLogin`). `/login/verify` ist eine öffentliche Seite
+  (Proxy `OPEN_PAGES`, Routen-Inventur), ohne Zwischenzustand zeigt sie einen Hinweis.
+* **Drosselung (eigenes Limit nach der Regel „jede Eingabe, die ein Geheimnis prüft“):** `loginThrottle.totp` je Konto (5 freie Versuche, dann 2 s … 90 s) **und dauerhaft**
+  (`TwoFactor.failedAttempts/lockedUntil`, übersteht einen Neustart), dazu das globale Fehlversuchs-Budget. Die Prüfung ist billig (HMAC/SHA-256) und läuft **nie** über die scrypt-Pfade.
+  Ein Erfolg gleicht nur den eigenen Versuch aus. Falsche Codes gehen gedrosselt ins Audit (`auth.secondFactorFailed`), ein Sicherungscode eigens (`auth.backupCodeUsed`).
+  **Restrisiko:** Wer das Passwort kennt, kann den zweiten Schritt eines Kontos bis zu 90 s je Versuch blockieren (wie beim Passwort); der Ausweg sind Sicherungscodes nach der Wartezeit, die
+  Administration (Zurücksetzen) oder der Notzugang.
+* **Das Geräte-Cookie ersetzt nie den zweiten Faktor** (R2-SEC-05): Der Passwort-Schritt mit bekanntem Gerät führt bei eingerichtetem zweiten Faktor ebenfalls zum Code (Test). Das Gerät
+  befreit ausschließlich von der Konto-Wartezeit des Passwort-Schritts. „Dieses Gerät merken“ gilt erst nach dem Abschluss.
+* **Zurücksetzen:** (a) **Notzugang** (`redeemRecoveryCode`): setzt ihn zurück, die Antwort sagt es, das Konto sieht ein Banner (`SecurityBanner`) bis zur Bestätigung; (b) **Administration**
+  (`admin.users.resetTwoFactor`, Recht `users.manage`): Rechte-Hierarchie wie beim Ändern des Kontos, **Passwortabfrage der handelnden Person**, Audit `auth.twoFactorReset`, beendet Sitzungen,
+  Geräte und API-Tokens des Kontos, nie das eigene Konto; (c) **Restore ohne passenden `secret.key`**: ein Geheimnis, das sich nicht entschlüsseln lässt, setzt **alle** unlesbaren zweiten
+  Faktoren zurück (`resetUnreadableSecondFactors`, beim ersten Login eines betroffenen Kontos, ein Audit-Eintrag), die Konten melden sich dann nur mit dem Passwort an und sehen den Hinweis.
+* **Pflicht für Administratoren** (Einstellungen → Sicherheit, Standard **aus**, `auth.require2faAdmins`): Administrator-Konten ohne zweiten Faktor erreichen nur `/account` (wie bei einem
+  ausstehenden Passwortwechsel: `mustSetupTwoFactor`, `requireSession`), können ihn nicht ausschalten; nach einem Reset (Restore, Notzugang, Administration) müssen sie sofort neu einrichten.
+
+**Sitzungen und Geräte** (Konto): `listSessions`/`listDevices` zeigen Browser und System aus dem User-Agent (`src/lib/user-agent.ts`, grob), Zeiten und einen **datensparsamen Adressteil**
+(`Session.ipHint`/`KnownDevice.ipHint`: IPv4 ohne letztes Byte, IPv6 nur 48 Bit – nur hinter dem Reverse-Proxy bekannt); die eigene Sitzung ist markiert und nicht beendbar. „Überall
+abmelden“ (`account.logoutEverywhere`) beendet **Sitzungen, Geräte und API-Tokens** des Kontos über `revokeAccess` und räumt die Cookies. Alle diese Operationen sind **Konto-Operationen**
+(`permission: "authenticated"`, nie über die API, automatisch aus der API-Ausnahmeliste); Schutzsenkungen (einrichten, ausschalten, Sicherungscodes erneuern) verlangen die Passwortabfrage
+(`confirmOwnPassword`, Limit `loginThrottle.passwordChange`).
+
+**Leerlauf-Abmeldung** (Einstellungen → Sicherheit, Standard **aus**, 1–720 Stunden, `auth.idleTimeoutHours`): `getSession` beendet (löscht) eine Sitzung, deren letzte Nutzung länger zurückliegt;
+mit eingeschalteter Frist wird die letzte Nutzung minütlich festgehalten. **Nach Ablauf zurück zur selben Seite:** der Proxy reicht den Pfad als `x-so-path` an die Seite (vom Absender
+mitgeschickte Werte werden überschrieben), `requireSession` leitet auf `/login?expired=1&next=…` (`safeNext`). **Entwürfe:** Die Anmeldeseite löscht keine Entwürfe mehr (`ClearDrafts` entfällt);
+`DraftScope` verwirft beim Öffnen des Rahmens nur Entwürfe **anderer** Benutzer-IDs, das ausdrückliche Abmelden (`clearFormDrafts` im Benutzermenü) löscht alle – derselbe Benutzer
+findet nach der erneuten Anmeldung im selben Tab seinen Entwurf wieder.
 
 ## Container, Starter und Updates
 
