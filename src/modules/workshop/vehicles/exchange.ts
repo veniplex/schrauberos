@@ -1,3 +1,4 @@
+import { parseArchiveFilter } from "@/lib/archive-filter";
 import { monthOf } from "@/lib/month";
 import { normalizePlate } from "@/lib/plate";
 import { findCustomerIdsByNumber, numberKey } from "@/modules/workshop/customers/public";
@@ -21,7 +22,7 @@ const mayUseOwner = (session: AppSession) => session.features.has("workshop.cust
 const columnsFor = (session: AppSession) => (mayUseOwner(session) ? VEHICLE_COLUMNS : VEHICLE_COLUMNS.filter((c) => c.key !== "customerNumber"));
 
 /**
- * Export der Fahrzeuge (`vehicles.export` und `vehicles.view`). Auswahl wie die Fahrzeugliste: Suche `q`, `inspection=soon|none`, `month=JJJJ-MM`, `owner=none` (wie die Adresse der Liste) – der Knopf „Exportieren“
+ * Export der Fahrzeuge (`vehicles.export` und `vehicles.view`). Auswahl wie die Fahrzeugliste: Suche `q`, `inspection=soon|none`, `month=JJJJ-MM`, `owner=none`, `archived=1|all` (Archiv; Standard nur aktive Fahrzeuge, wie die Adresse der Liste) – der Knopf „Exportieren“
  * der Liste reicht die gewählten Filter durch. Kunden erscheinen nur als Kundennummer und nur mit `customers.view`.
  */
 export const vehiclesExport: ExportDef = {
@@ -40,6 +41,7 @@ export const vehiclesExport: ExportDef = {
         noOwnerOnly: query.get("owner") === "none",
         inspection: inspection === "soon" || inspection === "none" ? inspection : undefined,
         month: month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : undefined,
+        archived: parseArchiveFilter(query.get("archived")),
       },
       session.can,
       monthOf(new Date()),

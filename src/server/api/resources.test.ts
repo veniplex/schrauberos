@@ -68,8 +68,28 @@ describe("Fahrzeuge", () => {
     assert.equal((await api("POST", `/vehicles/${vehicle.id}/transfer`, { body: { customerId: other.id, date: "2026-03-02" } })).json.fields.customerId.code, "vehicles.errors.sameOwner");
     assert.equal((await api("POST", `/vehicles/${vehicle.id}/transfer`, { body: { date: "kein-datum" } })).status, 422);
 
-    assert.equal((await api("DELETE", `/vehicles/${vehicle.id}`)).status, 204);
-    assert.deepEqual((await env.db.auditLog.findMany({ orderBy: { createdAt: "asc" } })).map((a) => a.action).filter((a) => a.startsWith("vehicle")), ["vehicle.create", "vehicle.update", "vehicle.transfer", "vehicle.delete"]);
+    // Mit Halterwechsel hängt Geschichte daran: Löschen ist gesperrt (409), archiviert wird stattdessen (P4b-2)
+    const blocked = await api("DELETE", `/vehicles/${vehicle.id}`);
+    assert.equal(blocked.status, 409);
+    const archived = await api("POST", `/vehicles/${vehicle.id}/archive`);
+    assert.equal(archived.status, 200);
+    assert.ok(archived.json.data.archivedAt);
+    const ids = async (query: string) => ((await api("GET", `/vehicles${query}`)).json.data as Json[]).map((v) => v.id);
+    assert.ok(!(await ids("")).includes(vehicle.id), "archivierte Fahrzeuge stehen nicht in der Standardliste");
+    assert.ok((await ids("?archived=true")).includes(vehicle.id) && (await ids("?archived=all")).includes(vehicle.id));
+    assert.equal((await api("POST", `/vehicles/${vehicle.id}/archive`)).status, 412, "doppelt archivieren ist ein Konflikt (conflict)");
+    const reactivated = await api("POST", `/vehicles/${vehicle.id}/unarchive`);
+    assert.equal(reactivated.status, 200);
+    assert.equal(reactivated.json.data.archivedAt, null);
+    assert.ok((await ids("")).includes(vehicle.id));
+    // ein Fahrzeug ohne Geschichte (nur der erste Halter) ist löschbar
+    const plain = (await api("POST", "/vehicles", { body: { plate: "B-ZZ 1", customerId: owner.id } })).json.data as Json;
+    assert.equal((await api("DELETE", `/vehicles/${plain.id}`)).status, 204);
+    assert.equal(await env.db.vehicleOwnership.count({ where: { vehicleId: plain.id } }), 0);
+    assert.deepEqual(
+      (await env.db.auditLog.findMany({ orderBy: { createdAt: "asc" } })).map((a) => a.action).filter((a) => a.startsWith("vehicle")),
+      ["vehicle.create", "vehicle.update", "vehicle.transfer", "vehicle.archive", "vehicle.unarchive", "vehicle.create", "vehicle.delete"],
+    );
   });
 
   it("Prüffristen und weitere Felder: schreiben, filtern, sortieren, leeren; Dublette nur mit allowDuplicate", async () => {

@@ -131,6 +131,8 @@ export const auditEn: typeof auditDe = {
     customer: {
       create: "Customer created",
       update: "Customer changed",
+      archive: "Customer archived",
+      unarchive: "Customer reactivated",
       delete: "Customer deleted",
       export: "Customers exported (CSV)",
       import: "Customers imported (CSV)",
@@ -138,6 +140,8 @@ export const auditEn: typeof auditDe = {
     vehicle: {
       create: "Vehicle created",
       update: "Vehicle changed",
+      archive: "Vehicle archived",
+      unarchive: "Vehicle reactivated",
       delete: "Vehicle deleted",
       transfer: "Vehicle transferred",
       export: "Vehicles exported (CSV)",

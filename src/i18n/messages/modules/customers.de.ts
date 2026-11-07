@@ -11,7 +11,7 @@ export const customersDe = {
   new: "Kunde anlegen",
   edit: "Kunde bearbeiten",
   delete: "Kunde löschen",
-  confirmDelete: "Kunde wirklich löschen? Seine Fahrzeuge bleiben ohne Halter erhalten.",
+  confirmDelete: "Kunde wirklich löschen? Das lässt sich nicht rückgängig machen.",
   confirmDeleteAppointments_one: "{count} Termin verliert die Zuordnung zum Kunden.",
   confirmDeleteAppointments_other: "{count} Termine verlieren die Zuordnung zum Kunden.",
   saveAndAddVehicle: "Speichern und Fahrzeug anlegen",
@@ -39,7 +39,8 @@ export const customersDe = {
   },
   exchange: {
     exportTitle: "Kunden exportieren",
-    exportDescription: "Alle Kunden als CSV-Datei, zum Beispiel für Excel, ein Adressprogramm oder eine Datensicherung außerhalb der Anwendung.",
+    selection: "Ausgewählt: {filters} (ohne Auswahl nur aktive Kunden)",
+    exportDescription: "Alle aktiven Kunden als CSV-Datei (archivierte nur mit dem Filter „Archivierte“ bzw. „Alle“ in der Kundenliste), zum Beispiel für Excel, ein Adressprogramm oder eine Datensicherung außerhalb der Anwendung.",
     importTitle: "Kunden importieren",
     importDescription: "Neue Kunden aus einer CSV-Datei anlegen, zum Beispiel aus einem anderen Programm. Bestehende Kunden werden nie verändert.",
     importRules: "Gleiche Kundennummer, gleiche E-Mail-Adresse mit gleichem Namen oder gleicher Name mit gleicher Anschrift gelten als Dublette und werden übersprungen.",
@@ -59,7 +60,7 @@ export const customersDe = {
   },
   errors: {
     nameRequired: "Nachname oder Firma angeben.",
-    inUse: "Dieser Kunde kann nicht gelöscht werden: {vehicles} Fahrzeuge, {ownerships} Halter-Einträge (die Halter-Historie bleibt auch nach einem Halterwechsel bestehen), {invoices} Rechnungen.",
+    inUse: "Dieser Kunde kann nicht gelöscht werden: {vehicles} Fahrzeuge, {former} frühere Halterschaften (die Halter-Historie bleibt auch nach einem Halterwechsel bestehen), {invoices} Rechnungen. Stattdessen archivieren: Der Kunde bleibt erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
   },
   deleteBlocked: "Löschen nicht möglich, solange Fahrzeuge, Halter-Historie oder Rechnungen mit diesem Kunden verknüpft sind: {vehicles} Fahrzeuge, {ownerships} Halter-Einträge (auch frühere Halterschaft), {invoices} Rechnungen.",
 };

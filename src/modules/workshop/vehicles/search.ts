@@ -14,7 +14,7 @@ export const searchProviders: SearchProviderDef[] = [
     order: 31,
     async search(q, { limit }) {
       const rows = await db.vehicle.findMany({
-        where: { OR: vehicleTextWhere(q) },
+        where: { archivedAt: null, OR: vehicleTextWhere(q) },
         orderBy: { plateNorm: "asc" },
         take: limit,
         select: { id: true, plate: true, make: true, model: true, customer: { select: { firstName: true, lastName: true, company: true } } },

@@ -8,8 +8,9 @@ import { formatPlate, normalizePlate } from "@/lib/plate";
 import { searchKey } from "@/lib/search-key";
 import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { parseMonthInput } from "@/lib/month";
-import { defineOperation, fail, failField, failFields } from "@/server/operations";
-import { EXTRA_INSPECTION_KINDS, FUEL_TYPES, HSN_PATTERN, TSN_PATTERN, normalizeKey, parseMileage } from "./domain";
+import { writeAudit } from "@/server/audit";
+import { auditActorName, defineOperation, fail, failField, failFields } from "@/server/operations";
+import { EXTRA_INSPECTION_KINDS, FUEL_TYPES, HSN_PATTERN, TSN_PATTERN, normalizeKey, ownershipTransfers, parseMileage, vehicleDeletable } from "./domain";
 
 /** Häkchen und Knopf des Formulars („1“, „on“) und Wahrheitswerte der API; fehlt der Wert, gilt `false`. */
 const flag = z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean());
@@ -51,6 +52,8 @@ export const vehicleInput = z.object({
   notes: z.string().max(2000).optional(),
   /** Das Kennzeichen gibt es schon, und das ist gewollt (Bestätigung nach der Warnung) */
   allowDuplicate: flag.optional(),
+  /** Das Kennzeichen gibt es schon, das vorhandene (alte) Fahrzeug soll archiviert werden: dritter Weg der Dublettenwarnung (P4b-2) */
+  archiveDuplicate: flag.optional(),
 });
 
 export type VehicleFields = z.output<typeof vehicleInput>;
@@ -82,16 +85,17 @@ export const saveVehicleOperation = defineOperation({
   permission: "vehicles.edit",
   input: vehicleInput,
   audit: (input) => (input.id ? "vehicle.update" : "vehicle.create"),
-  run: async ({ input: { id, version, customerId, plate, ...d }, tx, audit }) => {
+  run: async ({ input: { id, version, customerId, plate, ...d }, principal, tx, audit }) => {
     const plateNorm = normalizePlate(plate);
     if (plateNorm.length < 2) failField("plate", "validation.invalid");
 
     if (!!d.extraInspectionKind !== !!d.extraInspectionDue) failField(d.extraInspectionKind ? "extraInspectionDue" : "extraInspectionKind", "validation.required");
 
     // Ein Kennzeichen kann mehrfach vorkommen (Halterwechsel, wiederverwendete Kennzeichen, Altfahrzeug noch erfasst): Das ist eine **Warnung mit Bestätigung**, keine Sperre.
-    // Die Antwort nennt das vorhandene Fahrzeug (Kennung, Kennzeichen, Halter), damit das Formular „Vorhandenes Fahrzeug öffnen“ und „Trotzdem anlegen“ anbieten kann.
-    const duplicate = await tx.vehicle.findFirst({ where: { plateNorm, ...(id ? { id: { not: id } } : {}) }, include: { customer: { select: customerNameSelect } }, orderBy: { createdAt: "asc" } });
-    if (duplicate && !d.allowDuplicate) {
+    // Die Antwort nennt das vorhandene Fahrzeug (Kennung, Kennzeichen, Halter), damit das Formular „Vorhandenes Fahrzeug öffnen“, „Trotzdem anlegen“ und „Altfahrzeug archivieren“ anbieten kann.
+    // Archivierte Fahrzeuge zählen nicht (sie sind außer Dienst; so wird ein Kennzeichen frei, wenn das Altfahrzeug archiviert ist).
+    const duplicate = await tx.vehicle.findFirst({ where: { plateNorm, archivedAt: null, ...(id ? { id: { not: id } } : {}) }, include: { customer: { select: customerNameSelect } }, orderBy: { createdAt: "asc" } });
+    if (duplicate && !d.allowDuplicate && !d.archiveDuplicate) {
       const owner = duplicate.customer ? customerDisplayName(duplicate.customer) : "";
       failFields(
         { plate: duplicate.customer ? { key: "vehicles.errors.plateExists", params: { customer: owner } } : { key: "vehicles.errors.plateExistsNoOwner" } },
@@ -118,7 +122,15 @@ export const saveVehicleOperation = defineOperation({
       });
       savedId = created.id;
     }
-    audit({ target: duplicate ? `${data.plate} (Dublette bestätigt)` : data.plate, entityId: savedId });
+    // Dritter Weg der Warnung: das Altfahrzeug (alle nicht archivierten mit diesem Kennzeichen) wird in derselben Transaktion archiviert, mit eigenem Audit-Eintrag je Fahrzeug
+    let archivedOld = 0;
+    if (duplicate && d.archiveDuplicate) {
+      const old = await tx.vehicle.findMany({ where: { plateNorm, archivedAt: null, id: { not: savedId } }, select: { id: true, plate: true } });
+      await tx.vehicle.updateMany({ where: { id: { in: old.map((v) => v.id) } }, data: { archivedAt: new Date() } });
+      for (const v of old) await writeAudit(tx, "vehicle.archive", { target: `${v.plate} (Altfahrzeug beim Speichern von ${data.plate})`, entityId: v.id, actor: { id: principal.user.id, name: auditActorName(principal) } });
+      archivedOld = old.length;
+    }
+    audit({ target: duplicate ? `${data.plate} (${archivedOld > 0 ? "Altfahrzeug archiviert" : "Dublette bestätigt"})` : data.plate, entityId: savedId });
     return { id: savedId };
   },
 });
@@ -156,14 +168,60 @@ export const transferVehicleOperation = defineOperation({
   },
 });
 
+/**
+ * Archivieren (P4b-2): Das Fahrzeug bleibt mit Halter-Historie, Reifensätzen und Terminen erhalten, verschwindet aber aus Auswahlfeldern, Suche, Neu-Formularen, der
+ * Dublettenwarnung und dem Baustein „Prüffrist“; die Fahrzeugliste zeigt es im Filter „Archiviert“.
+ */
+export const archiveVehicleOperation = defineOperation({
+  name: "vehicles.archive",
+  permission: "vehicles.edit",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "vehicle.archive",
+  run: async ({ input, tx, audit }) => {
+    const vehicle = await tx.vehicle.findUnique({ where: { id: input.id }, select: { plate: true, archivedAt: true } });
+    if (!vehicle) fail("notFound");
+    if (vehicle.archivedAt) fail("conflict", "archive.errors.alreadyArchived");
+    await tx.vehicle.update({ where: { id: input.id }, data: { archivedAt: new Date() } });
+    audit({ target: vehicle.plate, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const unarchiveVehicleOperation = defineOperation({
+  name: "vehicles.unarchive",
+  permission: "vehicles.edit",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "vehicle.unarchive",
+  run: async ({ input, tx, audit }) => {
+    const vehicle = await tx.vehicle.findUnique({ where: { id: input.id }, select: { plate: true, archivedAt: true } });
+    if (!vehicle) fail("notFound");
+    if (!vehicle.archivedAt) fail("conflict", "archive.errors.notArchived");
+    await tx.vehicle.update({ where: { id: input.id }, data: { archivedAt: null } });
+    audit({ target: vehicle.plate, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+/**
+ * Löschen nur ohne Geschichte: Ein Fahrzeug mit Terminen, Reifensätzen oder Halterwechseln wird **archiviert statt gelöscht** (409 mit Zählung). Ein versehentlich angelegtes Fahrzeug
+ * (nur der erste Halter-Eintrag, nichts sonst) ist löschbar; sein Halter-Eintrag fällt dabei mit weg – die Halter-Historie hängt nie stillschweigend am Löschen (Schema: Restrict).
+ */
 export const deleteVehicleOperation = defineOperation({
   name: "vehicles.delete",
   permission: "vehicles.delete",
   input: z.object({ id: z.string().min(1) }),
   audit: "vehicle.delete",
   run: async ({ input, tx, audit }) => {
-    const vehicle = await tx.vehicle.findUnique({ where: { id: input.id }, select: { plate: true } });
+    const vehicle = await tx.vehicle.findUnique({
+      where: { id: input.id },
+      select: { plate: true, ownerships: { select: { id: true, toDate: true } }, _count: { select: { appointments: true, tireSets: true } } },
+    });
     if (!vehicle) fail("notFound");
+    const transfers = ownershipTransfers(vehicle.ownerships);
+    if (!vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, transfers })) {
+      fail("inUse", "vehicles.errors.inUse", { appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, transfers });
+    }
+    await tx.vehicleOwnership.deleteMany({ where: { vehicleId: input.id } });
     await tx.vehicle.delete({ where: { id: input.id } });
     audit({ target: vehicle.plate, entityId: input.id });
     return { id: input.id };

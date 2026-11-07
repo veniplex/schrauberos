@@ -8,11 +8,13 @@ GET /appointments/{id} appointments.get appointments.view
 PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId,vehicleId,customerId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
 DELETE /appointments/{id} appointments.delete appointments.delete
 POST /appointments/{id}/status appointments.status appointments.edit body=status
-GET /customers customers.list customers.view query=q,city sort=lastName,customerNumber,city,createdAt,updatedAt
+GET /customers customers.list customers.view query=q,city,archived sort=lastName,customerNumber,city,createdAt,updatedAt
 POST /customers customers.create customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
 GET /customers/{id} customers.get customers.view
 PATCH /customers/{id} customers.update customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes
 DELETE /customers/{id} customers.delete customers.delete
+POST /customers/{id}/archive customers.archive customers.edit
+POST /customers/{id}/unarchive customers.unarchive customers.edit
 GET /employee-absences employee-absences.list employees.view query=employeeId,type,from,to sort=startDate,endDate,createdAt
 POST /employee-absences employee-absences.create employees.edit body=employeeId,type,startDate,endDate,note
 GET /employee-absences/{id} employee-absences.get employees.view
@@ -86,9 +88,11 @@ PATCH /tire-sets/{id} tire-sets.update tires.edit body=vehicleId,season,status,b
 DELETE /tire-sets/{id} tire-sets.delete tires.delete
 POST /tire-sets/{id}/dispose tire-sets.dispose tires.edit
 POST /tire-sets/{id}/status tire-sets.status tires.stock body=status
-GET /vehicles vehicles.list vehicles.view query=q,customerId,inspectionDue sort=plate,make,year,inspectionDue,createdAt,updatedAt
-POST /vehicles vehicles.create vehicles.edit body=customerId,plate,make,model,vin,year,mileageKm,fuel,hsn,tsn,firstRegistration,inspectionDue,extraInspectionKind,extraInspectionDue,notes,allowDuplicate
+GET /vehicles vehicles.list vehicles.view query=q,customerId,inspectionDue,archived sort=plate,make,year,inspectionDue,createdAt,updatedAt
+POST /vehicles vehicles.create vehicles.edit body=customerId,plate,make,model,vin,year,mileageKm,fuel,hsn,tsn,firstRegistration,inspectionDue,extraInspectionKind,extraInspectionDue,notes,allowDuplicate,archiveDuplicate
 GET /vehicles/{id} vehicles.get vehicles.view
-PATCH /vehicles/{id} vehicles.update vehicles.edit body=plate,make,model,vin,year,mileageKm,fuel,hsn,tsn,firstRegistration,inspectionDue,extraInspectionKind,extraInspectionDue,notes,allowDuplicate
+PATCH /vehicles/{id} vehicles.update vehicles.edit body=plate,make,model,vin,year,mileageKm,fuel,hsn,tsn,firstRegistration,inspectionDue,extraInspectionKind,extraInspectionDue,notes,allowDuplicate,archiveDuplicate
 DELETE /vehicles/{id} vehicles.delete vehicles.delete
+POST /vehicles/{id}/archive vehicles.archive vehicles.edit
 POST /vehicles/{id}/transfer vehicles.transfer vehicles.edit body=customerId,date,note
+POST /vehicles/{id}/unarchive vehicles.unarchive vehicles.edit

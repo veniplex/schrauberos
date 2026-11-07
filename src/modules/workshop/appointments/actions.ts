@@ -2,7 +2,7 @@
 
 import { formObject, safeReturn } from "@/lib/forms";
 import { defineAction } from "@/server/operations";
-import { type AppointmentInput, createAppointmentOperation, deleteAppointmentOperation, deleteBayOperation, deleteTypeOperation, saveBayOperation, saveSettingsOperation, saveTypeOperation, setAppointmentStatusOperation, updateAppointmentOperation } from "./operations";
+import { type AppointmentInput, archiveBayOperation, archiveTypeOperation, createAppointmentOperation, deleteAppointmentOperation, deleteBayOperation, deleteTypeOperation, saveBayOperation, saveSettingsOperation, saveTypeOperation, setAppointmentStatusOperation, updateAppointmentOperation } from "./operations";
 
 const refresh = ["/appointments", "/", "/tires"] as const;
 
@@ -38,7 +38,7 @@ export const deleteAppointment = defineAction(deleteAppointmentOperation, {
 export const saveAppointmentSettings = defineAction(saveSettingsOperation, { form: formObject, revalidate: ["/appointments"], message: "common.saved" });
 
 export const saveBay = defineAction(saveBayOperation, {
-  form: (fd) => ({ ...formObject(fd), active: fd.get("active") === "on" }),
+  form: formObject,
   revalidate: ["/appointments"],
   message: "common.saved",
 });
@@ -46,9 +46,16 @@ export const saveBay = defineAction(saveBayOperation, {
 export const deleteBay = defineAction(deleteBayOperation, { revalidate: ["/appointments"], message: "common.deleted" });
 
 export const saveAppointmentType = defineAction(saveTypeOperation, {
-  form: (fd) => ({ ...formObject(fd), active: fd.get("active") === "on" }),
+  form: formObject,
   revalidate: ["/appointments"],
   message: "common.saved",
 });
 
 export const deleteAppointmentType = defineAction(deleteTypeOperation, { revalidate: ["/appointments"], message: "common.deleted" });
+
+/** Archivieren bzw. Wiederaktivieren (Formularfeld `archived` = „1“ oder „0“). */
+const archivedForm = (fd: FormData) => ({ id: String(fd.get("id") ?? ""), archived: fd.get("archived") === "1" });
+
+export const archiveBay = defineAction(archiveBayOperation, { form: archivedForm, revalidate: ["/appointments"], message: "common.saved" });
+
+export const archiveAppointmentType = defineAction(archiveTypeOperation, { form: archivedForm, revalidate: ["/appointments"], message: "common.saved" });

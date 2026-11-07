@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
   if (q.length < 1) return NextResponse.json({ results: [] });
 
   const vehicles = await db.vehicle.findMany({
-    where: { OR: vehicleTextWhere(q) },
+    // archivierte Fahrzeuge sind nicht wählbar (P4b-2)
+    where: { archivedAt: null, OR: vehicleTextWhere(q) },
     select: { id: true, plate: true, make: true, model: true, customer: { select: { firstName: true, lastName: true, company: true } } },
     orderBy: { plateNorm: "asc" },
     take: 8,

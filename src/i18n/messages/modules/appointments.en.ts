@@ -86,6 +86,8 @@ export const appointmentsEn: typeof appointmentsDe = {
   errors: {
     bayBusy: "Bay is occupied from {from|time} to {to|time} ({title}).",
     tireSetMismatch: "The linked tire set does not belong to this vehicle.",
+    bayInUse: "Appointments are linked to this bay ({count}). It cannot be deleted but can be archived: the appointments keep it, it just can no longer be chosen.",
+    typeInUse: "Appointments use this type ({count}). It cannot be deleted but can be archived: the appointments keep it, it just can no longer be chosen.",
     customerMismatch: "This vehicle belongs to another customer. Please leave the customer empty – the keeper of the vehicle applies.",
     statusStep: "This step is not possible from the current status.",
   },

@@ -8,6 +8,7 @@ import { LinkButton } from "@/components/ui/buttons";
 import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { getI18n } from "@/i18n/server";
+import { archiveParam, parseArchiveFilter } from "@/lib/archive-filter";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { nowDate } from "@/lib/dates";
@@ -27,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const SORTS = ["plate", "vehicle", "inspection"] as const;
 const DEFAULT = { sort: "plate", dir: "asc" } as const;
 
-export default async function VehiclesPage({ searchParams }: { searchParams: Promise<{ q?: string; owner?: string; inspection?: string; month?: string; sort?: string; dir?: string; page?: string }> }) {
+export default async function VehiclesPage({ searchParams }: { searchParams: Promise<{ q?: string; owner?: string; inspection?: string; month?: string; archived?: string; sort?: string; dir?: string; page?: string }> }) {
   const session = await requirePermission("vehicles.view");
   const [{ t, tp, date }, sp] = await Promise.all([getI18n(), searchParams]);
   const q = (sp.q ?? "").trim();
@@ -36,9 +37,10 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
   const thisMonth = monthOf(nowDate());
   const inspection = sp.inspection === "soon" || sp.inspection === "none" ? sp.inspection : undefined;
   const month = sp.month && isMonth(sp.month) ? sp.month : undefined;
+  const archived = parseArchiveFilter(sp.archived);
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT });
 
-  const where = vehicleListWhere({ q, noOwnerOnly, inspection, month }, session.can, thisMonth);
+  const where = vehicleListWhere({ q, noOwnerOnly, inspection, month, archived }, session.can, thisMonth);
 
   const total = await db.vehicle.count({ where });
   const page = clampPage(list.page, total, list.pageSize);
@@ -51,7 +53,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
   const vehicles = await db.vehicle.findMany({ where, include: { customer: { select: customerNameSelect }, _count: { select: { tireSets: true, appointments: true } } }, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("vehicles.edit");
   const canSeeCustomers = session.can("customers.view");
-  const filters = { q: q || undefined, owner: noOwnerOnly ? "none" : undefined, inspection, month };
+  const filters = { q: q || undefined, owner: noOwnerOnly ? "none" : undefined, inspection, month, ...archiveParam(archived) };
   const links = listLinks("/vehicles", filters, list, DEFAULT);
   // Druckliste: dieselben Filter (ohne Sortierung/Seite – die Liste ist nach Frist sortiert)
   const printHref = `/vehicles/print?${new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => !!entry[1])).toString()}`;
@@ -85,9 +87,9 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
 
       <FilterBar
         keep={sortFields(list, DEFAULT)}
-        columns="sm:grid-cols-[minmax(0,1fr)_11rem_13rem_10rem_auto]"
-        active={Boolean(q || noOwnerOnly || inspection || month)}
-        extrasOpen={noOwnerOnly || Boolean(inspection || month)}
+        columns="sm:grid-cols-[minmax(0,1fr)_11rem_13rem_10rem_9rem_auto]"
+        active={Boolean(q || noOwnerOnly || inspection || month || archived !== "active")}
+        extrasOpen={noOwnerOnly || Boolean(inspection || month) || archived !== "active"}
         resetHref="/vehicles"
         search={<SearchInput name="q" defaultValue={q} placeholder={t("vehicles.searchList")} aria-label={t("common.search")} />}
       >
@@ -101,6 +103,11 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
           <option value="none">{t("vehicles.filters.inspectionNone")}</option>
         </Select>
         <Input name="month" type="month" defaultValue={month ?? ""} aria-label={t("vehicles.filters.month")} placeholder="11/2026" />
+        <Select name="archived" defaultValue={archived === "active" ? "" : archived === "all" ? "all" : "1"} aria-label={t("archive.filter.label")}>
+          <option value="">{t("archive.filter.active")}</option>
+          <option value="1">{t("archive.filter.archived")}</option>
+          <option value="all">{t("archive.filter.all")}</option>
+        </Select>
       </FilterBar>
 
       <DataTable
@@ -113,9 +120,15 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         minWidth="44rem"
         summary={tp("vehicles.count", total)}
         footer={<Pagination page={page} pageSize={list.pageSize} total={total} hrefFor={links.pageHref} />}
-        empty={<EmptyState title={t("vehicles.listEmpty")} hint={q || noOwnerOnly || inspection || month ? t("common.noResults") : t("vehicles.listEmptyHint")} />}
+        empty={<EmptyState title={t("vehicles.listEmpty")} hint={q || noOwnerOnly || inspection || month || archived !== "active" ? t("common.noResults") : t("vehicles.listEmptyHint")} />}
         columns={[
-          { id: "plate", header: t("vehicles.fields.plate"), priority: "primary", sort: "plate", cell: (v) => <Plate>{v.plate}</Plate> },
+          { id: "plate", header: t("vehicles.fields.plate"), priority: "primary", sort: "plate", cell: (v) => (
+              <span className="flex flex-wrap items-center gap-2">
+                <Plate>{v.plate}</Plate>
+                {v.archivedAt ? <Badge>{t("archive.badge")}</Badge> : null}
+              </span>
+            ),
+          },
           {
             id: "vehicle",
             header: t("vehicles.cols.vehicle"),

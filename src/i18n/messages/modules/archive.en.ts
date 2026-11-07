@@ -1,0 +1,31 @@
+import type { archiveDe } from "./archive.de";
+
+export const archiveEn: typeof archiveDe = {
+  archived: "Archived.",
+  unarchived: "Reactivated.",
+  badge: "Archived",
+  filter: { label: "Show", active: "Active", archived: "Archived", all: "All" },
+  action: { archive: "Archive", unarchive: "Reactivate" },
+  confirmArchive: "Archive? The entry stays with all its links but no longer appears in selection fields and search. It can be reactivated at any time.",
+  notice: "This entry is archived: it does not appear in selection fields and search; all links are kept.",
+  errors: { alreadyArchived: "Already archived.", notArchived: "Not archived." },
+  deps: {
+    title: "What is linked to it",
+    none: "Nothing is linked to it.",
+    vehicles_one: "{count} vehicle",
+    vehicles_other: "{count} vehicles",
+    formerOwnerships_one: "{count} former keepership (keeper history stays)",
+    formerOwnerships_other: "{count} former keeperships (keeper history stays)",
+    invoices_one: "{count} invoice",
+    invoices_other: "{count} invoices",
+    appointments_one: "{count} appointment",
+    appointments_other: "{count} appointments",
+    tireSets_one: "{count} tyre set",
+    tireSets_other: "{count} tyre sets",
+    transfers_one: "{count} change of keeper",
+    transfers_other: "{count} changes of keeper",
+  },
+  hintDelete: "Deleting is only possible when nothing is linked to it any more. Otherwise archive it: the entry is kept but disappears from selection fields and search.",
+  openAppointments_one: "{count} open appointment stays in place.",
+  openAppointments_other: "{count} open appointments stay in place.",
+};

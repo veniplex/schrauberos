@@ -50,11 +50,11 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
   const from = view === "week" ? startOfWeek(date, { weekStartsOn: 1 }) : date;
   const to = addDays(from, view === "week" ? 7 : view === "day" ? 1 : 14);
 
-  const [events, bays] = await Promise.all([
-    // Raster (Woche, Tag): auch Termine, die vor dem Zeitraum begonnen haben und über Mitternacht hineinreichen; die Liste zeigt jeden Termin an seinem Starttag
-    appointmentsBetween(from, to, { overlapping: view !== "list" }),
-    db.bay.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
-  ]);
+  // Raster (Woche, Tag): auch Termine, die vor dem Zeitraum begonnen haben und über Mitternacht hineinreichen; die Liste zeigt jeden Termin an seinem Starttag
+  const events = await appointmentsBetween(from, to, { overlapping: view !== "list" });
+  // Archivierte Arbeitsplätze bekommen nur dann eine Spalte, wenn in diesem Zeitraum Termine an ihnen hängen
+  const usedBayIds = [...new Set(events.flatMap((a) => (a.bayId ? [a.bayId] : [])))];
+  const bays = await db.bay.findMany({ where: { OR: [{ active: true }, { id: { in: usedBayIds } }] }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } });
 
   const canCreate = session.can("appointments.create");
   const canEdit = session.can("appointments.edit");

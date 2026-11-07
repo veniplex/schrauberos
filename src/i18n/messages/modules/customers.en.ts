@@ -12,7 +12,7 @@ export const customersEn: typeof customersDe = {
   new: "Add customer",
   edit: "Edit customer",
   delete: "Delete customer",
-  confirmDelete: "Really delete the customer? Their vehicles are kept without an owner.",
+  confirmDelete: "Really delete the customer? This cannot be undone.",
   confirmDeleteAppointments_one: "{count} appointment loses its link to the customer.",
   confirmDeleteAppointments_other: "{count} appointments lose their link to the customer.",
   saveAndAddVehicle: "Save and add vehicle",
@@ -40,7 +40,8 @@ export const customersEn: typeof customersDe = {
   },
   exchange: {
     exportTitle: "Export customers",
-    exportDescription: "All customers as a CSV file, for example for Excel, an address programme or a backup outside the application.",
+    selection: "Selected: {filters} (without a selection only active customers)",
+    exportDescription: "All active customers as a CSV file (archived ones only with the filter “Archived” or “All” in the customer list), for example for Excel, an address programme or a backup outside the application.",
     importTitle: "Import customers",
     importDescription: "Create new customers from a CSV file, for example from another programme. Existing customers are never changed.",
     importRules: "The same customer number, the same e-mail address with the same name or the same name at the same address count as a duplicate and are skipped.",
@@ -60,7 +61,7 @@ export const customersEn: typeof customersDe = {
   },
   errors: {
     nameRequired: "Enter a last name or a company.",
-    inUse: "This customer cannot be deleted: {vehicles} vehicles, {ownerships} owner entries (the owner history stays even after a change of owner), {invoices} invoices.",
+    inUse: "This customer cannot be deleted: {vehicles} vehicles, {former} former keeperships (the keeper history stays even after a change of keeper), {invoices} invoices. Archive instead: the customer is kept but no longer appears in selection fields and search.",
   },
   deleteBlocked: "Cannot be deleted while vehicles, owner history or invoices are linked to this customer: {vehicles} vehicles, {ownerships} owner entries (including past ownership), {invoices} invoices.",
 };

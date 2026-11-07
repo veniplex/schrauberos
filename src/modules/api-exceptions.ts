@@ -10,6 +10,8 @@ export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
   "appointments.saveSettings": "Kalender-Konfiguration (Zeitraster, Tagesgrenzen) – Einstellung der Oberfläche, keine Stammdaten zum Austausch.",
   "appointments.saveBay": "Arbeitsplätze sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /bays), damit Termine darauf verweisen können.",
   "appointments.deleteBay": "Arbeitsplätze sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /bays).",
+  "appointments.archiveBay": "Arbeitsplätze sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /bays, Feld active).",
+  "appointments.archiveType": "Terminarten sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /appointment-types, Feld active).",
   "appointments.saveType": "Terminarten sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /appointment-types).",
   "appointments.deleteType": "Terminarten sind Konfiguration (Recht appointments.configure); die API liest sie nur (GET /appointment-types).",
   "docs.savePage": "Dokumentationsseiten (Markdown mit Versionen und Bildern, Lese-/Schreibrecht je Bereich und Kapitel) sind bewusst nicht Teil des API-Kerns; bei Bedarf mit F11.",

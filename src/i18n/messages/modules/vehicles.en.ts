@@ -15,7 +15,7 @@ export const vehiclesEn: typeof vehiclesDe = {
   new: "Add vehicle",
   edit: "Edit vehicle",
   delete: "Delete vehicle",
-  confirmDelete: "Really delete this vehicle? Its tyre sets will be deleted as well.",
+  confirmDelete: "Really delete this vehicle? This cannot be undone.",
   confirmDeleteAppointments_one: "{count} appointment loses its link to the vehicle.",
   confirmDeleteAppointments_other: "{count} appointments lose their link to the vehicle.",
   empty: "No vehicle recorded yet.",
@@ -112,6 +112,8 @@ export const vehiclesEn: typeof vehiclesDe = {
     open: "Open existing vehicle",
     anywayCreate: "Create anyway",
     anywaySave: "Save anyway",
+    archiveOld: "Archive old vehicle",
+    archiveOldHint: "“Archive old vehicle” archives the existing vehicle (it is kept with its history) and saves this one.",
   },
   print: {
     button: "Print list",
@@ -140,6 +142,7 @@ export const vehiclesEn: typeof vehiclesDe = {
     planFor: "Plan appointment for {plate}",
   },
   errors: {
+    inUse: "This vehicle cannot be deleted: {appointments} appointments, {tireSets} tyre sets, {transfers} changes of keeper. Archive it instead: the vehicle is kept with its history but no longer appears in selection fields and search.",
     plateExists: "There is already a vehicle with this plate (owner: {customer}).",
     plateExistsNoOwner: "There is already a vehicle with this plate (no owner).",
     sameOwner: "This is already the current owner.",

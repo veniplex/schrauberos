@@ -14,6 +14,15 @@ export const EXTRA_INSPECTION_KINDS = ["sp", "gas", "other"] as const;
 export type ExtraInspectionKind = (typeof EXTRA_INSPECTION_KINDS)[number];
 
 /** Wie viele Monate im Voraus das Dashboard-Fenster „bald fällig“ reicht (der laufende Monat und die folgenden). */
+/** Halterwechsel in der Halter-Historie: beendete Einträge und jeder Eintrag neben dem einen aktuellen (der erste Halter allein ist kein Wechsel). */
+export const ownershipTransfers = (ownerships: ReadonlyArray<{ toDate: Date | null }>): number => ownerships.filter((o) => o.toDate !== null).length + Math.max(ownerships.filter((o) => o.toDate === null).length - 1, 0);
+
+/**
+ * Darf ein Fahrzeug gelöscht werden? Nur ohne Geschichte: keine Termine, keine Reifensätze und kein Halterwechsel (`transfers`, siehe `ownershipTransfers`). Sonst wird es
+ * archiviert. Der erste Halter-Eintrag allein zählt nicht (er fällt mit dem Fahrzeug weg).
+ */
+export const vehicleDeletable = (links: { appointments: number; tireSets: number; transfers: number }): boolean => links.appointments === 0 && links.tireSets === 0 && links.transfers === 0;
+
 export const INSPECTION_SOON_MONTHS = 2;
 
 /** Herstellerschlüsselnummer (HSN, Feld 2.1: vier Zeichen) und Typschlüsselnummer (TSN, Feld 2.2: drei Zeichen) – Großbuchstaben und Ziffern, ohne Leerzeichen. */

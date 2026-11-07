@@ -20,11 +20,13 @@ import { updatesDe } from "./modules/updates.de";
 import { backupDe } from "./modules/backup.de";
 import { systemDe } from "./modules/system.de";
 import { holidaysDe } from "./modules/holidays.de";
+import { archiveDe } from "./modules/archive.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
   security: securityDe,
   holidays: holidaysDe,
+  archive: archiveDe,
   docs: docsDe,
   invoices: invoicesDe,
   fleet: fleetDe,

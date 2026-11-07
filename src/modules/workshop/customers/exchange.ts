@@ -1,3 +1,4 @@
+import { archivedWhere, parseArchiveFilter } from "@/lib/archive-filter";
 import { formatDay } from "@/server/csv/format";
 import { columnSpecs } from "@/server/csv/columns";
 import { defineImport } from "@/server/csv/define-import";
@@ -19,16 +20,15 @@ export const customersExport: ExportDef = {
   also: ["customers.view"],
   audit: "customer.export",
   filename: () => `kunden-${formatDay(new Date())}.csv`,
-  open: async () => ({
-    columns: CUSTOMER_COLUMNS,
-    count: await db.customer.count(),
-    target: "",
-    rows: rows(),
-  }),
+  // Standard nur aktive Kunden; `archived=1` nur archivierte, `archived=all` alle (P4b-2)
+  open: async ({ query }) => {
+    const where = archivedWhere(parseArchiveFilter(query.get("archived")));
+    return { columns: CUSTOMER_COLUMNS, count: await db.customer.count({ where }), target: "", rows: rows(where) };
+  },
 };
 
-async function* rows() {
-  for await (const c of paged((page) => db.customer.findMany({ ...pageArgs(page), orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }] }))) {
+async function* rows(where: ReturnType<typeof archivedWhere>) {
+  for await (const c of paged((page) => db.customer.findMany({ ...pageArgs(page), where, orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }] }))) {
     yield [c.customerNumber, c.firstName, c.lastName, c.company, c.email, c.phone, c.street, c.zip, c.city, c.notes];
   }
 }

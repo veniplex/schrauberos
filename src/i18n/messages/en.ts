@@ -21,9 +21,11 @@ import { updatesEn } from "./modules/updates.en";
 import { backupEn } from "./modules/backup.en";
 import { systemEn } from "./modules/system.en";
 import { holidaysEn } from "./modules/holidays.en";
+import { archiveEn } from "./modules/archive.en";
 
 export const en: Messages = {
   holidays: holidaysEn,
+  archive: archiveEn,
   docs: docsEn,
   invoices: invoicesEn,
   fleet: fleetEn,

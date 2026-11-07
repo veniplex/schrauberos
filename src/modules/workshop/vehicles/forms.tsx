@@ -59,10 +59,11 @@ export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValue
       {/* Kennzeichen-Dublette: eine Warnung mit Bestätigung, keine Sperre (die Aktion nennt das vorhandene Fahrzeug im Fehlerzustand) */}
       <DuplicateNotice
         title={t("vehicles.duplicate.title")}
-        message={(data) => t("vehicles.duplicate.message", { plate: data.duplicatePlate ?? "", owner: data.duplicateOwner ? t("vehicles.duplicate.ownerPart", { owner: data.duplicateOwner }) : "" })}
+        message={(data) => `${t("vehicles.duplicate.message", { plate: data.duplicatePlate ?? "", owner: data.duplicateOwner ? t("vehicles.duplicate.ownerPart", { owner: data.duplicateOwner }) : "" })} ${t("vehicles.duplicate.archiveOldHint")}`}
         openLabel={t("vehicles.duplicate.open")}
         openHref={(id) => `/vehicles/${id}`}
         anywayLabel={initial.id ? t("vehicles.duplicate.anywaySave") : t("vehicles.duplicate.anywayCreate")}
+        archiveLabel={t("vehicles.duplicate.archiveOld")}
       />
       <Field label={t("vehicles.fields.vin")} htmlFor="vin" name="vin" hint={t("vehicles.fields.vinHint")}>
         <Input id="vin" name="vin" defaultValue={initial.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />

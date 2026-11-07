@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Disc3, Pencil, Plus } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { ArchivePanel } from "@/components/archive/archive-panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
-import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
-import { customerDisplayName, customerHasLinks } from "@/modules/workshop/customers/domain";
+import { customerDisplayName, customerHasLinks, formerOwnerships } from "@/modules/workshop/customers/domain";
 import { toDateInput } from "@/lib/dates";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { customerTitle, getCustomerDetail } from "@/modules/workshop/customers/queries";
-import { deleteCustomer } from "@/modules/workshop/customers/actions";
+import { archiveCustomer, deleteCustomer, unarchiveCustomer } from "@/modules/workshop/customers/actions";
 import { HealthBadge, SeasonBadge, formatTireSize, getTireRules, setHealth } from "@/modules/workshop/tires/public";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
 
@@ -43,7 +43,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <PageHeader
         back={{ href: "/customers", label: t("nav.customers") }} help="workshop.customers"
         title={customerDisplayName(customer)}
-        description={customer.customerNumber ? <span className="tabular">#{customer.customerNumber}</span> : undefined}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            {customer.customerNumber ? <span className="tabular">#{customer.customerNumber}</span> : null}
+            {customer.archivedAt ? <Badge>{t("archive.badge")}</Badge> : null}
+          </span>
+        }
         actions={
           canEdit ? (
             <LinkButton href={`/customers/${customer.id}/edit`}>
@@ -153,18 +158,24 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               ]}
             />
           </Card>
-          {canDelete ? (
-            <DangerZone title={t("common.dangerZone")}>
-              {customerHasLinks(customer._count) ? (
-                <p className="text-sm text-ink-muted">{t("customers.deleteBlocked", { vehicles: customer._count.vehicles, ownerships: customer._count.ownerships, invoices: customer._count.invoices })}</p>
-              ) : (
-            <form action={deleteCustomer}>
-              <input type="hidden" name="id" value={customer.id} />
-              <ConfirmSubmitButton message={`${t("customers.confirmDelete")}${customer._count.appointments > 0 ? ` ${tp("customers.confirmDeleteAppointments", customer._count.appointments)}` : ""}`}>{t("customers.delete")}</ConfirmSubmitButton>
-            </form>
-              )}
-            </DangerZone>
-          ) : null}
+          <ArchivePanel
+            id={customer.id}
+            archived={Boolean(customer.archivedAt)}
+            deps={[
+              { kind: "vehicles", count: customer._count.vehicles },
+              { kind: "formerOwnerships", count: formerOwnerships(customer._count) },
+              { kind: "invoices", count: customer._count.invoices },
+              { kind: "appointments", count: customer._count.appointments },
+            ]}
+            canArchive={canEdit}
+            canDelete={canDelete}
+            deletable={!customerHasLinks(customer._count)}
+            archive={archiveCustomer}
+            unarchive={unarchiveCustomer}
+            remove={deleteCustomer}
+            deleteLabel={t("customers.delete")}
+            confirmDelete={`${t("customers.confirmDelete")}${customer._count.appointments > 0 ? ` ${tp("customers.confirmDeleteAppointments", customer._count.appointments)}` : ""}`}
+          />
         </div>
       </div>
     </>

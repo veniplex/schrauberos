@@ -18,6 +18,7 @@ export function DuplicateNotice({
   openLabel,
   openHref,
   anywayLabel,
+  archiveLabel,
 }: {
   title: ReactNode;
   /** Text aus den Zusatzangaben der Aktion */
@@ -25,6 +26,8 @@ export function DuplicateNotice({
   openLabel: ReactNode;
   openHref: (id: string) => string;
   anywayLabel: ReactNode;
+  /** Dritter Weg: das Vorhandene archivieren und trotzdem speichern (Feld `archiveDuplicate`); ohne Angabe gibt es den Knopf nicht */
+  archiveLabel?: ReactNode;
 }) {
   const data = useFormContext()?.state.data;
   if (!data?.duplicateId) return null;
@@ -42,6 +45,11 @@ export function DuplicateNotice({
           <SubmitButton variant="secondary" size="sm" name="allowDuplicate" value="1">
             {anywayLabel}
           </SubmitButton>
+          {archiveLabel ? (
+            <SubmitButton variant="secondary" size="sm" name="archiveDuplicate" value="1">
+              {archiveLabel}
+            </SubmitButton>
+          ) : null}
         </div>
       </div>
     </Alert>

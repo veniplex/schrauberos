@@ -14,7 +14,7 @@ export const vehiclesDe = {
   new: "Fahrzeug anlegen",
   edit: "Fahrzeug bearbeiten",
   delete: "Fahrzeug löschen",
-  confirmDelete: "Fahrzeug wirklich löschen? Zugehörige Reifensätze werden ebenfalls gelöscht.",
+  confirmDelete: "Fahrzeug wirklich löschen? Das lässt sich nicht rückgängig machen.",
   confirmDeleteAppointments_one: "{count} Termin verliert die Zuordnung zum Fahrzeug.",
   confirmDeleteAppointments_other: "{count} Termine verlieren die Zuordnung zum Fahrzeug.",
   empty: "Noch kein Fahrzeug erfasst.",
@@ -111,6 +111,8 @@ export const vehiclesDe = {
     open: "Vorhandenes Fahrzeug öffnen",
     anywayCreate: "Trotzdem anlegen",
     anywaySave: "Trotzdem speichern",
+    archiveOld: "Altfahrzeug archivieren",
+    archiveOldHint: "„Altfahrzeug archivieren“ archiviert das vorhandene Fahrzeug (es bleibt mit Historie erhalten) und speichert dieses.",
   },
   print: {
     button: "Druckliste",
@@ -139,6 +141,7 @@ export const vehiclesDe = {
     planFor: "Termin planen für {plate}",
   },
   errors: {
+    inUse: "Dieses Fahrzeug kann nicht gelöscht werden: {appointments} Termine, {tireSets} Reifensätze, {transfers} Halterwechsel. Stattdessen archivieren: Das Fahrzeug bleibt mit seiner Geschichte erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
     plateExists: "Es gibt schon ein Fahrzeug mit diesem Kennzeichen (Halter: {customer}).",
     plateExistsNoOwner: "Es gibt schon ein Fahrzeug mit diesem Kennzeichen (ohne Halter).",
     sameOwner: "Das ist bereits der aktuelle Halter.",

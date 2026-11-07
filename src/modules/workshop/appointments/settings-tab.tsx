@@ -1,13 +1,13 @@
 import { Trash2 } from "lucide-react";
 import { SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
-import { Checkbox, ColorInput, Field, Input, Select } from "@/components/ui/form";
-import { Card } from "@/components/ui/layout";
+import { ColorInput, Field, Input, Select } from "@/components/ui/form";
+import { Badge, Card } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import type { SettingsTabDef } from "@/modules/types";
 import { APPOINTMENT_KINDS } from "./constants";
-import { deleteAppointmentType, deleteBay, saveAppointmentType, saveBay } from "./actions";
+import { archiveAppointmentType, archiveBay, deleteAppointmentType, deleteBay, saveAppointmentType, saveBay } from "./actions";
 import { getAppointmentSettings } from "./settings";
 import { CalendarSettingsForm } from "./settings-form";
 
@@ -23,8 +23,8 @@ async function AppointmentsSettingsTab() {
 }
 
 async function BaysCards() {
-  const { t } = await getI18n();
-  const bays = await db.bay.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
+  const { t, tp } = await getI18n();
+  const bays = await db.bay.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], include: { _count: { select: { appointments: true } } } });
   return (
     <>
       <Card title={t("appointments.settings.bays.title")} padded={false}>
@@ -36,15 +36,27 @@ async function BaysCards() {
                 <input type="hidden" name="id" value={b.id} />
                 <Input name="name" defaultValue={b.name} aria-label={t("appointments.settings.bays.name")} className="min-w-40 flex-1" required maxLength={60} />
                 <Input name="sortOrder" type="number" min={0} defaultValue={b.sortOrder} aria-label={t("appointments.settings.sortOrder")} className="w-20" />
-                <Checkbox name="active" defaultChecked={b.active} label={t("appointments.settings.active")} />
                 <SubmitButton variant="secondary" size="sm">{t("common.save")}</SubmitButton>
               </form>
-              <form action={deleteBay}>
-                <input type="hidden" name="id" value={b.id} />
-                <ConfirmSubmitButton message={t("appointments.settings.bays.confirmDelete")} target={b.name} label={t("common.delete")}>
-                  <Trash2 className="size-3.5" aria-hidden />
-                </ConfirmSubmitButton>
-              </form>
+              <div className="flex flex-wrap items-center gap-2">
+                {b.active ? null : <Badge>{t("archive.badge")}</Badge>}
+                <span className="text-xs text-ink-muted">{tp("archive.deps.appointments", b._count.appointments)}</span>
+                <form action={archiveBay}>
+                  <input type="hidden" name="id" value={b.id} />
+                  <input type="hidden" name="archived" value={b.active ? "1" : "0"} />
+                  <SubmitButton variant="secondary" size="sm" aria-label={`${b.active ? t("archive.action.archive") : t("archive.action.unarchive")}: ${b.name}`}>
+                    {b.active ? t("archive.action.archive") : t("archive.action.unarchive")}
+                  </SubmitButton>
+                </form>
+                {b._count.appointments === 0 ? (
+                  <form action={deleteBay}>
+                    <input type="hidden" name="id" value={b.id} />
+                    <ConfirmSubmitButton message={t("appointments.settings.bays.confirmDelete")} target={b.name} label={t("common.delete")}>
+                      <Trash2 className="size-3.5" aria-hidden />
+                    </ConfirmSubmitButton>
+                  </form>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>
@@ -63,8 +75,8 @@ async function BaysCards() {
 
 
 async function TypesCards() {
-  const { t, td } = await getI18n();
-  const types = await db.appointmentType.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
+  const { t, tp, td } = await getI18n();
+  const types = await db.appointmentType.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], include: { _count: { select: { appointments: true } } } });
   const fields = (v?: (typeof types)[number]) => (
     <>
       {v ? <input type="hidden" name="id" value={v.id} /> : null}
@@ -89,15 +101,27 @@ async function TypesCards() {
             <li key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <form action={saveAppointmentType} className="flex flex-1 flex-wrap items-center gap-3">
                 {fields(v)}
-                <Checkbox name="active" defaultChecked={v.active} label={t("appointments.settings.active")} />
                 <SubmitButton variant="secondary" size="sm">{t("common.save")}</SubmitButton>
               </form>
-              <form action={deleteAppointmentType}>
-                <input type="hidden" name="id" value={v.id} />
-                <ConfirmSubmitButton message={t("appointments.settings.types.confirmDelete")} target={v.name} label={t("common.delete")}>
-                  <Trash2 className="size-3.5" aria-hidden />
-                </ConfirmSubmitButton>
-              </form>
+              <div className="flex flex-wrap items-center gap-2">
+                {v.active ? null : <Badge>{t("archive.badge")}</Badge>}
+                <span className="text-xs text-ink-muted">{tp("archive.deps.appointments", v._count.appointments)}</span>
+                <form action={archiveAppointmentType}>
+                  <input type="hidden" name="id" value={v.id} />
+                  <input type="hidden" name="archived" value={v.active ? "1" : "0"} />
+                  <SubmitButton variant="secondary" size="sm" aria-label={`${v.active ? t("archive.action.archive") : t("archive.action.unarchive")}: ${v.name}`}>
+                    {v.active ? t("archive.action.archive") : t("archive.action.unarchive")}
+                  </SubmitButton>
+                </form>
+                {v._count.appointments === 0 ? (
+                  <form action={deleteAppointmentType}>
+                    <input type="hidden" name="id" value={v.id} />
+                    <ConfirmSubmitButton message={t("appointments.settings.types.confirmDelete")} target={v.name} label={t("common.delete")}>
+                      <Trash2 className="size-3.5" aria-hidden />
+                    </ConfirmSubmitButton>
+                  </form>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

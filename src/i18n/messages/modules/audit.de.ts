@@ -129,6 +129,8 @@ export const auditDe = {
     customer: {
       create: "Kunde angelegt",
       update: "Kunde geändert",
+      archive: "Kunde archiviert",
+      unarchive: "Kunde wieder aktiviert",
       delete: "Kunde gelöscht",
       export: "Kunden exportiert (CSV)",
       import: "Kunden importiert (CSV)",
@@ -136,6 +138,8 @@ export const auditDe = {
     vehicle: {
       create: "Fahrzeug angelegt",
       update: "Fahrzeug geändert",
+      archive: "Fahrzeug archiviert",
+      unarchive: "Fahrzeug wieder aktiviert",
       delete: "Fahrzeug gelöscht",
       transfer: "Fahrzeug umgeschrieben",
       export: "Fahrzeuge exportiert (CSV)",

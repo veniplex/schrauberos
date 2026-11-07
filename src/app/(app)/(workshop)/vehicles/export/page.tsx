@@ -4,6 +4,7 @@ import { ExportPanel } from "@/components/exchange/export-panel";
 import { Alert, Card } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
+import { archiveParam, parseArchiveFilter } from "@/lib/archive-filter";
 import { defaultFormatId } from "@/server/csv/format";
 import { requirePermission } from "@/server/auth/session";
 
@@ -13,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /** Die Auswahl der Fahrzeugliste (Suche, Prüffrist, Halter) kommt als Adresse mit und geht unverändert an den Export. */
-export default async function VehiclesExportPage({ searchParams }: { searchParams: Promise<{ q?: string; owner?: string; inspection?: string; month?: string }> }) {
+export default async function VehiclesExportPage({ searchParams }: { searchParams: Promise<{ q?: string; owner?: string; inspection?: string; month?: string; archived?: string }> }) {
   const session = await requirePermission("vehicles.export");
   if (!session.can("vehicles.view")) redirect("/forbidden");
   const [{ t, locale }, sp] = await Promise.all([getI18n(), searchParams]);
@@ -34,6 +35,11 @@ export default async function VehiclesExportPage({ searchParams }: { searchParam
   if (sp.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.month)) {
     fixed.month = sp.month;
     parts.push(`${t("vehicles.filters.month")} ${sp.month}`);
+  }
+  const archived = parseArchiveFilter(sp.archived);
+  if (archived !== "active") {
+    Object.assign(fixed, archiveParam(archived));
+    parts.push(t(archived === "all" ? "archive.filter.all" : "archive.filter.archived"));
   }
   return (
     <>

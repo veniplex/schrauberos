@@ -150,21 +150,37 @@ describe("Termin: Speichern, Konflikte, Audit", () => {
     assert.equal(await env.db.auditLog.count({ where: { action: "settings.appointments" } }), 1);
   });
 
-  it("Arbeitsplätze und Terminarten: Anlegen, Bearbeiten (Häkchen „aktiv“), Löschen – jeweils im Audit-Log", async () => {
+  it("Arbeitsplätze und Terminarten: Anlegen, Bearbeiten, Archivieren, Löschen (nur ohne Termine) – jeweils im Audit-Log", async () => {
     await login(["appointments.configure"]);
     await actions.saveBay(form({ name: "Grube 7", sortOrder: 2 }));
     const created = await env.db.bay.findFirstOrThrow({ where: { name: "Grube 7" } });
     assert.equal(created.active, true, "neue Arbeitsplätze sind aktiv");
-    await actions.saveBay(form({ id: created.id, name: "Grube 7", sortOrder: 2 })); // Häkchen fehlt = deaktiviert
-    assert.equal((await env.db.bay.findUniqueOrThrow({ where: { id: created.id } })).active, false);
+    await actions.saveBay(form({ id: created.id, name: "Grube 7", sortOrder: 2 })); // Speichern ändert den Archivstatus nicht
+    assert.equal((await env.db.bay.findUniqueOrThrow({ where: { id: created.id } })).active, true);
     await actions.saveAppointmentType(form({ name: "Sonderart", color: "#112233", defaultMinutes: 45 }));
     const type = await env.db.appointmentType.findFirstOrThrow({ where: { name: "Sonderart" } });
     await actions.saveAppointmentType(form({ name: "Sonderart", color: "kein-hex", defaultMinutes: 45, id: type.id }));
     assert.equal((await env.db.appointmentType.findUniqueOrThrow({ where: { id: type.id } })).color, "#112233", "ungültige Farbe wird nicht gespeichert");
+    // Löschschutz: Hängen Termine daran, ist Löschen gesperrt – archiviert wird stattdessen (der Termin behält Platz und Art)
+    await env.db.appointment.create({ data: { title: "Hängt dran", startsAt: new Date("2030-06-03T07:00:00Z"), endsAt: new Date("2030-06-03T08:00:00Z"), bayId: created.id, typeId: type.id } });
+    await actions.deleteBay(form({ id: created.id }));
+    await actions.deleteAppointmentType(form({ id: type.id }));
+    assert.equal(await env.db.bay.count({ where: { id: created.id } }), 1, "mit Termin nicht löschbar");
+    assert.equal(await env.db.appointmentType.count({ where: { id: type.id } }), 1);
+    await actions.archiveBay(form({ id: created.id, archived: "1" }));
+    await actions.archiveAppointmentType(form({ id: type.id, archived: "1" }));
+    assert.equal((await env.db.bay.findUniqueOrThrow({ where: { id: created.id } })).active, false);
+    assert.equal((await env.db.appointmentType.findUniqueOrThrow({ where: { id: type.id } })).active, false);
+    const kept = await env.db.appointment.findFirstOrThrow({ where: { title: "Hängt dran" } });
+    assert.deepEqual([kept.bayId, kept.typeId], [created.id, type.id], "die Termine behalten Platz und Art");
+    await actions.archiveBay(form({ id: created.id, archived: "0" }));
+    assert.equal((await env.db.bay.findUniqueOrThrow({ where: { id: created.id } })).active, true, "wieder aktivieren");
+    // ohne Termine geht das Löschen
+    await env.db.appointment.deleteMany();
     await actions.deleteBay(form({ id: created.id }));
     await actions.deleteAppointmentType(form({ id: type.id }));
     assert.equal(await env.db.bay.count({ where: { id: created.id } }), 0);
     assert.equal(await env.db.appointmentType.count({ where: { id: type.id } }), 0);
-    assert.equal(await env.db.auditLog.count({ where: { action: "settings.appointments" } }), 5, "Anlegen, Bearbeiten, Anlegen, Löschen, Löschen (die abgelehnte Eingabe zählt nicht)");
+    assert.equal(await env.db.auditLog.count({ where: { action: "settings.appointments" } }), 8, "Anlegen, Bearbeiten, Anlegen, 2 × Archivieren, Wiederaktivieren, 2 × Löschen (abgelehnte Eingaben zählen nicht)");
   });
 });

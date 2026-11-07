@@ -13,5 +13,5 @@ export const customersFeature = defineFeature({
   ],
   quickActions: [{ id: "customers.new", labelKey: "customers.quick.new", href: "/customers/new", icon: "customers", permission: "customers.edit", order: 30 }],
   routes: ["customers", "api/customers"],
-  auditActions: ["customer.create", "customer.update", "customer.delete", "customer.export", "customer.import"],
+  auditActions: ["customer.create", "customer.update", "customer.archive", "customer.unarchive", "customer.delete", "customer.export", "customer.import"],
 });

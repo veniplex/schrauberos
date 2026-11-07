@@ -1,16 +1,18 @@
 import { z } from "zod";
 import type { Customer } from "@/generated/prisma/client";
+import { archivedWhere, parseArchiveFilter } from "@/lib/archive-filter";
 import { versionOf } from "@/lib/concurrency";
 import { iso, nullableString, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { keyContains } from "@/server/search";
-import { deleteCustomerOperation, saveCustomerOperation } from "./operations";
+import { archiveCustomerOperation, deleteCustomerOperation, saveCustomerOperation, unarchiveCustomerOperation } from "./operations";
 import { customerSearchFields } from "./queries";
 
 /**
  * API-Ressource „Kunden“ (`/api/v1/customers`). Schreiben läuft über dieselben Operationen wie die Oberfläche (Prüfung der Sache, Audit); Kunden mit
- * Fahrzeugen, Halter-Historie oder Rechnungen bleiben unlöschbar (409).
+ * Fahrzeugen, Halter-Historie oder Rechnungen bleiben unlöschbar (409) und werden stattdessen archiviert (`POST /customers/{id}/archive`, `/unarchive`);
+ * archivierte Kunden stehen nur im Filter `archived=true` bzw. `archived=all`.
  */
 
 const body = z.strictObject({
@@ -39,6 +41,8 @@ const item = z.object({
   zip: nullableString,
   city: nullableString,
   notes: nullableString,
+  /** Zeitpunkt der Archivierung; null = aktiv */
+  archivedAt: nullableString,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -66,12 +70,19 @@ export const endpoints = defineResource({
     zip: c.zip,
     city: c.city,
     notes: c.notes,
+    archivedAt: c.archivedAt ? iso(c.archivedAt) : null,
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
   }),
   list: {
-    filters: z.strictObject({ q: z.string().max(100).optional(), city: z.string().max(80).optional() }),
-    where: ({ q, city }) => ({
+    filters: z.strictObject({
+      q: z.string().max(100).optional(),
+      city: z.string().max(80).optional(),
+      /** Archiv: `false` (Standard) nur aktive, `true` nur archivierte, `all` alle */
+      archived: z.enum(["false", "true", "all"]).optional(),
+    }),
+    where: ({ q, city, archived }) => ({
+      ...archivedWhere(parseArchiveFilter(archived === "false" ? undefined : archived)),
       ...(city ? keyContains("cityKey", city) : {}),
       ...(q ? { OR: customerSearchFields.map((f) => f.where(q)) } : {}),
     }),
@@ -104,4 +115,8 @@ export const endpoints = defineResource({
     toInput: (merged, { id, version }) => ({ ...merged, id, version }),
   },
   remove: { permission: "customers.delete", operation: deleteCustomerOperation },
+  actions: [
+    { name: "archive", summary: "Archive a customer: it stays with all links but disappears from selection fields, search and the default list", permission: "customers.edit", operation: archiveCustomerOperation, body: z.strictObject({}), toInput: (id) => ({ id }) },
+    { name: "unarchive", summary: "Reactivate an archived customer", permission: "customers.edit", operation: unarchiveCustomerOperation, body: z.strictObject({}), toInput: (id) => ({ id }) },
+  ],
 });

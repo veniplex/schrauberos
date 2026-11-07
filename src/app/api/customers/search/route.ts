@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
 
   const withAddress = session.can("customers.view");
   const customers = await db.customer.findMany({
-    where: { OR: [keyContains("nameKey", q), { customerNumber: contains(q) }, ...(withAddress ? [keyContains("cityKey", q)] : [])] },
+    // archivierte Kunden sind nicht wählbar (P4b-2)
+    where: { archivedAt: null, OR: [keyContains("nameKey", q), { customerNumber: contains(q) }, ...(withAddress ? [keyContains("cityKey", q)] : [])] },
     select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true, ...(withAddress ? { city: true } : {}) },
     orderBy: { lastName: "asc" },
     take: 8,

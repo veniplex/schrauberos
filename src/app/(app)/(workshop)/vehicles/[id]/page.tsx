@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Disc3, Pencil, Repeat } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { ArchivePanel } from "@/components/archive/archive-panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
-import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { nowDate, toDateInput, todayInput } from "@/lib/dates";
@@ -16,9 +16,9 @@ import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
 import { HealthBadge, SeasonBadge, formatTireSize, getTireRules, setHealth } from "@/modules/workshop/tires/public";
-import { deleteVehicle } from "@/modules/workshop/vehicles/actions";
+import { archiveVehicle, deleteVehicle, unarchiveVehicle } from "@/modules/workshop/vehicles/actions";
 import { TransferForm } from "@/modules/workshop/vehicles/forms";
-import { extraInspectionState, inspectionState, monthOf, type InspectionState } from "@/modules/workshop/vehicles/domain";
+import { extraInspectionState, inspectionState, monthOf, ownershipTransfers, vehicleDeletable, type InspectionState } from "@/modules/workshop/vehicles/domain";
 import { INSPECTION_TONE } from "@/modules/workshop/vehicles/status-tone";
 import { formatMileage } from "@/modules/workshop/vehicles/format";
 
@@ -38,12 +38,13 @@ export default async function VehiclePage({
 }) {
   const session = await requirePermission("vehicles.view");
   const [{ id }, sp, i18n, tireRules] = await Promise.all([params, searchParams, getI18n(), getTireRules()]);
-  const { t, tp, td, date } = i18n;
+  const { t, td, date } = i18n;
 
   const vehicle = await getVehicleDetail(session, id);
   if (!vehicle) notFound();
 
   const canEdit = session.can("vehicles.edit");
+  const transfers = ownershipTransfers(vehicle.ownerships);
   const base = `/vehicles/${vehicle.id}`;
   const thisMonth = monthOf(nowDate());
   const monthLabel = (month: string) => date(monthStart(month), { month: "long", year: "numeric" });
@@ -215,14 +216,23 @@ export default async function VehiclePage({
             />
           </Card>
 
-          {session.can("vehicles.delete") ? (
-            <DangerZone title={t("common.dangerZone")}>
-              <form action={deleteVehicle}>
-                <input type="hidden" name="id" value={vehicle.id} />
-                <ConfirmSubmitButton message={`${t("vehicles.confirmDelete")}${vehicle._count.appointments > 0 ? ` ${tp("vehicles.confirmDeleteAppointments", vehicle._count.appointments)}` : ""}`}>{t("vehicles.delete")}</ConfirmSubmitButton>
-              </form>
-            </DangerZone>
-          ) : null}
+          <ArchivePanel
+            id={vehicle.id}
+            archived={Boolean(vehicle.archivedAt)}
+            deps={[
+              { kind: "appointments", count: vehicle._count.appointments },
+              { kind: "tireSets", count: vehicle._count.tireSets },
+              { kind: "transfers", count: transfers },
+            ]}
+            canArchive={canEdit}
+            canDelete={session.can("vehicles.delete")}
+            deletable={vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, transfers })}
+            archive={archiveVehicle}
+            unarchive={unarchiveVehicle}
+            remove={deleteVehicle}
+            deleteLabel={t("vehicles.delete")}
+            confirmDelete={t("vehicles.confirmDelete")}
+          />
         </div>
       </div>
 

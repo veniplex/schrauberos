@@ -26,12 +26,12 @@ export async function AppointmentModal({
   canDelete: boolean;
 }) {
   const session = await getSession();
-  const assigneeId = params.edit ? ((await db.appointment.findUnique({ where: { id: params.edit }, select: { assigneeId: true } }))?.assigneeId ?? null) : null;
+  const current = params.edit ? await db.appointment.findUnique({ where: { id: params.edit }, select: { assigneeId: true, typeId: true, bayId: true } }) : null;
   const [{ t }, settings, options] = await Promise.all([
     getI18n(),
     getAppointmentSettings(),
     // „Zuständig“: Mitarbeiter statt aller Benutzerkonten, wenn die Funktion Mitarbeiter aktiv ist (weiche Abhängigkeit)
-    appointmentFormOptions({ employees: session?.features.has("office.employees") ?? false, assigneeId }),
+    appointmentFormOptions({ employees: session?.features.has("office.employees") ?? false, assigneeId: current?.assigneeId, typeId: current?.typeId, bayId: current?.bayId }),
   ]);
 
   let initial: AppointmentFormInitial;

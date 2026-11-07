@@ -38,10 +38,11 @@ export type AppointmentRow = Awaited<ReturnType<typeof appointmentsBetween>>[num
  * Stammdaten für das Termin-Formular. `employees`: Ist die Funktion „Mitarbeiter“ aktiv, besteht die Auswahl „Zuständig“ aus den Mitarbeitern mit Konto statt aus allen
  * Benutzerkonten. `assigneeId`: der bisher Zuständige bleibt immer wählbar (auch ohne Mitarbeitereintrag), sonst ginge die Zuordnung beim Speichern verloren.
  */
-export async function appointmentFormOptions(options: { employees?: boolean; assigneeId?: string | null } = {}) {
+export async function appointmentFormOptions(options: { employees?: boolean; assigneeId?: string | null; typeId?: string | null; bayId?: string | null } = {}) {
+  // Archivierte Terminarten und Arbeitsplätze (`active = false`) sind nicht wählbar – außer, der Termin hat sie schon (sonst ginge die Zuordnung beim Speichern verloren)
   const [types, bays, staff] = await Promise.all([
-    db.appointmentType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
-    db.bay.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    db.appointmentType.findMany({ where: { OR: [{ active: true }, ...(options.typeId ? [{ id: options.typeId }] : [])] }, orderBy: { sortOrder: "asc" } }),
+    db.bay.findMany({ where: { OR: [{ active: true }, ...(options.bayId ? [{ id: options.bayId }] : [])] }, orderBy: { sortOrder: "asc" } }),
     options.employees ? staffWithAccount() : db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   let users = staff;

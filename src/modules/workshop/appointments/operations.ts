@@ -176,7 +176,8 @@ export const saveSettingsOperation = defineOperation({
 
 /* ───────────── Arbeitsplätze ───────────── */
 
-const bayInput = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(60), sortOrder: z.coerce.number().int().min(0).max(999).default(0), active: z.boolean() });
+/** Arbeitsplatz anlegen/ändern; `active` (nicht archiviert) bleibt beim Ändern unverändert, wenn es fehlt – Archivieren und Wiederaktivieren sind eigene Operationen. */
+const bayInput = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(60), sortOrder: z.coerce.number().int().min(0).max(999).default(0), active: z.boolean().optional() });
 
 export const saveBayOperation = defineOperation({
   name: "appointments.saveBay",
@@ -184,7 +185,7 @@ export const saveBayOperation = defineOperation({
   input: bayInput,
   audit: "settings.appointments",
   run: async ({ input: { id, ...data }, tx, audit }) => {
-    // Neue Arbeitsplätze sind immer aktiv; das Häkchen gilt nur beim Bearbeiten
+    // Neue Arbeitsplätze sind immer aktiv; archiviert wird über die eigene Operation
     const saved = id ? await tx.bay.update({ where: { id }, data }) : await tx.bay.create({ data: { ...data, active: true } });
     audit({ target: `Bay: ${saved.name}`, entityId: saved.id });
     return { id: saved.id };
@@ -197,8 +198,10 @@ export const deleteBayOperation = defineOperation({
   input: z.object({ id: z.string().min(1) }),
   audit: "settings.appointments",
   run: async ({ input, tx, audit }) => {
-    const bay = await tx.bay.findUnique({ where: { id: input.id }, select: { name: true } });
+    const bay = await tx.bay.findUnique({ where: { id: input.id }, select: { name: true, _count: { select: { appointments: true } } } });
     if (!bay) fail("notFound");
+    // Löschschutz: Hängen Termine daran, wird archiviert statt gelöscht (der Platz bleibt an den Terminen, ist aber nicht mehr wählbar)
+    if (bay._count.appointments > 0) fail("inUse", "appointments.errors.bayInUse", { count: bay._count.appointments });
     await tx.bay.delete({ where: { id: input.id } });
     audit({ target: `Bay deleted: ${bay.name}`, entityId: input.id });
     return { id: input.id };
@@ -207,6 +210,21 @@ export const deleteBayOperation = defineOperation({
 
 /* ───────────── Terminarten ───────────── */
 
+/** Arbeitsplatz archivieren (nicht mehr wählbar, Termine behalten ihn) bzw. wieder aktivieren. */
+export const archiveBayOperation = defineOperation({
+  name: "appointments.archiveBay",
+  permission: "appointments.configure",
+  input: z.object({ id: z.string().min(1), archived: z.boolean() }),
+  audit: "settings.appointments",
+  run: async ({ input, tx, audit }) => {
+    const bay = await tx.bay.findUnique({ where: { id: input.id }, select: { name: true } });
+    if (!bay) fail("notFound");
+    await tx.bay.update({ where: { id: input.id }, data: { active: !input.archived } });
+    audit({ target: `Bay ${input.archived ? "archived" : "reactivated"}: ${bay.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
 const typeInput = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(1).max(60),
@@ -214,7 +232,7 @@ const typeInput = z.object({
   defaultMinutes: z.coerce.number().int().min(5).max(720),
   kind: z.enum(APPOINTMENT_KINDS).default("general"),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
-  active: z.boolean(),
+  active: z.boolean().optional(),
 });
 
 export const saveTypeOperation = defineOperation({
@@ -235,11 +253,27 @@ export const deleteTypeOperation = defineOperation({
   input: z.object({ id: z.string().min(1) }),
   audit: "settings.appointments",
   run: async ({ input, tx, audit }) => {
-    const type = await tx.appointmentType.findUnique({ where: { id: input.id }, select: { name: true } });
+    const type = await tx.appointmentType.findUnique({ where: { id: input.id }, select: { name: true, _count: { select: { appointments: true } } } });
     if (!type) fail("notFound");
+    if (type._count.appointments > 0) fail("inUse", "appointments.errors.typeInUse", { count: type._count.appointments });
     await tx.appointmentType.delete({ where: { id: input.id } });
     audit({ target: `Type deleted: ${type.name}`, entityId: input.id });
     return { id: input.id };
   },
 });
 
+
+/** Terminart archivieren (nicht mehr wählbar, Termine behalten sie) bzw. wieder aktivieren. */
+export const archiveTypeOperation = defineOperation({
+  name: "appointments.archiveType",
+  permission: "appointments.configure",
+  input: z.object({ id: z.string().min(1), archived: z.boolean() }),
+  audit: "settings.appointments",
+  run: async ({ input, tx, audit }) => {
+    const type = await tx.appointmentType.findUnique({ where: { id: input.id }, select: { name: true } });
+    if (!type) fail("notFound");
+    await tx.appointmentType.update({ where: { id: input.id }, data: { active: !input.archived } });
+    audit({ target: `Type ${input.archived ? "archived" : "reactivated"}: ${type.name}`, entityId: input.id });
+    return { id: input.id };
+  },
+});

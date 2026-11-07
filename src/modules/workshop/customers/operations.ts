@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { defineOperation, fail } from "@/server/operations";
-import { customerDisplayName, customerHasLinks, customerSearchKeys } from "./domain";
+import { customerDisplayName, customerHasLinks, customerSearchKeys, formerOwnerships } from "./domain";
 
 /** Eingabe eines Kunden – auch die Prüfung der Zeilen des CSV-Imports (`exchange.ts`). */
 export const customerInput = z
@@ -58,6 +58,40 @@ export const saveCustomerOperation = defineOperation({
   },
 });
 
+/**
+ * Archivieren (P4b-2): Der Kunde bleibt mit allen Fahrzeugen, Terminen und Rechnungen erhalten, verschwindet aber aus Auswahlfeldern, Suche und Neu-Formularen und erscheint nur noch im
+ * Listenfilter „Archiviert“. Wer Fahrzeuge oder Rechnungen hat, kann nicht gelöscht werden – archiviert wird er trotzdem. Keine Anonymisierung (kommt mit der Aufbewahrungsfrist).
+ */
+export const archiveCustomerOperation = defineOperation({
+  name: "customers.archive",
+  permission: "customers.edit",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "customer.archive",
+  run: async ({ input, tx, audit }) => {
+    const customer = await tx.customer.findUnique({ where: { id: input.id } });
+    if (!customer) fail("notFound");
+    if (customer.archivedAt) fail("conflict", "archive.errors.alreadyArchived");
+    await tx.customer.update({ where: { id: input.id }, data: { archivedAt: new Date() } });
+    audit({ target: customerDisplayName(customer), entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+export const unarchiveCustomerOperation = defineOperation({
+  name: "customers.unarchive",
+  permission: "customers.edit",
+  input: z.object({ id: z.string().min(1) }),
+  audit: "customer.unarchive",
+  run: async ({ input, tx, audit }) => {
+    const customer = await tx.customer.findUnique({ where: { id: input.id } });
+    if (!customer) fail("notFound");
+    if (!customer.archivedAt) fail("conflict", "archive.errors.notArchived");
+    await tx.customer.update({ where: { id: input.id }, data: { archivedAt: null } });
+    audit({ target: customerDisplayName(customer), entityId: input.id });
+    return { id: input.id };
+  },
+});
+
 export const deleteCustomerOperation = defineOperation({
   name: "customers.delete",
   permission: "customers.delete",
@@ -68,7 +102,7 @@ export const deleteCustomerOperation = defineOperation({
     if (!customer) fail("notFound");
     // Kunden mit Fahrzeugen, Halter-Historie oder Rechnungen bleiben erhalten (Nachvollziehbarkeit); im Schema zusätzlich per Restrict gesichert
     const links = customer._count;
-    if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles, ownerships: links.ownerships, invoices: links.invoices });
+    if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles, former: formerOwnerships(links), invoices: links.invoices });
     await tx.customer.delete({ where: { id: input.id } });
     audit({ target: customerDisplayName(customer), entityId: input.id });
     return { id: input.id };

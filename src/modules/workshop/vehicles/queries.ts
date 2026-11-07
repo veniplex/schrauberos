@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
+import { archivedWhere, type ArchiveFilter } from "@/lib/archive-filter";
 import { addMonths } from "@/lib/month";
 import { normalizePlate } from "@/lib/plate";
 import type { Permission } from "@/modules/catalog";
@@ -26,6 +27,8 @@ export type VehicleListFilters = {
   inspection?: "soon" | "none";
   /** fällig in genau diesem Monat, „JJJJ-MM“ */
   month?: string;
+  /** Archiv: Standard nur aktive Fahrzeuge (P4b-2) */
+  archived?: ArchiveFilter;
 };
 
 /**
@@ -33,9 +36,10 @@ export type VehicleListFilters = {
  * `currentMonth`: der laufende Monat „JJJJ-MM“ (von außen, damit die Funktion ohne Uhr bleibt).
  */
 export function vehicleListWhere(filters: VehicleListFilters, can: (permission: Permission) => boolean, currentMonth: string): Prisma.VehicleWhereInput {
-  const { q, noOwnerOnly, inspection, month } = filters;
+  const { q, noOwnerOnly, inspection, month, archived = "active" } = filters;
   const text = searchWhere<Prisma.VehicleWhereInput>(q, can, [{ where: (term) => ({ OR: vehicleTextWhere(term) }) }]);
   return {
+    ...archivedWhere(archived),
     ...(noOwnerOnly ? { customerId: null } : {}),
     ...(inspection === "soon" ? { inspectionDue: { not: null, lte: addMonths(currentMonth, INSPECTION_SOON_MONTHS) } } : {}),
     ...(inspection === "none" ? { inspectionDue: null } : {}),
@@ -45,7 +49,7 @@ export function vehicleListWhere(filters: VehicleListFilters, can: (permission: 
 }
 
 /** Bald fällige Prüfungen (überfällig, laufender Monat, nächste Monate) – Grundlage des Dashboard-Bausteins. Nach Frist sortiert, älteste zuerst. */
-export const attentionWhere = (currentMonth: string): Prisma.VehicleWhereInput => ({ inspectionDue: { not: null, lte: addMonths(currentMonth, INSPECTION_SOON_MONTHS) } });
+export const attentionWhere = (currentMonth: string): Prisma.VehicleWhereInput => ({ archivedAt: null, inspectionDue: { not: null, lte: addMonths(currentMonth, INSPECTION_SOON_MONTHS) } });
 
 /**
  * Fahrzeug für die Detailseite. Der Halter erscheint mit Anzeigename (Richtlinie D7), sein Telefon nur mit `customers.view`; Reifensätze samt Reifen nur mit `tires.view`, die
@@ -57,7 +61,7 @@ export async function getVehicleDetail(viewer: Viewer, id: string) {
     include: {
       customer: { select: customerNameSelect },
       ownerships: { include: { customer: { select: customerNameSelect } }, orderBy: { fromDate: "desc" } },
-      _count: { select: { appointments: true } },
+      _count: { select: { appointments: true, tireSets: true } },
     },
   });
   if (!vehicle) return null;

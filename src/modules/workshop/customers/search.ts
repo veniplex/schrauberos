@@ -14,7 +14,7 @@ export const searchProviders: SearchProviderDef[] = [
     order: 30,
     async search(q, { limit }) {
       const rows = await db.customer.findMany({
-        where: { OR: customerSearchFields.map((f) => f.where(q)) },
+        where: { archivedAt: null, OR: customerSearchFields.map((f) => f.where(q)) },
         orderBy: { lastName: "asc" },
         take: limit,
         select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true, city: true },

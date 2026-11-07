@@ -27,6 +27,7 @@ const CUSTOMER = {
   zip: true,
   city: true,
   notes: true,
+  archivedAt: true,
   createdAt: true,
   updatedAt: true,
 } as const satisfies Prisma.CustomerSelect;
