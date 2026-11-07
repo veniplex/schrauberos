@@ -8,6 +8,7 @@ import { safeNext } from "@/lib/safe-next";
 import { getWorkshop } from "@/server/workshop";
 import { LoginForm } from "./login-form";
 import { Card, TextLink } from "@/components/ui/layout";
+import { ClearDrafts } from "@/components/ui/clear-drafts";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -22,6 +23,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (await getSession()) redirect(safeNext(next));
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
+      <ClearDrafts />
+      <ClearDrafts />
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           {workshop.logoDataUrl ? (

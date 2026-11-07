@@ -6,26 +6,9 @@ import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type Rea
 import { useFormStatus } from "react-dom";
 import { useI18n } from "@/i18n/client";
 import { Button, buttonClass, type ButtonSize, type ButtonVariant } from "./buttons";
-import { Input } from "./form";
+import { Input } from "./form-fields";
 
-/**
- * Rückfrage vor einer Aktion – ersetzt `window.confirm`. Ein natives `<dialog>` (Fokusfalle, Escape, Hintergrund inaktiv kommen vom Browser) mit
- * übersetzten Knöpfen. Der Titel **benennt die Aktion** („Kunde löschen?“), die Bestätigung trägt die Beschriftung der Aktion („Löschen“).
- * `typeToConfirm`: bei besonders folgenreichen Aktionen (Wiederherstellung) muss das Wort eingetippt werden, bevor die Bestätigung freigegeben ist.
- *
- * Wird nur gerendert, solange sie offen ist (`open`); das Schließen meldet `onCancel` (Abbrechen, Escape, Klick daneben).
- */
-export function ConfirmDialog({
-  open,
-  title,
-  description,
-  confirmLabel,
-  cancelLabel,
-  variant = "danger",
-  typeToConfirm,
-  onConfirm,
-  onCancel,
-}: {
+type ConfirmDialogProps = {
   open: boolean;
   title: ReactNode;
   description?: ReactNode;
@@ -36,19 +19,38 @@ export function ConfirmDialog({
   typeToConfirm?: string;
   onConfirm: () => void;
   onCancel: () => void;
-}) {
+};
+
+/**
+ * Rückfrage vor einer Aktion – ersetzt `window.confirm`. Ein natives `<dialog>` (Fokusfalle, Escape, Hintergrund inaktiv kommen vom Browser) mit
+ * übersetzten Knöpfen. Der Titel **benennt die Aktion** („Kunde löschen?“), die Bestätigung trägt die Beschriftung der Aktion („Löschen“).
+ * `typeToConfirm`: bei besonders folgenreichen Aktionen (Wiederherstellung) muss das Wort eingetippt werden, bevor die Bestätigung freigegeben ist.
+ *
+ * Wird nur gerendert, solange sie offen ist (`open`); das Schließen meldet `onCancel` (Abbrechen, Escape, Klick daneben). Beim Schließen **geht der Fokus zurück** an das Element, das ihn
+ * vor dem Öffnen hatte (WCAG 2.4.3 – ein ausgehängtes `<dialog>` gibt ihn nicht von selbst zurück); jedes Öffnen beginnt frisch (ein getipptes Bestätigungswort bleibt nicht stehen).
+ */
+export function ConfirmDialog(props: ConfirmDialogProps) {
+  return props.open ? <OpenConfirmDialog {...props} /> : null;
+}
+
+function OpenConfirmDialog({ title, description, confirmLabel, cancelLabel, variant = "danger", typeToConfirm, onConfirm, onCancel }: ConfirmDialogProps) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
+  const downOnBackdrop = useRef(false);
   const titleId = useId();
   const descriptionId = useId();
   const [typed, setTyped] = useState("");
 
   useEffect(() => {
     const dialog = ref.current;
-    if (open && dialog && !dialog.open) dialog.showModal();
-  }, [open]);
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => {
+      if (dialog?.open) dialog.close();
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
 
-  if (!open) return null;
   const allowed = !typeToConfirm || typed.trim().toLowerCase() === typeToConfirm.toLowerCase();
   return (
     <dialog
@@ -60,8 +62,13 @@ export function ConfirmDialog({
         event.preventDefault();
         onCancel();
       }}
+      // Klick auf den Hintergrund schließt nur, wenn auch das Drücken dort begann (Text markieren und außerhalb loslassen ist kein „Klick daneben“)
+      onMouseDown={(event) => {
+        downOnBackdrop.current = event.target === ref.current;
+      }}
       onClick={(event) => {
-        if (event.target === ref.current) onCancel();
+        if (event.target === ref.current && downOnBackdrop.current) onCancel();
+        downOnBackdrop.current = false;
       }}
     >
       <div className="flex flex-col gap-3 p-5">
@@ -119,6 +126,7 @@ export function ConfirmSubmitButton({
   confirmLabel,
   typeToConfirm,
   label,
+  target,
   children,
   variant = "danger",
   size = "sm",
@@ -132,6 +140,8 @@ export function ConfirmSubmitButton({
   confirmLabel?: string;
   typeToConfirm?: string;
   label?: string;
+  /** Wovon die Rede ist („Meier, 3.–7. Mai“): macht gleichnamige Knöpfe in Listen unterscheidbar (Name „Löschen: Meier, 3.–7. Mai“, Titel der Rückfrage) */
+  target?: string;
   children: ReactNode;
 }) {
   const { t } = useI18n();
@@ -139,13 +149,16 @@ export function ConfirmSubmitButton({
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const action = confirmLabel ?? label ?? (typeof children === "string" ? children : props["aria-label"]);
+  const verb = label ?? (typeof children === "string" ? children : props["aria-label"]);
+  const named = target && verb ? `${verb.replace(/[?:]+$/, "")}: ${target}` : undefined;
   return (
     <>
       <button
         {...props}
         ref={button}
         type="submit"
-        title={label}
+        title={named ?? label}
+        aria-label={named ?? props["aria-label"]}
         disabled={pending || props.disabled}
         aria-busy={pending || undefined}
         className={clsx(buttonClass(variant, size), className)}
@@ -160,7 +173,7 @@ export function ConfirmSubmitButton({
       </button>
       <ConfirmDialog
         open={open}
-        title={title ?? (action ? `${action.replace(/[?:]+$/, "")}?` : t("common.confirmTitle"))}
+        title={title ?? (named ? `${named}?` : action ? `${action.replace(/[?:]+$/, "")}?` : t("common.confirmTitle"))}
         description={message}
         confirmLabel={action ?? t("common.confirm")}
         variant={variant}

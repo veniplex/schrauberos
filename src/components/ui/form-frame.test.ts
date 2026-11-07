@@ -143,7 +143,7 @@ describe("Form", () => {
     await f.type("email", "a@b.de");
     await act(() => mock.timers.tick(500));
     mock.timers.reset();
-    const stored = JSON.parse(sessionStorage.getItem("so_draft:customer:new") ?? "null") as { entries: Array<{ name: string; value: string }> };
+    const stored = JSON.parse(sessionStorage.getItem("so_draft:anon:customer:new") ?? "null") as { entries: Array<{ name: string; value: string }> };
     assert.deepEqual(stored.entries.map((e) => e.name).sort(), ["email", "lastName"]);
     await view!.unmount();
 
@@ -154,7 +154,7 @@ describe("Form", () => {
 
     // Verwerfen löscht den Entwurf und setzt zurück
     await act(() => void [...f.root.querySelectorAll("button")].find((b) => /Entwurf verwerfen/.test(b.textContent ?? ""))!.click());
-    assert.equal(sessionStorage.getItem("so_draft:customer:new"), null);
+    assert.equal(sessionStorage.getItem("so_draft:anon:customer:new"), null);
     assert.equal(f.input("lastName").value, "");
   });
 

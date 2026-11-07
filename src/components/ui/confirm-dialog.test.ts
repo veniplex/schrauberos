@@ -110,6 +110,80 @@ describe("ConfirmSubmitButton", () => {
   });
 });
 
+describe("ConfirmSubmitButton: Fokus, Tipp-Bestätigung, Hintergrund, Name", () => {
+  const typeInto = (field: HTMLInputElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value);
+      field.dispatchEvent(new window.Event("input", { bubbles: true }));
+    });
+
+  it("nach Abbrechen und nach Escape steht der Fokus wieder auf dem Auslöser (WCAG 2.4.3)", async () => {
+    const c = await mountDelete();
+    c.trigger().focus();
+    await act(() => c.trigger().click());
+    await act(() => c.inDialog(/^Abbrechen$/).click());
+    assert.equal(c.dialog(), null);
+    assert.ok(document.activeElement === c.trigger(), "Fokus nach Abbrechen auf dem Auslöser");
+
+    c.trigger().focus();
+    await act(() => c.trigger().click());
+    await act(() => void c.dialog()!.dispatchEvent(new window.Event("cancel", { cancelable: true })));
+    assert.ok(document.activeElement === c.trigger(), "Fokus nach Escape auf dem Auslöser");
+  });
+
+  it("Tipp-Bestätigung: das richtige Wort gibt frei und sendet; nach Abbrechen und erneutem Öffnen ist wieder alles gesperrt und das Feld leer", async () => {
+    const c = await mountDelete({ typeToConfirm: "wiederherstellen" });
+    await act(() => c.trigger().click());
+    await typeInto(c.dialog()!.querySelector("input") as HTMLInputElement, "Wiederherstellen");
+    assert.equal(c.inDialog(/^Kunde löschen$/).disabled, false, "freigegeben");
+    await act(() => c.inDialog(/^Abbrechen$/).click());
+
+    await act(() => c.trigger().click());
+    assert.equal((c.dialog()!.querySelector("input") as HTMLInputElement).value, "", "frisch geöffnet: Feld leer");
+    assert.equal(c.inDialog(/^Kunde löschen$/).disabled, true, "frisch geöffnet: gesperrt");
+    assert.equal(c.submitted.length, 0);
+
+    await typeInto(c.dialog()!.querySelector("input") as HTMLInputElement, "wiederherstellen");
+    await act(() => c.inDialog(/^Kunde löschen$/).click());
+    await sleep(20);
+    assert.equal(c.submitted.length, 1, "positiver Pfad: das Formular wurde abgesendet");
+  });
+
+  it("Enter mit dem richtigen Wort bestätigt, ohne das Formular zweimal abzusenden", async () => {
+    const c = await mountDelete({ typeToConfirm: "löschen" });
+    await act(() => c.trigger().click());
+    const field = c.dialog()!.querySelector("input") as HTMLInputElement;
+    await typeInto(field, "LÖSCHEN");
+    await act(() => void field.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })));
+    await sleep(20);
+    assert.equal(c.submitted.length, 1);
+  });
+
+  it("ein Klick auf den Hintergrund schließt nur, wenn auch das Drücken dort begann (Text markieren und außerhalb loslassen schließt nicht)", async () => {
+    const c = await mountDelete();
+    await act(() => c.trigger().click());
+    const dialog = c.dialog()!;
+    await act(() => void dialog.dispatchEvent(new window.MouseEvent("click", { bubbles: true })));
+    assert.ok(c.dialog(), "Klick ohne Drücken auf dem Hintergrund (Markierung gezogen): offen");
+
+    await act(() => void dialog.querySelector("h2")!.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true })));
+    await act(() => void dialog.dispatchEvent(new window.MouseEvent("click", { bubbles: true })));
+    assert.ok(c.dialog(), "Drücken im Dialog, Loslassen auf dem Hintergrund: offen");
+
+    await act(() => void dialog.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true })));
+    await act(() => void dialog.dispatchEvent(new window.MouseEvent("click", { bubbles: true })));
+    assert.equal(c.dialog(), null, "Drücken und Loslassen auf dem Hintergrund: geschlossen");
+  });
+
+  it("`target` macht den Knopf unterscheidbar: Name „Aktion: Ziel“, Titel der Rückfrage ebenso – der sichtbare Text bleibt im Namen enthalten", async () => {
+    const c = await mountDelete({ target: "Meier, 3.–7. Mai" });
+    assert.equal(c.trigger().getAttribute("aria-label"), "Kunde löschen: Meier, 3.–7. Mai");
+    await act(() => c.trigger().click());
+    assert.equal(c.dialog()?.querySelector("h2")?.textContent, "Kunde löschen: Meier, 3.–7. Mai?");
+    assert.equal(c.inDialog(/^Kunde löschen$/) !== undefined, true, "Bestätigung trägt weiter die Beschriftung der Aktion");
+  });
+});
+
 describe("SubmitSwitch", () => {
   async function mountSwitch(checked: boolean) {
     const { Form } = await import("./form");

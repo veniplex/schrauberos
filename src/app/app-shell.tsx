@@ -13,6 +13,7 @@ import { NAV_COOKIE, parseCollapsed } from "@/lib/nav-state";
 import type { AppSession } from "@/server/auth/session";
 import { RecoveryBanner } from "@/platform/account/recovery-banner";
 import { FlashNotice } from "@/components/shell/flash-notice";
+import { DraftScope } from "@/components/ui/draft-scope";
 import { getWorkshop } from "@/server/workshop";
 
 const ICON_CLASS = "size-[18px] shrink-0";
@@ -50,6 +51,7 @@ export async function AppShell({ session, children }: { session: AppSession; chi
   const user = { name: session.user.name, roles: session.user.roleNames.join(", ") || "–", locale, theme, logoutAction };
 
   return (
+    <DraftScope userId={session.user.id}>
     <Sidebar
       workshopName={workshop.name}
       logoDataUrl={workshop.logoDataUrl}
@@ -69,5 +71,6 @@ export async function AppShell({ session, children }: { session: AppSession; chi
         {children}
       </main>
     </Sidebar>
+    </DraftScope>
   );
 }

@@ -75,6 +75,9 @@ export function DocEditor({
     requestAnimationFrame(() => {
       ta.focus();
       ta.setSelectionRange(edit.start, edit.end);
+      // Eingaben über die Werkzeugleiste (Fett, Tabelle, Bild …) sind keine Tastatureingaben: Das Ereignis sagt dem Formular, dass sich etwas geändert hat
+      // (ungespeichert → Warnung beim Verlassen, Entwurf) – React meldet geänderte Werte nicht von selbst als Ereignis
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
 
@@ -104,7 +107,7 @@ export function DocEditor({
   }
 
   return (
-    <Form action={saveDocPage} warnOnLeave className="flex flex-col gap-4">
+    <Form action={saveDocPage} draftKey={`doc:${area}:${initial.id ?? "new"}`} warnOnLeave className="flex flex-col gap-4">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />

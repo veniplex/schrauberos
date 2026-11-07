@@ -1,14 +1,20 @@
 "use client";
 
 import clsx from "clsx";
-import { useActionState, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useFormStatus } from "react-dom";
+import { useActionState, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormHTMLAttributes, ReactNode } from "react";
 import { useI18n } from "@/i18n/client";
 import { LinkButton, Button, SubmitButton } from "./buttons";
+import { ConfirmDialog } from "./confirm-dialog";
 import { Alert } from "./layout";
-import { FieldError } from "./form";
-import { FormContext, formErrorId, useFormContext, type FormState } from "./form-context";
+import { FieldError } from "./form-fields";
+import { createRestoreJob, readDraft, removeDraft, restorePass, snapshotBase, takeSnapshot, versionOf, writeDraft, purgeForeignDrafts, type Entry, type RestoreJob } from "./form-draft";
+import { DraftScopeContext, FormContext, formErrorId, useFormContext, type FormState } from "./form-context";
 import { useToast } from "./toast";
+
+export { clearFormDrafts } from "./form-draft";
 
 /**
  * Der Formular-Rahmen. `Form`/`FormCard` führen die Server Action selbst aus (`useActionState`) und stellen Zustand, Fehler und Wartezustand den Feldbausteinen
@@ -16,116 +22,17 @@ import { useToast } from "./toast";
  *
  * - **Fehlerzusammenfassung** oben (`FormErrorSummary`): alle Fehler gesammelt, ein Klick springt ins Feld.
  * - **Eingabe bleibt erhalten:** React setzt Formulare nach jeder Aktion zurück; bei einem Fehler (auch „Keine Verbindung“) stellt der Rahmen die abgesendeten Werte wieder her
- *   (nie Passwort- und Dateifelder).
+ *   (nie Passwort- und Dateifelder). Was während der Aktion getippt wurde, geht dabei nicht verloren.
  * - **Netzwerkfehler** als eigener Zustand („Keine Verbindung“, erneut absenden genügt) statt einer Fehlerseite.
  * - **Entwurf** (`draftKey`): lange Formulare merken ihre Eingabe in `sessionStorage` (nie Passwörter, Dateien und mit `data-no-draft` markierte Felder), stellen sie beim erneuten
- *   Öffnen wieder her und löschen sie nach dem Speichern und beim Abmelden (`clearFormDrafts`).
+ *   Öffnen wieder her und löschen sie **nach dem erfolgreichen Speichern** (ein Fehler oder Sitzungsablauf lässt den Entwurf stehen), bei „Verwerfen“ und beim Abmelden
+ *   (`clearFormDrafts`). Entwürfe gehören der angemeldeten Person (`DraftScope`) und passen nur zur selben Vorbelegung (Fingerabdruck der Ausgangswerte) und Version der Zeile.
+ *   Die Wiederherstellung funktioniert auch bei von React gesteuerten Feldern (siehe `form-draft.ts`); zustandsbehaftete Bausteine (Kundenauswahl) melden ihren Zustand über
+ *   `data-draft-state`.
  * - **Erfolgsmeldung** als Toast.
  * - **`noValidate`:** Die Prüfung der Eingaben macht der Server mit übersetzten, spezifischen Meldungen (E-Mail, FIN, Datum, Zahlenbereich …); die englischen/uneinheitlichen
  *   Sprechblasen des Browsers würden sie verdecken. `required` und `type` bleiben als Hinweis für Tastatur und Bedienhilfen.
  */
-
-const DRAFT_PREFIX = "so_draft:";
-
-type Entry = { name: string; kind: "value" | "check" | "multi"; value: string | string[]; checked?: boolean; sensitive?: boolean };
-
-const SKIPPED_TYPES = new Set(["password", "file", "hidden", "submit", "button", "image", "reset"]);
-
-/** Werte des Formulars (ohne Passwort-, Datei- und versteckte Felder), in Dokumentreihenfolge. */
-function takeSnapshot(form: HTMLFormElement | null): Entry[] {
-  if (!form) return [];
-  const out: Entry[] = [];
-  for (const element of Array.from(form.elements)) {
-    if (element instanceof HTMLInputElement) {
-      if (!element.name || element.disabled || SKIPPED_TYPES.has(element.type)) continue;
-      const sensitive = element.hasAttribute("data-no-draft");
-      if (element.type === "checkbox" || element.type === "radio") out.push({ name: element.name, kind: "check", value: element.value, checked: element.checked, sensitive });
-      else out.push({ name: element.name, kind: "value", value: element.value, sensitive });
-    } else if (element instanceof HTMLTextAreaElement) {
-      if (element.name && !element.disabled) out.push({ name: element.name, kind: "value", value: element.value, sensitive: element.hasAttribute("data-no-draft") });
-    } else if (element instanceof HTMLSelectElement) {
-      if (!element.name || element.disabled) continue;
-      const sensitive = element.hasAttribute("data-no-draft");
-      if (element.multiple) out.push({ name: element.name, kind: "multi", value: Array.from(element.selectedOptions).map((o) => o.value), sensitive });
-      else out.push({ name: element.name, kind: "value", value: element.value, sensitive });
-    }
-  }
-  return out;
-}
-
-/**
- * Setzt den Wert wie eine Eingabe des Menschen: über den nativen Setter und ein `input`-Ereignis, damit auch von React gesteuerte Felder (Zustand statt `defaultValue`)
- * den Wert übernehmen – ein bloßes `element.value = …` würde beim nächsten Rendern wieder überschrieben.
- */
-function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
-  if (element.value === value) return;
-  const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-  if (setter) setter.call(element, value);
-  else element.value = value;
-  element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
-}
-
-/** Schreibt die Werte zurück (gleiche Reihenfolge wie `takeSnapshot`: Feld für Feld, nicht über Namen). */
-function restoreSnapshot(form: HTMLFormElement | null, entries: Entry[]): void {
-  if (!form) return;
-  const queue = [...entries];
-  for (const element of Array.from(form.elements)) {
-    const isInput = element instanceof HTMLInputElement;
-    if (isInput && (!element.name || element.disabled || SKIPPED_TYPES.has(element.type))) continue;
-    if (!(isInput || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) continue;
-    if (!element.name || element.disabled) continue;
-    const index = queue.findIndex((entry) => entry.name === element.name);
-    if (index < 0) continue;
-    const [entry] = queue.splice(index, 1);
-    if (entry.kind === "check" && isInput) {
-      // ein Klick löst auch bei gesteuerten Kontrollkästchen die Änderung aus
-      if (element.checked !== Boolean(entry.checked)) element.click();
-    } else if (entry.kind === "multi" && element instanceof HTMLSelectElement) {
-      for (const option of Array.from(element.options)) option.selected = (entry.value as string[]).includes(option.value);
-    } else if (entry.kind === "value") {
-      setValue(element, entry.value as string);
-    }
-  }
-}
-
-const versionOf = (form: HTMLFormElement | null) => (form?.elements.namedItem("version") as HTMLInputElement | null)?.value ?? "";
-
-function readDraft(key: string): { version: string; entries: Entry[] } | null {
-  try {
-    const raw = sessionStorage.getItem(DRAFT_PREFIX + key);
-    return raw ? (JSON.parse(raw) as { version: string; entries: Entry[] }) : null;
-  } catch {
-    return null;
-  }
-}
-function writeDraft(key: string, form: HTMLFormElement | null) {
-  if (!form) return;
-  try {
-    sessionStorage.setItem(DRAFT_PREFIX + key, JSON.stringify({ version: versionOf(form), entries: takeSnapshot(form).filter((e) => !e.sensitive) }));
-  } catch {
-    /* Speicher voll oder gesperrt: kein Entwurf */
-  }
-}
-function removeDraft(key: string) {
-  try {
-    sessionStorage.removeItem(DRAFT_PREFIX + key);
-  } catch {
-    /* ignorieren */
-  }
-}
-
-/** Alle Entwürfe löschen (beim Abmelden: auf einem geteilten Gerät soll nichts von der Eingabe zurückbleiben). */
-export function clearFormDrafts(): void {
-  try {
-    for (let i = sessionStorage.length - 1; i >= 0; i--) {
-      const key = sessionStorage.key(i);
-      if (key?.startsWith(DRAFT_PREFIX)) sessionStorage.removeItem(key);
-    }
-  } catch {
-    /* ignorieren */
-  }
-}
 
 /** Formulare, deren Entwurf beim Öffnen wiederhergestellt wurde (für den Hinweis „Entwurf wiederhergestellt“). */
 const restoredKeys = new Set<string>();
@@ -136,10 +43,13 @@ const subscribeRestored = (listener: () => void) => {
   return () => void restoredListeners.delete(listener);
 };
 
-/** Hat die Anfrage den Server nicht erreicht? (Netzwerk weg, Zeitüberschreitung des Browsers) */
+/**
+ * Hat die Anfrage den Server nicht erreicht? (Netzwerk weg, Zeitüberschreitung des Browsers) Ein `TypeError` zählt nur, wenn er wie ein Netzwerkfehler aussieht
+ * (`fetch` meldet „Failed to fetch“ / „NetworkError …“ / „Load failed“); ein Programmierfehler (`Cannot read properties of …`) ist keiner und soll sichtbar scheitern.
+ */
 export function isNetworkError(error: unknown): boolean {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
-  return error instanceof TypeError;
+  return error instanceof TypeError && /failed to fetch|networkerror|network request failed|load failed|fetch failed|network connection was lost/i.test(error.message);
 }
 
 export type FormAction<S extends FormState = FormState> = (prev: S, formData: FormData) => Promise<S>;
@@ -150,38 +60,80 @@ type FormProps<S extends FormState = FormState> = Omit<FormHTMLAttributes<HTMLFo
   children?: ReactNode | ((state: S) => ReactNode);
   /** Eindeutiger Schlüssel (z. B. `customer:neu`, `invoice:<id>`) – schaltet den Entwurf in `sessionStorage` ein */
   draftKey?: string;
-  /** Vor dem Verlassen der Seite mit ungespeicherten Eingaben warnen (`beforeunload`, z. B. Doku-Editor) */
+  /**
+   * Mit ungespeicherten Eingaben vor dem Verlassen warnen: beim Neuladen/Schließen des Tabs (`beforeunload`) **und** bei Klicks auf Links der Anwendung (Rückfrage
+   * „Änderungen verwerfen?“). Die Zurück-Taste des Browsers lässt sich nicht abfangen.
+   */
   warnOnLeave?: boolean;
 };
 
 const toastIds = new WeakSet<object>();
 
+type RestoreHolder = { current: { job: RestoreJob; done?: () => void; generation: number } | null };
+
+/** Ein Durchlauf der Wiederherstellung, danach (falls noch etwas zu tun ist) der nächste in einer weiteren Mikroaufgabe; eine neuere Wiederherstellung (`generation`) löst die laufende ab. */
+function continueRestore(formRef: { current: HTMLFormElement | null }, holder: RestoreHolder, generation: number): void {
+  const current = holder.current;
+  if (!current || current.generation !== generation) return;
+  if (restorePass(formRef.current, current.job)) queueMicrotask(() => continueRestore(formRef, holder, generation));
+  else {
+    holder.current = null;
+    current.done?.();
+  }
+}
+
 export function Form<S extends FormState = FormState>({ action, draftKey, warnOnLeave, className, children, onInput, onChange, ...props }: FormProps<S>) {
   const { t } = useI18n();
   const toast = useToast();
+  const scope = useContext(DraftScopeContext);
   const formRef = useRef<HTMLFormElement>(null);
   const snapshot = useRef<Entry[]>([]);
+  const initialEntries = useRef<Entry[]>([]);
+  const base = useRef("");
   const dirty = useRef(false);
+  const submitting = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const job: RestoreHolder = useRef(null);
+  const generations = useRef(0);
+
+  const saveDraft = useCallback(() => {
+    if (draftKey) writeDraft(scope, draftKey, formRef.current, base.current);
+  }, [draftKey, scope]);
+  const dropDraft = useCallback(() => {
+    if (!draftKey) return;
+    removeDraft(scope, draftKey);
+    restoredKeys.delete(draftKey);
+    notifyRestored();
+  }, [draftKey, scope]);
+
+  // Zurückschreiben in Durchläufen, jeder in einer Mikroaufgabe (nach dem Festschreiben, vor dem Zeichnen): Dort verarbeitet React ein Ereignis vollständig – auch die Zustandsänderung
+  // eines gesteuerten Feldes ist fertig, bevor das nächste Feld drankommt, und kein Rückruf liest einen veralteten Stand. Bleibt ein Wert dennoch hängen oder entstehen Felder durch
+  // einen Wert (Reserverad), folgt ein weiterer Durchlauf (siehe `restorePass`).
+  const restore = useCallback((entries: Entry[], done?: () => void) => {
+    const generation = ++generations.current;
+    job.current = { job: createRestoreJob(entries), done, generation };
+    queueMicrotask(() => continueRestore(formRef, job, generation));
+  }, []);
 
   const run = useCallback(
     async (previous: S, data: FormData): Promise<S> => {
       snapshot.current = takeSnapshot(formRef.current);
       dirty.current = false;
+      submitting.current = true;
       if (timer.current) clearTimeout(timer.current);
-      if (draftKey) {
-        removeDraft(draftKey);
-        restoredKeys.delete(draftKey);
-        notifyRestored();
-      }
       try {
-        return await action(previous, data);
+        const result = await action(previous, data);
+        submitting.current = false;
+        // Der Entwurf geht erst nach dem Erfolg: ein Fehler, Sitzungsablauf oder Netzwerkausfall lässt ihn stehen
+        if (result?.ok) dropDraft();
+        return result;
       } catch (error) {
+        submitting.current = false;
         if (isNetworkError(error)) return { error: t("common.network"), network: true } as S;
         throw error;
       }
     },
-    [action, draftKey, t],
+    [action, dropDraft, t],
   );
   const [current, dispatch, pending] = useActionState<FormState, FormData>(run as unknown as FormAction, {});
   const state = current as S;
@@ -190,10 +142,11 @@ export function Form<S extends FormState = FormState>({ action, draftKey, warnOn
   // Nach einer Aktion hat React das Formular zurückgesetzt: bei einem Fehler die abgesendeten Werte zurückschreiben (nach dem Zurücksetzen, vor dem Zeichnen)
   useLayoutEffect(() => {
     if (state === first.current || state.ok) return;
-    restoreSnapshot(formRef.current, snapshot.current);
-    dirty.current = true;
-    if (draftKey) writeDraft(draftKey, formRef.current);
-  }, [state, draftKey]);
+    restore(snapshot.current, () => {
+      dirty.current = true;
+      saveDraft();
+    });
+  }, [state, restore, saveDraft]);
 
   // Erfolgsmeldung als Toast (einmal je Rückgabe)
   useEffect(() => {
@@ -203,13 +156,16 @@ export function Form<S extends FormState = FormState>({ action, draftKey, warnOn
     }
   }, [state, toast]);
 
-  // Entwurf beim Öffnen wiederherstellen (nur, wenn er zur selben Version der Zeile gehört)
+  // Entwurf beim Öffnen wiederherstellen (nur, wenn er zur selben Person, Version der Zeile und Vorbelegung gehört)
   useLayoutEffect(() => {
-    if (!draftKey) return;
-    const draft = readDraft(draftKey);
     const form = formRef.current;
-    if (draft && form && draft.version === versionOf(form)) {
-      restoreSnapshot(form, draft.entries);
+    initialEntries.current = takeSnapshot(form);
+    if (!draftKey) return;
+    purgeForeignDrafts(scope);
+    base.current = snapshotBase(form);
+    const draft = readDraft(scope, draftKey);
+    if (draft && form && draft.version === versionOf(form) && draft.base === base.current) {
+      restore(draft.entries);
       dirty.current = true;
       restoredKeys.add(draftKey);
       notifyRestored();
@@ -217,7 +173,7 @@ export function Form<S extends FormState = FormState>({ action, draftKey, warnOn
     return () => {
       if (restoredKeys.delete(draftKey)) notifyRestored();
     };
-  }, [draftKey]);
+  }, [draftKey, scope, restore]);
   const restored = useSyncExternalStore(
     subscribeRestored,
     () => (draftKey ? restoredKeys.has(draftKey) : false),
@@ -238,24 +194,30 @@ export function Form<S extends FormState = FormState>({ action, draftKey, warnOn
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
+      // Das Formular verschwindet mitten im Absenden (Weiterleitung nach dem Speichern): erfolgreich gespeichert, der Entwurf ist erledigt
+      if (submitting.current && draftKey) removeDraft(scope, draftKey);
     },
-    [],
+    [draftKey, scope],
   );
 
   const changed = () => {
     dirty.current = true;
+    // Während des Absendens zählt die neueste Eingabe (React setzt das Formular danach zurück; bei einem Fehler wird sie statt des Standes beim Absenden zurückgeschrieben)
+    if (submitting.current) {
+      snapshot.current = takeSnapshot(formRef.current);
+      return;
+    }
     if (!draftKey) return;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => writeDraft(draftKey, formRef.current), 400);
+    timer.current = setTimeout(saveDraft, 400);
   };
 
   const discard = () => {
     if (!draftKey) return;
-    removeDraft(draftKey);
-    restoredKeys.delete(draftKey);
-    notifyRestored();
+    dropDraft();
     dirty.current = false;
     formRef.current?.reset();
+    restore(initialEntries.current);
   };
 
   const value = useMemo(() => ({ state, pending, restored }), [state, pending, restored]);
@@ -266,6 +228,7 @@ export function Form<S extends FormState = FormState>({ action, draftKey, warnOn
         noValidate
         {...props}
         ref={formRef}
+        data-draft-key={draftKey}
         action={dispatch}
         className={clsx("group/form", className)}
         onInput={(event) => {
@@ -287,11 +250,55 @@ export function Form<S extends FormState = FormState>({ action, draftKey, warnOn
             </div>
           </Alert>
         ) : null}
+        {/* Pflichtfeld-Legende vor den Feldern: wer „*“ liest, soll die Erklärung schon kennen */}
+        <p className="hidden text-xs text-ink-muted group-has-[.required-mark]/form:block">{t("common.requiredNote")}</p>
         {errorCount > 0 ? <FormErrorSummary /> : null}
         {typeof children === "function" ? children(state) : children}
-        <p className="hidden text-xs text-ink-muted group-has-[.required-mark]/form:block">{t("common.requiredNote")}</p>
+        {warnOnLeave ? <LeaveGuard dirtyRef={dirty} /> : null}
       </form>
     </FormContext.Provider>
+  );
+}
+
+/**
+ * Navigationsbremse (`warnOnLeave`): Ein Klick auf einen Link der Anwendung mit ungespeicherten Eingaben öffnet die Rückfrage „Änderungen verwerfen?“, statt sie stumm zu
+ * verlieren (`beforeunload` fängt nur das Neuladen). Links mit Zusatztasten, in neuen Tabs oder zu Dateien und Sprungmarken auf derselben Seite bleiben unberührt.
+ */
+function LeaveGuard({ dirtyRef }: { dirtyRef: { current: boolean } }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !dirtyRef.current) return;
+      const anchor = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || (anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin || (url.pathname === window.location.pathname && url.search === window.location.search)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setTarget(`${url.pathname}${url.search}${url.hash}`);
+    };
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
+  }, [dirtyRef]);
+
+  return (
+    <ConfirmDialog
+      open={target !== null}
+      title={t("common.discardTitle")}
+      description={t("common.discardText")}
+      confirmLabel={t("common.discard")}
+      cancelLabel={t("common.keepEditing")}
+      onCancel={() => setTarget(null)}
+      onConfirm={() => {
+        const href = target;
+        setTarget(null);
+        dirtyRef.current = false;
+        if (href) router.push(href);
+      }}
+    />
   );
 }
 
@@ -399,6 +406,15 @@ export function FormFieldError({ name, className }: { name: string; className?: 
 }
 
 /**
+ * Unsichtbarer Standard-Absender (Enter im Textfeld): sendet das Formular ohne Zusatzfeld – wie die Hauptaktion, an deren Stelle er steht. Nicht fokussierbar und vor Bedienhilfen
+ * verborgen (die sichtbare Hauptaktion ist der eigentliche Knopf); während des Absendens gesperrt wie sie, damit Enter nicht doppelt absendet.
+ */
+function DefaultSubmit() {
+  const { pending } = useFormStatus();
+  return <button type="submit" tabIndex={-1} aria-hidden disabled={pending} className="sr-only" data-default-submit />;
+}
+
+/**
  * Aktionsleiste eines Formulars: Abbrechen, optional eine zweite Aktion („Speichern und weiter“) und die Hauptaktion. Sie klebt am unteren Rand der Seite, **solange das
  * Formular länger als der Bildschirm ist** (`position: sticky` in der Dokumentfolge, nicht `fixed`), rückt bei Touch-Geräten mit geöffneter Tastatur wieder in den Fluss
  * (nie über den Eingabefeldern) und hebt den Toast über sich (`data-form-actions` am Wurzelelement, siehe `.toast-viewport`).
@@ -434,6 +450,8 @@ export function FormActions({
     <div className={clsx("form-actions flex flex-col gap-2", className)}>
       <FormMessage />
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {/* Enter in einem Textfeld löst den **ersten** Absende-Knopf im Dokument aus: bei zwei Aktionen soll das die Hauptaktion sein, nicht „Speichern und weiter“ (steht aus Gründen der Reihenfolge davor) */}
+        {secondaryLabel ? <DefaultSubmit /> : null}
         {children ? <div className="mr-auto text-sm text-ink-muted">{children}</div> : null}
         {cancelHref ? <LinkButton href={cancelHref}>{t("common.cancel")}</LinkButton> : null}
         {secondaryLabel ? (

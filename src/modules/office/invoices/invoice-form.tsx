@@ -1,20 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useReducer } from "react";
 import { Checkbox, Field, FileInput, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { SearchCombobox, type SearchOption } from "@/components/ui/search-combobox";
 import { INVOICE_FILE_MAX_BYTES, INVOICE_STATUSES } from "@/modules/office/invoices/domain";
 import { useI18n } from "@/i18n/client";
-import { centsToInput, parseMoneyToCents } from "@/lib/money";
+import { amountsReducer, grossSuggestion } from "./amounts";
 import { saveInvoice } from "./actions";
-
-/** Brutto-Vorschlag aus Netto + MwSt. (Text im Eingabeformat, „“ wenn nicht berechenbar) */
-export function grossSuggestion(net: string, vat: string): string {
-  const n = parseMoneyToCents(net);
-  const v = vat.trim() === "" ? 0 : parseMoneyToCents(vat);
-  return n === null || v === null ? "" : centsToInput(n + v);
-}
 
 export type InvoiceFormInitial = {
   id?: string;
@@ -42,14 +35,9 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
   const { t, td, number } = useI18n();
   const outgoing = initial.direction === "outgoing";
   // Brutto aus Netto + MwSt. vorschlagen – solange Brutto nicht selbst eingegeben wurde
-  const [amounts, setAmounts] = useState({ net: initial.net, vat: initial.vat, gross: initial.gross });
-  const [grossTouched, setGrossTouched] = useState(initial.gross !== "");
+  const [amounts, change] = useReducer(amountsReducer, { net: initial.net, vat: initial.vat, gross: initial.gross, grossTouched: initial.gross !== "" });
+  const grossTouched = amounts.grossTouched;
   const suggested = grossSuggestion(amounts.net, amounts.vat);
-  const changeAmount = (field: "net" | "vat", value: string) => {
-    const next = { ...amounts, [field]: value };
-    const suggestion = grossSuggestion(next.net, next.vat);
-    setAmounts(!grossTouched && suggestion ? { ...next, gross: suggestion } : next);
-  };
 
   return (
     <Form action={saveInvoice} draftKey={`invoice:${initial.id ?? initial.direction}`} className="flex max-w-4xl flex-col gap-5">
@@ -86,10 +74,10 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
       <Card title={t("invoices.sections.amounts")}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("invoices.fields.net")} htmlFor="net" name="net">
-            <Input id="net" name="net" inputMode="decimal" value={amounts.net} onChange={(e) => changeAmount("net", e.target.value)} placeholder="0,00" />
+            <Input id="net" name="net" inputMode="decimal" value={amounts.net} onChange={(e) => change({ field: "net", value: e.target.value })} placeholder="0,00" />
           </Field>
           <Field label={t("invoices.fields.vat")} htmlFor="vat" name="vat">
-            <Input id="vat" name="vat" inputMode="decimal" value={amounts.vat} onChange={(e) => changeAmount("vat", e.target.value)} placeholder="0,00" />
+            <Input id="vat" name="vat" inputMode="decimal" value={amounts.vat} onChange={(e) => change({ field: "vat", value: e.target.value })} placeholder="0,00" />
           </Field>
           <Field label={t("invoices.fields.gross")} htmlFor="gross" name="gross" hint={!grossTouched && suggested ? t("invoices.fields.grossSuggested") : undefined} required>
             <Input
@@ -97,10 +85,7 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
               name="gross"
               inputMode="decimal"
               value={amounts.gross}
-              onChange={(e) => {
-                setGrossTouched(e.target.value !== "");
-                setAmounts({ ...amounts, gross: e.target.value });
-              }}
+              onChange={(e) => change({ field: "gross", value: e.target.value })}
               placeholder="0,00"
               required
             />

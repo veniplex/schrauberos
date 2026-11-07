@@ -38,7 +38,7 @@ describe("Touch-Fundament", () => {
     assert.match(ui("menu.tsx"), /min-h-\(--tap\) w-full/);
     assert.match(ui("segmented.tsx"), /min-h-\(--tap-sm\)/);
     // keine festen 32/36-px-Höhen mehr in den Bausteinen (außer dekorativen Platzhaltern)
-    for (const file of ["buttons.tsx", "menu.tsx", "segmented.tsx", "form.tsx"]) assert.doesNotMatch(ui(file), /\bmin-h-(8|9)\b|\bh-9\b/, `${file}: feste Höhe`);
+    for (const file of ["buttons.tsx", "menu.tsx", "segmented.tsx", "form-fields.tsx"]) assert.doesNotMatch(ui(file), /\bmin-h-(8|9)\b|\bh-9\b/, `${file}: feste Höhe`);
   });
 
   it("Kennzeichen und FIN: Großbuchstaben ohne Autokorrektur; Zahlenfelder bekommen die Zahlentastatur", () => {

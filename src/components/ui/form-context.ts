@@ -4,7 +4,7 @@ import { createContext, useContext } from "react";
 
 /**
  * Gemeinsamer Zustand zwischen `Form` (form-frame.tsx) und den Feldbausteinen (form.tsx): Rückgabe der Aktion (Feldfehler, Fehlermeldung), Wartezustand.
- * Eigene Datei, damit sich die beiden nicht gegenseitig importieren.
+ * Eigene Datei, die beide importieren (keine Importschleife zwischen Rahmen und Feldern).
  */
 export type FormState = {
   ok?: boolean;
@@ -43,3 +43,9 @@ export const useField = () => useContext(FieldContext);
 
 /** Id des Fehlertextes eines Feldes ohne eigenes `Field` (siehe `FormFieldError`) */
 export const formErrorId = (name: string) => `formerror-${name}`;
+
+/**
+ * Umfang der Entwürfe: die Person, der sie gehören (Benutzer-ID aus dem Anwendungsrahmen). Entwürfe anderer Personen werden nie wiederhergestellt und beim Öffnen
+ * eines Formulars verworfen. Ohne Anmeldung (Einrichtung, Anmeldeseite) leer.
+ */
+export const DraftScopeContext = createContext("");

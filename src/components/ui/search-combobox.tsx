@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Search, X } from "lucide-react";
 import { useI18n } from "@/i18n/client";
 import { Button } from "./buttons";
+import { DRAFT_STATE_EVENT } from "./form-draft";
 import { useField } from "./form-context";
 import { TextLink } from "./layout";
 
@@ -20,6 +21,7 @@ type Status = "idle" | "done" | "error";
  * - **Ladefehler** („Die Suche ist gerade nicht möglich“) statt stummem Nichts.
  * - **Keine Treffer:** mit `createHref` bietet die Liste „… neu anlegen“ an (der Suchtext geht als `?<createParam>=` mit).
  * - **Eigene Darstellung:** `renderOption`/`renderSelected` (z. B. Kennzeichen-Plakette für Fahrzeuge) – der Baustein bleibt derselbe.
+ * - **Entwurf:** Die Auswahl steht (samt Beschriftung) in einem unsichtbaren Zustandsfeld (`data-draft-state`); der Formular-Rahmen sichert und stellt sie damit wieder her.
  * - Id, Beschriftung und Fehlerzustand kommen vom umgebenden `Field`. Zeilen sind bei Touch mindestens 44 px hoch.
  */
 export function SearchCombobox<T extends SearchOption = SearchOption>({
@@ -100,6 +102,29 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
   const optionId = (index: number) => `${listId}-option-${index}`;
   const announcement = !showPopup ? "" : status === "error" ? t("common.searchUnavailable") : visible.length === 0 ? t("common.noResults") : tp("common.resultsCount", visible.length);
 
+  // Wiederherstellung eines Entwurfs: der Rahmen schickt den gemerkten Zustand (Auswahl als Text, leer = nichts gewählt) an das Zustandsfeld
+  const stateField = useCallback((element: HTMLInputElement | null) => {
+    if (!element) return;
+    const handler = (event: Event) => {
+      const text = String((event as CustomEvent<string>).detail ?? "");
+      let option: T | null = null;
+      try {
+        const parsed = text ? (JSON.parse(text) as Partial<T>) : null;
+        if (parsed && typeof parsed.id === "string" && typeof parsed.label === "string") option = parsed as T;
+      } catch {
+        /* unlesbar: keine Auswahl */
+      }
+      setSelected(option);
+      setQuery("");
+      setResults([]);
+      setStatus("idle");
+      setOpen(false);
+    };
+    element.addEventListener(DRAFT_STATE_EVENT, handler);
+    return () => element.removeEventListener(DRAFT_STATE_EVENT, handler);
+  }, []);
+  const stateInput = <input ref={stateField} type="hidden" data-draft-state={name} value={selected ? JSON.stringify(selected) : ""} readOnly />;
+
   function choose(option: T) {
     setSelected(option);
     setQuery("");
@@ -112,6 +137,7 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
     return (
       <div role="group" aria-labelledby={field?.labelId} aria-describedby={field?.describedBy} className="flex items-center justify-between gap-3 rounded-md border border-control bg-surface-2 px-3 py-1.5">
         <input type="hidden" name={name} value={selected.id} />
+        {stateInput}
         {renderSelected ? (
           <div className="min-w-0 text-sm">{renderSelected(selected)}</div>
         ) : (
@@ -144,6 +170,7 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
       }}
     >
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
+      {stateInput}
       <input
         ref={input}
         id={field?.id}
