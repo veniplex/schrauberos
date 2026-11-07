@@ -171,9 +171,10 @@ export type PrivacyProviderDef = {
  *  - `appointments/detail`: Knopf im Termin (Aufträge: „Auftrag aus Termin“),
  *  - `vehicles/detail`: Abschnitt (Karte) auf der Fahrzeugseite (Dokumente & Fotos, Checklisten),
  *  - `billing/items`: Werkzeug über dem Positionen-Editor eines Belegs der Rechnungserstellung (Teile & Lager: Artikel einfügen),
- *  - `invoices/detail`: Abschnitt (Karte) auf der Rechnungsseite des Archivs (Rechnungserstellung: Beleg öffnen, Zahlungen).
+ *  - `invoices/detail`: Abschnitt (Karte) auf der Rechnungsseite des Archivs (Rechnungserstellung: Beleg öffnen, Zahlungen),
+ *  - `customers/detail`: Abschnitt (Karte) auf der Kundenseite (Rechnungserstellung: neues Angebot, neue Rechnung für diesen Kunden).
  */
-export type SectionHost = "orders/detail" | "orders/items" | "orders/close" | "appointments/detail" | "vehicles/detail" | "invoices/detail" | "billing/items";
+export type SectionHost = "orders/detail" | "orders/items" | "orders/close" | "appointments/detail" | "vehicles/detail" | "invoices/detail" | "billing/items" | "customers/detail";
 
 /** Was ein Abschnitt vom Gastgeber bekommt: die Kennung der Sache (Auftrag, Termin) und die Sitzung. */
 export type SectionProps = { entityId: string; session: AppSession };

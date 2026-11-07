@@ -1,5 +1,5 @@
 import { LinkButton } from "@/components/ui/buttons";
-import { Card, StatusBadge, TextLink } from "@/components/ui/layout";
+import { Alert, Card, StatusBadge, TextLink } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { formatCents } from "@/lib/money";
@@ -33,12 +33,19 @@ async function ArchiveLink({ entityId, session }: SectionProps) {
  */
 async function OrderBilling({ entityId, session }: SectionProps) {
   const [{ t, td, locale }, ref, docs] = await Promise.all([getI18n(), orderRef(entityId), documentsOfOrder(entityId)]);
-  if (!ref || ref.restricted || ref.status === "cancelled") return null;
-  const canCreate = session.can("billing.edit") && session.can("orders.prices");
+  if (!ref || ref.restricted || (ref.status === "cancelled" && docs.length === 0)) return null;
+  const canCreate = ref.status !== "cancelled" && session.can("billing.edit") && session.can("orders.prices");
   if (docs.length === 0 && !canCreate) return null;
   const eur = (cents: number) => formatCents(cents, INTL_LOCALE[locale]);
+  // Ruhiger Hinweis (keine Sperre): Eine festgeschriebene Rechnung bleibt bestehen, auch wenn der Auftrag danach wieder geöffnet oder storniert wird – sie folgt dem Auftrag nicht
+  const issued = docs.filter((d) => d.finalizedAt && ["invoice", "partial", "final"].includes(d.docType) && d.status !== "cancelled");
   return (
     <Card title={t("billing.orderSection.title")}>
+      {issued.length > 0 ? (
+        <Alert tone="info" className="mb-3">
+          {t("billing.orderSection.issuedHint", { numbers: issued.map((d) => d.number).join(", ") })}
+        </Alert>
+      ) : null}
       {docs.length === 0 ? (
         <p className="text-sm text-ink-muted">{t("billing.orderSection.none")}</p>
       ) : (
@@ -67,7 +74,28 @@ async function OrderBilling({ entityId, session }: SectionProps) {
   );
 }
 
+/**
+ * Beitrag zur Kundenseite (`customers/detail`): neues Angebot bzw. neue Rechnung für diesen Kunden (der Empfänger ist vorbelegt, bei einer Schlussrechnung stehen seine Abschläge zur Wahl). Die Kundenseite
+ * zeigt den Abschnitt nicht für archivierte, eingeschränkte (Art. 18) und anonymisierte Kunden – für sie gibt es keine neuen Belege.
+ */
+async function CustomerBilling({ entityId }: SectionProps) {
+  const { t } = await getI18n();
+  return (
+    <Card title={t("billing.customerSection.title")}>
+      <div className="flex flex-wrap gap-2">
+        <LinkButton href={`/billing/new?type=offer&customer=${entityId}`} variant="secondary" size="sm">
+          {t("billing.quick.newOffer")}
+        </LinkButton>
+        <LinkButton href={`/billing/new?type=invoice&customer=${entityId}`} variant="secondary" size="sm">
+          {t("billing.quick.newInvoice")}
+        </LinkButton>
+      </div>
+    </Card>
+  );
+}
+
 export const sections: SectionDef[] = [
+  { id: "billing-customer", feature: "office.billing", host: "customers/detail", permission: "billing.edit", order: 50, uses: ["workshop.customers"], Component: CustomerBilling },
   { id: "billing-archive", feature: "office.billing", host: "invoices/detail", permission: "billing.view", order: 10, Component: ArchiveLink },
   { id: "billing-order", feature: "office.billing", host: "orders/detail", permission: "billing.view", order: 60, uses: ["workshop.orders"], Component: OrderBilling },
 ];

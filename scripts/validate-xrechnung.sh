@@ -35,6 +35,13 @@ if [ "${#files[@]}" -eq 0 ]; then
   exit 0
 fi
 
+# Mit XRECHNUNG_REQUIRE_SAMPLES=1 müssen die erwarteten Beispiele der Tests vorhanden sein – ein still übersprungener Test (oder ein umbenanntes Beispiel) soll das Gate nicht passieren, nur weil irgendeine Datei da ist.
+if [ "${XRECHNUNG_REQUIRE_SAMPLES:-0}" = "1" ]; then
+  for name in billing-invoice-mixed billing-invoice-small-business billing-partial billing-final billing-credit-note invoice-mixed-rates invoice-small-business credit-note partial-invoice final-invoice; do
+    [ -f "$samples/$name.xml" ] || { echo "Erwartetes Beispiel fehlt: $name.xml (wurde der Test übersprungen?)" >&2; exit 1; }
+  done
+fi
+
 command -v java >/dev/null || { echo "Java fehlt (ab Version 11 nötig)." >&2; exit 1; }
 mkdir -p "$work"
 

@@ -66,7 +66,7 @@ export const partsEn: typeof partsDe = {
     truncated: "Showing {shown} of {total} articles (sorted by article number). Book this stocktaking; count the remaining articles afterwards via \"Continue with the next articles\".",
     next: "Continue with the next articles",
   },
-  picker: { label: "Insert article", placeholder: "Article number or name …", hint: "Inserts a position with the article's name, sale price and tax rate; everything stays editable. Stock is booked when the order is closed." },
+  picker: { label: "Insert article", placeholder: "Article number or name …", hint: "Inserts a position with the article's name, sale price and tax rate; everything stays editable. Stock is booked when the order is closed.", hintBilling: "Inserts a position with the article's name, sale price and tax rate; everything stays editable. A document does not book stock - only the order does when it is closed." },
   consumed: {
     title: "Parts used",
     shortage_one: "Stock does not cover {count} article. The order can still be closed; stock then becomes negative.",

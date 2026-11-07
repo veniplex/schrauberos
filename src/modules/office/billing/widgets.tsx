@@ -38,7 +38,7 @@ export async function BillingWidget() {
       <div className="grid grid-cols-3 divide-x divide-line border-b border-line">
         {cell(t("billing.widgets.drafts"), String(stats.drafts), tp("billing.stats.count", stats.drafts), "/billing?status=draft")}
         {cell(t("billing.widgets.openOffers"), String(stats.openOffers), tp("billing.stats.count", stats.openOffers), "/billing?type=offer&status=open")}
-        {cell(t("billing.widgets.dueInvoices"), eur(stats.outstandingCents), stats.overdueCount ? `${stats.overdueCount} ${t("billing.widgets.overdue")}` : tp("billing.stats.count", stats.outstandingCount), "/billing?status=open")}
+        {cell(t("billing.widgets.dueInvoices"), eur(stats.outstandingCents), stats.overdueCount ? `${stats.overdueCount} ${t("billing.widgets.overdue")}` : tp("billing.stats.count", stats.outstandingCount), "/billing?status=unpaid")}
       </div>
       {rows.length === 0 ? (
         <EmptyState title={t("billing.widgets.none")} />

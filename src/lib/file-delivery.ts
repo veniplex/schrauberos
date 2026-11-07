@@ -71,3 +71,14 @@ export function deliveryHeaders(options: DeliveryOptions): Record<string, string
   if (options.size !== undefined) headers["Content-Length"] = String(options.size);
   return headers;
 }
+
+/**
+ * Fehlerantwort einer Dateiroute (401/403/404/422 …): reiner Text mit denselben Schutzköpfen wie die Auslieferung (`nosniff`, Sandbox-CSP, nicht speichern) – auch eine Fehlermeldung wird nie als Seite gedeutet.
+ * `extra`: zusätzliche Köpfe (z. B. `x-problems`).
+ */
+export function errorResponse(status: number, text: string, extra: Record<string, string> = {}): Response {
+  return new Response(text, {
+    status,
+    headers: { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store", "Content-Security-Policy": SANDBOX_CONTENT_SECURITY_POLICY, ...extra },
+  });
+}

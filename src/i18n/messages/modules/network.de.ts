@@ -147,7 +147,7 @@ export const networkDe = {
   cablingDescription: "Wer hängt an welchem Port? Standorte und Räume der Geräte.",
   tabs: { connections: "Verbindungen", locations: "Standorte" },
   connectionsEmpty: "Noch keine Verbindungen erfasst.",
-  connectionsEmptyHint: "Erfasse, welches Gerät an welchem Port eines Switches hängt.",
+  connectionsEmptyHint: "Erfassen, welches Gerät an welchem Port eines Switches hängt.",
   connectionsCount_one: "{count} Verbindung",
   connectionsCount_other: "{count} Verbindungen",
   connectionDeleteConfirm: "Verbindung löschen?",

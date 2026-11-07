@@ -64,7 +64,7 @@ export const partsDe = {
     truncated: "Angezeigt werden {shown} von {total} Artikeln (nach Artikelnummer sortiert). Diese Inventur wird für sich gebucht; die übrigen Artikel folgen über „Weiter mit den nächsten Artikeln“.",
     next: "Weiter mit den nächsten Artikeln",
   },
-  picker: { label: "Artikel einfügen", placeholder: "Artikelnummer oder Bezeichnung …", hint: "Fügt eine Position mit Bezeichnung, Verkaufspreis und Steuersatz des Artikels ein; alles bleibt änderbar. Gebucht wird beim Abschluss des Auftrags." },
+  picker: { label: "Artikel einfügen", placeholder: "Artikelnummer oder Bezeichnung …", hint: "Fügt eine Position mit Bezeichnung, Verkaufspreis und Steuersatz des Artikels ein; alles bleibt änderbar. Gebucht wird beim Abschluss des Auftrags.", hintBilling: "Fügt eine Position mit Bezeichnung, Verkaufspreis und Steuersatz des Artikels ein; alles bleibt änderbar. Ein Beleg bucht keinen Bestand – das tut nur der Auftrag beim Abschluss." },
   consumed: {
     title: "Verbrauchte Teile",
     shortage_one: "Für {count} Artikel reicht der Bestand nicht. Der Auftrag lässt sich trotzdem abschließen; der Bestand wird dann negativ.",

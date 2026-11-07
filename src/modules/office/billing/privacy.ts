@@ -20,7 +20,8 @@ export const privacyProviders: PrivacyProviderDef[] = [
         orderBy: [{ issueDate: "asc" }, { createdAt: "asc" }],
         select: {
           id: true, docType: true, number: true, partyName: true, partyStreet: true, partyZip: true, partyCity: true, buyerEmail: true, issueDate: true, finalizedAt: true, validUntil: true,
-          netCents: true, vatCents: true, grossCents: true, status: true, offerStatus: true, sentAt: true, introText: true, footerText: true,
+          netCents: true, vatCents: true, grossCents: true, status: true, offerStatus: true, sentAt: true, introText: true, footerText: true, vehicleLabel: true, mileageKm: true, buyerReference: true, taxNote: true,
+          payments: { orderBy: { paidAt: "asc" }, select: { note: true } },
           items: { orderBy: { position: "asc" }, select: { description: true, quantityMilli: true, unitCents: true } },
         },
       });
@@ -45,6 +46,11 @@ export const privacyProviders: PrivacyProviderDef[] = [
             field("status", "privacy.f.status", r.finalizedAt ? (r.offerStatus ?? r.status) : "draft"),
             field("items", "privacy.f.items", r.items.map((i) => `${i.description} (${i.quantityMilli / 1000} × ${(i.unitCents / 100).toFixed(2)} EUR)`).join("; ") || null),
             field("notes", "privacy.f.notes", [r.introText, r.footerText].filter(Boolean).join(" / ") || null),
+            field("vehicle", "privacy.f.vehicle", r.vehicleLabel),
+            field("mileageKm", "privacy.f.mileageKm", r.mileageKm == null ? null : String(r.mileageKm)),
+            field("buyerReference", "privacy.f.buyerReference", r.buyerReference),
+            field("taxNote", "privacy.f.taxNote", r.taxNote),
+            field("paymentNotes", "privacy.f.paymentNotes", r.payments.map((p) => p.note).filter(Boolean).join("; ") || null),
             dayField("sentAt", "privacy.f.sentAt", r.sentAt),
           ]),
         },

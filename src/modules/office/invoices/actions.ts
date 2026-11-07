@@ -28,7 +28,8 @@ export const deleteInvoice = defineAction(deleteInvoiceOperation, {
 export const finalizeInvoice = defineAction(finalizeInvoiceOperation, { revalidate: ({ id }) => paths(id), message: "invoices.flash.finalized" });
 
 export const cancelInvoice = defineAction(cancelInvoiceOperation, {
-  revalidate: ({ id, counterId }) => [...paths(id), ...paths(counterId)],
-  redirect: ({ counterId }) => `/invoices/${counterId}`,
+  revalidate: ({ id, counterId }) => [...paths(id), ...paths(counterId), "/billing", `/billing/${id}`, `/billing/${counterId}`],
+  // Belege der Rechnungserstellung bleiben dort (auf der Seite der Stornorechnung), solange die Funktion aktiv ist; sonst das Rechnungsarchiv
+  redirect: ({ counterId, fromBilling }, _input, principal) => (fromBilling && principal.features.has("office.billing") ? `/billing/${counterId}` : `/invoices/${counterId}`),
   message: "invoices.flash.cancelled",
 });

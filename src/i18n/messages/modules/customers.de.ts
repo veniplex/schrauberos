@@ -61,7 +61,7 @@ export const customersDe = {
   errors: {
     nameRequired: "Nachname oder Firma angeben.",
     numberExists: "Diese Kundennummer hat schon {name}.",
-    inUse: "Dieser Kunde kann nicht gelöscht werden: {vehicles} Fahrzeuge, {former} frühere Halterschaften (die Halter-Historie bleibt auch nach einem Halterwechsel bestehen), {invoices} Rechnungen, {orders} Aufträge (Aufträge werden nie gelöscht). Stattdessen archivieren: Der Kunde bleibt erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
+    inUse: "Dieser Kunde kann nicht gelöscht werden: {vehicles} Fahrzeuge, {former} frühere Halterschaften (die Halter-Historie bleibt auch nach einem Halterwechsel bestehen), {invoices} Rechnungen und Belege (auch Angebote und Entwürfe), {orders} Aufträge (Aufträge werden nie gelöscht). Stattdessen archivieren: Der Kunde bleibt erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
   },
   duplicate: {
     title: "Diese Kundennummer gibt es schon",

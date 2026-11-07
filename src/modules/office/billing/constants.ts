@@ -40,7 +40,7 @@ export const SMALL_AMOUNT_GROSS_CENTS = 25_000;
 export const SENT_FILES_DIR = "rechnungen/versand";
 
 /**
- * Frist (Tage nach dem Versand), nach der der Aufräumlauf die Anhänge **versendeter Angebote und Auftragsbestätigungen** vom Datenträger löst (`billing.sentFiles`). Rechnungen haben keine Frist:
+ * Frist (Tage nach dem Versand), nach der der Aufräumlauf die Anhänge **versendeter Angebote und Auftragsbestätigungen** vom Datenträger löst (`billing.sent-files`). Rechnungen haben keine Frist:
  * ihre Kopie „wie versendet“ bleibt, bis die Anonymisierung des Kunden sie freigibt (Aufbewahrungsfristen, Steuerberater).
  */
 export const SENT_QUOTE_FILES_KEEP_DAYS = 30;

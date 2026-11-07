@@ -7,7 +7,7 @@ import type { OperationHookDef } from "@/server/operations/hooks";
  *    **Name und Anschrift bleiben** (Pflichtangabe der Rechnung, Aufbewahrungsfrist – die Anonymisierung ist ohnehin erst nach Ablauf der Fristen freigegeben, `anonymizeBlock`),
  *  - das **Sendeprotokoll** (E-Mails zu Belegen des Kunden): Empfängeradresse, Betreff und Fehlercodes-freie Angaben werden unkenntlich gemacht, Inhalt und Anhänge entfallen; Zeitpunkt und Status bleiben.
  * Die Anhänge der versendeten Mails (PDF, XRechnung) liegen als Dateien im Dateispeicher; eine Datei lässt sich nicht in der Transaktion löschen. Der Hook setzt sie deshalb auf „jetzt fällig“
- *    (`InvoiceSentFile.purgeAfter`), der Aufräumlauf `billing.sentFiles` löst sie vom Datenträger (Backups behalten ihre Hardlinks bis zur eigenen Aufbewahrung).
+ *    (`InvoiceSentFile.purgeAfter`), der Aufräumlauf `billing.sent-files` löst sie vom Datenträger (Backups behalten ihre Hardlinks bis zur eigenen Aufbewahrung).
  */
 export const hooks: OperationHookDef[] = [
   {

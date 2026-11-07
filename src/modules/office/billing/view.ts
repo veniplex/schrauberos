@@ -164,9 +164,9 @@ export const viewPayable = (view: Pick<DocView, "totals" | "deductedCents">): nu
 
 /**
  * Die Prüfliste eines Entwurfs für die Detailseite – dieselbe Regel wie beim Festschreiben (`finalizeProblems`), gerechnet aus dem Ansichtsmodell (Entwurf: live aus dem Werkstattprofil).
- * Dazu die Fälle, die nur die Operation kennt: abgelaufene Angebotsgültigkeit, geänderte Kleinunternehmer-Einstellung seit dem Anlegen, zu hohe Abschläge.
+ * Dazu die Fälle, die nur die Operation kennt: abgelaufene Angebotsgültigkeit, geänderte Kleinunternehmer-Einstellung seit dem Anlegen, zu hohe Abschläge, eingeschränkter Kunde, nicht mehr anrechenbare Abschläge.
  */
-export function draftProblems(view: DocView, row: Pick<Invoice, "exempt" | "deductedCents">, today: string): string[] {
+export function draftProblems(view: DocView, row: Pick<Invoice, "exempt" | "deductedCents">, today: string, extra: { restricted?: boolean; invalidDeductions?: number } = {}): string[] {
   const problems = finalizeProblems({
     docType: view.docType,
     sender: { name: view.sender.name, street: view.sender.street, zip: view.sender.zip, city: view.sender.city, taxNumber: view.sender.taxNumber, vatId: view.sender.vatId, iban: view.sender.iban, smallBusiness: view.sender.smallBusiness },
@@ -185,5 +185,8 @@ export function draftProblems(view: DocView, row: Pick<Invoice, "exempt" | "dedu
   if (view.docType === "offer" && view.validUntil && view.validUntil < today) problems.push("validUntilPast");
   if (row.exempt !== view.exempt) problems.push("exemptChanged");
   if (view.docType === "final" && row.deductedCents > view.totals.grossCents) problems.push("deductionTooHigh");
+  // Fälle, die nur die Datenbank kennt: Kunde inzwischen eingeschränkt/anonymisiert (Art. 18); ein gewählter Abschlag ist nicht mehr anrechenbar (storniert, anderswo angerechnet)
+  if (extra.restricted) problems.push("restricted");
+  if (extra.invalidDeductions) problems.push("deduction");
   return problems;
 }

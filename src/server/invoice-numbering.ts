@@ -14,7 +14,8 @@ import { nextCounterValue } from "./counters";
  */
 type Client = Pick<PrismaClient | Prisma.TransactionClient, "counter" | "invoice">;
 
-export const MAX_SKIPS = 200;
+/** So viele aufeinanderfolgende vergebene Fremdnummern (z. B. aus dem CSV-Import) überspringt der Zähler, bevor er aufgibt. */
+export const MAX_SKIPS = 5000;
 export class NumberExhaustedError extends Error {
   constructor() {
     super("Nummernkreis: keine freie Nummer gefunden");

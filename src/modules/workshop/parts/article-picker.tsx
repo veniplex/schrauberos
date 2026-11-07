@@ -15,7 +15,7 @@ export type PickerOption = SearchOption & { name: string; unit: string; taxBp: n
  * änderbar), Art „Teil“, Verweis auf den Artikel. Der Editor kennt den Artikel nicht, er bekommt das Ereignis `LINE_ITEM_ADD_EVENT`. Ohne `parts.prices` kommt kein Preis mit (die Position
  * bleibt ohne Preis, der Preis wird von Hand eingetragen).
  */
-export function ArticlePicker({ editor = "items" }: { editor?: string }) {
+export function ArticlePicker({ editor = "items", context = "order" }: { editor?: string; /** `billing`: Positionen eines Angebots oder einer Rechnung – dort wird nichts gebucht */ context?: "order" | "billing" }) {
   const { t, locale } = useI18n();
   const [key, setKey] = useState(0);
 
@@ -40,7 +40,7 @@ export function ArticlePicker({ editor = "items" }: { editor?: string }) {
   }
 
   return (
-    <Field label={t("parts.picker.label")} hint={t("parts.picker.hint")}>
+    <Field label={t("parts.picker.label")} hint={t(context === "billing" ? "parts.picker.hintBilling" : "parts.picker.hint")}>
       <SearchCombobox<PickerOption>
         key={key}
         endpoint="/api/parts/search"

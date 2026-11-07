@@ -16,7 +16,7 @@ export const invoicesDe = {
   confirmDelete: "Rechnung {number} samt Beleg endgültig löschen?",
   searchPlaceholder: "Nummer, Partner, Kategorie, Ablageort …",
   empty: "Keine Rechnungen gefunden.",
-  emptyHint: "Erfasse die erste Rechnung oder passe Filter und Jahr an.",
+  emptyHint: "Die erste Rechnung erfassen oder Filter und Jahr anpassen.",
   newestShown: "die neuesten {count} werden angezeigt",
   count_one: "{count} Rechnung",
   count_other: "{count} Rechnungen",

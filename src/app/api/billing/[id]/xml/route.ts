@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server";
-import { deliveryHeaders } from "@/lib/file-delivery";
+import { deliveryHeaders, errorResponse } from "@/lib/file-delivery";
 import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { getSession } from "@/server/auth/session";
 import { buildDocumentXml, xrechnungProblems } from "@/modules/office/billing/xrechnung";
@@ -14,19 +14,19 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return new Response("Unauthorized", { status: 401 });
-  if (!session.can("billing.view")) return new Response("Forbidden", { status: 403 });
+  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return errorResponse(401, "Unauthorized");
+  if (!session.can("billing.view")) return errorResponse(403, "Forbidden");
 
   const { id } = await params;
   const loaded = await loadDocView(id);
-  if (!loaded) return new Response("Not found", { status: 404 });
+  if (!loaded) return errorResponse(404, "Not found");
   const problems = xrechnungProblems(loaded.view);
-  if (problems.length > 0) return new Response("Unprocessable", { status: 422, headers: { "x-problems": problems.join(","), "cache-control": "no-store" } });
+  if (problems.length > 0) return errorResponse(422, "Unprocessable", { "x-problems": problems.join(",") });
   try {
     const bytes = new TextEncoder().encode(buildDocumentXml(loaded.view));
     return new Response(bytes, { headers: deliveryHeaders({ mime: "application/xml", name: documentFileName(loaded.view.docType, loaded.view.number, "xml"), download: true, size: bytes.byteLength }) });
   } catch (error) {
-    if (error instanceof EinvoiceError) return new Response("Unprocessable", { status: 422, headers: { "x-problems": error.problems.join(","), "cache-control": "no-store" } });
+    if (error instanceof EinvoiceError) return errorResponse(422, "Unprocessable", { "x-problems": error.problems.join(",") });
     throw error;
   }
 }

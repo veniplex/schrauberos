@@ -397,6 +397,6 @@ export const cancelInvoiceOperation = defineOperation({
     }
     await tx.invoice.update({ where: { id: original.id }, data: { status: "cancelled" } });
     audit({ target: `${number} → ${original.number}`, entityId: original.id });
-    return { id: original.id, counterId: counter.id };
+    return { id: original.id, counterId: counter.id, fromBilling: billing };
   },
 });

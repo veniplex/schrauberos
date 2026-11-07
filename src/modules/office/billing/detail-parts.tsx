@@ -116,8 +116,8 @@ export function PartiesCard({ view, i18n, snapshot }: { view: DocView; i18n: I18
         <div className="text-sm">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">{t("billing.sections.sender")}</p>
           <strong className="block">{s.name}</strong>
-          {lines([s.street, [s.zip, s.city].filter(Boolean).join(" ") || null, s.taxNumber ? `Steuernummer ${s.taxNumber}` : null, s.vatId ? `USt-IdNr. ${s.vatId}` : null, s.iban ? `IBAN ${s.iban}` : null])}
-          {s.smallBusiness ? <span className="block text-ink-muted">§ 19 UStG</span> : null}
+          {lines([s.street, [s.zip, s.city].filter(Boolean).join(" ") || null, s.taxNumber ? `${t("billing.fields.taxNumber")} ${s.taxNumber}` : null, s.vatId ? `${t("billing.fields.vatId")} ${s.vatId}` : null, s.iban ? `${t("billing.fields.iban")} ${s.iban}` : null])}
+          {s.smallBusiness ? <span className="block text-ink-muted">{t("billing.fields.smallBusiness")}</span> : null}
         </div>
       </div>
       {snapshot ? <p className="mt-3 text-xs text-ink-muted">{t("billing.snapshotHint")}</p> : null}
@@ -144,7 +144,7 @@ export function FactsCard({ view, i18n, extra }: { view: DocView; i18n: I18n; ex
                 { label: t("billing.fields.buyerReference"), value: view.buyerReference },
               ]
             : []),
-          { label: t("billing.fields.vehicle"), value: view.vehicleLabel ? `${view.vehicleLabel}${view.mileageKm != null ? ` · ${view.mileageKm.toLocaleString("de-DE")} km` : ""}` : null },
+          { label: t("billing.fields.vehicle"), value: view.vehicleLabel ? `${view.vehicleLabel}${view.mileageKm != null ? ` · ${i18n.number(view.mileageKm)} km` : ""}` : null },
           ...(extra ?? []),
         ]}
       />
@@ -292,7 +292,9 @@ export function SendCard({
         <p className="text-sm text-ink-muted">{t("billing.send.notConfigured")}</p>
       ) : !to ? (
         <p className="text-sm text-ink-muted">{t("billing.send.noEmail")}</p>
-      ) : !canSend ? null : (
+      ) : !canSend ? (
+        <p className="text-sm text-ink-muted">{t("billing.send.noPermission")}</p>
+      ) : (
         <form action={sendDocument} className="flex flex-col gap-3">
           <input type="hidden" name="id" value={docId} />
           <p className="text-sm">

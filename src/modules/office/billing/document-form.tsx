@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Checkbox, Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { LineItemEditor, type LineItemInitial } from "@/components/ui/line-item-editor";
@@ -39,7 +39,7 @@ export type DeductionCandidate = { id: string; label: string; checked: boolean }
 /**
  * Formular eines Entwurfs (Angebot, Rechnung, Abschlags- oder Schlussrechnung): Empfänger, Daten je Belegart, Fahrzeug, Texte und die Positionen im Positionen-Editor
  * (rechnet im Browser nach derselben Regel wie der Server; der Server glaubt nur die Eingaben). `exempt`: Kleinunternehmer – der Editor rechnet ohne Steuer. `tools` ist der Platz für Werkzeuge anderer
- * Funktionen (Artikel einfügen). Leere Empfängerfelder werden beim Speichern aus dem gewählten Kunden übernommen.
+ * Funktionen (Artikel einfügen). Leere Empfängerfelder werden beim Speichern aus dem gewählten Kunden übernommen; beim Wechsel des Kunden eines gespeicherten Entwurfs alle.
  */
 export function DocumentForm({
   initial,
@@ -60,6 +60,28 @@ export function DocumentForm({
   cancelHref: string;
 }) {
   const { t, td } = useI18n();
+  // Abschläge: bei einer Schlussrechnung hängen sie am Kunden – wechselt die Auswahl, werden sie für den neuen Kunden nachgeladen
+  const [options, setOptions] = useState<readonly DeductionCandidate[]>(candidates);
+  const [hasCustomer, setHasCustomer] = useState(Boolean(initial.customer));
+  const [loadFailed, setLoadFailed] = useState(false);
+  const pickCustomer = useCallback(
+    (option: { id: string } | null) => {
+      setHasCustomer(option !== null);
+      if (initial.docType !== "final") return;
+      if (!option) {
+        setOptions([]);
+        return;
+      }
+      fetch(`/api/billing/deductions?customer=${encodeURIComponent(option.id)}`)
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("deductions"))))
+        .then((body: { results: DeductionCandidate[] }) => {
+          setLoadFailed(false);
+          setOptions(body.results);
+        })
+        .catch(() => setLoadFailed(true));
+    },
+    [initial.docType],
+  );
   const invoiceLike = initial.docType === "invoice" || initial.docType === "partial" || initial.docType === "final";
   const kinds = ITEM_KINDS.map((value) => ({ value, label: td(`billing.kinds.${value}`, value) }));
 
@@ -78,7 +100,7 @@ export function DocumentForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {canPickCustomer ? (
             <Field label={t("billing.fields.customer")} name="customerId" hint={t("billing.fields.customerHint")} className="sm:col-span-2">
-              <SearchCombobox endpoint="/api/customers/search" name="customerId" initial={initial.customer} placeholder={t("customers.searchPlaceholder")} />
+              <SearchCombobox endpoint="/api/customers/search" name="customerId" initial={initial.customer} placeholder={t("customers.searchPlaceholder")} onChange={pickCustomer} />
             </Field>
           ) : null}
           <Field label={t("billing.fields.partyName")} htmlFor="partyName" name="partyName" className="sm:col-span-2">
@@ -150,11 +172,12 @@ export function DocumentForm({
       {initial.docType === "final" ? (
         <Card title={t("billing.sections.deductions")}>
           <p className="mb-3 text-sm text-ink-muted">{t("billing.deductions.hint")}</p>
-          {candidates.length === 0 ? (
-            <p className="text-sm text-ink-muted">{initial.customer ? t("billing.deductions.none") : t("billing.deductions.needCustomer")}</p>
+          {loadFailed ? <p className="text-sm text-danger-ink" role="status">{t("billing.deductions.loadFailed")}</p> : null}
+          {options.length === 0 ? (
+            <p className="text-sm text-ink-muted">{hasCustomer ? t("billing.deductions.none") : t("billing.deductions.needCustomer")}</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {candidates.map((c) => (
+              {options.map((c) => (
                 <li key={c.id}>
                   <Checkbox name="deductPartialIds" value={c.id} defaultChecked={c.checked} label={c.label} />
                 </li>

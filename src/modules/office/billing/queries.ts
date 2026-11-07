@@ -34,7 +34,7 @@ export function billingTextWhere(term: string): Prisma.InvoiceWhereInput[] {
   return [{ number: contains(term) }, keyContains("partyKey", term), { vehicleLabel: contains(term) }, { buyerReference: contains(term) }];
 }
 
-export const BILLING_STATUS_FILTERS = ["all", "draft", "issued", "open", "paid", "accepted", "rejected"] as const;
+export const BILLING_STATUS_FILTERS = ["all", "draft", "issued", "open", "unpaid", "paid", "accepted", "rejected"] as const;
 export type BillingStatusFilter = (typeof BILLING_STATUS_FILTERS)[number];
 export const BILLING_TYPE_FILTERS = ["all", "offer", "confirmation", "invoice", "partial", "final", "credit"] as const;
 export type BillingTypeFilter = (typeof BILLING_TYPE_FILTERS)[number];
@@ -60,6 +60,10 @@ export function billingListWhere(filters: BillingListFilters): Prisma.InvoiceWhe
       break;
     case "open":
       and.push({ finalizedAt: { not: null }, OR: [{ docType: { in: [...INVOICE_TYPES] }, status: "open" }, { docType: "offer", offerStatus: "open" }] });
+      break;
+    case "unpaid":
+      // offene Rechnungen (noch zu zahlen), ohne Angebote – die Zahl des Dashboards
+      and.push({ finalizedAt: { not: null }, docType: { in: ["invoice", "partial", "final"] }, status: "open" });
       break;
     case "paid":
       and.push({ docType: { in: [...INVOICE_TYPES] }, status: "paid" });
@@ -130,5 +134,12 @@ export async function documentDetail(id: string) {
   const original = row.cancelsInvoiceId ? await db.invoice.findUnique({ where: { id: row.cancelsInvoiceId }, select: { id: true } }) : null;
   // Ein Abschlag, den eine festgeschriebene Schlussrechnung anrechnet, lässt sich nicht stornieren (erst die Schlussrechnung)
   const deductedInFinal = (await db.invoiceDeduction.count({ where: { partialId: id, finalKey: { not: null } } })) > 0;
-  return { view, row, payments, derived, counter, restricted, sendTo, originalId: original?.id ?? null, deductedInFinal };
+  // Entwurf einer Schlussrechnung: wie viele der gewählten Abschläge sich nicht mehr anrechnen lassen (storniert, anderswo angerechnet) – die Prüfliste nennt es, statt dass erst das Festschreiben scheitert
+  let invalidDeductions = 0;
+  if (view.draft && view.docType === "final") {
+    const chosen = row.deductions.map((d) => d.partialId);
+    const valid = chosen.length === 0 ? 0 : await db.invoice.count({ where: { id: { in: chosen }, source: "billing", docType: "partial", customerId: row.customerId, finalizedAt: { not: null }, status: { not: "cancelled" }, cancelledBy: null, deductedIn: { none: { finalKey: { not: null }, finalId: { not: id } } } } });
+    invalidDeductions = chosen.length - valid;
+  }
+  return { view, row, payments, derived, counter, restricted, sendTo, originalId: original?.id ?? null, deductedInFinal, invalidDeductions };
 }

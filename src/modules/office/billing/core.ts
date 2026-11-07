@@ -11,6 +11,12 @@ import type { FinalizeCheckInput } from "./domain";
  * Schnappschuss von Absender und Empfänger bilden.
  */
 
+/**
+ * Steuerzeichen (außer Tabulator und Zeilenumbruch), DEL, C1 und die Umkehrzeichen (Bidi: U+202A–U+202E, U+2066–U+2069) aus Texten, die auf Beleg, PDF und XML landen: ein Umkehrzeichen in einem Namen
+ * würde Beträge und Namen im Beleg optisch vertauschen; U+0000 hat in der Datenbank nichts zu suchen.
+ */
+export const stripControl = (value: string): string => value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f‪-‮⁦-⁩]/g, "");
+
 export type ItemInput = z.output<ReturnType<typeof lineItemsSchema>>[number];
 
 /** Das Werkstattprofil (Singleton); fehlt die Zeile, entsteht sie mit den Standardwerten (wie `getWorkshop()`, aber in der Transaktion). */
@@ -32,8 +38,8 @@ export function normalizeItems(items: readonly ItemInput[], exempt: boolean) {
   return items.map((item, position) => ({
     position,
     kind: item.kind || "labor",
-    description: item.description,
-    unit: item.unit ?? "",
+    description: stripControl(item.description),
+    unit: stripControl(item.unit ?? ""),
     quantityMilli: item.quantityMilli,
     unitCents: item.unitCents,
     taxBp: exempt ? 0 : item.taxBp,

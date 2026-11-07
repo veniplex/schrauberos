@@ -36,7 +36,7 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
   const { t, td } = i18n;
   const detail = await documentDetail(id);
   if (!detail) notFound();
-  const { view, row, payments, derived, counter, restricted, sendTo, originalId, deductedInFinal } = detail;
+  const { view, row, payments, derived, counter, restricted, sendTo, originalId, deductedInFinal, invalidDeductions } = detail;
 
   const draft = isDraft(row);
   const invoiceLike = isInvoiceType(view.docType);
@@ -46,7 +46,7 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
   const typeName = td(`billing.types.${view.docType}`, view.docType);
   const title = draft ? `${typeName} (${t("billing.status.draft")})` : `${typeName} ${view.number}`;
 
-  const problems = draft ? draftProblems(view, row, todayKey()) : [];
+  const problems = draft ? draftProblems(view, row, todayKey(), { restricted, invalidDeductions }) : [];
   const xmlProblems = invoiceLike ? xrechnungProblems(view) : [];
   const canFinalize = quote ? canEdit : session.can("invoices.finalize");
   const state = isOffer && !draft ? offerState(row) : null;
@@ -82,7 +82,7 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
             {row.customerId && session.can("customers.view") ? <TextLink href={`/customers/${row.customerId}`}>{t("billing.fields.customer")}</TextLink> : null}
             {originalId ? <TextLink href={`/billing/${originalId}`}>{t("billing.links.cancelOf", { number: view.cancels?.number ?? "" })}</TextLink> : null}
             {counter ? <TextLink href={`/billing/${counter.id}`}>{t("billing.links.cancelledBy", { number: counter.number })}</TextLink> : null}
-            {!draft && invoiceLike ? <TextLink href={`/invoices/${row.id}`}>{t("billing.links.archive")}</TextLink> : null}
+            {!draft && invoiceLike && session.can("invoices.view") ? <TextLink href={`/invoices/${row.id}`}>{t("billing.links.archive")}</TextLink> : null}
           </span>
         }
         actions={
@@ -237,6 +237,7 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
             <DangerZone title={t("common.dangerZone")}>
               <form action={deleteDraft}>
                 <input type="hidden" name="id" value={row.id} />
+                <input type="hidden" name="version" value={version} />
                 <ConfirmSubmitButton message={t("billing.confirm.delete")}>{t("billing.actions.delete")}</ConfirmSubmitButton>
               </form>
             </DangerZone>

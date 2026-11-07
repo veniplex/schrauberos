@@ -17,7 +17,7 @@ import { defineOperation, fail, failField, mapPrismaError, OperationError, type 
 import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { getWorkshop } from "@/server/workshop";
 import { CREATABLE_TYPES, OFFER_VALIDITY_DAYS, PAYMENT_METHODS, SENT_FILES_DIR, SENT_QUOTE_FILES_KEEP_DAYS, isInvoiceType, isQuoteType } from "./constants";
-import { amountColumns, assertCustomerUsable, checkInputOf, findLinkableCustomer, itemInputOf, loadWorkshop, normalizeItems, replaceItems, snapshotColumns, totalsOf } from "./core";
+import { amountColumns, assertCustomerUsable, stripControl, checkInputOf, findLinkableCustomer, itemInputOf, loadWorkshop, normalizeItems, replaceItems, snapshotColumns, totalsOf } from "./core";
 import { dueDayKey, finalizeProblems, isDraft, mailContent, documentFileName, docTitle, remainingCents, statusAfterPayments } from "./domain";
 import { loadDocView } from "./queries";
 import { viewPayable } from "./view";
@@ -31,7 +31,7 @@ import { viewPayable } from "./view";
  */
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const text = (max: number) => z.string().trim().max(max).optional();
+const text = (max: number) => z.string().max(max * 2).transform(stripControl).pipe(z.string().trim().max(max)).optional();
 const idInput = z.object({ id: z.string().min(1) });
 
 const who = (principal: { user: { name: string } }) => principal.user.name.slice(0, 120);
@@ -197,11 +197,13 @@ export const saveDraftOperation = defineOperation({
 export const deleteDraftOperation = defineOperation({
   name: "billing.delete",
   permission: "billing.edit",
-  input: idInput,
+  input: idInput.extend({ version: z.string().optional() }),
   audit: "billing.delete",
   run: async ({ input, tx, audit }) => {
     const doc = await billingDoc(tx, input.id);
     if (!isDraft(doc)) fail("inUse", "billing.errors.notDraft");
+    // Wer löscht, hat den Stand gesehen: wurde der Entwurf inzwischen geändert, nicht stillschweigend wegwerfen (ohne Version – API, ältere Formulare – wie bisher)
+    if (input.version !== undefined && !(await claimRow(tx.invoice, doc.id, input.version))) fail("conflict");
     await tx.invoice.delete({ where: { id: doc.id } });
     audit({ target: labelOf(doc.docType, ""), entityId: doc.id });
     return { id: doc.id };

@@ -10,6 +10,7 @@ import { getI18n } from "@/i18n/server";
 import { customerDisplayName, customerHasLinks, formerOwnerships } from "@/modules/workshop/customers/domain";
 import { toDateInput } from "@/lib/dates";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
+import { PageSections } from "@/modules/page-sections";
 import { customerTitle, getCustomerDetail } from "@/modules/workshop/customers/queries";
 import { archiveCustomer, deleteCustomer, unarchiveCustomer } from "@/modules/workshop/customers/actions";
 import { PrivacyNotice, PrivacyPanel } from "@/modules/workshop/customers/privacy-panel";
@@ -164,6 +165,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               ]}
             />
           </Card>
+          {customer.archivedAt || customer.processingRestrictedAt || customer.anonymizedAt ? null : <PageSections session={session} host="customers/detail" entityId={customer.id} />}
           <PrivacyPanel session={session} customer={customer} />
           <ArchivePanel
             id={customer.id}

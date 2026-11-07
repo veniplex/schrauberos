@@ -14,6 +14,10 @@ const DU = /\b(du|dir|dich|dein|deine|deinen|deinem|deiner|deines)\b/i;
 /** „Legen Sie …“, „stellen Sie …“: Verb, dann „Sie“ (ein Satzanfang „Sie wird …“ meint die/sie und ist erlaubt) */
 const SIE_IMPERATIVE = /\b[A-Za-zÄÖÜäöüß]+(?:en|et) Sie\b/;
 const IHR = /\bIhr(?:e|en|em|er|es)?\b/;
+/** „… wenn Sie das Angebot erneuern“: „Sie“ nach einer unterordnenden Konjunktion (nicht der Satzanfang „Sie wird …“) */
+const SIE_CLAUSE = /\b(?:wenn|dass|ob|falls|sobald|damit|weil|bevor|nachdem|solange|wie|was|wann|bis) Sie\b/;
+/** Ein Text, der mit einem Imperativ der Du-Form beginnt („Lege ein Angebot an …“) */
+const DU_IMPERATIVE = /:\s*"(?:Lege|Passe|Wähle|Gib|Trage|Klicke|Schreibe|Prüfe|Starte|Speichere|Öffne|Füge|Erfasse|Erstelle|Nimm|Gehe|Probiere|Versuche|Melde|Setze|Verwende|Beachte|Achte|Lösche|Ändere|Ergänze)\b/;
 
 describe("Anrede", () => {
   const ui = walk(path.join(root, "src/i18n/messages"), /\.de\.ts$|^de\.ts$/);
@@ -23,7 +27,7 @@ describe("Anrede", () => {
   for (const file of ui) {
     it(`Oberfläche ${path.relative(root, file).split(path.sep).join("/")}: Nennform`, () => {
       const lines = readFileSync(file, "utf8").split("\n");
-      const bad = lines.flatMap((line, i) => (/^\s*\/\//.test(line) ? [] : [DU, SIE_IMPERATIVE, IHR].some((re) => re.test(line)) ? [`${i + 1}: ${line.trim().slice(0, 120)}`] : []));
+      const bad = lines.flatMap((line, i) => (/^\s*\/\//.test(line) ? [] : [DU, SIE_IMPERATIVE, IHR, SIE_CLAUSE, DU_IMPERATIVE].some((re) => re.test(line)) ? [`${i + 1}: ${line.trim().slice(0, 120)}`] : []));
       assert.deepEqual(bad, []);
     });
   }

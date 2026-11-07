@@ -999,3 +999,144 @@ describe("Fix-Runde 12d: versendete Anhänge", () => {
     }
   });
 });
+
+describe("Fix-Runde 12d: Eingaben, Löschen, Prüfliste, Auskunft", () => {
+  it("Umkehr- und Steuerzeichen werden aus Namen und Positionen entfernt (Zeilenumbrüche in Texten bleiben)", async () => {
+    const session = await sessionFor(EDIT);
+    const rlo = String.fromCharCode(0x202e);
+    const nul = String.fromCharCode(0);
+    const id = await draft(session, { partyName: `Mustermann${rlo} GmbH${nul}`, introText: `Zeile 1\nZeile 2${rlo}`, items: items([{ description: `Öl${rlo}wechsel${nul}` }]) });
+    const row = await fresh(id);
+    assert.equal(row.partyName, "Mustermann GmbH");
+    assert.equal(row.introText, "Zeile 1\nZeile 2");
+    assert.equal((await env.db.invoiceItem.findFirstOrThrow({ where: { invoiceId: id } })).description, "Ölwechsel");
+  });
+
+  it("Entwurf löschen: eine veraltete Version wird nicht stillschweigend weggeworfen", async () => {
+    const session = await sessionFor(EDIT);
+    const id = await draft(session);
+    const stale = versionOf(await fresh(id));
+    const saved = await ops.saveDraftOperation.execute(session, { id, version: stale, customerId, items: items([{ description: "Geändert" }]) });
+    assert.ok(saved.ok);
+    assert.equal(failureOf(await ops.deleteDraftOperation.execute(session, { id, version: stale })).code, "conflict");
+    assert.equal(await env.db.invoice.count({ where: { id } }), 1);
+    assert.ok((await ops.deleteDraftOperation.execute(session, { id, version: versionOf(await fresh(id)) })).ok);
+  });
+
+  it("die Prüfliste nennt einen eingeschränkten Kunden und einen nicht mehr anrechenbaren Abschlag, bevor das Festschreiben scheitert", async () => {
+    const session = await sessionFor(FINALIZE);
+    const partial = await ops.saveDraftOperation.execute(session, { docType: "partial", customerId, items: items([{ unitCents: 5000 }]), serviceFrom: todayInput() });
+    assert.ok(partial.ok);
+    assert.ok((await finalize(session, partial.data.id)).ok);
+    const finalDraft = await draft(session, { docType: "final", deductPartialIds: [partial.data.id], items: items([{ unitCents: 20000 }]) });
+    assert.deepEqual((await queries.documentDetail(finalDraft))!.invalidDeductions, 0);
+    // der Abschlag wird storniert, solange die Schlussrechnung noch Entwurf ist
+    assert.ok((await invoiceOps.cancelInvoiceOperation.execute(session, { id: partial.data.id, version: versionOf(await fresh(partial.data.id)) })).ok);
+    const detail = (await queries.documentDetail(finalDraft))!;
+    assert.equal(detail.invalidDeductions, 1);
+    const { draftProblems } = await import("./view");
+    assert.ok(draftProblems(detail.view, detail.row, todayInput(), { restricted: detail.restricted, invalidDeductions: detail.invalidDeductions }).includes("deduction"));
+    await env.db.customer.update({ where: { id: customerId }, data: { processingRestrictedAt: new Date() } });
+    const restricted = (await queries.documentDetail(finalDraft))!;
+    assert.ok(draftProblems(restricted.view, restricted.row, todayInput(), { restricted: restricted.restricted }).includes("restricted"));
+  });
+
+  it("die Auskunft nennt auch Fahrzeug, Kilometerstand, Käuferreferenz, Steuerhinweis und Zahlungsnotizen", async () => {
+    const { privacyProviders } = await import("./privacy");
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session, { buyerReference: "LEIT-99", taxNote: "Steuerfrei nach § 4", mileageKm: 12345 });
+    assert.ok((await ops.addPaymentOperation.execute(session, { id, amount: "10,00", note: "Anzahlung bar" })).ok);
+    const sections = await privacyProviders[0].collect({ id: customerId, terms: [] });
+    const text = JSON.stringify(sections);
+    for (const needle of ["LEIT-99", "Steuerfrei nach § 4", "12345", "Anzahlung bar"]) assert.ok(text.includes(needle), needle);
+  });
+
+  it("der Statusfilter „unbezahlt“ zeigt nur offene Rechnungen, keine Angebote", async () => {
+    const session = await sessionFor(FINALIZE);
+    const invoice = await finalized(session);
+    const offer = await ops.saveDraftOperation.execute(session, { docType: "offer", customerId, items: items() });
+    assert.ok(offer.ok);
+    assert.ok((await ops.issueDocumentOperation.execute(session, { id: offer.data.id, version: versionOf(await fresh(offer.data.id)) })).ok);
+    const ids = (await env.db.invoice.findMany({ where: queries.billingListWhere({ q: "", type: "all", status: "unpaid" }), select: { id: true } })).map((r) => r.id);
+    assert.deepEqual(ids, [invoice]);
+  });
+
+  it("das Löschen eines Fahrzeugs mit Angebot oder Rechnung wird abgelehnt (mit Zählung)", async () => {
+    const { deleteVehicleOperation } = await import("@/modules/workshop/vehicles/operations");
+    const session = await sessionFor([...EDIT, "vehicles.delete"]);
+    const vehicle = await env.db.vehicle.create({ data: { plate: "B-DL 1", plateNorm: "BDL1", customerId } });
+    const lone = await env.db.vehicle.create({ data: { plate: "B-DL 2", plateNorm: "BDL2" } });
+    const offer = await ops.saveDraftOperation.execute(session, { docType: "offer", vehicleId: vehicle.id, customerId, items: items() });
+    assert.ok(offer.ok, JSON.stringify(!offer.ok && offer.failure));
+    const refused = failureOf(await deleteVehicleOperation.execute(session, { id: vehicle.id }));
+    assert.equal(refused.code, "inUse");
+    assert.equal(refused.key, "vehicles.errors.inUse");
+    assert.equal(await env.db.vehicle.count({ where: { id: vehicle.id } }), 1);
+    assert.ok((await deleteVehicleOperation.execute(session, { id: lone.id })).ok, "ohne Beleg löschbar");
+  });
+});
+
+describe("Fix-Runde 12d: Seiten und Routen", () => {
+  it("die Route der Abschläge liefert nur anrechenbare Abschläge eines neu verknüpfbaren Kunden und braucht billing.edit", async () => {
+    const route = await import("@/app/api/billing/deductions/route");
+    const session = await sessionFor(FINALIZE);
+    const partial = await ops.saveDraftOperation.execute(session, { docType: "partial", customerId, items: items([{ unitCents: 5000 }]), serviceFrom: todayInput() });
+    assert.ok(partial.ok);
+    assert.ok((await finalize(session, partial.data.id)).ok);
+    const call = async (customer: string) => {
+      const response = await route.GET({ nextUrl: new URL(`http://localhost/api/billing/deductions?customer=${customer}`) } as never);
+      return { status: response.status, body: (await response.json()) as { results?: Array<{ id: string; label: string; checked: boolean }> } };
+    };
+    env.signOut();
+    assert.equal((await call(customerId)).status, 401);
+    await env.signIn(await env.user({ username: `d-${Math.random().toString(36).slice(2)}`, roles: [await env.role({ permissions: ["billing.view"] })] }));
+    assert.equal((await call(customerId)).status, 403);
+    env.signOut();
+    await env.signIn(await env.user({ username: `e-${Math.random().toString(36).slice(2)}`, roles: [await env.role({ permissions: EDIT })] }));
+    const ok = await call(customerId);
+    assert.deepEqual(ok.body.results?.map((r) => r.id), [partial.data.id]);
+    assert.match(ok.body.results![0].label, new RegExp(`${YEAR}-0001`));
+    assert.deepEqual((await call("gibt-es-nicht")).body.results, []);
+    await env.db.customer.update({ where: { id: customerId }, data: { processingRestrictedAt: new Date() } });
+    assert.deepEqual((await call(customerId)).body.results, [], "eingeschränkte Kunden: keine neuen Verknüpfungen");
+  });
+
+  it("Fehlerantworten der Dateirouten tragen Schutzköpfe", async () => {
+    const { errorResponse } = await import("@/lib/file-delivery");
+    const response = errorResponse(404, "Not found");
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.match(response.headers.get("content-type") ?? "", /^text\/plain/);
+    assert.ok(response.headers.get("content-security-policy"));
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  });
+
+  it("der Auftragsabschnitt weist auf eine festgeschriebene Rechnung hin, und die Kundenseite bietet neue Belege nur für zulässige Kunden", async () => {
+    const { sections } = await import("./sections");
+    const session = await sessionFor([...FINALIZE, "orders.view", "orders.prices", "orders.create", "orders.edit"]);
+    const vehicle = await env.db.vehicle.create({ data: { plate: "B-HN 1", plateNorm: "BHN1", customerId } });
+    const order = await env.db.order.create({ data: { number: "A-HN-1", vehicleId: vehicle.id, customerId, status: "picked_up", closedAt: new Date(), createdByName: "t" } });
+    await env.db.invoice.create({ data: { source: "billing", direction: "outgoing", docType: "invoice", number: `${YEAR}-0042`, outgoingKey: `${YEAR}-0042`, partyName: "Max Mustermann", partyKey: "max mustermann", customerId, issueDate: new Date(), grossCents: 11900, finalizedAt: new Date(), finalizedByName: "t", orderId: order.id } });
+    const orderSection = sections.find((s) => s.id === "billing-order")!;
+    const element = await orderSection.Component({ entityId: order.id, session });
+    const { resolveServerTree } = await import("@/test/server-tree");
+    const tree = JSON.stringify(await resolveServerTree(element as never));
+    assert.ok(tree.includes(`${YEAR}-0042`) && tree.includes("bleibt bestehen"), "Hinweis mit Rechnungsnummer");
+    assert.ok(sections.some((s) => s.id === "billing-customer" && s.host === "customers/detail" && s.permission === "billing.edit"));
+  });
+});
+
+describe("Fix-Runde 12d: Meldung bei Feldfehlern ohne Formularzustand", () => {
+  it("das Zahlungsformular meldet den konkreten Fehler („Betrag höher als offen“), nicht nur „Ungültiger Wert.“", async () => {
+    const { form } = await import("@/test/harness");
+    const { decodeFlash } = await import("@/server/operations/flash");
+    const actions = await import("./actions");
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session);
+    env.browser.reset();
+    await env.signIn(await env.user({ username: `f-${Math.random().toString(36).slice(2)}`, roles: [await env.role({ permissions: FINALIZE })] }));
+    await actions.addPayment(form({ id, amount: "9999,00" }));
+    const write = env.browser.writes.filter((w) => w.name === "so_flash").at(-1);
+    assert.equal(decodeFlash(write!.value)?.key, "billing.errors.overpaid");
+    assert.equal(await env.db.invoicePayment.count(), 0);
+  });
+});
