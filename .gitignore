@@ -64,3 +64,5 @@ next-env.d.ts
 
 # Starter: Testbauten (docker/test)
 /docker/test/build/
+
+.lighthouseci

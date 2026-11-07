@@ -361,7 +361,7 @@ function WeekStrip({ ctx, week, view, counts }: { ctx: Ctx; week: Date[]; view: 
   return (
     <nav
       aria-label={i18n.t("appointments.weekDays")}
-      className="sticky top-(--sticky-top) z-20 -mx-4 border-b border-line bg-bg/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6"
+      className="sticky top-(--sticky-top) z-20 -mx-4 border-b border-line glass-bar [--glass:var(--bg)] px-4 py-2 sm:-mx-6 sm:px-6"
     >
       <ul className="flex gap-1 overflow-x-auto">
         {week.map((d, i) => {
@@ -523,7 +523,7 @@ export function ListView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
       {[...groups.entries()].map(([key, items]) => (
         <section key={key} aria-labelledby={`day-${key}`}>
           {/* klebt unter der Kopfzeile, solange man durch die Karten des Tages scrollt */}
-          <h3 id={`day-${key}`} className="sticky top-(--sticky-top) z-20 -mx-4 bg-bg/95 px-4 py-2 text-sm font-semibold backdrop-blur sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
+          <h3 id={`day-${key}`} className="sticky top-(--sticky-top) z-20 -mx-4 glass-bar [--glass:var(--bg)] px-4 py-2 text-sm font-semibold sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
             {ctx.i18n.date(items[0].startsAt, { weekday: "long", day: "numeric", month: "long" })}
           </h3>
           <ul className="mt-2 flex flex-col gap-3">

@@ -274,6 +274,18 @@ html[data-scroll-lock] {
   }
 }
 
+/* Klebende Leisten (Kopfzeile, Kalender-Tageskopf): deckend, die Unschärfe dahinter (backdrop-filter) ist auf schwachen Handys teuer – sie gibt es nur auf großen Bildschirmen und nur,
+   wenn das Gerät keine reduzierte Transparenz verlangt (prefers-reduced-transparency). `--glass` ist die Flächenfarbe (Standard: Fläche der Karten). */
+.glass-bar {
+  background: var(--glass, var(--surface));
+}
+@media (min-width: 1024px) and (prefers-reduced-transparency: no-preference) {
+  .glass-bar {
+    background: color-mix(in oklab, var(--glass, var(--surface)) 90%, transparent);
+    backdrop-filter: blur(8px);
+  }
+}
+
 /* Aktionsleiste eines Formulars (FormActions): klebt am unteren Rand, solange das Formular länger als der Bildschirm ist; in der Dokumentfolge, nicht fixed */
 .form-actions {
   position: sticky;

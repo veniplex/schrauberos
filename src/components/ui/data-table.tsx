@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import Link from "next/link";
+import { AppLink as Link } from "./app-link";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { getI18n } from "@/i18n/server";

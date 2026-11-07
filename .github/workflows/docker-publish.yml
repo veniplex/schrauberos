@@ -17,6 +17,9 @@ name: Build & publish Docker image
 # Browser-Tests (Playwright, Job "e2e") kosten viele Minuten: Sie laufen NICHT bei jedem Push auf main, sondern nur bei Versions-Tags (und blockieren
 # dort Image und Release), bei Pull Requests und von Hand ("Run workflow"; optional "update_snapshots" für neue Baseline-Screenshots).
 #
+# Lighthouse-CI (Job "lighthouse", mobil: Leistung, Zugänglichkeit, Installierbarkeit) läuft zu denselben Zeiten wie die Browser-Tests, blockiert aber nichts: Die Schwellen in
+# lighthouserc.json sind Platzhalter (nur Warnungen), bis die erste Messung vorliegt.
+#
 # Auf main läuft die Pipeline nur, wenn sich etwas ändert, das in Image oder Tests eingeht: reine Änderungen an README, CLAUDE.md, AGENTS.md,
 # .claude/ und den .env-Vorlagen lösen nichts aus (sie sind nicht im Image: siehe .dockerignore). Die Compose-Dateien gehen in den Smoke-Test
 # ein und lösen deshalb einen Lauf aus; die Docs unter docs/ gehören zum Image (Hilfe in der App). Versions-Tags bauen immer; "Run workflow" erzwingt einen Lauf von Hand.
@@ -170,6 +173,40 @@ jobs:
         with:
           name: snapshots
           path: e2e/snapshots/
+          retention-days: 14
+
+  lighthouse:
+    name: Lighthouse (mobil)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run build
+      - name: App starten (frische Daten, wie in der Browser-CI)
+        run: |
+          node e2e/start-server.mjs > server.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:3100/api/health >/dev/null && exit 0
+            sleep 2
+          done
+          cat server.log
+          exit 1
+      - name: Lighthouse (nur Warnungen, siehe lighthouserc.json)
+        run: npx --yes @lhci/cli@0.15.1 autorun --config=lighthouserc.json
+      - name: Bericht
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/
           retention-days: 14
 
   publish:

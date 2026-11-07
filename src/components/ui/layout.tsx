@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import Link from "next/link";
+import { AppLink as Link } from "./app-link";
 import { CircleAlert, CircleCheck, Info, TriangleAlert } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import type { StatusTone } from "@/lib/status-tone";

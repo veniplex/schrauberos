@@ -19,6 +19,8 @@ README.md
 
 e2e
 playwright.config.ts
+lighthouserc.json
+.lighthouseci
 .e2e-data
 test-results
 playwright-report
