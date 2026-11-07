@@ -14,7 +14,7 @@ import { warrantyState } from "@/modules/it/network/domain";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { checkDevices, listDevices } from "@/modules/it/network/queries";
-import { DemoNotice, DeviceStatusBadge, LinkStateBadge } from "@/modules/it/network/ui";
+import { DeviceStatusBadge, LinkStateBadge, MonitoringNotice } from "@/modules/it/network/ui";
 import { SearchInput, Select } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -119,7 +119,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
 
       {devices.some((d) => d.monitorEnabled) ? (
         <div className="mb-4">
-          <DemoNotice t={t} />
+          <MonitoringNotice t={t} />
         </div>
       ) : null}
 

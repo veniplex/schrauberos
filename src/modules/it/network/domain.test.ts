@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { compareIPv4, formatIPv4, freeRanges, ipInCidr, nextFreeIp, normalizeMac, parseCidr, parseIPv4, warrantyState } from "./domain";
+import { cidrsOverlap, compareIPv4, formatIPv4, freeRanges, ipInCidr, nextFreeIp, normalizeMac, overlappingSubnets, parseCidr, parseIPv4, warrantyState } from "./domain";
 
 describe("IPv4", () => {
   test("parse/format Roundtrip", () => {
@@ -26,7 +26,29 @@ describe("CIDR", () => {
     assert.equal(parseCidr("10.0.0.0/30")!.hosts, 2);
   });
   test("lehnt Host-Adresse als Netz, zu große/kleine Netze und Unsinn ab", () => {
-    for (const bad of ["192.168.1.5/24", "10.0.0.0/8", "10.0.0.0/31", "10.0.0.0", "x/24", "10.0.0.0/33"]) assert.equal(parseCidr(bad), null, bad);
+    for (const bad of ["192.168.1.5/24", "10.0.0.0/8", "10.0.0.1/31", "10.0.0.0", "x/24", "10.0.0.0/33", "10.0.0.5/32x"]) assert.equal(parseCidr(bad), null, bad);
+  });
+  test("/31 (Punkt-zu-Punkt): beide Adressen nutzbar, keine Broadcast-Adresse", () => {
+    const c = parseCidr("10.0.0.0/31")!;
+    assert.deepEqual([formatIPv4(c.first), formatIPv4(c.last), c.hosts], ["10.0.0.0", "10.0.0.1", 2]);
+    assert.equal(ipInCidr("10.0.0.0", "10.0.0.0/31"), true);
+    assert.equal(ipInCidr("10.0.0.1", "10.0.0.0/31"), true);
+    assert.equal(ipInCidr("10.0.0.2", "10.0.0.0/31"), false);
+    assert.equal(nextFreeIp("10.0.0.0/31", ["10.0.0.0"]), "10.0.0.1");
+    assert.equal(nextFreeIp("10.0.0.0/31", ["10.0.0.0", "10.0.0.1"]), null);
+    assert.notEqual(parseCidr("10.0.0.2/31"), null, "gerade Netzadresse");
+    assert.equal(parseCidr("10.0.0.3/31"), null, "ungerade Adresse ist keine Netzadresse");
+  });
+  test("/32 (einzelner Host): genau eine nutzbare Adresse", () => {
+    const c = parseCidr("10.0.0.7/32")!;
+    assert.deepEqual([formatIPv4(c.first), formatIPv4(c.last), c.hosts, c.network === c.broadcast], ["10.0.0.7", "10.0.0.7", 1, true]);
+    assert.equal(ipInCidr("10.0.0.7", "10.0.0.7/32"), true);
+    assert.equal(ipInCidr("10.0.0.8", "10.0.0.7/32"), false);
+    assert.deepEqual(freeRanges("10.0.0.7/32", []), [{ from: "10.0.0.7", to: "10.0.0.7", count: 1 }]);
+  });
+  test("/30 bleibt bei zwei nutzbaren Adressen (Netz und Broadcast fallen weg)", () => {
+    const c = parseCidr("10.0.0.0/30")!;
+    assert.deepEqual([formatIPv4(c.first), formatIPv4(c.last)], ["10.0.0.1", "10.0.0.2"]);
   });
   test("ipInCidr: Netz- und Broadcastadresse gelten nicht als Host", () => {
     assert.equal(ipInCidr("192.168.10.77", "192.168.10.0/24"), true);
@@ -72,5 +94,30 @@ describe("Garantie", () => {
     assert.equal(warrantyState(new Date("2026-10-01"), 90, now), "expired");
     assert.equal(warrantyState(new Date("2027-01-15"), 90, now), "soon");
     assert.equal(warrantyState(new Date("2028-01-01"), 90, now), "ok");
+  });
+});
+
+describe("Überschneidung von Netzen", () => {
+  test("gleiche Netze, Teilnetze und Randfälle (Netz- und Broadcast-Adresse, /31, /32)", () => {
+    assert.equal(cidrsOverlap("192.168.10.0/24", "192.168.10.0/24"), true);
+    assert.equal(cidrsOverlap("192.168.0.0/16", "192.168.10.0/24"), true, "ein Netz im anderen");
+    assert.equal(cidrsOverlap("192.168.10.0/24", "192.168.0.0/16"), true, "unabhängig von der Reihenfolge");
+    assert.equal(cidrsOverlap("192.168.10.0/24", "192.168.11.0/24"), false, "aneinandergrenzend ist keine Überschneidung");
+    assert.equal(cidrsOverlap("192.168.10.0/25", "192.168.10.128/25"), false);
+    assert.equal(cidrsOverlap("192.168.10.0/25", "192.168.10.0/24"), true);
+    assert.equal(cidrsOverlap("10.0.0.0/31", "10.0.0.1/32"), true, "/32 in /31");
+    assert.equal(cidrsOverlap("10.0.0.0/31", "10.0.0.2/31"), false);
+    assert.equal(cidrsOverlap("10.0.0.255/32", "10.0.0.0/24"), true, "die Broadcast-Adresse gehört zum Netz");
+    assert.equal(cidrsOverlap("10.0.0.0/32", "10.0.1.0/32"), false);
+    assert.equal(cidrsOverlap("kein netz", "10.0.0.0/24"), false);
+  });
+  test("overlappingSubnets lässt das Netz selbst aus", () => {
+    const all = [
+      { id: "a", cidr: "10.0.0.0/24" },
+      { id: "b", cidr: "10.0.0.0/25" },
+      { id: "c", cidr: "10.1.0.0/24" },
+    ];
+    assert.deepEqual(overlappingSubnets("10.0.0.0/24", all, "a").map((s) => s.id), ["b"]);
+    assert.deepEqual(overlappingSubnets("10.0.0.0/24", all).map((s) => s.id), ["a", "b"]);
   });
 });

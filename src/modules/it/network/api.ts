@@ -213,6 +213,8 @@ const subnetBody = z.strictObject({
   dhcpStart: text(15),
   dhcpEnd: text(15),
   description: text(300),
+  /** Überschneidung mit einem Netz in einem anderen VLAN trotz Warnung speichern (im selben VLAN nie) */
+  allowOverlap: z.boolean().optional(),
 });
 const subnetItem = z.object({
   id: z.string(),

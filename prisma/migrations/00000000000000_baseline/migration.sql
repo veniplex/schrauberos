@@ -874,7 +874,10 @@ CREATE UNIQUE INDEX "Tire_tireSetId_position_key" ON "Tire"("tireSetId", "positi
 CREATE UNIQUE INDEX "NetVlan_vlanId_key" ON "NetVlan"("vlanId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "NetSubnet_cidr_key" ON "NetSubnet"("cidr");
+CREATE INDEX "NetSubnet_cidr_idx" ON "NetSubnet"("cidr");
+
+-- CreateIndex
+CREATE INDEX "NetSubnet_vlanId_idx" ON "NetSubnet"("vlanId");
 
 -- CreateIndex
 CREATE INDEX "NetDevice_type_idx" ON "NetDevice"("type");
@@ -883,13 +886,13 @@ CREATE INDEX "NetDevice_type_idx" ON "NetDevice"("type");
 CREATE INDEX "NetDevice_locationId_idx" ON "NetDevice"("locationId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "NetIp_address_key" ON "NetIp"("address");
-
--- CreateIndex
-CREATE INDEX "NetIp_subnetId_idx" ON "NetIp"("subnetId");
-
--- CreateIndex
 CREATE INDEX "NetIp_deviceId_idx" ON "NetIp"("deviceId");
+
+-- CreateIndex
+CREATE INDEX "NetIp_address_idx" ON "NetIp"("address");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "NetIp_subnetId_address_key" ON "NetIp"("subnetId", "address");
 
 -- CreateIndex
 CREATE INDEX "NetConnection_fromDeviceId_idx" ON "NetConnection"("fromDeviceId");

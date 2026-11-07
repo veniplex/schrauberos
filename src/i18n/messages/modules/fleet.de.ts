@@ -24,6 +24,7 @@ export const fleetDe = {
   noCosts: "Noch keine Kosten erfasst.",
   costTotal: "Gesamtkosten",
   costPerKm: "pro Kilometer",
+  costPerKmPeriod: "nur Kosten und {km} km zwischen {from} und {to}",
   kmLeft: "noch {km} km",
   kmOver: "{km} km überfällig",
   nextCheck: "nächste Kontrolle",

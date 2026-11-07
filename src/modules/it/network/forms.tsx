@@ -1,5 +1,6 @@
 "use client";
 
+import { DuplicateNotice } from "@/components/ui/duplicate-notice";
 import { Field, Form, FormActions, FormCard, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { IP_KINDS } from "@/modules/it/network/constants";
@@ -118,6 +119,13 @@ export function SubnetForm({
         <Field label={t("network.fields.cidr")} htmlFor="cidr" name="cidr" hint={t("network.fields.cidrHint")} required>
           <Input id="cidr" name="cidr" defaultValue={initial.cidr} placeholder="192.168.10.0/24" className="font-mono" required autoComplete="off" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>
+        <DuplicateNotice
+          title={t("network.overlap.title")}
+          message={(data) => t("network.overlap.message", { name: data.duplicateName ?? "", cidr: data.duplicateCidr ?? "" })}
+          openLabel={t("network.overlap.open")}
+          openHref={(id) => `/network/ip/${id}`}
+          anywayLabel={t("network.overlap.anyway")}
+        />
         <Field label="VLAN" htmlFor="vlanId">
           <Select id="vlanId" name="vlanId" defaultValue={initial.vlanId}>
             <option value="">{t("common.none")}</option>

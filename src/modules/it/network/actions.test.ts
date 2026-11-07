@@ -173,3 +173,71 @@ describe("Standorte und Kabel", () => {
     assert.equal(await env.db.auditLog.count(), 0);
   });
 });
+
+describe("Subnetze: Überschneidung, /31, /32 und IP-Eindeutigkeit je Netz (P4b-6)", () => {
+  const subnet = (fields: Record<string, string | undefined>) => actions.saveSubnet({}, form({ name: "Netz", ...fields }));
+  const vlan = async (vlanId: number) => (await env.db.netVlan.create({ data: { vlanId, name: `VLAN ${vlanId}` } })).id;
+
+  it("im selben VLAN (auch ohne VLAN) sind Überschneidungen gesperrt – gleiches Netz, Teilnetz und Obernetz; aneinandergrenzende Netze gehen", async () => {
+    await login(["network.edit"]);
+    await redirectOf(() => subnet({ cidr: "192.168.10.0/24" }));
+    assert.ok((await subnet({ cidr: "192.168.10.0/24" })).fieldErrors?.cidr, "gleiches Netz");
+    assert.ok((await subnet({ cidr: "192.168.10.128/25" })).fieldErrors?.cidr, "Teilnetz");
+    assert.ok((await subnet({ cidr: "192.168.0.0/16" })).fieldErrors?.cidr, "Obernetz");
+    assert.equal(await env.db.netSubnet.count(), 1);
+    await redirectOf(() => subnet({ cidr: "192.168.11.0/24" }));
+    const v10 = await vlan(10);
+    await redirectOf(() => subnet({ cidr: "192.168.10.0/24", vlanId: v10, allowOverlap: "1" }));
+    assert.ok((await subnet({ cidr: "192.168.10.0/25", vlanId: v10, allowOverlap: "1" })).fieldErrors?.cidr, "im selben VLAN hilft die Bestätigung nicht");
+    assert.equal(await env.db.netSubnet.count(), 3);
+  });
+
+  it("in einem anderen VLAN: Warnung mit Bestätigung (allowOverlap), danach gespeichert; ändern ohne eigene Überschneidung", async () => {
+    await login(["network.edit"]);
+    const v10 = await vlan(10);
+    const v20 = await vlan(20);
+    await redirectOf(() => subnet({ name: "Büro", cidr: "192.168.1.0/24", vlanId: v10 }));
+    const warned = await subnet({ name: "Werkstatt", cidr: "192.168.1.0/24", vlanId: v20 });
+    assert.ok(warned.fieldErrors?.cidr);
+    assert.equal(warned.data?.duplicateCidr, "192.168.1.0/24");
+    assert.equal(warned.data?.duplicateName, "Büro");
+    assert.equal(await env.db.netSubnet.count(), 1);
+    await redirectOf(() => subnet({ name: "Werkstatt", cidr: "192.168.1.0/24", vlanId: v20, allowOverlap: "1" }));
+    assert.equal(await env.db.netSubnet.count(), 2);
+    // ein vorhandenes Netz ändern: es überschneidet sich nicht mit sich selbst
+    const own = await env.db.netSubnet.findFirstOrThrow({ where: { name: "Büro" } });
+    assert.ok(await redirectOf(() => subnet({ id: own.id, name: "Büro neu", cidr: "192.168.1.0/24", vlanId: v10 })));
+  });
+
+  it("/31 und /32 werden angelegt; die Adressen sind im Netz nutzbar", async () => {
+    await login(["network.edit"]);
+    await redirectOf(() => subnet({ name: "Link", cidr: "10.9.0.0/31" }));
+    await redirectOf(() => subnet({ name: "Host", cidr: "10.9.1.5/32" }));
+    const link = await env.db.netSubnet.findFirstOrThrow({ where: { name: "Link" } });
+    const host = await env.db.netSubnet.findFirstOrThrow({ where: { name: "Host" } });
+    assert.ok(await redirectOf(() => actions.saveIp({}, form({ subnetId: link.id, address: "10.9.0.0" }))));
+    assert.ok(await redirectOf(() => actions.saveIp({}, form({ subnetId: link.id, address: "10.9.0.1" }))));
+    assert.ok((await actions.saveIp({}, form({ subnetId: link.id, address: "10.9.0.2" }))).fieldErrors?.address, "außerhalb");
+    assert.ok(await redirectOf(() => actions.saveIp({}, form({ subnetId: host.id, address: "10.9.1.5" }))));
+    // /31 überschneidet sich mit /32 darin
+    assert.ok((await subnet({ name: "Eng", cidr: "10.9.0.0/32" })).fieldErrors?.cidr);
+  });
+
+  it("IP-Adressen sind je Netz eindeutig: dieselbe Adresse im selben Netz nie, in einem anderen Netz (VLAN) schon", async () => {
+    await login(["network.edit"]);
+    const v10 = await vlan(10);
+    const v20 = await vlan(20);
+    await redirectOf(() => subnet({ name: "A", cidr: "192.168.1.0/24", vlanId: v10 }));
+    await redirectOf(() => subnet({ name: "B", cidr: "192.168.1.0/24", vlanId: v20, allowOverlap: "1" }));
+    const [a, b] = [await env.db.netSubnet.findFirstOrThrow({ where: { name: "A" } }), await env.db.netSubnet.findFirstOrThrow({ where: { name: "B" } })];
+    await redirectOf(() => actions.saveIp({}, form({ subnetId: a.id, address: "192.168.1.10", hostname: "drucker" })));
+    assert.ok((await actions.saveIp({}, form({ subnetId: a.id, address: "192.168.001.010" }))).fieldErrors?.address, "gleiche Adresse im selben Netz (auch anders geschrieben)");
+    assert.ok(await redirectOf(() => actions.saveIp({}, form({ subnetId: b.id, address: "192.168.1.10", hostname: "kamera" }))), "gleiche Adresse im anderen Netz");
+    assert.equal(await env.db.netIp.count(), 2);
+    // die Datenbank hält es auch ohne Code-Prüfung
+    await assert.rejects(() => env.db.netIp.create({ data: { subnetId: a.id, address: "192.168.1.10" } }));
+    // ändern: die Adresse bleibt die eigene
+    const own = await env.db.netIp.findFirstOrThrow({ where: { subnetId: a.id } });
+    assert.ok(await redirectOf(() => actions.saveIp({}, form({ id: own.id, version: versionOf(own), subnetId: a.id, address: "192.168.1.10", hostname: "drucker 2" }))));
+  });
+});

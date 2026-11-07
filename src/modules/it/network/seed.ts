@@ -44,27 +44,27 @@ async function demo(db: PrismaClient) {
     return d;
   };
 
-  const fw = await dev("fw-01", "firewall", "Serverraum", { manufacturer: "Netgate", model: "4100", rackInfo: "Rack 1 / HE 1", warrantyUntil: "2027-06-30", purchaseDate: "2024-06-30", monitor: true }, [
+  const fw = await dev("fw-01", "firewall", "Serverraum", { manufacturer: "Netgate", model: "4100", rackInfo: "Rack 1 / HE 1", warrantyUntil: "2027-06-30", purchaseDate: "2024-06-30" }, [
     [10, "192.168.10.1", "gateway"],
     [20, "192.168.20.1", "gateway"],
     [30, "192.168.30.1", "gateway"],
     [99, "192.168.99.1", "gateway"],
   ]);
-  const core = await dev("sw-core-01", "switch", "Serverraum", { manufacturer: "Ubiquiti", model: "USW-Pro-24", rackInfo: "Rack 1 / HE 3", portCount: 24, warrantyUntil: "2026-12-15", purchaseDate: "2023-12-15", monitor: true }, [[99, "192.168.99.10"]]);
-  const swW = await dev("sw-werkstatt-01", "switch", "Werkstatt", { manufacturer: "Ubiquiti", model: "USW-16-PoE", portCount: 16, warrantyUntil: "2028-03-01", monitor: true }, [[99, "192.168.99.11"]]);
-  const apB = await dev("ap-buero", "access_point", "Büro EG", { manufacturer: "Ubiquiti", model: "U6-Pro", warrantyUntil: "2026-08-20", monitor: true }, [[99, "192.168.99.20"]]);
-  const apW = await dev("ap-werkstatt", "access_point", "Werkstatt", { manufacturer: "Ubiquiti", model: "U6-Lite", warrantyUntil: "2028-01-10", monitor: true }, [[99, "192.168.99.21"]]);
-  const dc = await dev("srv-dc01", "server", "Serverraum", { manufacturer: "Dell", model: "PowerEdge T150", serialNumber: "7K2M9Q3", rackInfo: "Rack 1 / HE 6", warrantyUntil: "2028-02-01", monitor: true, notes: "Domänencontroller, DNS, Dateiserver." }, [[10, "192.168.10.2", "static", "AA:BB:CC:10:00:02"]]);
-  const werbas = await dev("srv-werbas", "server", "Serverraum", { manufacturer: "HPE", model: "ProLiant ML30", serialNumber: "CZ2231004X", rackInfo: "Rack 1 / HE 8", warrantyUntil: "2027-09-30", monitor: true, notes: "Läuft die Werbas-Datenbank." }, [[10, "192.168.10.3", "static", "AA:BB:CC:10:00:03"]]);
-  const nas = await dev("nas-backup", "nas", "Serverraum", { manufacturer: "Synology", model: "DS923+", serialNumber: "2160T5N011", warrantyUntil: "2026-09-01", monitor: true, notes: "Nächtliche Backups von srv-dc01 und srv-werbas." }, [[10, "192.168.10.4", "static", "AA:BB:CC:10:00:04"]]);
+  const core = await dev("sw-core-01", "switch", "Serverraum", { manufacturer: "Ubiquiti", model: "USW-Pro-24", rackInfo: "Rack 1 / HE 3", portCount: 24, warrantyUntil: "2026-12-15", purchaseDate: "2023-12-15" }, [[99, "192.168.99.10"]]);
+  const swW = await dev("sw-werkstatt-01", "switch", "Werkstatt", { manufacturer: "Ubiquiti", model: "USW-16-PoE", portCount: 16, warrantyUntil: "2028-03-01" }, [[99, "192.168.99.11"]]);
+  const apB = await dev("ap-buero", "access_point", "Büro EG", { manufacturer: "Ubiquiti", model: "U6-Pro", warrantyUntil: "2026-08-20" }, [[99, "192.168.99.20"]]);
+  const apW = await dev("ap-werkstatt", "access_point", "Werkstatt", { manufacturer: "Ubiquiti", model: "U6-Lite", warrantyUntil: "2028-01-10" }, [[99, "192.168.99.21"]]);
+  const dc = await dev("srv-dc01", "server", "Serverraum", { manufacturer: "Dell", model: "PowerEdge T150", serialNumber: "7K2M9Q3", rackInfo: "Rack 1 / HE 6", warrantyUntil: "2028-02-01", notes: "Domänencontroller, DNS, Dateiserver." }, [[10, "192.168.10.2", "static", "AA:BB:CC:10:00:02"]]);
+  const werbas = await dev("srv-werbas", "server", "Serverraum", { manufacturer: "HPE", model: "ProLiant ML30", serialNumber: "CZ2231004X", rackInfo: "Rack 1 / HE 8", warrantyUntil: "2027-09-30", notes: "Läuft die Werbas-Datenbank." }, [[10, "192.168.10.3", "static", "AA:BB:CC:10:00:03"]]);
+  const nas = await dev("nas-backup", "nas", "Serverraum", { manufacturer: "Synology", model: "DS923+", serialNumber: "2160T5N011", warrantyUntil: "2026-09-01", notes: "Nächtliche Backups von srv-dc01 und srv-werbas." }, [[10, "192.168.10.4", "static", "AA:BB:CC:10:00:04"]]);
   const pcE = await dev("pc-empfang", "workstation", "Empfang", { manufacturer: "Lenovo", model: "ThinkCentre M70q", assignedTo: "Empfang", warrantyUntil: "2027-04-01" }, [[10, "192.168.10.150", "dhcp_reservation", "AA:BB:CC:10:01:50"]]);
   await dev("pc-buero-01", "workstation", "Büro EG", { manufacturer: "Lenovo", model: "ThinkCentre M70q", assignedTo: "Buchhaltung", warrantyUntil: "2027-04-01" }, [[10, "192.168.10.151", "dhcp_reservation", "AA:BB:CC:10:01:51"]]);
   await dev("pc-buero-02", "workstation", "Büro EG", { manufacturer: "Lenovo", model: "ThinkCentre M70q", assignedTo: "Serviceberatung", warrantyUntil: "2027-04-01" }, [[10, "192.168.10.152", "dhcp_reservation", "AA:BB:CC:10:01:52"]]);
   await dev("nb-chef", "laptop", "Büro EG", { manufacturer: "Dell", model: "Latitude 5440", assignedTo: "Geschäftsführung", warrantyUntil: "2027-01-20" }, [[10, "192.168.10.153", "dhcp_reservation", "AA:BB:CC:10:01:53"]]);
-  const pr = await dev("drucker-buero", "printer", "Büro EG", { manufacturer: "Brother", model: "HL-L8360CDW", monitor: true }, [[10, "192.168.10.60"]]);
-  const pcW = await dev("pc-werkstatt-01", "workstation", "Werkstatt", { manufacturer: "HP", model: "EliteDesk 800 G6", assignedTo: "Werkstatt (Diagnose)", warrantyUntil: "2026-12-01", monitor: true }, [[20, "192.168.20.50"]]);
+  const pr = await dev("drucker-buero", "printer", "Büro EG", { manufacturer: "Brother", model: "HL-L8360CDW" }, [[10, "192.168.10.60"]]);
+  const pcW = await dev("pc-werkstatt-01", "workstation", "Werkstatt", { manufacturer: "HP", model: "EliteDesk 800 G6", assignedTo: "Werkstatt (Diagnose)", warrantyUntil: "2026-12-01" }, [[20, "192.168.20.50"]]);
   await dev("tablet-diagnose", "laptop", "Werkstatt", { manufacturer: "Samsung", model: "Galaxy Tab Active4", assignedTo: "Werkstatt" }, [[20, "192.168.20.51", "dhcp_reservation"]]);
-  const cam = await dev("cam-hof", "camera", "Lagerhalle", { manufacturer: "Ubiquiti", model: "G4 Bullet", monitor: true }, [[20, "192.168.20.80"]]);
+  const cam = await dev("cam-hof", "camera", "Lagerhalle", { manufacturer: "Ubiquiti", model: "G4 Bullet" }, [[20, "192.168.20.80"]]);
   const patch = await dev("patch-01", "patch_panel", "Serverraum", { rackInfo: "Rack 1 / HE 2", portCount: 24, notes: "Arbeitsplätze Büro EG, Ports 1–12." });
 
   const link = (a: { id: string }, ap: string, b: { id: string }, bp: string, cable: string) =>

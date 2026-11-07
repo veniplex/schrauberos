@@ -76,9 +76,9 @@ GET /network-locations/{id} network-locations.get network.view
 PATCH /network-locations/{id} network-locations.update network.edit body=name,description,sortOrder
 DELETE /network-locations/{id} network-locations.delete network.delete
 GET /network-subnets network-subnets.list network.view query=vlanId sort=name,cidr
-POST /network-subnets network-subnets.create network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
+POST /network-subnets network-subnets.create network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description,allowOverlap
 GET /network-subnets/{id} network-subnets.get network.view
-PATCH /network-subnets/{id} network-subnets.update network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description
+PATCH /network-subnets/{id} network-subnets.update network.edit body=name,cidr,vlanId,gateway,dnsServers,dhcpStart,dhcpEnd,description,allowOverlap
 DELETE /network-subnets/{id} network-subnets.delete network.delete
 GET /network-vlans network-vlans.list network.view sort=number,name
 POST /network-vlans network-vlans.create network.edit body=number,name,description

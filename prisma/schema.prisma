@@ -542,8 +542,8 @@ model NetVlan {
 model NetSubnet {
   id          String  @id @default(cuid())
   name        String
-  // IPv4 in CIDR-Schreibweise, z. B. 192.168.10.0/24
-  cidr        String  @unique
+  // IPv4 in CIDR-Schreibweise, z. B. 192.168.10.0/24 (/16 bis /32). Nicht global eindeutig: Dasselbe Netz darf in getrennten VLANs vorkommen; im selben VLAN verhindert die Operation Überschneidungen (P4b-6)
+  cidr        String
   gateway     String?
   dnsServers  String?
   dhcpStart   String?
@@ -553,6 +553,9 @@ model NetSubnet {
 
   vlan NetVlan? @relation(fields: [vlanId], references: [id], onDelete: SetNull)
   ips  NetIp[]
+
+  @@index([cidr])
+  @@index([vlanId])
 }
 
 // Gerät im Netzwerk: Server, Switch, Access Point, PC, Drucker, ...
@@ -591,7 +594,8 @@ model NetDevice {
 
 model NetIp {
   id        String   @id @default(cuid())
-  address   String   @unique
+  // eindeutig je Netz (Subnetz), nicht global: dieselbe Adresse darf in getrennten Netzen vorkommen (P4b-6)
+  address   String
   subnetId  String
   deviceId  String?
   hostname  String?
@@ -605,8 +609,9 @@ model NetIp {
   subnet NetSubnet  @relation(fields: [subnetId], references: [id], onDelete: Cascade)
   device NetDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
-  @@index([subnetId])
+  @@unique([subnetId, address])
   @@index([deviceId])
+  @@index([address])
 }
 
 // Kabel/Verbindung zwischen zwei Geräten (Ports als freie Bezeichnung, z. B. "Gi1/0/12" oder "12")

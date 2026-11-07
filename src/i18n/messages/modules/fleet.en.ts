@@ -25,6 +25,7 @@ export const fleetEn: typeof fleetDe = {
   noCosts: "No costs recorded yet.",
   costTotal: "Total costs",
   costPerKm: "per kilometre",
+  costPerKmPeriod: "only costs and {km} km between {from} and {to}",
   kmLeft: "{km} km left",
   kmOver: "{km} km overdue",
   nextCheck: "next check",

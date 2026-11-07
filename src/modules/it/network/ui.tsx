@@ -19,7 +19,7 @@ export function DeviceStatusBadge({ status, td }: { status: string; td: Translat
   return <StatusBadge tone={DEVICE_STATUS_TONE[status as DeviceStatus] ?? "neutral"}>{td(`enums.deviceStatus.${status}`, status)}</StatusBadge>;
 }
 
-/** Hinweis, dass Status-Werte simuliert sind (kein echter Netzwerkzugriff). */
-export function DemoNotice({ t }: { t: Translator["t"] }) {
-  return <Alert tone="info">{t("network.demoNotice")}</Alert>;
+/** Hinweis, dass die Anwendung die Erreichbarkeit (noch) nicht prüft: Der Status bleibt „unbekannt“. */
+export function MonitoringNotice({ t }: { t: Translator["t"] }) {
+  return <Alert tone="info">{t("network.monitoringNotice")}</Alert>;
 }

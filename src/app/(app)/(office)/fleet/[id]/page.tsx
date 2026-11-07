@@ -6,12 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
-import { todayInput } from "@/lib/dates";
+import { endOfDayIn, startOfDayIn, todayInput } from "@/lib/dates";
+import { dayKey } from "@/lib/zone";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { FLEET_STATUS_TONE } from "@/modules/office/fleet/status-tone";
 import type { FleetStatus } from "@/modules/office/fleet/domain";
 import { employeeName } from "@/modules/office/employees/public";
-import { COST_CATEGORIES, costPerKm, currentMileage, fleetDues } from "@/modules/office/fleet/domain";
+import { COST_CATEGORIES, costPeriod, currentMileage, fleetDues } from "@/modules/office/fleet/domain";
 import { formatCents } from "@/lib/money";
 import { INTL_LOCALE } from "@/i18n/config";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
@@ -38,15 +39,22 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
   if (!v) notFound();
 
   // Summen und Kilometerspanne über ALLE Einträge des Fahrzeugs (von der Datenbank gerechnet) – die Listen darunter zeigen nur die neuesten
-  const [costSum, costGroups, kmRange] = await Promise.all([
+  const [costSum, costGroups, kmRange, firstKm, lastKm] = await Promise.all([
     db.fleetCost.aggregate({ where: { fleetVehicleId: id }, _sum: { amountCents: true } }),
     db.fleetCost.groupBy({ by: ["category"], where: { fleetVehicleId: id }, _sum: { amountCents: true } }),
-    db.fleetMileage.aggregate({ where: { fleetVehicleId: id }, _min: { km: true }, _max: { km: true }, _count: { _all: true } }),
+    db.fleetMileage.aggregate({ where: { fleetVehicleId: id }, _max: { km: true } }),
+    db.fleetMileage.findFirst({ where: { fleetVehicleId: id }, orderBy: [{ date: "asc" }, { km: "asc" }], select: { date: true, km: true } }),
+    db.fleetMileage.findFirst({ where: { fleetVehicleId: id }, orderBy: [{ date: "desc" }, { km: "desc" }], select: { date: true, km: true } }),
   ]);
   const km = kmRange._max.km ?? currentMileage(v.mileage);
   const dues = fleetDues(v, km);
   const total = costSum._sum.amountCents ?? 0;
-  const perKm = costPerKm(total, kmRange._count._all >= 2 ? [{ km: kmRange._min.km ?? 0 }, { km: kmRange._max.km ?? 0 }] : []);
+  // Kosten pro Kilometer nur über den Kostenzeitraum (erster bis letzter Kilometerstand): Kosten im Zeitraum / Kilometer im Zeitraum
+  const period = firstKm && lastKm ? costPeriod([firstKm, lastKm]) : null;
+  const periodCosts = period
+    ? (await db.fleetCost.aggregate({ where: { fleetVehicleId: id, date: { gte: startOfDayIn(dayKey(period.from)), lte: endOfDayIn(dayKey(period.to)) } }, _sum: { amountCents: true } }))._sum.amountCents ?? 0
+    : 0;
+  const perKm = period ? periodCosts / period.km : null;
   const byCategory = COST_CATEGORIES.map((c) => ({ c, sum: costGroups.find((g) => g.category === c)?._sum.amountCents ?? 0 })).filter((x) => x.sum > 0);
   const license = v.driver?.licenseChecks[0];
   const licenseState = license ? dueState(license.nextDue, 60) : null;
@@ -135,7 +143,8 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                   </span>
                   {perKm != null ? (
                     <span>
-                      {t("fleet.costPerKm")}: <strong className="tabular">{eur(Math.round(perKm))}</strong>
+                      {t("fleet.costPerKm")}: <strong className="tabular">{eur(Math.round(perKm))}</strong>{" "}
+                      {period ? <span className="text-ink-muted">({t("fleet.costPerKmPeriod", { from: date(period.from, { dateStyle: "medium" }), to: date(period.to, { dateStyle: "medium" }), km: number(period.km) })})</span> : null}
                     </span>
                   ) : null}
                   <span className="flex flex-wrap gap-1.5">

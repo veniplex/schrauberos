@@ -15,7 +15,7 @@ import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteDevice } from "@/modules/it/network/actions";
 import { checkDevices } from "@/modules/it/network/queries";
-import { DemoNotice, DeviceStatusBadge, LinkStateBadge } from "@/modules/it/network/ui";
+import { DeviceStatusBadge, LinkStateBadge, MonitoringNotice } from "@/modules/it/network/ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -79,7 +79,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       />
       {device.monitorEnabled ? (
         <div className="mb-5">
-          <DemoNotice t={t} />
+          <MonitoringNotice t={t} />
         </div>
       ) : null}
 

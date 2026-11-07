@@ -25,19 +25,35 @@ export type Cidr = {
   hosts: number;
 };
 
-/** Unterstützt /16 bis /30 – genug für ein Firmennetz und begrenzt die Listengröße. */
+/**
+ * Unterstützt /16 bis /32 – genug für ein Firmennetz und begrenzt die Listengröße. Das Präfix /31 (Punkt-zu-Punkt, RFC 3021) hat zwei nutzbare Adressen und keine Broadcast-Adresse, /32 genau eine (einen
+ * einzelnen Host): Bei beiden sind alle Adressen des Netzes nutzbar, anders als bei /30 und größer, wo Netz- und Broadcast-Adresse wegfallen.
+ */
 export function parseCidr(input: string): Cidr | null {
   const m = /^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec(input.trim());
   if (!m) return null;
   const ip = parseIPv4(m[1]);
   const prefix = Number(m[2]);
-  if (ip === null || prefix < 16 || prefix > 30) return null;
+  if (ip === null || prefix < 16 || prefix > 32) return null;
   const mask = (0xffffffff << (32 - prefix)) >>> 0;
   const network = (ip & mask) >>> 0;
   // Muss eine echte Netzadresse sein (192.168.1.5/24 ist ungültig)
   if (network !== ip) return null;
   const broadcast = (network | (~mask >>> 0)) >>> 0;
+  if (prefix >= 31) return { prefix, network, broadcast, first: network, last: broadcast, hosts: broadcast - network + 1 };
   return { prefix, network, broadcast, first: network + 1, last: broadcast - 1, hosts: broadcast - network - 1 };
+}
+
+/** Überschneiden sich zwei Netze (gleicher Adressbereich, eines liegt im anderen oder sie teilen einen Teil)? Ungültige Netze überschneiden nichts. */
+export function cidrsOverlap(a: string, b: string): boolean {
+  const x = parseCidr(a);
+  const y = parseCidr(b);
+  return x !== null && y !== null && x.network <= y.broadcast && y.network <= x.broadcast;
+}
+
+/** Netze (mit Kennung), die sich mit `cidr` überschneiden – ohne das Netz `ignoreId` selbst. */
+export function overlappingSubnets<T extends { id: string; cidr: string }>(cidr: string, others: readonly T[], ignoreId?: string): T[] {
+  return others.filter((o) => o.id !== ignoreId && cidrsOverlap(cidr, o.cidr));
 }
 
 export function ipInCidr(ip: string, cidr: string): boolean {

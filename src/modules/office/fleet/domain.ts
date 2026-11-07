@@ -1,5 +1,5 @@
 import { dueState, type DueState } from "@/lib/due";
-import { addMonths } from "@/lib/zone";
+import { addMonths, dayKey } from "@/lib/zone";
 
 export const FLEET_STATUSES = ["active", "in_service", "reserve", "sold"] as const;
 export type FleetStatus = (typeof FLEET_STATUSES)[number];
@@ -52,12 +52,36 @@ export function fleetDues(
   return out.sort((a, b) => (a.state === b.state ? (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0) : a.state === "expired" ? -1 : 1));
 }
 
-/** Kosten pro Kilometer aus Kilometerstand-Verlauf und Kosten (null, wenn nicht berechenbar). */
-export function costPerKm(totalCents: number, mileage: Array<{ km: number }>): number | null {
+/**
+ * Der **Kostenzeitraum** der Kosten pro Kilometer: vom Tag des ersten bis zum Tag des letzten erfassten Kilometerstands (nach Datum, nicht nach Höhe), mit den dabei gefahrenen Kilometern.
+ * Nur innerhalb dieses Zeitraums sind Kosten und Kilometer vergleichbar – Kosten davor (etwa die Anschaffung) oder danach gehören nicht zu den erfassten Kilometern. Kein Zeitraum (`null`),
+ * wenn weniger als zwei Stände an verschiedenen Tagen vorliegen oder nichts gefahren wurde.
+ */
+export type CostPeriod = { from: Date; to: Date; km: number };
+
+export function costPeriod(mileage: ReadonlyArray<{ date: Date; km: number }>): CostPeriod | null {
   if (mileage.length < 2) return null;
-  const kms = mileage.map((m) => m.km);
-  const driven = Math.max(...kms) - Math.min(...kms);
-  return driven > 0 ? totalCents / driven : null;
+  const sorted = [...mileage].sort((a, b) => a.date.getTime() - b.date.getTime() || a.km - b.km);
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const km = last.km - first.km;
+  return dayKey(first.date) !== dayKey(last.date) && km > 0 ? { from: first.date, to: last.date, km } : null;
+}
+
+/** Liegt der Tag der Kosten im Zeitraum (beide Tage eingeschlossen, Kalendertage der Werkstatt)? */
+export function inCostPeriod(date: Date, period: CostPeriod): boolean {
+  const day = dayKey(date);
+  return day >= dayKey(period.from) && day <= dayKey(period.to);
+}
+
+/** Summe der Kosten im Zeitraum. */
+export function costsInPeriod(costs: ReadonlyArray<{ date: Date; amountCents: number }>, period: CostPeriod): number {
+  return costs.filter((c) => inCostPeriod(c.date, period)).reduce((sum, c) => sum + c.amountCents, 0);
+}
+
+/** Kosten pro Kilometer: nur die Kosten **im Kostenzeitraum** geteilt durch die Kilometer **im selben Zeitraum** (null ohne Zeitraum). */
+export function costPerKm(costs: ReadonlyArray<{ date: Date; amountCents: number }>, period: CostPeriod | null): number | null {
+  return period ? costsInPeriod(costs, period) / period.km : null;
 }
 
 /** Aktueller Kilometerstand = höchster erfasster Wert. */

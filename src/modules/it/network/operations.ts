@@ -3,8 +3,8 @@ import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { DEVICE_STATUSES, DEVICE_TYPES, IP_KINDS } from "@/modules/it/network/constants";
-import { formatIPv4, ipInCidr, normalizeMac, parseCidr, parseIPv4 } from "@/modules/it/network/domain";
-import { defineOperation, fail, failField, failFields, type FieldMessage, type Tx } from "@/server/operations";
+import { formatIPv4, ipInCidr, normalizeMac, overlappingSubnets, parseCidr, parseIPv4 } from "@/modules/it/network/domain";
+import { defineOperation, fail, failField, failFields, mapPrismaError, type FieldMessage, type Tx } from "@/server/operations";
 
 const date = dateText().optional();
 const idInput = z.object({ id: z.string().min(1) });
@@ -124,6 +124,8 @@ const subnetInput = z.object({
   dhcpStart: z.string().max(15).optional(),
   dhcpEnd: z.string().max(15).optional(),
   description: z.string().max(300).optional(),
+  /** Überschneidung mit einem Netz in einem anderen VLAN trotz Warnung speichern */
+  allowOverlap: z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean()).optional(),
 });
 
 export const saveSubnetOperation = defineOperation({
@@ -131,7 +133,7 @@ export const saveSubnetOperation = defineOperation({
   permission: "network.edit",
   input: subnetInput,
   audit: (input) => (input.id ? "network.update" : "network.create"),
-  run: async ({ input: { id, ...d }, tx, audit }) => {
+  run: async ({ input: { id, allowOverlap, ...d }, tx, audit }) => {
     const net = parseCidr(d.cidr);
     if (!net) failField("cidr", "network.errors.cidr");
     const cidr = `${formatIPv4(net.network)}/${net.prefix}`;
@@ -149,8 +151,18 @@ export const saveSubnetOperation = defineOperation({
     if (Object.keys(errors).length) failFields(errors);
 
     if (d.vlanId && !(await tx.netVlan.findUnique({ where: { id: d.vlanId }, select: { id: true } }))) failField("vlanId", "validation.invalid");
-    const dup = await tx.netSubnet.findFirst({ where: { cidr, ...(id ? { id: { not: id } } : {}) } });
-    if (dup) failField("cidr", "network.errors.subnetExists");
+    // Überschneidungen: im selben VLAN (auch ohne VLAN) gibt es sie nicht – dort wäre eine Adresse in zwei Netzen zuhause; in einem anderen VLAN ist dasselbe Netz oder ein Teil davon denkbar
+    // (zwei Standorte mit 192.168.1.0/24), aber meist ein Versehen: eine Warnung mit Bestätigung (`allowOverlap`).
+    // Wer nur Name, Gateway o. Ä. eines bestehenden Netzes ändert (Netz und VLAN bleiben), bekommt die Warnung nicht jedes Mal erneut.
+    const existing = id ? await tx.netSubnet.findUnique({ where: { id }, select: { cidr: true, vlanId: true } }) : null;
+    const unchanged = existing !== null && existing.cidr === cidr && (existing.vlanId ?? null) === (d.vlanId ?? null);
+    const overlapping = unchanged ? [] : overlappingSubnets(cidr, await tx.netSubnet.findMany({ select: { id: true, name: true, cidr: true, vlanId: true } }), id);
+    const sameVlan = overlapping.find((o) => (o.vlanId ?? null) === (d.vlanId ?? null));
+    if (sameVlan) failField("cidr", sameVlan.cidr === cidr ? "network.errors.subnetExists" : "network.errors.subnetOverlap", { name: sameVlan.name, cidr: sameVlan.cidr });
+    const otherVlan = overlapping[0];
+    if (otherVlan && !allowOverlap) {
+      failFields({ cidr: { key: "network.errors.subnetOverlapOtherVlan", params: { name: otherVlan.name, cidr: otherVlan.cidr } } }, { duplicateId: otherVlan.id, duplicateName: otherVlan.name, duplicateCidr: otherVlan.cidr });
+    }
 
     const data = {
       name: d.name,
@@ -210,7 +222,8 @@ export const saveIpOperation = defineOperation({
     if (!ipInCidr(d.address, subnet.cidr)) failField("address", "network.errors.notInSubnet");
 
     const address = formatIPv4(parsed);
-    const dup = await tx.netIp.findFirst({ where: { address, ...(id ? { id: { not: id } } : {}) }, include: { device: true } });
+    // Eindeutig je Netz (Subnetz): dieselbe Adresse darf in einem anderen Netz vorkommen (zusätzlich der Unique-Index (subnetId, address) gegen Wettläufe)
+    const dup = await tx.netIp.findFirst({ where: { subnetId: subnet.id, address, ...(id ? { id: { not: id } } : {}) }, include: { device: true } });
     if (dup) failField("address", "network.errors.ipTaken", { who: dup.device?.name ?? dup.hostname ?? "–" });
 
     let mac: string | null = null;
@@ -222,7 +235,14 @@ export const saveIpOperation = defineOperation({
 
     const data = { address, subnetId: subnet.id, deviceId: d.deviceId ?? null, hostname: d.hostname ?? null, kind: d.kind, mac, notes: d.notes ?? null };
     if (id && !(await claimRow(tx.netIp, id, version))) fail("conflict");
-    const saved = id ? await tx.netIp.update({ where: { id }, data }) : await tx.netIp.create({ data });
+    let saved;
+    try {
+      saved = id ? await tx.netIp.update({ where: { id }, data }) : await tx.netIp.create({ data });
+    } catch (error) {
+      // Wettlauf um dieselbe Adresse im selben Netz: der Unique-Index entscheidet
+      if (mapPrismaError(error)?.code === "duplicate") failField("address", "network.errors.ipTaken", { who: "–" });
+      throw error;
+    }
     audit({ target: `IP: ${saved.address}`, entityId: saved.id });
     return { id: saved.id, subnetId: subnet.id };
   },
