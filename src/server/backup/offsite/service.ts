@@ -84,7 +84,7 @@ export async function runOffsite(options: { now?: Date; signal?: AbortSignal } =
       if (options.signal?.aborted) throw new OffsiteError("timeout", "abgebrochen");
       const dir = backupPath(name);
       if (!dir) continue;
-      await transport.put(offsiteFileName(name), encryptedArchive(dir, masterKey), options.signal);
+      await transport.put(offsiteFileName(name), encryptedArchive(dir, masterKey, name), options.signal);
       uploaded.push(name);
     }
     const after = uploaded.length ? await transport.list() : remote;
@@ -111,10 +111,10 @@ export async function runOffsite(options: { now?: Date; signal?: AbortSignal } =
 }
 
 /** Das Archiv einer Sicherung (wie der Download) als verschlüsselter Strom. Fehler beim Packen erreichen den Empfänger. */
-function encryptedArchive(dir: string, masterKey: Buffer): Readable {
+function encryptedArchive(dir: string, masterKey: Buffer, name: string): Readable {
   const pack = tar.c({ cwd: dir, portable: true }, ["."]);
   const source = Readable.from(pack);
-  const encrypted = createEncryptStream(masterKey);
+  const encrypted = createEncryptStream(masterKey, { context: name }); // der Name steht im Kopf (und im AAD): eine umbenannte oder zurückgespielte Datei fällt beim Zurückholen auf
   pack.on("error", (error: unknown) => encrypted.destroy(error as Error));
   source.once("error", (error) => encrypted.destroy(error));
   // Bricht der Empfänger ab, werden Strom und Archivierer geschlossen (sonst blieben Dateien der Sicherung geöffnet)
@@ -167,7 +167,7 @@ export async function fetchOffsiteBackup(file: string, signal?: AbortSignal): Pr
   const transport = await factory(settings, credentials);
   try {
     const input = await transport.get(file, signal);
-    await decryptToFile(input, plain, masterKey, root, BACKUP_ARCHIVE_LIMITS.maxBytes);
+    await decryptToFile(input, plain, masterKey, root, BACKUP_ARCHIVE_LIMITS.maxBytes, backupNameOf(file));
     return await importBackupFile(plain);
   } finally {
     await transport.close().catch(() => undefined);

@@ -76,7 +76,7 @@ describe("Off-Site-Format (.sobk)", () => {
     assert.equal(await codeOf(decrypt(Buffer.from("PK\x03\x04 kein Backup".padEnd(80, "x")))), "format");
     const blob = await encrypt(randomBytes(100));
     const wrongVersion = Buffer.from(blob);
-    wrongVersion[4] = 2;
+    wrongVersion[4] = 3;
     assert.equal(await codeOf(decrypt(wrongVersion)), "format");
     const hugeChunk = Buffer.from(blob);
     hugeChunk.writeUInt32BE(0x7fffffff, 8);
@@ -134,6 +134,45 @@ describe("Off-Site-Format (.sobk)", () => {
     const plain = randomBytes(MIN_CHUNK_SIZE * 2);
     const blob = await encrypt(plain);
     assert.equal(blob.length, HEADER_LENGTH + 2 * (4 + MIN_CHUNK_SIZE + TAG_LENGTH), "der letzte volle Block ist der Endblock (kein leerer Anhang)");
+  });
+});
+
+describe("Kontext im Kopf (Name der Sicherung, ZP5-9)", () => {
+  const NAME = "schrauberos-20260101T020000Z-auto";
+  const withContext = (plain: Buffer, context = NAME) => run(createEncryptStream(master, { chunkSize: MIN_CHUNK_SIZE, context }), plain, 1000);
+  const expecting = (blob: Buffer, expectContext: string | undefined, key = master) => run(createDecryptStream(key, { expectContext }), blob, 777);
+
+  it("der Name steht im Kopf; mit dem erwarteten Namen (oder ohne Erwartung) wird entschlüsselt", async () => {
+    const plain = randomBytes(MIN_CHUNK_SIZE * 2 + 3);
+    const blob = await withContext(plain);
+    assert.equal(blob.readUInt16BE(44), NAME.length);
+    assert.equal(blob.subarray(HEADER_LENGTH, HEADER_LENGTH + NAME.length).toString("utf8"), NAME);
+    assert.ok((await expecting(blob, NAME)).equals(plain));
+    assert.ok((await expecting(blob, undefined)).equals(plain), "ohne Erwartung (hochgeladene Datei) bleibt es möglich");
+  });
+
+  it("eine Datei unter fremdem Namen (ältere Datei als neuere ausgegeben) fällt auf – bei jedem Namensunterschied", async () => {
+    const blob = await withContext(randomBytes(500));
+    for (const other of ["schrauberos-20260102T020000Z-auto", "schrauberos-20260101T020000Z-manual", "", NAME + "x"]) {
+      assert.equal(await codeOf(expecting(blob, other)), "context", other);
+    }
+  });
+
+  it("der Name im Kopf ist beglaubigt: wer ihn ändert (auch auf den erwarteten Namen), scheitert an der Prüfung", async () => {
+    const old = await withContext(randomBytes(500), "schrauberos-20250101T020000Z-auto");
+    const forged = Buffer.from(old);
+    forged.write(NAME, HEADER_LENGTH, "utf8"); // gleiche Länge, anderer Name
+    assert.equal(forged.readUInt16BE(44), NAME.length);
+    assert.equal(await codeOf(expecting(forged, NAME)), "auth");
+    assert.equal(await codeOf(expecting(forged, undefined)), "auth");
+  });
+
+  it("ein zu langer Kontext oder ein beschädigtes Längenfeld wird abgewiesen", async () => {
+    assert.throws(() => createEncryptStream(master, { context: "x".repeat(256) }));
+    const blob = await withContext(randomBytes(100));
+    const huge = Buffer.from(blob);
+    huge.writeUInt16BE(0xffff, 44);
+    assert.equal(await codeOf(expecting(huge, undefined)), "format");
   });
 });
 

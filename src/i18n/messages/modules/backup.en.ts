@@ -75,6 +75,7 @@ export const backupEn: typeof backupDe = {
     wrongKey: "This recovery key does not match this file (or it has been altered).",
     noWrappedKey: "This backup contains no copy of the secret key protected by a recovery key (it is older than the feature or was made without a key). Please restore without a key – secrets that cannot be read are then reset.",
     keyRequired: "This encrypted file needs the recovery key.",
+    fileMismatch: "The file at the off-site target belongs to a different backup than its name says (renamed or replaced by an older one). It is not imported.",
     createFailed: "The backup could not be created. Please check free disk space.",
     restoreFailed: "The restore could not be prepared.",
     notFound: "This backup no longer exists.",

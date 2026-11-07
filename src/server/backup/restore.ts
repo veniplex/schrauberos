@@ -29,7 +29,9 @@ export type RestoreErrorCode =
   /** Das Backup enthält keine mit einem Wiederherstellungsschlüssel umhüllte Kopie von secret.key (zu alt oder ohne Schlüssel erstellt) */
   | "noWrappedKey"
   /** Verschlüsseltes Off-Site-Backup: der Wiederherstellungsschlüssel fehlt */
-  | "keyRequired";
+  | "keyRequired"
+  /** Die Datei am Off-Site-Ziel gehört zu einer anderen Sicherung als ihr Name sagt (umbenannt, ältere Datei untergeschoben) */
+  | "fileMismatch";
 
 /** Fehler mit festem Code; die Oberfläche übersetzt `backup.errors.<code>`. */
 export class RestoreError extends Error {
@@ -335,15 +337,15 @@ async function decryptUploaded(uploaded: string, recoveryKey: string | null | un
  * Entschlüsselt einen `.sobk`-Strom nach `dest` – mit Obergrenze (`maxBytes`, zusätzlich der freie Platz abzüglich Reserve, laufend geprüft). Fehler als `RestoreError`:
  * `wrongKey` (falscher Schlüssel oder verändert), `notBackup` (keine .sobk-Datei), `corrupt` (abgeschnitten), `tooLarge`/`diskFull`. Die halbe Datei wird in jedem Fall gelöscht.
  */
-export async function decryptToFile(input: Readable, dest: string, masterKey: Buffer, root: string, maxBytes: number): Promise<void> {
+export async function decryptToFile(input: Readable, dest: string, masterKey: Buffer, root: string, maxBytes: number, expectContext?: string): Promise<void> {
   const free = await freeBytes(root);
   const diskLimit = free === null ? Number.POSITIVE_INFINITY : Math.max(0, free - DISK_RESERVE_BYTES);
   try {
-    await pipeline(input, createDecryptStream(masterKey), limitStream({ maxBytes: Math.min(maxBytes, diskLimit), free: () => freeBytes(root), reserve: DISK_RESERVE_BYTES }), createWriteStream(dest));
+    await pipeline(input, createDecryptStream(masterKey, { expectContext }), limitStream({ maxBytes: Math.min(maxBytes, diskLimit), free: () => freeBytes(root), reserve: DISK_RESERVE_BYTES }), createWriteStream(dest));
   } catch (error) {
     rmSync(dest, { force: true });
     if (error instanceof StreamLimitError) throw new RestoreError(error.code === "tooLarge" && diskLimit < maxBytes ? "diskFull" : error.code);
-    if (error instanceof OffsiteCryptoError) throw new RestoreError(error.code === "auth" ? "wrongKey" : error.code === "format" ? "notBackup" : "corrupt");
+    if (error instanceof OffsiteCryptoError) throw new RestoreError(error.code === "auth" ? "wrongKey" : error.code === "format" ? "notBackup" : error.code === "context" ? "fileMismatch" : "corrupt");
     throw error;
   }
 }

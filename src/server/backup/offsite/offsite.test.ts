@@ -285,6 +285,17 @@ describe("Off-Site: Übertragen (WebDAV)", () => {
     assert.ok(bad.error);
   });
 
+  it("eine ältere Sicherung unter dem Namen einer neueren (Zurückspielen) wird beim Zurückholen erkannt (ZP5-9)", async () => {
+    await saveWebdav();
+    const [older, newer] = await makeBackups(2);
+    await service.runOffsite();
+    dav.files.set(`${newer}.sobk`, Buffer.from(dav.files.get(`${older}.sobk`)!)); // die neuere Datei wird durch die ältere ersetzt
+    const before = (await core.listBackups()).length;
+    await assert.rejects(service.fetchOffsiteBackup(`${newer}.sobk`), (error) => error instanceof restore.RestoreError && error.code === "fileMismatch");
+    assert.equal((await core.listBackups()).length, before, "nichts wird übernommen");
+    assert.ok((await service.fetchOffsiteBackup(`${older}.sobk`)), "die echte ältere Datei unter ihrem Namen geht");
+  });
+
   it("eine veränderte Datei am Ziel wird beim Zurückholen erkannt (nichts wird übernommen)", async () => {
     await saveWebdav();
     const [name] = await makeBackups(1);

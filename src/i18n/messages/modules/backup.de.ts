@@ -73,6 +73,7 @@ export const backupDe = {
     wrongKey: "Dieser Wiederherstellungsschlüssel passt nicht zu dieser Datei (oder sie wurde verändert).",
     noWrappedKey: "Diese Sicherung enthält keine mit einem Wiederherstellungsschlüssel gesicherte Kopie des Geheimnisschlüssels (sie ist älter als die Funktion oder wurde ohne Schlüssel erstellt). Bitte ohne Schlüssel wiederherstellen – nicht lesbare Geheimnisse werden dann zurückgesetzt.",
     keyRequired: "Für diese verschlüsselte Datei wird der Wiederherstellungsschlüssel gebraucht.",
+    fileMismatch: "Die Datei am Off-Site-Ziel gehört zu einer anderen Sicherung, als ihr Name sagt (umbenannt oder durch eine ältere ersetzt). Sie wird nicht übernommen.",
     createFailed: "Das Backup konnte nicht angelegt werden. Bitte freien Speicherplatz prüfen.",
     restoreFailed: "Die Wiederherstellung konnte nicht vorbereitet werden.",
     notFound: "Dieses Backup gibt es nicht mehr.",

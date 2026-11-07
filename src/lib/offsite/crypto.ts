@@ -6,7 +6,9 @@ import { Transform, type TransformCallback } from "node:stream";
  * entschlüsselt) werden kann – nie komplett im Speicher.
  *
  * Aufbau:
- *   Kopf (44 Byte):  "SOBK" · Version (1) · 3 Nullbytes · Blockgröße (u32, Klartext je Block) · Salz (32 Byte, zufällig je Datei)
+ *   Kopf (46 Byte + Kontext): "SOBK" · Version (2) · 3 Nullbytes · Blockgröße (u32, Klartext je Block) · Salz (32 Byte, zufällig je Datei) · Länge des Kontexts (u16) · Kontext (UTF-8)
+ *   Der **Kontext** ist der Name der Sicherung (`schrauberos-<Zeit>-<Art>`), für die die Datei erzeugt wurde. Er steht im Kopf und damit im AAD jedes Blocks: Eine ältere Datei, die am
+ *   Ziel unter einem neueren Namen liegt (Zurückspielen eines alten Stands, Attrappe), fällt beim Entschlüsseln auf (`context`), wenn der erwartete Name bekannt ist.
  *   danach Blöcke:   Länge (u32) · Chiffretext · Tag (16 Byte)           – Länge = Chiffretext + Tag
  * Schlüssel je Datei: HKDF-SHA256(Hauptschlüssel, Salz, "schrauberos-offsite-file-v1") – kein Schlüssel wird für zwei Dateien benutzt, deshalb sind Zähler-Nonces sicher.
  * Nonce des Blocks: 4 Nullbytes · Blocknummer (u64, ab 0). Zusätzlich authentifiziert (AAD): der ganze Kopf und ein Endmarken-Byte (1 beim **letzten** Block).
@@ -15,15 +17,19 @@ import { Transform, type TransformCallback } from "node:stream";
  * Falscher Schlüssel und Veränderung sind nicht zu unterscheiden (`auth`).
  */
 export const OFFSITE_MAGIC = Buffer.from("SOBK", "latin1");
-export const OFFSITE_VERSION = 1;
-export const HEADER_LENGTH = 44;
+export const OFFSITE_VERSION = 2;
+/** fester Teil des Kopfes bis einschließlich Salz */
+export const FIXED_HEADER_LENGTH = 44;
+/** kleinster Kopf (ohne Kontext): fester Teil und das Längenfeld des Kontexts */
+export const HEADER_LENGTH = 46;
+export const MAX_CONTEXT_LENGTH = 255;
 export const TAG_LENGTH = 16;
 export const DEFAULT_CHUNK_SIZE = 1024 * 1024;
 export const MIN_CHUNK_SIZE = 4096;
 export const MAX_CHUNK_SIZE = 16 * 1024 * 1024;
 const FILE_INFO = "schrauberos-offsite-file-v1";
 
-export type OffsiteCryptoCode = "format" | "auth" | "truncated";
+export type OffsiteCryptoCode = "format" | "auth" | "truncated" | /** die Datei gehört zu einer anderen Sicherung als erwartet */ "context";
 
 export class OffsiteCryptoError extends Error {
   constructor(readonly code: OffsiteCryptoCode) {
@@ -47,14 +53,18 @@ export function isOffsiteHeader(head: Buffer): boolean {
 }
 
 /** Verschlüsselt einen Strom (Klartext rein, `.sobk` raus). `chunkSize` nur für Tests kleiner wählen. */
-export function createEncryptStream(masterKey: Buffer, options: { chunkSize?: number } = {}): Transform {
+export function createEncryptStream(masterKey: Buffer, options: { chunkSize?: number; /** Name der Sicherung, für die die Datei erzeugt wird (kommt in den Kopf) */ context?: string } = {}): Transform {
   const chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
   if (chunkSize < MIN_CHUNK_SIZE || chunkSize > MAX_CHUNK_SIZE) throw new Error("Ungültige Blockgröße.");
-  const header = Buffer.alloc(HEADER_LENGTH);
+  const context = Buffer.from(options.context ?? "", "utf8");
+  if (context.length > MAX_CONTEXT_LENGTH) throw new Error("Kontext zu lang.");
+  const header = Buffer.alloc(HEADER_LENGTH + context.length);
   OFFSITE_MAGIC.copy(header, 0);
   header[4] = OFFSITE_VERSION;
   header.writeUInt32BE(chunkSize, 8);
   randomBytes(32).copy(header, 12);
+  header.writeUInt16BE(context.length, FIXED_HEADER_LENGTH);
+  context.copy(header, HEADER_LENGTH);
   const key = fileKey(masterKey, header.subarray(12, 44));
 
   let pending: Buffer = Buffer.alloc(0);
@@ -101,7 +111,7 @@ export function createEncryptStream(masterKey: Buffer, options: { chunkSize?: nu
 }
 
 /** Entschlüsselt einen `.sobk`-Strom. Fehler: `OffsiteCryptoError` (`format` = keine Datei dieses Formats, `auth` = falscher Schlüssel oder verändert, `truncated` = abgeschnitten). */
-export function createDecryptStream(masterKey: Buffer): Transform {
+export function createDecryptStream(masterKey: Buffer, options: { /** erwarteter Name der Sicherung; weicht der Kontext im Kopf ab, endet der Strom mit `context` */ expectContext?: string } = {}): Transform {
   let buffer: Buffer = Buffer.alloc(0);
   let header: Buffer | null = null;
   let key: Buffer | null = null;
@@ -125,13 +135,15 @@ export function createDecryptStream(masterKey: Buffer): Transform {
     const known = Math.min(OFFSITE_MAGIC.length, buffer.length);
     if (!buffer.subarray(0, known).equals(OFFSITE_MAGIC.subarray(0, known))) throw new OffsiteCryptoError("format");
     if (buffer.length < HEADER_LENGTH) return false;
-    const candidate = buffer.subarray(0, HEADER_LENGTH);
-    const size = candidate.readUInt32BE(8);
-    if (candidate[4] !== OFFSITE_VERSION || candidate.readUIntBE(5, 3) !== 0 || size < MIN_CHUNK_SIZE || size > MAX_CHUNK_SIZE) throw new OffsiteCryptoError("format");
-    header = Buffer.from(candidate);
+    const size = buffer.readUInt32BE(8);
+    const contextLength = buffer.readUInt16BE(FIXED_HEADER_LENGTH);
+    if (buffer[4] !== OFFSITE_VERSION || buffer.readUIntBE(5, 3) !== 0 || size < MIN_CHUNK_SIZE || size > MAX_CHUNK_SIZE || contextLength > MAX_CONTEXT_LENGTH) throw new OffsiteCryptoError("format");
+    if (buffer.length < HEADER_LENGTH + contextLength) return false;
+    header = Buffer.from(buffer.subarray(0, HEADER_LENGTH + contextLength));
     chunkSize = size;
     key = fileKey(masterKey, header.subarray(12, 44));
-    buffer = buffer.subarray(HEADER_LENGTH);
+    buffer = buffer.subarray(HEADER_LENGTH + contextLength);
+    if (options.expectContext !== undefined && header.subarray(HEADER_LENGTH).toString("utf8") !== options.expectContext) throw new OffsiteCryptoError("context");
     return true;
   };
 
