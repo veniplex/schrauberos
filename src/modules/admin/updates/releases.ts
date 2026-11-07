@@ -3,6 +3,8 @@ import { FetchPolicyError, fetchWithPolicy } from "@/lib/updates/safe-fetch";
 import { fetchPolicy, updateConfig } from "./config";
 import { parseEndorsements, trustedReleaseKeys, validEndorsements } from "@/lib/updates/keychain";
 import { readEndorsements, readNotesCopy, writeEndorsements, writeNotesCopy } from "@/lib/updates/store";
+import { pemToRawKey } from "@/lib/updates/keychain";
+import { SEAL_MAX_BYTES, verifySeal } from "@/lib/updates/seal";
 import { UpdateError, verifyManifest, type Manifest } from "./manifest";
 
 type GithubAsset = { name: string; url: string; size: number };
@@ -14,6 +16,10 @@ export type Release = {
   publishedAt: string | null;
   manifest: Manifest;
   bundle: GithubAsset;
+  /** Bytes des Siegels (`SOS-SEAL`): geprüft (Signatur, Kette, Ablauf) und mit dem Manifest abgeglichen; der Installer legt es in den Versionsordner */
+  seal: Buffer;
+  /** Ablaufdatum der Beglaubigung des Signaturschlüssels (JJJJ-MM-TT), wenn nicht der eingebaute Release-Schlüssel signiert hat */
+  endorsedUntil?: string;
 };
 
 const baseHeaders = (accept: string) => ({ Accept: accept, "User-Agent": "SchrauberOS-Updater", "X-GitHub-Api-Version": "2022-11-28" });
@@ -107,7 +113,21 @@ async function loadLatestRelease(): Promise<Release> {
   const bundle = find(manifest.asset);
   if (!bundle) throw new UpdateError("badRelease", "Paket fehlt");
 
-  return { version: manifest.version, notes: release.body ?? "", publishedAt: release.published_at, manifest, bundle };
+  // Das Siegel gehört dem Release wie das Manifest und wird vor dem Download des (großen) Pakets geprüft: Signatur über die Schlüsselkette (die Beglaubigung steckt
+  // im Siegel selbst), Ablauf der Beglaubigung gegen die Uhr, und es muss zu dem passen, was das Manifest ankündigt.
+  const sealAsset = find("SOS-SEAL");
+  if (!sealAsset) throw new UpdateError("badRelease", "Siegel (SOS-SEAL) fehlt");
+  if (sealAsset.size > SEAL_MAX_BYTES) throw new UpdateError("badRelease", "SOS-SEAL zu groß");
+  const sealBytes = await smallAsset(sealAsset);
+  const releaseKey = pemToRawKey(builtInKey);
+  const rootRaw = pemToRawKey(rootKey);
+  if (!releaseKey || !rootRaw) throw new UpdateError("badSignature");
+  const sealCheck = verifySeal(sealBytes, { releaseKey, rootKey: rootRaw }, new Date());
+  if (!sealCheck.ok) throw new UpdateError(sealCheck.reason === "endorsement-expired" ? "sealExpired" : sealCheck.code === 11 ? "badSignature" : "badRelease", `Siegel: ${sealCheck.reason}`);
+  const { seal } = sealCheck;
+  if (seal.version !== manifest.version || seal.base !== manifest.base || seal.arch !== manifest.arch) throw new UpdateError("badRelease", "Siegel passt nicht zum Manifest");
+
+  return { version: manifest.version, notes: release.body ?? "", publishedAt: release.published_at, manifest, bundle, seal: sealBytes, ...(seal.endorsedUntil ? { endorsedUntil: seal.endorsedUntil } : {}) };
 }
 
 export type ReleaseCheck = { at: number; release: Release } | { at: number; error: UpdateError["code"] };

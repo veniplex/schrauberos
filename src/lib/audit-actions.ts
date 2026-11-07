@@ -109,6 +109,7 @@ export const AUDIT_ACTIONS = [
   "setup.restore",
   "system.update",
   "system.updateFailed",
+  "system.integrityFailed",
   "system.auditPruned",
 ] as const;
 

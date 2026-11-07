@@ -8,6 +8,7 @@ import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
 import { startJobRunner } from "@/server/jobs";
 import { appliedMigrations, MigrationError, runMigrations } from "@/server/migrate";
+import { reportIntegrityOnce } from "@/server/integrity-report";
 import { ensureBaseData } from "@/server/seed/base";
 import { resetUnreadableSecrets } from "@/server/secret-reset";
 import { ensureSecretKey } from "@/server/secrets";
@@ -76,6 +77,8 @@ export async function startApp(): Promise<void> {
     const revoked = await revokeApiTokensAfterRestore();
     if (revoked > 0) console.log(`[start] Nach der Wiederherstellung: ${revoked} API-Token(s) widerrufen.`);
     // Geheimnisschlüssel: bei frischer Datenbank anlegen; fehlt er bei vorhandenen Geheimnissen oder ist er nicht lesbar, wird nichts angelegt und nichts gelöscht (siehe secrets.ts)
+    // Integritätsbefund des Starters (installierte Version abgelehnt): einmal im Audit-Log festhalten; ein Fehler dabei verhindert nie den Start
+    await reportIntegrityOnce().catch((error) => logError("start:integrity", error));
     const keyState = ensureSecretKey();
     if (keyState.state !== "readable") console.error(`[start] secret.key ist ${keyState.state === "missing" ? "nicht vorhanden" : "nicht lesbar"}: Zwei-Faktor-Anmeldung, Update-Token und Zugangsdaten sind gesperrt, bis der Schlüssel wieder da ist (Anmeldeseite: „Schlüssel wiederherstellen“, Verwaltung → Backups → Schlüssel).`);
     // Geheimnisse, die der Schlüssel dieses Datenträgers nicht entschlüsseln kann (Wiederherstellung ohne Wiederherstellungsschlüssel): werden über das Register der Geheimnis-Verbraucher

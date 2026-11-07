@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { makeReadOnly, removeTreeSync } from "@/lib/updates/fs-tree";
+import { createEndorsement } from "@/lib/updates/keychain";
+import { createSeal, sealFieldsFor } from "@/lib/updates/seal";
+import { TEST_OTHER_ROOT, TEST_RELEASE, TEST_ROGUE, TEST_ROOT, TEST_SECOND, type TestKey } from "@/lib/updates/testdata/anchor/test-keys";
+import { generateTree, nodeFs, serializeTree } from "@/lib/updates/tree";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, before, beforeEach, describe, it } from "node:test";
@@ -15,6 +20,7 @@ import { createTestEnv, type TestEnv } from "@/test/harness";
  */
 let env: TestEnv;
 let install: typeof import("./install");
+let verifyModule: typeof import("./verify");
 let store: typeof import("@/lib/updates/store");
 let UpdateError: typeof import("./manifest").UpdateError;
 const realFetch = globalThis.fetch;
@@ -23,8 +29,15 @@ const work = mkdtempSync(path.join(tmpdir(), "so-install-"));
 
 type Release = import("./releases").Release;
 
-/** Baut ein Paket mit den Dateien, die ein gültiges Release enthalten muss (ohne die in `omit` genannten). */
-async function bundle(version: string, options: { base?: number; omit?: string[]; metaVersion?: string } = {}) {
+/** Das Siegel zu einem gebauten Paket (kommt im echten Release als eigenes Asset) */
+const seals = new WeakMap<Buffer, Buffer>();
+
+/**
+ * Baut ein Paket mit den Dateien, die ein gültiges Release enthalten muss (ohne die in `omit` genannten), samt Dateiliste SOS-TREE und – für `release()` – Siegel.
+ * `extra`: Dateien, die **nach** dem Erzeugen der Liste ins Paket kommen (Manipulation); `tamper`: Dateien, deren Inhalt danach verändert wird;
+ * `signer`/`endorsedUntil`: Signaturschlüssel des Siegels (Testschlüssel).
+ */
+async function bundle(version: string, options: { base?: number; omit?: string[]; metaVersion?: string; extra?: string[]; tamper?: string[]; signer?: TestKey; endorsedUntil?: string; endorsedBy?: TestKey } = {}) {
   const dir = path.join(work, `pkg-${version}-${Math.random().toString(36).slice(2)}`);
   const files: Record<string, string> = {
     "version.json": JSON.stringify({ version: options.metaVersion ?? version, base: options.base ?? 1 }),
@@ -39,9 +52,20 @@ async function bundle(version: string, options: { base?: number; omit?: string[]
     mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
     writeFileSync(path.join(dir, name), content);
   }
+  const tree = serializeTree(await generateTree(nodeFs(dir)));
+  writeFileSync(path.join(dir, "SOS-TREE"), tree);
+  for (const name of options.extra ?? []) writeFileSync(path.join(dir, name), "böse");
+  for (const name of options.tamper ?? []) writeFileSync(path.join(dir, name), "verändert!!");
+  const signer = options.signer ?? TEST_RELEASE;
+  const seal = createSeal(sealFieldsFor(tree, { version, base: options.base ?? 1, arch: process.arch }), signer.privatePem, {
+    builtInKeyPem: TEST_RELEASE.publicPem,
+    endorsement: signer === TEST_RELEASE ? undefined : createEndorsement((options.endorsedBy ?? TEST_ROOT).privatePem, signer.publicPem, options.endorsedUntil ?? "2099-12-31"),
+  });
   const archive = path.join(work, `${path.basename(dir)}.tar.gz`);
-  await tar.c({ gzip: true, file: archive, cwd: dir }, Object.keys(files).filter((f) => !options.omit?.includes(f)));
-  return readFileSync(archive);
+  await tar.c({ gzip: true, file: archive, cwd: dir }, [...Object.keys(files).filter((f) => !options.omit?.includes(f)), "SOS-TREE", ...(options.extra ?? [])]);
+  const bytes = readFileSync(archive);
+  seals.set(bytes, seal);
+  return bytes;
 }
 
 function release(version: string, bytes: Buffer, overrides: Partial<Release["manifest"]> = {}): Release {
@@ -52,6 +76,7 @@ function release(version: string, bytes: Buffer, overrides: Partial<Release["man
     publishedAt: null,
     manifest: { schema: 1, version, base: 1, arch: process.arch, asset, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length, ...overrides },
     bundle: { name: asset, url: `http://fake/asset/${asset}`, size: bytes.length },
+    seal: seals.get(bytes) ?? Buffer.alloc(0),
   };
 }
 
@@ -90,21 +115,27 @@ before(async () => {
   mkdirSync(running, { recursive: true });
   writeFileSync(path.join(running, "version.json"), JSON.stringify({ version: "1.0.0", base: 1 }));
   process.chdir(running);
+  const config = await import("./config");
+  config.setTrustAnchorsForTest({ builtInKey: TEST_RELEASE.publicPem, rootKey: TEST_ROOT.publicPem });
+  verifyModule = await import("./verify");
   install = await import("./install");
   store = await import("@/lib/updates/store");
   UpdateError = (await import("./manifest")).UpdateError;
 });
 after(async () => {
   process.chdir(realCwd);
+  (await import("./config")).setTrustAnchorsForTest(null);
+  verifyModule.setTreeVerifier(null);
   globalThis.fetch = realFetch;
   delete process.env.APP_UPDATER;
   delete process.env.UPDATE_API_URL;
   delete process.env.UPDATE_REDIRECT_HOSTS;
+  removeTreeSync(store.updatesDir()); // installierte Versionen sind schreibgeschützt
   await env.cleanup();
   rmSync(work, { recursive: true, force: true });
 });
 beforeEach(() => {
-  rmSync(store.updatesDir(), { recursive: true, force: true });
+  removeTreeSync(store.updatesDir()); // installierte Versionen sind schreibgeschützt
 });
 afterEach(() => {
   globalThis.fetch = realFetch;
@@ -285,5 +316,161 @@ describe("installRelease", () => {
     await install.installRelease(release("1.1.0", bytes));
     assert.equal(requests[0].auth, "Bearer geheim-token-123");
     assert.equal(requests[0].url.includes("geheim"), false, "das Token steht nie in der URL");
+  });
+});
+
+describe("installRelease: Siegel und Prüfung vor der Aktivierung (Starter-Vertrauensanker)", () => {
+  const nothingActivated = (version: string) => {
+    assert.equal(store.readState().current, null, "der Zustand bleibt unberührt");
+    assert.equal(store.readActive(), null, "der Zeiger bleibt leer");
+    assert.equal(existsSync(store.versionDir(version)), false, "keine Version im Volume");
+    assert.equal(existsSync(path.join(store.versionsDir(), `.partial-${version}`)), false, "kein Staging-Rest");
+  };
+
+  it("legt das Siegel in den Versionsordner; Liste und Siegel passen zum Inhalt; auf POSIX-Systemen ist der Baum schreibgeschützt", async () => {
+    const bytes = await bundle("1.1.0");
+    fakeDownload(bytes);
+    const rel = release("1.1.0", bytes);
+    await install.installRelease(rel);
+    const dir = store.versionDir("1.1.0");
+    assert.ok(readFileSync(path.join(dir, "SOS-SEAL")).equals(rel.seal), "das Siegel aus dem Release liegt im Versionsordner");
+    assert.ok(existsSync(path.join(dir, "SOS-TREE")));
+    if (process.platform !== "win32") {
+      assert.equal(statSync(dir).mode & 0o222, 0, "Ordner schreibgeschützt");
+      assert.equal(statSync(path.join(dir, "server.js")).mode & 0o222, 0, "Dateien schreibgeschützt");
+      assert.throws(() => writeFileSync(path.join(dir, "neu.txt"), "x"), /EACCES|EPERM/);
+    }
+  });
+
+  it("eine zusätzliche Datei im Paket (nicht in der Liste) wird abgelehnt: nichts wird aktiviert", async () => {
+    const bytes = await bundle("1.1.0", { extra: ["backdoor.js"] });
+    fakeDownload(bytes);
+    await rejectsWith(install.installRelease(release("1.1.0", bytes)), "badTree");
+    nothingActivated("1.1.0");
+  });
+
+  it("eine veränderte Datei wird abgelehnt", async () => {
+    const bytes = await bundle("1.1.0", { tamper: ["server.js"] });
+    fakeDownload(bytes);
+    await rejectsWith(install.installRelease(release("1.1.0", bytes)), "badTree");
+    nothingActivated("1.1.0");
+  });
+
+  it("ein Siegel, das ein nicht vertrauter Schlüssel signiert hat, ein fehlendes oder ein zerstörtes Siegel wird abgelehnt", async () => {
+    const rogue = await bundle("1.1.0", { signer: TEST_ROGUE, endorsedBy: TEST_OTHER_ROOT });
+    fakeDownload(rogue);
+    await rejectsWith(install.installRelease(release("1.1.0", rogue)), "badTree");
+    const good = await bundle("1.1.0");
+    fakeDownload(good);
+    await rejectsWith(install.installRelease({ ...release("1.1.0", good), seal: Buffer.alloc(0) }), "badTree");
+    const broken = Buffer.from(seals.get(good)!);
+    broken[broken.length - 20] = broken[broken.length - 20] === 0x30 ? 0x31 : 0x30;
+    await rejectsWith(install.installRelease({ ...release("1.1.0", good), seal: broken }), "badTree");
+    nothingActivated("1.1.0");
+  });
+
+  it("der Siegel-Schlüssel ist beglaubigt: gültig akzeptiert; abgelaufene Beglaubigung: eigener Fehler (Ablauf prüft nur die App, nie der Starter)", async () => {
+    const endorsed = await bundle("1.1.0", { signer: TEST_SECOND });
+    fakeDownload(endorsed);
+    await install.installRelease(release("1.1.0", endorsed));
+    assert.equal(store.readState().current, "1.1.0");
+    store.writeState({ ...store.readState(), current: null, previous: null, pending: false }); // zurücksetzen
+    removeTreeSync(store.versionDir("1.1.0"));
+    const expired = await bundle("1.2.0", { signer: TEST_SECOND, endorsedUntil: "2026-01-31" });
+    fakeDownload(expired);
+    await rejectsWith(install.installRelease(release("1.2.0", expired)), "sealExpired");
+    nothingActivated("1.2.0");
+  });
+
+  it("node_modules in einem Vorfahrenordner (versions/, app/, Datenverzeichnis) verhindert die Installation: Node würde dort Module nachladen", async () => {
+    const bytes = await bundle("1.1.0");
+    fakeDownload(bytes);
+    for (const where of [store.versionsDir(), store.updatesDir(), path.dirname(store.updatesDir())]) {
+      mkdirSync(path.join(where, "node_modules"), { recursive: true });
+      await rejectsWith(install.installRelease(release("1.1.0", bytes)), "badTree");
+      removeTreeSync(path.join(where, "node_modules"));
+    }
+    nothingActivated("1.1.0");
+    await install.installRelease(release("1.1.0", bytes));
+    assert.equal(store.readState().current, "1.1.0", "ohne node_modules oberhalb klappt es");
+  });
+
+  it("die Prüfung ist einspritzbar: der Installer ruft sie mit Staging-Ordner (inkl. Siegel) und Version auf; ihr Befund entscheidet", async () => {
+    const bytes = await bundle("1.1.0");
+    fakeDownload(bytes);
+    const calls: Array<{ dir: string; version: string; hasSeal: boolean }> = [];
+    verifyModule.setTreeVerifier(async ({ dir, version }) => {
+      calls.push({ dir, version, hasSeal: existsSync(path.join(dir, "SOS-SEAL")) });
+      return { ok: false, code: 15, reason: "extra", path: "x" };
+    });
+    await rejectsWith(install.installRelease(release("1.1.0", bytes)), "badTree");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].version, "1.1.0");
+    assert.equal(calls[0].hasSeal, true);
+    assert.match(path.basename(calls[0].dir), /^\.partial-1\.1\.0$/);
+    nothingActivated("1.1.0");
+
+    verifyModule.setTreeVerifier(async () => ({ ok: true, version: "1.1.0", files: 1, bytes: 1, ms: 1, floor: "above" }));
+    await install.installRelease(release("1.1.0", bytes));
+    assert.equal(store.readState().current, "1.1.0");
+    verifyModule.setTreeVerifier(null);
+  });
+
+  it("veraltet/unverträglich (Code 19 des Prüfers) wird als „nicht neuer“ bzw. „neues Image nötig“ gemeldet, nicht als Integritätsfehler", async () => {
+    const bytes = await bundle("1.1.0");
+    fakeDownload(bytes);
+    verifyModule.setTreeVerifier(async () => ({ ok: false, code: 19, reason: "floor" }));
+    await rejectsWith(install.installRelease(release("1.1.0", bytes)), "notNewer");
+    verifyModule.setTreeVerifier(async () => ({ ok: false, code: 19, reason: "base" }));
+    await rejectsWith(install.installRelease(release("1.1.0", bytes)), "needsImage");
+    verifyModule.setTreeVerifier(null);
+  });
+
+  it("die Untergrenze des Starters ist die eingebaute Version: eine Version, die nicht darüber liegt, wird schon beim Installieren abgewiesen", async () => {
+    const builtinDir = path.join(work, "builtin-floor");
+    mkdirSync(builtinDir, { recursive: true });
+    writeFileSync(path.join(builtinDir, "version.json"), JSON.stringify({ version: "1.1.0", base: 1 }));
+    process.env.BUILTIN_DIR = builtinDir;
+    try {
+      const bytes = await bundle("1.1.0");
+      fakeDownload(bytes);
+      await rejectsWith(install.installRelease(release("1.1.0", bytes)), "notNewer");
+      const above = await bundle("1.2.0");
+      fakeDownload(above);
+      await install.installRelease(release("1.2.0", above));
+    } finally {
+      delete process.env.BUILTIN_DIR;
+    }
+    assert.equal(store.readState().current, "1.2.0");
+  });
+
+  it("dieselbe Version erneut installieren (Reparatur): ersetzt eine vorhandene, auch schreibgeschützte; hebt die Sperre auf", async () => {
+    const bytes = await bundle("1.1.0");
+    fakeDownload(bytes);
+    await install.installRelease(release("1.1.0", bytes));
+    // Zustand nach einem Integritätsbefund: Version gesperrt, Rückfall auf die eingebaute; der schreibgeschützte Baum liegt noch da
+    await makeReadOnly(store.versionDir("1.1.0")).catch(() => undefined);
+    store.writeState({ ...store.readState(), current: null, pending: false, failed: ["1.1.0"] });
+    await install.installRelease(release("1.1.0", bytes));
+    const state = store.readState();
+    assert.equal(state.current, "1.1.0");
+    assert.deepEqual(state.failed, [], "die Sperre ist aufgehoben");
+    assert.ok(existsSync(path.join(store.versionDir("1.1.0"), "SOS-SEAL")));
+  });
+
+  it("räumt beim Aufräumen alter Versionen auch schreibgeschützte Bäume weg", async () => {
+    const a = await bundle("1.1.0");
+    fakeDownload(a);
+    await install.installRelease(release("1.1.0", a));
+    store.writeState({ ...store.readState(), pending: false });
+    const b = await bundle("1.2.0");
+    fakeDownload(b);
+    await install.installRelease(release("1.2.0", b));
+    store.writeState({ ...store.readState(), pending: false });
+    const c = await bundle("1.3.0");
+    fakeDownload(c);
+    await install.installRelease(release("1.3.0", c));
+    assert.equal(existsSync(store.versionDir("1.1.0")), false, "nur aktuelle und vorherige Version bleiben");
+    assert.ok(existsSync(store.versionDir("1.2.0")));
   });
 });

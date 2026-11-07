@@ -67,6 +67,7 @@ export const auditDe = {
     system: {
       update: "Update installiert",
       updateFailed: "Update fehlgeschlagen",
+      integrityFailed: "Integritätsprüfung einer installierten Version fehlgeschlagen",
       auditPruned: "Alte Audit-Einträge gelöscht",
     },
     auth: {

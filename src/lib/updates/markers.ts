@@ -24,7 +24,6 @@ export function versionFromMarker(raw: string): string | null {
 }
 
 /** Entfernt Steuerzeichen und kürzt (Pfade aus Markern landen in Logs, Audit-Text und Anzeige). */
-// eslint-disable-next-line no-control-regex
 export const cleanDetail = (value: string, max = 200): string => value.replace(/[\u0000-\u001f\u007f]/g, "?").slice(0, max);
 
 export type VerifyFailedMarker = { version: string; code: (typeof NEGATIVE_CODES)[number]; path: string };

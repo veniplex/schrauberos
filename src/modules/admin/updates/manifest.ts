@@ -1,5 +1,6 @@
 import { createPublicKey, verify } from "node:crypto";
 import { z } from "zod";
+import { manifestSignedBytes } from "@/lib/updates/keychain";
 import { isCompatible, type VersionMeta } from "@/lib/updates/state";
 
 /** Größtes akzeptiertes Release-Paket (Schutz vor versehentlich/böswillig riesigen Downloads). */
@@ -20,6 +21,8 @@ export type UpdateErrorCode =
   | "disabled"
   | "extract"
   | "invalidBundle"
+  | "badTree"
+  | "sealExpired"
   | "backupFailed";
 
 /** Fehler mit festem Code; die Oberfläche übersetzt `updates.errors.<code>`. */
@@ -45,13 +48,15 @@ export const manifestSchema = z.object({
 export type Manifest = z.infer<typeof manifestSchema>;
 
 /**
- * Prüft die Ed25519-Signatur über die exakten Bytes des Manifests und liest es dann. Es genügt ein passender Schlüssel aus der
+ * Prüft die Ed25519-Signatur über Kontext (`schrauberos-manifest-v1
+`) + die exakten Bytes des Manifests und liest es dann. Es genügt ein passender Schlüssel aus der
  * Liste der vertrauten Release-Schlüssel (siehe `trustedReleaseKeys`: eingebaute plus vom Wurzelschlüssel beglaubigte).
  */
 export function verifyManifest(manifestBytes: Buffer, signature: Buffer, publicKeys: string | readonly string[]): Manifest {
+  const signed = manifestSignedBytes(manifestBytes);
   const valid = (typeof publicKeys === "string" ? [publicKeys] : publicKeys).some((pem) => {
     try {
-      return verify(null, manifestBytes, createPublicKey(pem), signature);
+      return verify(null, signed, createPublicKey(pem), signature);
     } catch {
       return false;
     }

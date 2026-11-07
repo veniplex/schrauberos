@@ -1,4 +1,4 @@
-import { constants as fsConstants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { constants as fsConstants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { removeTreeSync } from "./fs-tree";
 import { parseEndorsements, type Endorsement } from "./keychain";

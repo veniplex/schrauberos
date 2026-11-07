@@ -3,7 +3,9 @@ import { generateKeyPairSync, sign } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { after, before, beforeEach, describe, it } from "node:test";
-import { createEndorsement } from "@/lib/updates/keychain";
+import { createEndorsement, manifestSignedBytes, type Endorsement } from "@/lib/updates/keychain";
+import { createSeal, sealFieldsFor, type SealFields } from "@/lib/updates/seal";
+import { serializeTree } from "@/lib/updates/tree";
 import { createTestEnv, type TestEnv } from "@/test/harness";
 
 /** Schlüsselkette im Update-Ablauf (gegen ein Fake-GitHub): Release mit neuem, beglaubigtem Schlüssel wird akzeptiert, ein nicht beglaubigter abgelehnt. */
@@ -24,12 +26,20 @@ const realFetch = globalThis.fetch;
 const manifest = { schema: 1, version: "9.9.9", base: 1, arch: "x64", asset: "schrauberos-9.9.9.tar.gz", sha256: "a".repeat(64), size: 1000 };
 const manifestBytes = Buffer.from(JSON.stringify(manifest));
 
-/** Fake-GitHub: neuestes Release mit Manifest, Signatur des gegebenen Schlüssels und optional release-keys.json */
-function fakeGithub(signer: ReturnType<typeof pair>, keysFile?: unknown) {
+/**
+ * Fake-GitHub: neuestes Release mit Manifest (Kontext + Manifest signiert), Siegel (SOS-SEAL), Signatur des gegebenen Schlüssels und optional release-keys.json.
+ * Ist `signer` nicht der eingebaute Schlüssel, trägt das Siegel eine Beglaubigung (`endorsement`, Standard: vom Wurzelschlüssel, gültig bis 2099).
+ */
+function fakeGithub(signer: ReturnType<typeof pair>, keysFile?: unknown, options: { seal?: Buffer | null; sealOver?: Partial<SealFields>; endorsement?: Endorsement } = {}) {
+  const tree = serializeTree([]);
+  const fields = { ...sealFieldsFor(tree, { version: manifest.version, base: manifest.base, arch: manifest.arch }), ...options.sealOver };
+  const endorsement = signer === builtIn ? undefined : (options.endorsement ?? createEndorsement(priv(root), pub(signer), "2099-12-31"));
+  const seal = options.seal === undefined ? createSeal(fields, priv(signer), { builtInKeyPem: pub(builtIn), endorsement }) : options.seal;
   const files = new Map<string, Buffer>([
     ["manifest.json", manifestBytes],
-    ["manifest.json.sig", sign(null, manifestBytes, signer.privateKey)],
+    ["manifest.json.sig", sign(null, manifestSignedBytes(manifestBytes), signer.privateKey)],
     ["schrauberos-9.9.9.tar.gz", Buffer.alloc(0)],
+    ...(seal ? ([["SOS-SEAL", seal]] as Array<[string, Buffer]>) : []),
     ...(keysFile ? ([["release-keys.json", Buffer.from(JSON.stringify(keysFile))]] as Array<[string, Buffer]>) : []),
   ]);
   globalThis.fetch = (async (input: string | URL | Request) => {
@@ -45,16 +55,14 @@ function fakeGithub(signer: ReturnType<typeof pair>, keysFile?: unknown) {
 
 before(async () => {
   env = await createTestEnv();
-  process.env.UPDATE_PUBLIC_KEY = pub(builtIn);
-  process.env.UPDATE_ROOT_PUBLIC_KEY = pub(root);
   process.env.UPDATE_API_URL = "http://fake";
+  (await import("./config")).setTrustAnchorsForTest({ builtInKey: pub(builtIn), rootKey: pub(root) });
   releases = await import("./releases");
   store = await import("@/lib/updates/store");
 });
 after(async () => {
   globalThis.fetch = realFetch;
-  delete process.env.UPDATE_PUBLIC_KEY;
-  delete process.env.UPDATE_ROOT_PUBLIC_KEY;
+  (await import("./config")).setTrustAnchorsForTest(null);
   delete process.env.UPDATE_API_URL;
   await env.cleanup();
 });
@@ -90,6 +98,48 @@ describe("Release-Prüfung mit Schlüsselkette", () => {
   it("eine kaputte Schlüsselliste macht ein korrekt signiertes Release nicht unlesbar", async () => {
     fakeGithub(builtIn, "kein json {");
     assert.ok("release" in (await releases.checkLatestRelease(true)));
+  });
+});
+
+describe("Siegel (SOS-SEAL) im Release", () => {
+  const errorOf = async () => {
+    const check = await releases.checkLatestRelease(true);
+    return "error" in check ? check.error : "ok";
+  };
+
+  it("das Siegel wird vor dem Download des Pakets geprüft und liegt im Release (Form A mit dem eingebauten Schlüssel, Form B mit beglaubigtem)", async () => {
+    fakeGithub(builtIn);
+    const a = await releases.checkLatestRelease(true);
+    assert.ok("release" in a && a.release.seal.length > 100);
+    fakeGithub(rotated, { keys: [createEndorsement(priv(root), pub(rotated), "2099-12-31")] });
+    const b = await releases.checkLatestRelease(true);
+    assert.ok("release" in b && b.release.seal.toString().includes("endorsement-sig "));
+  });
+
+  it("ohne Siegel, mit zu großem, zerstörtem, fremd signiertem oder nicht zum Manifest passendem Siegel gibt es kein installierbares Release", async () => {
+    fakeGithub(builtIn, undefined, { seal: null });
+    assert.equal(await errorOf(), "badRelease", "Siegel fehlt");
+    fakeGithub(builtIn, undefined, { seal: Buffer.alloc(9000, 0x61) });
+    assert.equal(await errorOf(), "badRelease", "zu groß");
+    fakeGithub(builtIn, undefined, { seal: Buffer.from("kein Siegel\n") });
+    assert.equal(await errorOf(), "badRelease", "formal fehlerhaft");
+    fakeGithub(builtIn, undefined, { sealOver: { version: "9.9.8" } });
+    assert.equal(await errorOf(), "badRelease", "Version passt nicht zum Manifest");
+    fakeGithub(builtIn, undefined, { sealOver: { base: 7 } });
+    assert.equal(await errorOf(), "badRelease", "base passt nicht zum Manifest");
+    fakeGithub(builtIn, undefined, { sealOver: { arch: "arm64" } });
+    assert.equal(await errorOf(), "badRelease", "arch passt nicht zum Manifest");
+  });
+
+  it("ein Siegel mit einem Schlüssel, den der Wurzelschlüssel nicht beglaubigt hat, wird abgelehnt – auch wenn das Manifest passt", async () => {
+    // Manifest vom eingebauten Schlüssel, Siegel vom Fremden mit selbst ausgestellter Beglaubigung
+    fakeGithub(builtIn, undefined, { seal: createSeal(sealFieldsFor(serializeTree([]), { version: "9.9.9", base: 1, arch: "x64" }), priv(rogue), { builtInKeyPem: pub(builtIn), endorsement: createEndorsement(priv(rogue), pub(rogue), "2099-12-31") }) });
+    assert.equal(await errorOf(), "badSignature");
+  });
+
+  it("eine abgelaufene Beglaubigung im Siegel: eigener Fehler (die App prüft den Ablauf, der Starter nie)", async () => {
+    fakeGithub(rotated, { keys: [createEndorsement(priv(root), pub(rotated), "2099-12-31")] }, { endorsement: createEndorsement(priv(root), pub(rotated), "2026-01-31") });
+    assert.equal(await errorOf(), "sealExpired");
   });
 });
 

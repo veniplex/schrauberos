@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, it } from "node:test";
+import { manifestSignedBytes } from "@/lib/updates/keychain";
 import { UpdateError, needsNewImage, verifyManifest, type Manifest } from "./manifest";
 
 const pair = generateKeyPairSync("ed25519");
@@ -17,7 +18,7 @@ const manifest: Manifest = {
   size: 1234,
 };
 const bytes = Buffer.from(JSON.stringify(manifest));
-const signed = (data: Buffer, key = pair.privateKey) => sign(null, data, key);
+const signed = (data: Buffer, key = pair.privateKey) => sign(null, manifestSignedBytes(data), key);
 
 const codeOf = (fn: () => unknown) => {
   try {
@@ -40,6 +41,10 @@ describe("Release-Manifest", () => {
   it("lehnt ein verändertes Manifest ab", () => {
     const tampered = Buffer.from(JSON.stringify({ ...manifest, sha256: "c".repeat(64) }));
     assert.equal(codeOf(() => verifyManifest(tampered, signed(bytes), publicPem)), "badSignature");
+  });
+
+  it("lehnt eine Signatur ohne Kontext-Präfix ab (Domänentrennung, Sec F14)", () => {
+    assert.equal(codeOf(() => verifyManifest(bytes, sign(null, bytes, pair.privateKey), publicPem)), "badSignature");
   });
 
   it("lehnt kaputte Signaturen und Schlüssel ab", () => {

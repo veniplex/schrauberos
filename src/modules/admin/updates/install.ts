@@ -1,15 +1,17 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync, mkdirSync, rmSync, renameSync, statSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, rmSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { extractArchive } from "@/lib/archive";
+import { makeReadOnly, removeTreeSync, syncTree } from "@/lib/updates/fs-tree";
 import { compareVersions } from "@/lib/updates/semver";
 import { afterInstall } from "@/lib/updates/state";
 import { pruneVersions, readMeta, readState, updatesDir, versionDir, versionsDir, writeState } from "@/lib/updates/store";
 import { runningMeta, updaterEnabled } from "./config";
 import { UpdateError, needsNewImage } from "./manifest";
+import { verifyInstalledTree } from "./verify";
 import { downloadAsset, type Release } from "./releases";
 
 const LOCK_STALE_MS = 30 * 60 * 1000;
@@ -73,7 +75,7 @@ export async function installRelease(release: Release): Promise<void> {
   const staging = path.join(versionsDir(), `.partial-${version}`);
   try {
     rmSync(tmp, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    removeTreeSync(staging);
     mkdirSync(tmp, { recursive: true });
     mkdirSync(staging, { recursive: true });
 
@@ -96,10 +98,24 @@ export async function installRelease(release: Release): Promise<void> {
       existsSync(path.join(staging, "runtime", "node")) &&
       existsSync(path.join(staging, "runtime", "loader")) &&
       existsSync(path.join(staging, "prisma", "migrations"));
-    if (!ok) throw new UpdateError("invalidBundle");
+    if (!ok || !existsSync(path.join(staging, "SOS-TREE"))) throw new UpdateError("invalidBundle");
+
+    // Siegel ablegen (es kommt als eigenes Release-Asset, nicht im Paket) und mit derselben Prüfung wie beim Start prüfen – **vor** der Aktivierung: Was installiert wird,
+    // besteht die Prüfung des Starters. Scheitert sie, wird nichts aktiviert und der Zustand bleibt unberührt.
+    writeFileSync(path.join(staging, "SOS-SEAL"), release.seal);
+    const verdict = await verifyInstalledTree({ dir: staging, version, now: new Date() });
+    if (!verdict.ok) {
+      const code = verdict.code === 11 && verdict.reason === "endorsement-expired" ? "sealExpired" : verdict.code === 19 ? (verdict.reason === "floor" ? "notNewer" : "needsImage") : "badTree";
+      throw new UpdateError(code, `Prüfung ${verdict.code} ${verdict.reason}${verdict.path ? ` ${verdict.path}` : ""}`);
+    }
+
+    // Haltbar machen (tar ruft kein fsync; nach einem Stromausfall dürfen Zustand und Dateien nicht auseinanderlaufen) und schreibschützen: ein Schreibversuch der
+    // laufenden App in den Paketordner scheitert dann (EACCES) statt still eine Datei zu erzeugen, die die Prüfung beim nächsten Start scheitern ließe
+    await syncTree(staging);
+    await makeReadOnly(staging);
 
     const target = versionDir(version);
-    rmSync(target, { recursive: true, force: true });
+    removeTreeSync(target); // dieselbe Version erneut installieren (Reparatur) ersetzt die vorhandene, auch wenn sie schreibgeschützt ist
     renameSync(staging, target);
 
     const next = afterInstall(readState(), version);
@@ -107,7 +123,7 @@ export async function installRelease(release: Release): Promise<void> {
     pruneVersions([next.current, next.previous].filter((v): v is string => !!v));
   } finally {
     rmSync(tmp, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    removeTreeSync(staging);
     unlock();
   }
 }

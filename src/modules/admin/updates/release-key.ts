@@ -14,7 +14,8 @@
  * beim Tag-Build ab**, bis ein eigener Wurzelschlüssel eingetragen ist – es fällt nie still auf den Release-Schlüssel zurück.
  * Vor der Veröffentlichung: Wurzelpaar offline erzeugen, öffentlichen Teil unten eintragen.
  *
- * Eigene Forks setzen `UPDATE_PUBLIC_KEY` (Release-Schlüssel, zugleich Wurzel) und optional `UPDATE_ROOT_PUBLIC_KEY`.
+ * Die Schlüssel kommen **nur** aus dieser Datei (Build): keine Umgebungsvariable überschreibt sie, weder in der App noch im Starter (der Starter im Image
+ * bekommt seinen Header aus derselben Datei, `scripts/gen-trust-header.mjs`). Eigene Forks tragen hier ihre Schlüssel ein.
  */
 export const RELEASE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAOY1veyDs85EBZMw40+3aDEBedu6QJAO7+u5hORhnf7g=

@@ -5,8 +5,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Markdown } from "@/components/ui/markdown";
 import { getI18n } from "@/i18n/server";
+import type { MessageKey } from "@/i18n/translate";
+import { splitBytes } from "@/lib/bytes";
+import { endorsementWarning } from "@/lib/updates/expiry";
+import { integrityCodeOf, parseVerifyOk } from "@/lib/updates/markers";
 import { compareVersions } from "@/lib/updates/semver";
-import { readState } from "@/lib/updates/store";
+import { readSmallFile, readState, verifyOkFile } from "@/lib/updates/store";
 import { requirePermission } from "@/server/auth/session";
 import { checkForUpdates } from "@/modules/admin/updates/actions";
 import { runningMeta, runsFromVolume, updateConfig, updaterEnabled } from "@/modules/admin/updates/config";
@@ -15,6 +19,9 @@ import { needsNewImage } from "@/modules/admin/updates/manifest";
 import { checkLatestRelease, fetchReleaseNotes } from "@/modules/admin/updates/releases";
 import { FieldLabel } from "@/components/ui/form";
 
+/** Gründe, die der Starter für eine unklare Prüfung nennt (lib/updates/markers.ts) */
+const UNCLEAR_REASONS = ["signal", "timeout", "io", "fork", "other"] as const;
+
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return { title: t("updates.title") };
@@ -22,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function UpdatesPage() {
   await requirePermission("updates.manage");
-  const { t, date } = await getI18n();
+  const { t, date, number } = await getI18n();
   const running = runningMeta();
   const enabled = updaterEnabled();
   const state = enabled ? readState() : null;
@@ -32,6 +39,17 @@ export default async function UpdatesPage() {
   const release = "release" in check ? check.release : null;
   const newer = release ? compareVersions(release.version, running.version) > 0 : false;
   const imageNeeded = release ? needsNewImage(release.manifest, running) : false;
+
+  // Integrität (Starter-Vertrauensanker): letzter Befund, unklare Prüfung, letzte erfolgreiche Prüfung, Beglaubigung des Release-Schlüssels
+  const integrityCode = state?.last?.status === "rolled-back" ? integrityCodeOf(state.last.reason) : null;
+  const unclear = state?.inconclusive ?? null;
+  const verified = enabled ? parseVerifyOk(readSmallFile(verifyOkFile()) ?? "") : null;
+  const expiringDays = release ? endorsementWarning(release.endorsedUntil) : null;
+  const repair = !!release && !!state && state.failed.includes(release.version) && integrityCode !== null;
+  const sizeLabel = (bytes: number) => {
+    const { value, unit } = splitBytes(bytes);
+    return `${number(value, { maximumFractionDigits: unit === "B" || value >= 100 ? 0 : 1 })} ${unit}`;
+  };
 
   return (
     <>
@@ -52,7 +70,45 @@ export default async function UpdatesPage() {
               },
             ]}
           />
-          {state?.last ? (
+          {verified || enabled ? (
+            <p className="mt-4 text-sm text-ink-muted">
+              <span className="font-medium">{t("updates.verified.title")}: </span>
+              {verified
+                ? t("updates.verified.text", {
+                    version: verified.version,
+                    files: number(verified.files),
+                    size: sizeLabel(verified.bytes),
+                    seconds: number(verified.ms / 1000, { maximumFractionDigits: 1 }),
+                    date: date(verified.at, { dateStyle: "medium", timeStyle: "short" }),
+                  })
+                : t("updates.verified.none")}
+            </p>
+          ) : null}
+          {integrityCode !== null && state?.last ? (
+            <div className="mt-4 flex flex-col gap-2">
+              <Alert tone="danger">
+                {t("updates.integrity.rolledBack", {
+                  version: state.last.version,
+                  date: date(state.last.at, { dateStyle: "medium", timeStyle: "short" }),
+                  reason: t(`updates.integrity.codes.c${integrityCode}` as MessageKey),
+                  detail: state.last.detail ? t("updates.integrity.detail", { path: state.last.detail }) : "",
+                })}
+              </Alert>
+              <p className="text-sm text-ink-muted">{t("updates.integrity.hint")}</p>
+            </div>
+          ) : null}
+          {unclear ? (
+            <div className="mt-4">
+              <Alert tone="warning">
+                {t("updates.integrity.unclear", {
+                  version: unclear.version,
+                  count: unclear.count,
+                  reason: t(`updates.integrity.unclearReasons.${(UNCLEAR_REASONS as readonly string[]).includes(unclear.reason) ? unclear.reason : "other"}` as MessageKey),
+                })}
+              </Alert>
+            </div>
+          ) : null}
+          {state?.last && integrityCode === null ? (
             <div className="mt-4">
               <Alert tone={state.last.status === "ok" ? "success" : "warning"}>
                 {state.last.status === "ok"
@@ -107,11 +163,15 @@ export default async function UpdatesPage() {
               ) : (
                 <>
                   <Alert tone="info">{t("updates.install.backupHint")}</Alert>
+                  {repair ? <Alert tone="warning">{t("updates.repair.hint", { version: release.version })}</Alert> : null}
+                  {expiringDays !== null ? (
+                    <Alert tone="warning">{t("updates.endorsement.expiring", { date: date(release.endorsedUntil ?? "", { dateStyle: "medium" }), days: Math.max(0, expiringDays) })}</Alert>
+                  ) : null}
                   <InstallForm
                     version={release.version}
                     labels={{
-                      button: t("updates.install.button", { version: release.version }),
-                      confirm: t("updates.install.confirm", { version: release.version }),
+                      button: repair ? t("updates.repair.button", { version: release.version }) : t("updates.install.button", { version: release.version }),
+                      confirm: repair ? t("updates.repair.confirm", { version: release.version }) : t("updates.install.confirm", { version: release.version }),
                     }}
                   />
                 </>

@@ -69,6 +69,7 @@ export const auditEn: typeof auditDe = {
     system: {
       update: "Update installed",
       updateFailed: "Update failed",
+      integrityFailed: "Integrity check of an installed version failed",
       auditPruned: "Old audit entries deleted",
     },
     auth: {

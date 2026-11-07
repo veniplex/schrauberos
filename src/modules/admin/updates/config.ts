@@ -8,6 +8,18 @@ import { RELEASE_PUBLIC_KEY, ROOT_PUBLIC_KEY } from "./release-key";
 
 export const UPDATE_TOKEN_KEY = "update.token";
 
+/**
+ * Vertrauensanker der App: **nur** aus dem Build (`release-key.ts`) – keine Umgebungsvariable überschreibt sie. Der Starter im Image trägt dieselben Schlüssel
+ * (`scripts/gen-trust-header.mjs` erzeugt seinen Header aus derselben Datei); zwei Quellen könnten auseinanderlaufen, und eine Umgebungsvariable wäre ein
+ * Schalter, mit dem sich die Prüfung aushebeln ließe (Betriebskonzept: kein Umgebungsschalter „unsigniert erlauben“). Forks tragen ihre Schlüssel in `release-key.ts` ein.
+ * Nur Tests ersetzen sie über `setTrustAnchorsForTest` (im Betrieb, `NODE_ENV=production`, wirft das).
+ */
+let testAnchors: { builtInKey: string; rootKey: string } | null = null;
+export function setTrustAnchorsForTest(anchors: { builtInKey: string; rootKey: string } | null): void {
+  if (process.env.NODE_ENV === "production") throw new Error("Die Vertrauensanker lassen sich im Betrieb nicht ersetzen.");
+  testAnchors = anchors;
+}
+
 const updateApiUrl = () => (process.env.UPDATE_API_URL ?? "https://api.github.com").replace(/\/$/, "");
 
 /** Token aus den Einstellungen (verschlüsselt in der Datenbank); UPDATE_GITHUB_TOKEN bleibt als Rückfall nutzbar. */
@@ -19,9 +31,9 @@ export async function updateConfig() {
     token: (await getSecret(UPDATE_TOKEN_KEY)) || process.env.UPDATE_GITHUB_TOKEN || null,
     // Nur für Tests/Spiegel: Basis-URL der GitHub-API
     apiUrl: updateApiUrl(),
-    /** Eingebauter Release-Schlüssel und Wurzelschlüssel der Schlüsselkette (Forks: Umgebungsvariablen, siehe release-key.ts) */
-    builtInKey: process.env.UPDATE_PUBLIC_KEY || RELEASE_PUBLIC_KEY,
-    rootKey: process.env.UPDATE_ROOT_PUBLIC_KEY || process.env.UPDATE_PUBLIC_KEY || ROOT_PUBLIC_KEY,
+    /** Eingebauter Release-Schlüssel und Wurzelschlüssel der Schlüsselkette (nur aus dem Build, siehe release-key.ts) */
+    builtInKey: testAnchors?.builtInKey ?? RELEASE_PUBLIC_KEY,
+    rootKey: testAnchors?.rootKey ?? ROOT_PUBLIC_KEY,
   };
 }
 
