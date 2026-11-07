@@ -1,7 +1,9 @@
 import "server-only";
+import { existsSync } from "node:fs";
 import { lstat } from "node:fs/promises";
 import { pemToRawKey } from "@/lib/updates/keychain";
 import { findNodeModulesAncestor, verifyVersion, type VerifyFailure, type VerifySuccess } from "@/lib/updates/seal";
+import { parseStarterVerdict, runStarter, starterArgs } from "@/lib/updates/starter-verify";
 import { nodeFs } from "@/lib/updates/tree";
 import { dataDir, readMeta } from "@/lib/updates/store";
 import { runningMeta, updateConfig } from "./config";
@@ -11,9 +13,9 @@ import { runningMeta, updateConfig } from "./config";
  * Siegel (Signatur, Kette, Ablauf der Beglaubigung), Dateiliste, Mengengleichheit des Baums, Vorfahrenregel (`node_modules` oberhalb), Untergrenze, Starter-Vertrag.
  * Was hier besteht, besteht beim Start; was hier scheitert, wird nie aktiviert.
  *
- * Die Prüfung ist **einspritzbar**: Standard ist der TypeScript-Referenzprüfer (`lib/updates/seal.ts`). Der Starter bringt `/bootstrap --verify <Ordner>
- * --expect-version <v> --check-expiry <Datum>` mit (Teil 2 des Pakets P1b-6); dann ruft der Installer ihn statt des Referenzprüfers auf – damit gilt für Installation
- * und Start dieselbe Implementierung. Der Vertrag beider ist in README „Starter-Vertrauensanker“ festgelegt, der Goldkorpus prüft ihn.
+ * Im Betrieb (Image) ruft der Installer den Prüfer des Starters auf – `/bootstrap --verify <Ordner> --expect-version <v> --check-expiry <heute>` –, damit für Installation und Start dieselbe
+ * Implementierung gilt (docker/verify.c). Fehlt `/bootstrap` (Entwicklung, Tests), prüft der TypeScript-Referenzprüfer (`lib/updates/seal.ts`); der Vertrag beider ist in README „Starter-Vertrauensanker“
+ * festgelegt, der Goldkorpus und die nativen Tests (docker/test) halten sie gleich. Die Prüfung ist außerdem **einspritzbar** (Tests).
  */
 export type TreeVerifier = (input: { dir: string; version: string; now: Date }) => Promise<VerifySuccess | VerifyFailure>;
 
@@ -46,4 +48,12 @@ const referenceVerifier: TreeVerifier = async ({ dir, version, now }) => {
   });
 };
 
-export const verifyInstalledTree: TreeVerifier = (input) => (injected ?? referenceVerifier)(input);
+/** Der Starter im Image (Entwicklung: nicht vorhanden); `BOOTSTRAP_BINARY` ist nur für Tests und Spiegel-Aufbauten gedacht, keine Betriebseinstellung. */
+const starterBinary = () => process.env.BOOTSTRAP_BINARY ?? "/bootstrap";
+
+const starterVerifier: TreeVerifier = async ({ dir, version, now }) => {
+  const result = await runStarter(starterBinary(), starterArgs(dir, version, now), { PATH: process.env.PATH ?? "", DATA_DIR: dataDir(), NODE_ENV: "production" });
+  return parseStarterVerdict(result.code, result.stdout);
+};
+
+export const verifyInstalledTree: TreeVerifier = (input) => (injected ?? (existsSync(starterBinary()) ? starterVerifier : referenceVerifier))(input);
