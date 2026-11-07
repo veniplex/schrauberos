@@ -105,7 +105,7 @@ export const backupDe = {
       notConfirmed: "Noch nicht als gesichert bestätigt.",
       stale: "Der bisherige Schlüssel passt nicht mehr zu diesem Server (es wurde ein Backup ohne Schlüssel wiederhergestellt). Bitte einen neuen erzeugen.",
     },
-    password: "Ihr Passwort",
+    password: "Passwort",
     passwordHint: "Zur Sicherheit wird das Passwort noch einmal abgefragt.",
     generate: "Wiederherstellungsschlüssel erzeugen",
     regenerate: "Neuen Wiederherstellungsschlüssel erzeugen",

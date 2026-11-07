@@ -1,6 +1,7 @@
 import { OFFSITE_CREDENTIALS_SECRET } from "@/server/backup/offsite/settings";
 import { OFFSITE_MASTER_SECRET } from "@/server/recovery-key";
 import { resetUnreadableSettingSecrets, type SecretConsumerDef } from "@/server/secret-consumers";
+import { db } from "@/server/db";
 import { getSetting, setSetting } from "@/server/settings";
 
 /**
@@ -17,7 +18,10 @@ export const secretConsumers: SecretConsumerDef[] = [
       const wasEnabled = (await getSetting("offsite.enabled")) === "true";
       const master = await resetUnreadableSettingSecrets([OFFSITE_MASTER_SECRET]);
       const credentials = await resetUnreadableSettingSecrets([OFFSITE_CREDENTIALS_SECRET]);
-      if (master + credentials > 0) await setSetting("offsite.enabled", "false");
+      if (master + credentials > 0) {
+        await setSetting("offsite.enabled", "false");
+        await db.jobState.updateMany({ where: { id: "backup.offsite" }, data: { failures: 0, lastStatus: null, lastMessage: null } }); // keine alte Fehlerserie im Systemstatus
+      }
       return credentials + (master > 0 && wasEnabled ? 1 : 0);
     },
   },

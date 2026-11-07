@@ -22,6 +22,8 @@ zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
 > (`docker compose logs app`); es verhindert, dass Fremde die Einrichtung übernehmen. Auf Wunsch startet die Anwendung mit
 > Beispieldaten zum Ausprobieren. Zum Schluss zeigt die Einrichtung Ihren **Wiederherstellungs-Code** (siehe unten) auf einer eigenen
 > Seite; weiter geht es erst, wenn Sie bestätigen, ihn gesichert zu haben.
+>
+> **Neuer Server, vorhandenes Backup?** Unten auf der Einrichtungsseite gibt es **„Aus einem Backup wiederherstellen“**: Einrichtungs-Token, Backup-Datei und – falls vorhanden – der **Wiederherstellungsschlüssel** genügen, die Einrichtung entfällt (siehe Hilfe **Backups**). Der Wiederherstellungsschlüssel ist nicht der Wiederherstellungs-Code des Notzugangs: Der Code holt Sie in ein Konto zurück, der Schlüssel macht Backups und deren Geheimnisse nach einem Serververlust wieder lesbar.
 
 ## Die Oberfläche
 

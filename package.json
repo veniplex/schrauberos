@@ -67,6 +67,8 @@
     "better-sqlite3@12.11.1": true,
     "@prisma/engines@7.10.1": true,
     "prisma@7.10.1": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "ssh2@1.17.0": false,
+    "cpu-features@0.0.10": false
   }
 }

@@ -313,6 +313,18 @@ describe("Off-Site: Übertragen (SFTP)", () => {
   });
 });
 
+describe("Off-Site: Fehlerserie", () => {
+  it("eine alte Fehlerserie färbt den Systemstatus nicht weiter, sobald Off-Site ausgeschaltet oder das Ziel gewechselt wird", async () => {
+    await saveWebdav();
+    await env.db.jobState.create({ data: { id: "backup.offsite", failures: 3, lastStatus: "error", lastMessage: "connect: ECONNREFUSED" } });
+    await saveWebdav({ enabled: false });
+    assert.equal((await env.db.jobState.findUniqueOrThrow({ where: { id: "backup.offsite" } })).failures, 0);
+    await env.db.jobState.update({ where: { id: "backup.offsite" }, data: { failures: 2 } });
+    await saveWebdav({ password: "geheim" });
+    assert.equal((await env.db.jobState.findUniqueOrThrow({ where: { id: "backup.offsite" } })).failures, 2, "gleiches Ziel, eingeschaltet: unverändert");
+  });
+});
+
 describe("Off-Site: Restore ohne passenden Schlüssel", () => {
   it("Zugangsdaten und Hauptschlüssel sind unlesbar → Off-Site wird ausgeschaltet und im Hinweis/Audit gemeldet; der Lauf lädt nichts mehr hoch", async () => {
     await saveWebdav({ password: TARGET_PASSWORD });

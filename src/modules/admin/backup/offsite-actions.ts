@@ -98,6 +98,8 @@ const saveOffsiteOperation = defineOperation({
     await saveOffsiteSettings({ enabled: input.enabled, protocol: input.protocol, host, port, path, url, username: input.username, hostKey, keep: input.keep }, tx);
     if (hasNew) await saveOffsiteCredentials(provided, tx);
     if (targetChanged) await saveUploadedNames(new Set(), tx); // anderes Ziel: nichts gilt als schon hochgeladen
+    // Eine alte Fehlerserie gehört zum bisherigen Ziel bzw. zu einem ausgeschalteten Off-Site: Sie soll den Systemstatus nicht weiter färben
+    if (targetChanged || !input.enabled) await tx.jobState.updateMany({ where: { id: "backup.offsite" }, data: { failures: 0, lastStatus: null, lastMessage: null } });
     setAudit({ target: `${input.protocol} ${input.protocol === "sftp" ? `${host}:${port}${path.startsWith("/") ? "" : "/"}${path}` : url} · ${input.enabled ? "an" : "aus"} · behalten ${input.keep}` });
     return { saved: true };
   },

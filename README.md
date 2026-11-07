@@ -344,6 +344,12 @@ dann Anlegen in einer Transaktion; **erst danach** wird die Zeitzone angewendet 
 Token gelöscht. Dasselbe gilt für die Einstellungen (Zeitzone erst nach dem Speichern). Das Token ist die bewusste Ausnahme vom Grundsatz
 „alles über die Weboberfläche“: **einmalige Installationshandlung, kein laufender Betrieb**.
 
+**Wiederherstellung in der Einrichtung** (frisches Volume, vorhandenes Backup): Unter dem Formular steht „Aus einem Backup wiederherstellen“ (`src/app/setup/setup-restore.tsx`). Die Datei geht gestreamt an `POST /api/setup/restore`
+(`src/app/api/setup/restore/route.ts`; läuft wie der Backup-Upload **nicht** durch den Proxy, Body-Grenze). Reihenfolge: Startzustand → gibt es schon einen Benutzer (409) → Herkunft (`x-requested-with`) → **Einrichtungs-Token** im Kopf `x-setup-token`
+(`checkSetupToken`, dieselbe globale Drosselung wie die Ersteinrichtung; **vor** dem Lesen des Bodys) → Datei übernehmen (`importBackupFile`, auch verschlüsselte `.sobk` mit `x-recovery-key`) → `stageRestore(name, { recoveryKey })` → Audit `setup.restore` → Neustart.
+Ohne das Token wäre der Schutz der Ersteinrichtung über ein importiertes Backup (mit eigenen Administratoren) zu umgehen. Test: `src/server/backup/recovery-key.test.ts` (ohne/falsches Token, Drosselung, 409 nach der Einrichtung, mit/ohne Schlüssel). Der Audit-Eintrag steht in der
+frischen Datenbank, die danach ersetzt wird (er bleibt im Sicherungsstand „vor Wiederherstellung“).
+
 ### Gleichzeitiges Bearbeiten
 
 Bearbeiten-Formulare tragen die Version der Zeile (`updatedAt`) als Feld `version` mit (`versionOf(row)` aus
@@ -546,6 +552,28 @@ wird er konservativ zurückgesetzt – die Antwort und das Konto zeigen das, sie
 `auth.recoveryCreated/Used/Failed` (Fehlversuche gedrosselt, ohne Code-Material). Der Code gehört zu den Daten: Nach einer
 Backup-Wiederherstellung kann ein gedruckter Code veraltet sein (Hinweis in Hilfe und Wiederherstellungs-Rückfrage).
 
+### Geheimnisse, Wiederherstellungsschlüssel und Restore (P1b-4a)
+
+**Ein Mechanismus für alle Geheimnisse:** `setSecret/getSecret` (`src/server/settings.ts`) verschlüsseln mit AES-256-GCM und `<DATA_DIR>/secret.key` (`src/server/secrets.ts`; **nicht im Backup**). TOTP-Geheimnisse (`TwoFactor.secret`), das Update-Token,
+die Off-Site-Zugangsdaten und künftig Mail-Passwort, Webhook-Secrets und Tresor-Schlüssel gehen alle durch ihn. Zwei Dinge machen ihn nach einem Volume-Verlust brauchbar:
+
+* **Wiederherstellungsschlüssel** (`src/server/recovery-key.ts`, Format `src/lib/recovery-key.ts`): 256 Bit Zufall, 52 Zeichen im Crockford-Alphabet in 13 Gruppen mit Prüfzeichen (anders als der Notzugangs-Code mit 8 Gruppen). Erzeugen/Neu-Erzeugen: Operation
+  `admin.backup.createRecoveryKey` (Recht `backup.keys`, `adminOnly`, **nur `isAdmin`**, erneute Passwortabfrage über `confirmOwnPassword`, Audit `secrets.keyCreated` ohne Schlüssel). Der Klartext steht nur in der Antwort der Aktion (`state`), die Ansicht ist
+  `RecoveryCodeView` mit eigenen Texten (Druckansicht, Pflicht-Bestätigung → `confirmRecoveryKey`, Audit `secrets.keyConfirmed`). Gespeichert werden in `AppSetting` (also in der Datenbank und in jedem Backup): `secrets.wrapped` = `secret.key` per HKDF-SHA256 +
+  AES-256-GCM mit dem Schlüssel umhüllt (`src/lib/secret-wrap.ts`, Salz und Nonce zufällig), `secrets.keyCheck` = HMAC-Kennwert von `secret.key` (erkennt eine veraltete Hülle), `secrets.keyCreatedAt`/`secrets.keyConfirmedAt` und der aus dem Schlüssel
+  abgeleitete **Off-Site-Hauptschlüssel** (`secrets.offsiteMaster`, selbst ein mit `secret.key` verschlüsseltes Geheimnis – der Server kann so unbeaufsichtigt sichern, jeder mit dem Schlüssel kann die Off-Site-Dateien auch ohne Server öffnen).
+  **Statusfunktion für die Einrichtungs-Checkliste (P2b-4):** `recoveryKeyConfirmed()` / `recoveryKeyStatus()` (`exists`, `confirmed`, `stale`). Eine **Passphrase-Variante gibt es bewusst nicht** (Mindestlänge, Stärkeprüfung, scrypt mit eigenen Kosten und Pfad wären ein zweiter Mechanismus; ein
+  zufälliger 256-Bit-Schlüssel ist sicherer und billiger zu prüfen).
+* **Restore mit Schlüssel** (`stageRestore(name, { recoveryKey })`, Verwaltung und Einrichtung): Das Backup wird entpackt und geprüft, **dann vor allem anderen** die Hülle aus `pending.db` gelesen und mit der Eingabe geöffnet (`openWrappedSecretKey`); erst danach entsteht der Stand „vor Wiederherstellung“.
+  Der entschlüsselte Schlüssel liegt als `restore/pending-secret.key` (0600) bereit; **der Launcher setzt ihn im selben Schritt wie die Datenbank ein** (`applyPendingRestore`: `secret.key` → `restore/replaced-secret.key`; Bestätigung löscht die Kopie, Rückfall stellt sie wieder her; `PendingRestore.secretKey` wird nur gesetzt,
+  wenn die Datei da ist). Passt der Schlüssel des Backups ohnehin zum laufenden, passiert nichts. Fehler: `keyFormat` (Länge/Zeichen/Prüfzeichen), `wrongKey`, `noWrappedKey` (Backup ohne Hülle), `keyRequired` (.sobk ohne Schlüssel). **Drosselung `loginThrottle.recoveryKey`:** global (nie pro Konto),
+  ein `FailureBudget`, das ab dem siebten Versuch pro Minute um je 500 ms (höchstens 8 s) **verlangsamt, aber nie abweist**; eigener Pfad ohne scrypt-Semaphoren (`recovery-key-input.ts`, in `restore.ts` erst bei Bedarf geladen, weil es `server-only` ist). Ein Erfolg gibt seinen Versuch zurück.
+* **Restore ohne Schlüssel:** Beim Start (`startup.ts`) läuft `resetUnreadableSecrets()` (`src/server/secret-reset.ts`) über das **Register der Geheimnis-Verbraucher** (`SecretConsumerDef` in `src/server/secret-consumers.ts`; Plattform: `auth.totp`; Funktionen melden sich in einer `secrets.ts` und tragen
+  sich in `src/modules/secrets.ts` ein – `architecture.test.ts` verlangt beides, auch für jede Funktion, die `setSecret` benutzt). Jeder Verbraucher setzt zurück, was er nicht entschlüsseln kann (`resetUnreadableSettingSecrets` für `AppSetting`-Geheimnisse). Gibt es etwas: ein Audit-Eintrag `secrets.reset` (Verbraucher und Anzahl, nie Inhalt),
+  der Hinweis `secrets.resetNotice` für **Administratoren** (`SecretsBanner` im Layout, bestätigen mit `account.acknowledgeSecretsReset`), und eine veraltete Hülle (`secrets.keyCheck` passt nicht) wird entfernt – ein neuer Schlüssel ist nötig. Off-Site wird dabei ausgeschaltet.
+  **Neues Geheimnis anlegen = Verbraucher anmelden**, sonst bliebe es nach einem Restore unlesbar liegen. Der zweite Faktor setzt seine Konten zusätzlich selbst zurück (`resetUnreadableSecondFactors`, eigener Audit `auth.twoFactorReset`).
+* **Nicht im Klartext:** Weder der Wiederherstellungsschlüssel noch `secret.key` noch Zugangsdaten stehen in Datenbank, Audit, Log oder URL (Tests suchen die Zeichenfolgen in allen Tabellen und im mitgeschriebenen Log).
+
 ### Konto-Sicherheit: Zwei-Faktor-Anmeldung, Sitzungen, Geräte
 
 **Zwei-Faktor-Anmeldung (TOTP, optional)** – RFC 6238 mit SHA-1, 6 Stellen, 30 s (die Vorgabe der Authenticator-Apps; `src/lib/totp.ts`, mit den RFC-Testvektoren getestet), ±1 Zeitschritt
@@ -671,7 +699,22 @@ Launcher tauscht Datenbank samt WAL und Dateien, bestätigt nach gesundem Start 
   Ordners ändert sich nur, wenn direkt darin etwas angelegt wird – ein langer Import schreibt tiefer).
 * **Entpacken der Datenbank hat eine Obergrenze** (Gzip-Bombe, `gunzipDatabase` in `restore.ts`, `src/lib/limit-stream.ts`): zwischen Entkomprimierer und Schreibstrom zählt ein Strom mit `min(64 GiB, freier Platz − 512 MiB)`, der freie Platz wird alle 64 MiB nachgeprüft
   → `tooLarge`/`diskFull`, die halbe Datei wird gelöscht. Gilt für Wiederherstellung (`stageRestore`), Import und die Prüfung des Imports.
-* **Upload** (`/api/backups/upload`): Länge vorab gegen freien Platz (2 × Länge + 512 MiB Reserve → 507) und Obergrenze (100 GiB → 413); während des Empfangs werden die Bytes gezählt (Obergrenze auch ohne Längenangabe)
+* **Off-Site-Backup (P1b-4)** – Reiter **Off-Site** (`/admin/backup/offsite`), Recht `backup.manage`:
+  * **Format `.sobk`** (`src/lib/offsite/crypto.ts`): AES-256-GCM in Blöcken zu 1 MiB; Kopf (44 Byte: Kennung, Version, Blockgröße, 32 Byte Salz) im AAD; Schlüssel je Datei per HKDF aus dem **Off-Site-Hauptschlüssel**
+    (`deriveOffsiteMasterKey` aus dem Wiederherstellungsschlüssel); Nonce = Blocknummer; ein **Endmarken-Byte im AAD** erkennt abgeschnittene Ströme, die Nonce vertauschte/doppelte/fehlende Blöcke. Streamend in beide Richtungen
+    (`createEncryptStream`/`createDecryptStream`, nie komplett im Speicher; Klartext erst nach geprüftem Block). Falscher Schlüssel und Veränderung sind nicht zu unterscheiden (`wrongKey`).
+  * **Ablauf** (`src/server/backup/offsite/service.ts`): Job `backup.offsite` (alle 10 min, `shouldRun`: lokal prüfbar nur bei Arbeit, sonst einmal täglich Abgleich mit dem Ziel; Wiederholung 15 min … 4 h; Audit nur beim ersten Fehlschlag `backup.offsiteFailed`).
+    Hochgeladen werden die neuesten `keep` Backups der Arten `auto`/`manual`, die am Ziel fehlen (`planUploads`); das Archiv wie beim Download (`tar`), verschlüsselt, als `<name>.sobk.part`, danach umbenannt; Prüfung, dass die Datei am Ziel liegt; **Aufbewahrung** löscht nur Dateien
+    mit dem eigenen Namensmuster `OFFSITE_NAME` jenseits der neuesten `keep` (und unfertige `.part` nach einem Tag) – nie fremde Dateien (`planDeletions`). Der Merker `offsite.uploaded` spart das Auflisten bei jedem Takt.
+  * **Ziele hinter der Schnittstelle `OffsiteTransport`** (`transport.ts`; Tests setzen `setTransportFactoryForTest`): **WebDAV** (`webdav.ts`, nur `fetch`: PROPFIND/MKCOL/PUT gestreamt mit `duplex: "half"`/MOVE/GET/DELETE, **nur HTTPS** – Klartext nur für den eigenen Rechner –, keine Zugangsdaten in der Adresse,
+    **Weiterleitungen werden nie verfolgt** (`redirect: "manual"`), Zeitlimit je Anfrage und Wächter gegen hängende Übertragungen; der Server muss Chunked-PUT annehmen) und **SFTP** (`sftp.ts`, `ssh2` 1.17.0, MIT, `import()` erst bei Bedarf). `ssh2` hat optionale native Teile (`sshcrypto`, `cpu-features`): In `package.json` ist
+    ihr Install-Skript über `allowScripts` verneint (`false`), es läuft die reine JavaScript-Variante; ein Test prüft, dass `ssh2` ohne `sshcrypto.node` lädt. **Der Hostschlüssel ist fest hinterlegt:** `hostVerifier` vergleicht den SHA-256-Fingerabdruck mit der Einstellung und bricht **vor der Anmeldung** ab
+    (`OffsiteError("hostKey")`, getestet gegen einen `ssh2`-Server im Speicher: kein Anmeldeversuch); abgerufen und bestätigt wird er beim Einrichten (`admin.backup.fetchHostKey`: Verbindung bis zum Schlüsselaustausch, keine Anmeldedaten; speichern nur mit gesetztem Häkchen, wenn Server, Anschluss
+    oder Fingerabdruck wechseln). Zugangsdaten (`offsite.credentials`) sind ein Geheimnis; **ändert sich das Ziel, müssen sie neu eingegeben werden** (kein Abfließen gespeicherter Zugangsdaten an einen neuen Host). Gesperrte Ziele: Verbindungs-lokale/Metadaten-Adressen (`isForbiddenHost`).
+  * **Rückweg:** `fetchOffsiteBackup` (Operation `admin.backup.fetchOffsite`, Audit `backup.offsiteFetch`): holen → mit dem gespeicherten Hauptschlüssel entschlüsseln (`decryptToFile`, Obergrenze/Platzprüfung wie beim Entpacken) → `importBackupFile` → Backup der Art `upload`. Ist der Server weg, öffnet
+    `importBackupFile` eine `.sobk` mit dem Wiederherstellungsschlüssel (Upload in der Verwaltung: Kopf `x-recovery-key`; Einrichtung: siehe oben).
+  * **Tests ohne Netzwerk:** `src/test/fake-webdav.ts` (`node:http`) und `src/test/fake-sftp.ts` (Server-Teil von `ssh2`); `webdav.test.ts`, `sftp.test.ts`, `offsite.test.ts` (Dienst, Aktionen, Job, Rückweg, Aufbewahrung), `src/lib/offsite/crypto.test.ts` (Manipulationen).
+* **Upload** (`/api/backups/upload`, `receive.ts` teilt sich Empfang und Platzprüfung mit der Einrichtung): Länge vorab gegen freien Platz (2 × Länge + 512 MiB Reserve → 507) und Obergrenze (100 GiB → 413); während des Empfangs werden die Bytes gezählt (Obergrenze auch ohne Längenangabe)
   und alle 64 MiB der freie Platz geprüft; beim Entpacken zusätzlich Grenze für Einträge/Größe und freier Platz (`diskFull`/`tooLarge`). Abbruch löscht die halbe Datei.
 
 ## Job-Runner (`src/server/jobs`)
@@ -691,7 +734,7 @@ Persistenter Zeitgeber für alles, was die App im Hintergrund erledigt. Zustand 
   Jobs müssen daher **wiederholbar** sein. Scheitert das Belegen nach dem Update (Datenbankfehler), wird die Sperre sofort freigegeben (nur wenn sie dieser Prozess hält), sonst verfiele sie erst nach Zeitlimit + 1 min. Ein Job, der `ctx.signal` ignoriert und über sein Zeitlimit hinaus
   hängt, blockiert nur sich selbst: Jeder fällige Termin bekommt einen sichtbaren Vermerk (`lastMessage` „Hängt …“), die Fehlerserie wächst, der nächste Termin rückt nach der Wartezeit weiter. **`ctx.signal` sollten Jobs auswerten** (der Backup-Job prüft es vor der Aufbewahrung, die Outbox zwischen den Ereignissen).
 * **Start mit Wiederholung, Herzschlag:** `start()` setzt die Timer **immer**; `recover()`/`sync()` laufen sofort und – scheitern sie (Datenbank kurz weg) – bei jedem Takt erneut, bis es gelingt; vorher läuft kein Job. `status()` (im Prozessspeicher: gestartet, vorbereitet, letzter Takt, letzter Fehler)
-  speist den Systemstatus („Zeitgeber zuletzt aktiv“). `runNow(jobId)` führt einen Job sofort aus (Aktivierung der Funktion gilt, `ctx.manual = true`, `shouldRun` wird umgangen); verdrahtet ist es bisher nur für `backup.auto` („Jetzt erneut versuchen“).
+  speist den Systemstatus („Zeitgeber zuletzt aktiv“). `runNow(jobId)` führt einen Job sofort aus (Aktivierung der Funktion gilt, `ctx.manual = true`, `shouldRun` wird umgangen); verdrahtet ist es bisher für `backup.auto` („Jetzt erneut versuchen“) und `backup.offsite` („Jetzt übertragen“).
 * **Nur Auffälliges wird festgehalten:** Ein Lauf ohne Fehler **und ohne Ergebnismeldung** schreibt keinen `JobRun` (nur `JobState`) – sonst Zehntausende Zeilen am Tag allein für den 15-Sekunden-Takt der Outbox. Jobs sollten bei „nichts zu tun“ `undefined` zurückgeben. `JobDef.shouldRun` ist eine billige Vorabprüfung
   **nur mit Lesezugriffen** vor Sperre und Lauf (Outbox: ein `count`); `false` → keinerlei Schreibzugriff, der Job bleibt fällig. Ein laufender Job hat keinen Lauf-Eintrag (sichtbar über `JobState.lockedUntil`).
 * **Outbox-Zustellung** (`outbox.ts`, Job `platform.outbox` alle 15 s): mindestens einmal, je Abnehmer idempotent über `OutboxDelivery`; Wiederholung nach 30 s · 2^n (höchstens 1 h), nach `maxAttempts` (8) `failedAt`;
@@ -1022,8 +1065,8 @@ Wiederherstellung schreiben nur nach `/data` und funktionieren unverändert. In 
 /data/files/                          Belege und Bilder, lesbare Pfade (rechnungen/<Jahr>/<eingang|ausgang>/…, doku/<bereich>/…)
 /data/backups/<name>/                 Backups (database.db.gz, files/ als Hardlinks, info.json); Aufbewahrung je Art einstellbar
 /data/app/                            state.json, active, versions/<version>/ (installierte Pakete), launcher-crash
-/data/restore/                        vorgemerkte/ersetzte Daten während einer Wiederherstellung
-/data/secret.key                      Schlüssel für verschlüsselte Einstellungen (nicht in Backups)
+/data/restore/                        vorgemerkte/ersetzte Daten während einer Wiederherstellung (auch pending-secret.key/replaced-secret.key)
+/data/secret.key                      Schlüssel für verschlüsselte Einstellungen (nicht in Backups; eine mit dem Wiederherstellungsschlüssel umhüllte Kopie steckt in der Datenbank)
 /data/setup-token                     Einrichtungs-Token (nur bis zur Ersteinrichtung, Modus 0600, nicht in Backups)
 ```
 
@@ -1078,7 +1121,7 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
   Betriebsgrößen in Ordnung, bei Bedarf Pagination ergänzen.
 * Dateien wachsen mit dem Archiv; Backups verweisen per Hardlink darauf (kaum Zusatzplatz), schützen aber nicht vor dem Ausfall des
   Datenträgers – Kopien außerhalb des Servers über „Herunterladen“.
-* Backups sind unverschlüsselt.
+* Lokale Backups und heruntergeladene Dateien sind unverschlüsselt; nur die Off-Site-Dateien (`.sobk`) sind es. Ändert sich der Wiederherstellungsschlüssel, bleiben bereits am Ziel liegende Dateien mit dem alten verschlüsselt. Der WebDAV-Server muss Chunked-PUT annehmen; selbst ausgestellte Zertifikate werden nicht akzeptiert (dafür SFTP).
 * **Für die Browser-CI / Block 13 vorgemerkt (CSP und Dateirouten, ZP3-S-F9):** Zusammenspiel im Browser prüfen: PDF-Beleg im `<iframe>` unter `frame-ancestors 'self'` (Chrome-Betrachter, WebKit), Bilder der Dateirouten mit `sandbox` inline; Doku-Bild-Upload mit `Content-Length` über die gebaute App und einen üblichen Reverse-Proxy (nginx/Traefik; fehlt die Länge, antwortet die Route 411).
 * Der Job-Runner setzt genau einen Prozess voraus (ein Container, eine SQLite-Datei): Nach einem Neustart gelten laufende Läufe als unterbrochen. Jobs sind deshalb wiederholbar auszulegen.
 * **Tests mit Symlinks** (`archive.test.ts`: Prüfung auf dem Dateisystem, Verzeichnis-Symlink) laufen nur unter Linux/macOS (unter Windows ohne Entwicklermodus fehlt das Recht, sie werden übersprungen) – die Linux-Pipeline muss sie ausführen; `safe-fetch.test.ts` bindet `127.0.0.2` (sonst Ausweichen auf `127.0.0.1`).
@@ -1095,5 +1138,5 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 ## Technik
 
 Next.js 16 (App Router, Server Actions) · TypeScript · Tailwind CSS 4 · Prisma 7 (SQLite) · eigene Sitzungs-Authentifizierung (scrypt,
-serverseitige Sitzungen) · eigene schlanke i18n · Zod · react-markdown + remark-gfm · node-tar · esbuild. Design-Tokens in
+serverseitige Sitzungen) · eigene schlanke i18n · Zod · react-markdown + remark-gfm · node-tar · ssh2 (SFTP, reine JavaScript-Variante) · esbuild. Design-Tokens in
 `src/app/tokens.css`.
