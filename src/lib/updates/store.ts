@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { constants as fsConstants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { removeTreeSync } from "./fs-tree";
 import { parseEndorsements, type Endorsement } from "./keychain";
 import { emptyState, parseState, type UpdateState, type VersionMeta } from "./state";
 
@@ -17,6 +18,31 @@ export const activeFile = (data = dataDir()) => path.join(updatesDir(data), "act
 const endorsementsFile = (data = dataDir()) => path.join(updatesDir(data), "release-keys.json");
 /** Marker des Starters: der Launcher dieser Version ist wiederholt abgestürzt. */
 export const launcherCrashFile = (data = dataDir()) => path.join(updatesDir(data), "launcher-crash");
+/** Marker des Starters (Format und Bedeutung: markers.ts): Integritätsbefund, unklare Prüfung, letzte erfolgreiche Prüfung; Marker des Launchers: Rückfall zu alt für die Datenbank. */
+export const verifyFailedFile = (data = dataDir()) => path.join(updatesDir(data), "verify-failed");
+export const inconclusiveFile = (data = dataDir()) => path.join(updatesDir(data), "inconclusive");
+export const verifyOkFile = (data = dataDir()) => path.join(updatesDir(data), "verify-ok");
+export const incompatibleFile = (data = dataDir()) => path.join(updatesDir(data), "incompatible");
+
+/**
+ * Liest eine kleine Textdatei, die jemand anderes geschrieben hat (Marker sind Daten): nur reguläre Dateien (kein FIFO, der blockiert), höchstens `max` Bytes,
+ * `null`, wenn sie fehlt oder nicht lesbar ist. Öffnet nicht blockierend und folgt keinem Symlink, wo das Betriebssystem es kann.
+ */
+export function readSmallFile(file: string, max = 4096): string | null {
+  let fd: number | null = null;
+  try {
+    const flags = (fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0) | (fsConstants.O_NOFOLLOW ?? 0)) >>> 0;
+    fd = openSync(file, flags);
+    if (!fstatSync(fd).isFile()) return null;
+    const buffer = Buffer.alloc(max);
+    const read = readSync(fd, buffer, 0, max, 0);
+    return buffer.subarray(0, read).toString("utf8");
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) closeSync(fd);
+  }
+}
 
 /** version.json eines App-Verzeichnisses; null, wenn nicht vorhanden oder ungültig. */
 export function readMeta(dir: string): VersionMeta | null {
@@ -66,7 +92,7 @@ export function pruneVersions(keep: readonly string[], data = dataDir()): void {
   const dir = versionsDir(data);
   if (!existsSync(dir)) return;
   for (const name of readdirSync(dir)) {
-    if (!keep.includes(name)) rmSync(path.join(dir, name), { recursive: true, force: true });
+    if (!keep.includes(name)) removeTreeSync(path.join(dir, name));
   }
 }
 

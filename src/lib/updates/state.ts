@@ -34,10 +34,22 @@ export type UpdateState = {
   pending: boolean;
   /** Versionen, die nicht gestartet werden konnten – der Launcher überspringt sie */
   failed: string[];
-  last: { at: string; version: string; status: "ok" | "rolled-back"; reason?: string } | null;
+  /**
+   * Ergebnis des letzten Versuchs. `reason` ist ein Kurztext oder ein Code der Form `integrity:<Prüfcode>` (Integritätsprüfung des Starters fehlgeschlagen);
+   * `detail` ist dann der – von Steuerzeichen befreite, gekürzte – Pfad der Abweichung (nur Anzeige).
+   */
+  last: { at: string; version: string; status: "ok" | "rolled-back"; reason?: string; detail?: string } | null;
+  /**
+   * Die Prüfung dieser Version durch den Starter ist unklar geblieben (Signal, Zeitüberschreitung, Ein-/Ausgabefehler): kein Befund über den Inhalt. Die Version bleibt
+   * `current`; der nächste Start prüft erneut. Nach `INCONCLUSIVE_LIMIT` unklaren Läufen in Folge wird sie wie ein negativer Befund behandelt.
+   */
+  inconclusive: { version: string; count: number; at: string; reason: string } | null;
 };
 
-export const emptyState = (): UpdateState => ({ schema: STATE_SCHEMA, current: null, previous: null, pending: false, failed: [], last: null });
+/** So viele unklare Prüfungen derselben Version in Folge, bis sie wie ein negativer Befund behandelt wird. */
+export const INCONCLUSIVE_LIMIT = 3;
+
+export const emptyState = (): UpdateState => ({ schema: STATE_SCHEMA, current: null, previous: null, pending: false, failed: [], last: null, inconclusive: null });
 
 /** Liest eine unbekannte JSON-Struktur defensiv in einen gültigen Zustand (kaputte Datei → leerer Zustand). */
 export function parseState(raw: unknown): UpdateState {
@@ -46,6 +58,7 @@ export function parseState(raw: unknown): UpdateState {
   if (r.schema !== STATE_SCHEMA) return emptyState();
   const str = (v: unknown) => (typeof v === "string" ? v : null);
   const last = r.last as Record<string, unknown> | null | undefined;
+  const unclear = r.inconclusive as Record<string, unknown> | null | undefined;
   return {
     schema: STATE_SCHEMA,
     current: str(r.current),
@@ -54,7 +67,11 @@ export function parseState(raw: unknown): UpdateState {
     failed: Array.isArray(r.failed) ? r.failed.filter((v): v is string => typeof v === "string") : [],
     last:
       last && typeof last === "object" && typeof last.at === "string" && typeof last.version === "string" && (last.status === "ok" || last.status === "rolled-back")
-        ? { at: last.at, version: last.version, status: last.status, ...(typeof last.reason === "string" ? { reason: last.reason } : {}) }
+        ? { at: last.at, version: last.version, status: last.status, ...(typeof last.reason === "string" ? { reason: last.reason } : {}), ...(typeof last.detail === "string" ? { detail: last.detail.slice(0, 200) } : {}) }
+        : null,
+    inconclusive:
+      unclear && typeof unclear === "object" && typeof unclear.version === "string" && typeof unclear.at === "string" && typeof unclear.reason === "string" && Number.isInteger(unclear.count) && (unclear.count as number) > 0
+        ? { version: unclear.version, count: unclear.count as number, at: unclear.at, reason: unclear.reason.slice(0, 40) }
         : null,
   };
 }
@@ -73,7 +90,7 @@ export function afterHealthy(state: UpdateState, version: string, now: string): 
 }
 
 /** Die neue Version startete nicht: zurück auf die Vorversion und die fehlerhafte merken. */
-export function afterFailure(state: UpdateState, reason: string, now: string): UpdateState {
+export function afterFailure(state: UpdateState, reason: string, now: string, detail?: string): UpdateState {
   const broken = state.current;
   return {
     ...state,
@@ -81,8 +98,27 @@ export function afterFailure(state: UpdateState, reason: string, now: string): U
     previous: null,
     pending: false,
     failed: broken && !state.failed.includes(broken) ? [...state.failed, broken] : state.failed,
-    last: broken ? { at: now, version: broken, status: "rolled-back", reason } : state.last,
+    last: broken ? { at: now, version: broken, status: "rolled-back", reason, ...(detail ? { detail } : {}) } : state.last,
+    inconclusive: state.inconclusive?.version === broken ? null : state.inconclusive,
   };
+}
+
+/**
+ * Der Starter hat `version` (nach einem Integritätsbefund) abgelehnt – egal ob sie die aktuelle, die Vorversion oder eine andere war: Sie wird gesperrt. Ist es die
+ * aktuelle, gilt die Vorversion (soweit vorhanden) – dann prüft der Starter beim nächsten Start diese (Vorversion zuerst, erst danach die eingebaute Version).
+ * `reason` ist `integrity:<Code>`.
+ */
+export function afterIntegrityFailure(state: UpdateState, version: string, reason: string, now: string, detail?: string): UpdateState {
+  const failed = state.failed.includes(version) ? state.failed : [...state.failed, version];
+  const last = { at: now, version, status: "rolled-back" as const, reason, ...(detail ? { detail } : {}) };
+  if (state.current === version) return { ...afterFailure(state, reason, now, detail), failed, last };
+  return { ...state, previous: state.previous === version ? null : state.previous, failed, last, pending: false, inconclusive: state.inconclusive?.version === version ? null : state.inconclusive };
+}
+
+/** Eine unklare Prüfung von `version`: mitzählen (die Version bleibt eingetragen). */
+export function afterInconclusive(state: UpdateState, version: string, reason: string, now: string): UpdateState {
+  const count = state.inconclusive?.version === version ? state.inconclusive.count + 1 : 1;
+  return { ...state, inconclusive: { version, count, at: now, reason: reason.slice(0, 40) } };
 }
 
 export type StartChoice = { kind: "builtin" } | { kind: "volume"; version: string };

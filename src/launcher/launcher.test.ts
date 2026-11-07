@@ -5,8 +5,8 @@ import path from "node:path";
 import { after, afterEach, beforeEach, describe, it } from "node:test";
 import { applyPendingRestore, pendingDbFile, readApplied, readRestoreResult, restoreDir, writePending } from "../lib/updates/restore";
 import { RESTART_EXIT_CODE, emptyState } from "../lib/updates/state";
-import { launcherCrashFile, readState, versionDir, writeState } from "../lib/updates/store";
-import { createLauncher, DEFAULT_HEALTH_MAX_MS, type AppProcess, type LauncherConfig, type LauncherDeps, type SpawnSpec } from "./launcher";
+import { incompatibleFile, inconclusiveFile, launcherCrashFile, readActive, readState, verifyFailedFile, versionDir, writeState } from "../lib/updates/store";
+import { createLauncher, DEFAULT_HEALTH_MAX_MS, INCOMPATIBLE_EXIT_CODE, type AppProcess, type LauncherConfig, type LauncherDeps, type SpawnSpec } from "./launcher";
 
 /**
  * Ablauf des Launchers mit Fake-Prozess, Fake-Gesundheitsabfrage und Fake-Uhr gegen ein echtes temporäres Datenverzeichnis:
@@ -54,6 +54,8 @@ type Rig = {
   /** Antworten von /api/health in Reihenfolge; danach `null` (nicht erreichbar) */
   healthReplies: Array<{ status: number; body: unknown } | null>;
   healthCalls: number;
+  /** Angewendete Migrationen der Datenbank für die Kompatibilitätsschranke; `null` = nicht lesbar */
+  applied: string[] | null;
 };
 let rig: Rig;
 const savedEnv = { DATA_DIR: process.env.DATA_DIR, DATABASE_URL: process.env.DATABASE_URL };
@@ -74,6 +76,7 @@ function launcherFor(own: string, overrides: Partial<LauncherConfig> = {}) {
     sleep: async (ms) => void (rig.clock.ms += ms),
     now: () => rig.clock.ms,
     log: (message) => void rig.logs.push(message),
+    appliedMigrations: () => rig.applied,
   };
   const config: LauncherConfig = { own, builtin, port: "3999", healthTimeoutMs: 10_000, env: { PATH: "x" } as unknown as NodeJS.ProcessEnv, execPath: "/usr/bin/node", ...overrides };
   return createLauncher(config, deps);
@@ -85,8 +88,9 @@ beforeEach(() => {
   writeFileSync(dbFile, "DB");
   process.env.DATA_DIR = data;
   process.env.DATABASE_URL = `file:${dbFile}`;
+  rmSync(builtin, { recursive: true, force: true });
   meta(builtin, "1.0.0");
-  rig = { spawned: [], logs: [], clock: { ms: Date.parse("2026-01-01T00:00:00Z") }, onSpawn: (proc) => proc.exit(0), healthReplies: [], healthCalls: 0 };
+  rig = { spawned: [], logs: [], clock: { ms: Date.parse("2026-01-01T00:00:00Z") }, onSpawn: (proc) => proc.exit(0), healthReplies: [], healthCalls: 0, applied: null };
 });
 afterEach(() => {
   for (const [key, value] of Object.entries(savedEnv)) {
@@ -122,10 +126,10 @@ describe("eingebaute Version", () => {
     assert.deepEqual(args, ["--library-path", path.join(builtin, "runtime", "lib"), path.join(builtin, "runtime", "node"), "server.js"]);
   });
 
-  it("startet die App nach Neustart-Wunsch (Exit 42) im selben Launcher neu, solange der Zeiger nicht wechselt", async () => {
-    rig.onSpawn = (proc, index) => proc.exit(index === 0 ? RESTART_EXIT_CODE : 0);
-    assert.equal(await launcherFor(builtin).run(), 0);
-    assert.equal(rig.spawned.length, 2);
+  it("startet die App nur ein einziges Mal: auf einen Neustart-Wunsch (Exit 42) antwortet der Launcher mit 42, der Starter prüft und startet neu (kein Neustart im Launcher)", async () => {
+    rig.onSpawn = (proc) => proc.exit(RESTART_EXIT_CODE);
+    assert.equal(await launcherFor(builtin).run(), RESTART_EXIT_CODE);
+    assert.equal(rig.spawned.length, 1, "genau ein Start je Aufruf – ein zweiter Start im selben Launcher liefe ohne Prüfung des Starters");
     assert.ok(rig.logs.some((l) => l.includes("Neustart angefordert")));
   });
 
@@ -367,25 +371,38 @@ describe("Wiederherstellung", () => {
     assert.equal(await finished, 0);
   });
 
-  it("setzt die vorherige Datenbank zurück, wenn die wiederhergestellte nicht gesund startet, und startet dann neu", async () => {
+  it("setzt die vorherige Datenbank zurück, wenn die wiederhergestellte nicht gesund startet, und meldet Exit 42 (der Starter prüft neu; der Rückfall startet die App nicht im selben Launcher)", async () => {
     stage("KAPUTT");
-    // erster Start: nie gesund; zweiter Start (nach dem Zurücksetzen): endet normal
-    rig.onSpawn = (proc, index) => {
-      if (index === 1) proc.exit(0);
-    };
-    assert.equal(await launcherFor(builtin).run(), 0);
-    assert.equal(rig.spawned.length, 2);
+    rig.onSpawn = () => undefined; // nie gesund
+    assert.equal(await launcherFor(builtin).run(), RESTART_EXIT_CODE);
+    assert.equal(rig.spawned.length, 1, "kein zweiter Start im selben Launcher");
     assert.deepEqual(rig.spawned[0].kills, ["SIGKILL"]);
     assert.equal(readFileSync(dbFile, "utf8"), "DB", "die vorherige Datenbank ist wieder da");
     assert.equal(readRestoreResult(data)?.status, "rolled-back");
+    // Der Starter ruft den Launcher erneut auf: jetzt gibt es nichts mehr zurückzunehmen, die App läuft normal – die Schleife endet
+    rig.spawned.length = 0;
+    rig.onSpawn = (proc) => proc.exit(0);
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+    assert.equal(readFileSync(dbFile, "utf8"), "DB");
   });
 
-  it("setzt zurück, wenn der Prozess nach dem Einspielen sofort endet (z. B. Migration scheitert)", async () => {
+  it("setzt zurück, wenn der Prozess nach dem Einspielen sofort endet (z. B. Migration scheitert) – Exit 42, genau ein Start", async () => {
     stage("KAPUTT");
-    rig.onSpawn = (proc, index) => proc.exit(index === 0 ? 1 : 0);
-    assert.equal(await launcherFor(builtin).run(), 0);
+    rig.onSpawn = (proc) => proc.exit(1);
+    assert.equal(await launcherFor(builtin).run(), RESTART_EXIT_CODE);
+    assert.equal(rig.spawned.length, 1);
     assert.equal(readFileSync(dbFile, "utf8"), "DB");
     assert.equal(readRestoreResult(data)?.status, "rolled-back");
+    rig.onSpawn = (proc) => proc.exit(0);
+    assert.equal(await launcherFor(builtin).run(), 0, "kein Dauerlauf: das Journal ist abgeschlossen");
+  });
+
+  it("eine App, die nach einer Wiederherstellung mit Exit 42 endet, bevor sie bestätigt ist, wird zurückgenommen (kein ungeprüfter Neustart im Launcher)", async () => {
+    stage("NEU");
+    rig.onSpawn = (proc) => proc.exit(RESTART_EXIT_CODE);
+    assert.equal(await launcherFor(builtin).run(), RESTART_EXIT_CODE);
+    assert.equal(rig.spawned.length, 1);
   });
 
   it("nimmt eine eingespielte, noch unbestätigte Wiederherstellung nach einem abgebrochenen Start wieder auf", async () => {
@@ -397,5 +414,212 @@ describe("Wiederherstellung", () => {
     assert.equal(readRestoreResult(data)?.status, "ok");
     rig.spawned[0].exit(0);
     await finished;
+  });
+});
+
+describe("Marker des Starters (nur die eingebaute Version wertet sie aus)", () => {
+  const install = (version: string, over: Partial<ReturnType<typeof emptyState>> = {}) => {
+    meta(volume(version), version);
+    writeState({ ...emptyState(), current: version, ...over }, data);
+  };
+  const failedMarker = (version: string, code = 15, detail = "extra.txt") => writeFileSync(verifyFailedFile(data), `${volume(version)}\n${code}\n${detail}\n`);
+  const unclearMarker = (version: string, reason = "signal") => writeFileSync(inconclusiveFile(data), `${version}\n${reason}\n`);
+
+  it("Integritätsbefund ohne Vorversion: Version sperren, Grund merken, die eingebaute App läuft; der Marker wird verbraucht", async () => {
+    install("1.1.0");
+    failedMarker("1.1.0", 15, "extra.txt");
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1, "die eingebaute App läuft");
+    const state = readState(data);
+    assert.equal(state.current, null);
+    assert.deepEqual(state.failed, ["1.1.0"]);
+    assert.equal(state.last?.status, "rolled-back");
+    assert.equal(state.last?.reason, "integrity:15");
+    assert.equal(state.last?.detail, "extra.txt");
+    assert.equal(readActive(data), null, "der Zeiger ist leer");
+    assert.equal(existsSync(verifyFailedFile(data)), false);
+  });
+
+  it("Rückfall zuerst auf die Vorversion: Exit 42 ohne App-Start, der Zeiger zeigt auf die Vorversion (der Starter prüft sie selbst); erst deren Befund führt zur eingebauten Version", async () => {
+    meta(volume("1.0.5"), "1.0.5");
+    install("1.1.0", { previous: "1.0.5" });
+    failedMarker("1.1.0");
+    assert.equal(await launcherFor(builtin).run(), RESTART_EXIT_CODE);
+    assert.equal(rig.spawned.length, 0, "kein App-Start: der Starter prüft zuerst die Vorversion");
+    assert.equal(readState(data).current, "1.0.5");
+    assert.equal(readActive(data), volume("1.0.5"));
+    assert.deepEqual(readState(data).failed, ["1.1.0"]);
+
+    // Die Vorversion besteht die Prüfung ebenfalls nicht: jetzt die eingebaute Version, beide gesperrt – die Kette endet
+    failedMarker("1.0.5", 16, "server.js");
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+    assert.equal(readState(data).current, null);
+    assert.deepEqual(readState(data).failed, ["1.1.0", "1.0.5"]);
+    assert.equal(readState(data).last?.reason, "integrity:16");
+  });
+
+  it("ungültige Marker (kein Befundcode, Pfad statt Version, Müll) werden ignoriert und verbraucht – der Zustand bleibt", async () => {
+    for (const text of ["nur eine Zeile", "../../etc/passwd\n15\nx\n", "1.1.0\n99\nx\n", "1.1.0\nabc\n", "\n\n"]) {
+      install("1.1.0", { pending: false });
+      writeFileSync(verifyFailedFile(data), text);
+      rig.spawned.length = 0;
+      await launcherFor(builtin).run();
+      assert.equal(existsSync(verifyFailedFile(data)), false, text);
+      assert.deepEqual(readState(data).failed, [], text);
+    }
+  });
+
+  it("steuerzeichenhaltige Pfade aus dem Marker werden bereinigt gespeichert (Log-Injektion)", async () => {
+    install("1.1.0");
+    writeFileSync(verifyFailedFile(data), `${volume("1.1.0")}\n15\n\u001b[31mrot\u0007${"x".repeat(500)}\n`);
+    await launcherFor(builtin).run();
+    const detail = readState(data).last?.detail ?? "";
+    assert.doesNotMatch(detail, /[\u0000-\u001f]/);
+    assert.ok(detail.length <= 200);
+  });
+
+  it("unklare Prüfung: die Version bleibt eingetragen und ungesperrt, für diesen Start läuft die eingebaute App; nach dreimal in Folge gilt sie als fehlgeschlagen", async () => {
+    install("1.1.0", { pending: false });
+    for (const count of [1, 2]) {
+      unclearMarker("1.1.0", "timeout");
+      rig.spawned.length = 0;
+      assert.equal(await launcherFor(builtin).run(), 0);
+      assert.equal(rig.spawned.length, 1, "die eingebaute App läuft");
+      const state = readState(data);
+      assert.equal(state.current, "1.1.0", "Version bleibt aktuell");
+      assert.deepEqual(state.failed, [], "und wird nicht gesperrt");
+      assert.equal(state.inconclusive?.count, count);
+      assert.equal(existsSync(inconclusiveFile(data)), false, "Marker verbraucht");
+    }
+    unclearMarker("1.1.0", "io");
+    rig.spawned.length = 0;
+    await launcherFor(builtin).run();
+    const state = readState(data);
+    assert.equal(state.current, null);
+    assert.deepEqual(state.failed, ["1.1.0"]);
+    assert.equal(state.last?.reason, "integrity:17");
+    assert.equal(state.inconclusive, null);
+  });
+
+  it("die installierte Version setzt den Zähler unklarer Prüfungen zurück, sobald der Starter sie wieder startet", async () => {
+    install("1.1.0", { pending: false, inconclusive: { version: "1.1.0", count: 2, at: "t", reason: "signal" } });
+    assert.equal(await launcherFor(volume("1.1.0")).run(), 0);
+    assert.equal(readState(data).inconclusive, null);
+  });
+
+  it("Abgleich mit dem Starter (chooseStart): ein Eintrag, den die eingebaute Version überholt hat, verfällt – ohne Alarm und ohne Marker", async () => {
+    install("0.9.0", { pending: false });
+    meta(volume("0.8.0"), "0.8.0");
+    assert.equal(await launcherFor(builtin).run(), 0);
+    const state = readState(data);
+    assert.equal(state.current, null);
+    assert.equal(state.previous, null);
+    assert.deepEqual(state.failed, [], "kein Integritätsbefund");
+    assert.equal(state.last, null, "keine Meldung");
+    assert.equal(existsSync(volume("0.9.0")), false, "die überholte Version wird aufgeräumt");
+    assert.equal(readActive(data), null);
+  });
+
+  it("Abgleich: unverträglicher Starter-Vertrag (base) lässt den Eintrag ebenfalls ohne Alarm verfallen", async () => {
+    meta(volume("1.1.0"), "1.1.0", 2);
+    writeState({ ...emptyState(), current: "1.1.0", pending: false }, data);
+    await launcherFor(builtin).run();
+    assert.equal(readState(data).current, null);
+    assert.deepEqual(readState(data).failed, []);
+  });
+
+  it("Abgleich: eine startbare, eingetragene Version, die der Starter übergangen hat, wird nicht gelöscht (nur ein Hinweis)", async () => {
+    install("1.1.0", { pending: false });
+    await launcherFor(builtin).run();
+    assert.equal(readState(data).current, "1.1.0");
+    assert.equal(existsSync(volume("1.1.0")), true);
+    assert.ok(rig.logs.some((l) => l.includes("der Zustand bleibt unverändert")));
+  });
+});
+
+describe("Kompatibilitätsschranke (Rückfall auf zu alten Code)", () => {
+  const MIGRATION = "20260301000000_neu";
+  const BASELINE = "00000000000000_baseline";
+  const withMigrations = (dir: string, names: string[]) => {
+    for (const name of names) {
+      mkdirSync(path.join(dir, "prisma", "migrations", name), { recursive: true });
+      writeFileSync(path.join(dir, "prisma", "migrations", name, "migration.sql"), "-- sql");
+    }
+  };
+  const install = (version: string, over: Partial<ReturnType<typeof emptyState>> = {}) => {
+    meta(volume(version), version);
+    writeState({ ...emptyState(), current: version, ...over }, data);
+  };
+  const failedMarker = (version: string) => writeFileSync(verifyFailedFile(data), `${volume(version)}\n15\nx\n`);
+
+  it("kennt die Datenbank Migrationen, die die eingebaute Version nicht kennt, und fällt man von einer bewährten Version zurück: gesteuert stoppen statt weiterlaufen", async () => {
+    withMigrations(builtin, [BASELINE]);
+    install("1.1.0", { pending: false });
+    rig.applied = [BASELINE, MIGRATION];
+    failedMarker("1.1.0");
+    assert.equal(await launcherFor(builtin).run(), INCOMPATIBLE_EXIT_CODE);
+    assert.equal(rig.spawned.length, 0, "die App wird nicht gestartet");
+    assert.equal(readFileSync(incompatibleFile(data), "utf8"), "1.1.0\n1\n");
+    assert.ok(rig.logs.some((l) => l.includes(MIGRATION) && l.includes("Image")), "die Meldung nennt die Migration und was zu tun ist");
+    // Der Zustand bleibt, wie er ist: ein neues Image mit der Migration löst es später sauber auf
+    assert.equal(readState(data).current, "1.1.0");
+    assert.deepEqual(readState(data).failed, []);
+  });
+
+  it("ist das Image inzwischen aktualisiert (die eingebaute Version kennt die Migration), startet die App wieder und der Hinweis verschwindet", async () => {
+    withMigrations(builtin, [BASELINE, MIGRATION]);
+    mkdirSync(path.dirname(incompatibleFile(data)), { recursive: true });
+    writeFileSync(incompatibleFile(data), "1.1.0\n1\n");
+    rig.applied = [BASELINE, MIGRATION];
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+    assert.equal(existsSync(incompatibleFile(data)), false);
+  });
+
+  it("die Rücknahme eines noch unbestätigten Updates (pending) ist der vorgesehene Weg und bleibt erlaubt: Migrationen sind additiv", async () => {
+    withMigrations(builtin, [BASELINE]);
+    install("1.1.0", { pending: true });
+    rig.applied = [BASELINE, MIGRATION];
+    failedMarker("1.1.0");
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+    assert.equal(existsSync(incompatibleFile(data)), false);
+  });
+
+  it("maßgeblich ist der Code, auf den zurückgefallen wird: kennt die Vorversion die Migration, geht der Rückfall dorthin (Exit 42), sonst wird gestoppt", async () => {
+    withMigrations(builtin, [BASELINE]);
+    meta(volume("1.0.5"), "1.0.5");
+    withMigrations(volume("1.0.5"), [BASELINE, MIGRATION]);
+    install("1.1.0", { pending: false, previous: "1.0.5" });
+    rig.applied = [BASELINE, MIGRATION];
+    failedMarker("1.1.0");
+    assert.equal(await launcherFor(builtin).run(), RESTART_EXIT_CODE, "die Vorversion kennt die Migration");
+    assert.equal(readState(data).current, "1.0.5");
+
+    // Vorversion kennt sie nicht
+    withMigrations(volume("1.0.4"), [BASELINE]);
+    meta(volume("1.0.4"), "1.0.4");
+    writeState({ ...emptyState(), current: "1.1.0", previous: "1.0.4", pending: false }, data);
+    failedMarker("1.1.0");
+    assert.equal(await launcherFor(builtin).run(), INCOMPATIBLE_EXIT_CODE);
+  });
+
+  it("ist die Datenbank nicht lesbar (null), gibt es kein Urteil: die Schranke verhindert keinen Start, den die App selbst prüft", async () => {
+    withMigrations(builtin, [BASELINE]);
+    install("1.1.0", { pending: false });
+    rig.applied = null;
+    failedMarker("1.1.0");
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+  });
+
+  it("auch der Absturz-Marker des Starters (Launcher einer bewährten Version stürzt wiederholt ab) läuft durch die Schranke", async () => {
+    withMigrations(builtin, [BASELINE]);
+    install("1.1.0", { pending: false });
+    rig.applied = [BASELINE, MIGRATION];
+    writeFileSync(launcherCrashFile(data), `${volume("1.1.0")}\n`);
+    assert.equal(await launcherFor(builtin).run(), INCOMPATIBLE_EXIT_CODE);
+    assert.equal(rig.spawned.length, 0);
   });
 });

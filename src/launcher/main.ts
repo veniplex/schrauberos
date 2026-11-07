@@ -5,8 +5,11 @@
  * Gesundheit abwarten, zurückrollen, Wiederherstellung einspielen – steht in `launcher.ts` und ist dort mit Fakes getestet.
  */
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import path from "node:path";
+import { readAppliedMigrations, type MigrationDb } from "../lib/updates/compat";
 import { positiveMs, probeHealth } from "../lib/updates/health";
+import { databaseFile } from "../server/db-client-path";
 import { createLauncher, DEFAULT_HEALTH_MAX_MS, type AppProcess, type LauncherDeps } from "./launcher";
 
 const PORT = process.env.PORT ?? "3000";
@@ -31,6 +34,15 @@ const deps: LauncherDeps = {
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now: () => Date.now(),
   log: (message) => console.log(`[launcher] ${message}`),
+  // Nur lesend und erst bei Bedarf (Rückfall): better-sqlite3 liegt im Paket neben dem Launcher (kein Teil des esbuild-Pakets, daher über require aus dem Paketordner)
+  appliedMigrations: () => {
+    try {
+      const Database = createRequire(path.join(process.cwd(), "launcher.mjs"))("better-sqlite3") as new (file: string, options: { readonly: boolean; fileMustExist: boolean }) => MigrationDb;
+      return readAppliedMigrations(databaseFile(), (file) => new Database(file, { readonly: true, fileMustExist: true }));
+    } catch {
+      return null;
+    }
+  },
 };
 
 const launcher = createLauncher(
