@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Download, ExternalLink, Pencil } from "lucide-react";
+import { Download, ExternalLink, Lock, Pencil } from "lucide-react";
 import { Badge, Card, DefinitionList, TextLink, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
@@ -9,14 +9,15 @@ import { PdfPreview } from "@/components/ui/pdf-preview";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { todayInput } from "@/lib/dates";
-import { paymentState } from "@/modules/office/invoices/domain";
+import { versionOf } from "@/lib/concurrency";
+import { cancelBlock, finalizeBlock, isFinalized, paymentState } from "@/modules/office/invoices/domain";
 import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { formatCents } from "@/lib/money";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { deleteInvoice, markInvoicePaid, reopenInvoice } from "@/modules/office/invoices/actions";
+import { cancelInvoice, deleteInvoice, finalizeInvoice, markInvoicePaid, reopenInvoice } from "@/modules/office/invoices/actions";
 import { PaymentBadge } from "@/modules/office/invoices/ui";
-import { Input } from "@/components/ui/form";
+import { Field, Input, Textarea } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -33,12 +34,20 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const inv = await db.invoice.findUnique({
     where: { id },
-    include: { customer: { select: customerNameSelect }, file: { select: { name: true, mime: true, size: true, uploadedAt: true } } },
+    include: {
+      customer: { select: customerNameSelect },
+      file: { select: { name: true, mime: true, size: true, uploadedAt: true } },
+      cancels: { select: { id: true, number: true } },
+      cancelledBy: { select: { id: true, number: true } },
+    },
   });
   if (!inv) notFound();
 
   const state = paymentState(inv);
   const canEdit = session.can("invoices.edit");
+  const finalized = isFinalized(inv);
+  const canFinalize = session.can("invoices.finalize") && finalizeBlock(inv) === null;
+  const canCancel = canEdit && cancelBlock({ ...inv, hasCounterDocument: inv.cancelledBy !== null }) === null;
   const outgoing = inv.direction === "outgoing";
   const isImage = inv.file?.mime.startsWith("image/");
 
@@ -50,12 +59,20 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <span className="flex flex-wrap items-center gap-3">
             <span className="font-mono">{inv.number}</span>
             <PaymentBadge state={state} t={t} />
+            {finalized ? (
+              <Badge tone="neutral">
+                <Lock className="mr-1 inline size-3" aria-hidden />
+                {t("invoices.finalize.badge")}
+              </Badge>
+            ) : null}
           </span>
         }
         description={
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={outgoing ? "accent" : "neutral"}>{t(`invoices.tabs.${outgoing ? "outgoing" : "incoming"}`)}</Badge>
             <span>{inv.partyName}</span>
+            {inv.cancels ? <TextLink href={`/invoices/${inv.cancels.id}`}>{t("invoices.cancel.counterOf", { number: inv.cancels.number })}</TextLink> : null}
+            {inv.cancelledBy ? <TextLink href={`/invoices/${inv.cancelledBy.id}`}>{t("invoices.cancel.cancelledBy", { number: inv.cancelledBy.number })}</TextLink> : null}
           </span>
         }
         actions={
@@ -73,9 +90,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <SubmitButton variant="primary">{t("invoices.markPaid")}</SubmitButton>
                 </form>
               ) : null}
-              <LinkButton href={`/invoices/${inv.id}/edit`}>
-                <Pencil className="size-4" aria-hidden /> {t("common.edit")}
-              </LinkButton>
+              {finalized ? null : (
+                <LinkButton href={`/invoices/${inv.id}/edit`}>
+                  <Pencil className="size-4" aria-hidden /> {t("common.edit")}
+                </LinkButton>
+              )}
             </>
           ) : null
         }
@@ -147,7 +166,49 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             />
           </Card>
 
-          {session.can("invoices.delete") ? (
+          {finalized ? (
+            <Card title={t("invoices.finalize.title")}>
+              <p className="text-sm">{t("invoices.finalize.done", { date: inv.finalizedAt ? date(inv.finalizedAt) : "", name: inv.finalizedByName ?? "–" })}</p>
+              <p className="mt-2 text-sm text-ink-muted">{t("invoices.finalize.locked")}</p>
+            </Card>
+          ) : null}
+
+          {canFinalize ? (
+            <Card title={t("invoices.finalize.title")}>
+              <p className="mb-3 text-sm text-ink-muted">{t("invoices.finalize.hint")}</p>
+              <form action={finalizeInvoice}>
+                <input type="hidden" name="id" value={inv.id} />
+                <input type="hidden" name="version" value={versionOf(inv)} />
+                <ConfirmSubmitButton variant="primary" message={t("invoices.finalize.confirm", { number: inv.number })} confirmLabel={t("invoices.finalize.action")}>
+                  {t("invoices.finalize.action")}
+                </ConfirmSubmitButton>
+              </form>
+            </Card>
+          ) : null}
+
+          {canCancel ? (
+            <Card title={t("invoices.cancel.title")}>
+              <p className="mb-3 text-sm text-ink-muted">{t("invoices.cancel.hint")}</p>
+              <form action={cancelInvoice} className="flex flex-col gap-3">
+                <input type="hidden" name="id" value={inv.id} />
+                <input type="hidden" name="version" value={versionOf(inv)} />
+                <Field label={t("invoices.cancel.number")} htmlFor="cancelNumber" name="number" required>
+                  <Input id="cancelNumber" name="number" maxLength={60} required autoComplete="off" className="font-mono" />
+                </Field>
+                <Field label={t("invoices.cancel.issueDate")} htmlFor="cancelDate" name="issueDate" hint={t("invoices.cancel.issueDateHint")}>
+                  <Input id="cancelDate" name="issueDate" type="date" />
+                </Field>
+                <Field label={t("invoices.cancel.reason")} htmlFor="cancelReason" name="reason">
+                  <Textarea id="cancelReason" name="reason" maxLength={500} rows={2} />
+                </Field>
+                <ConfirmSubmitButton message={t("invoices.cancel.confirm", { original: inv.number })} confirmLabel={t("invoices.cancel.action")}>
+                  {t("invoices.cancel.action")}
+                </ConfirmSubmitButton>
+              </form>
+            </Card>
+          ) : null}
+
+          {session.can("invoices.delete") && !finalized ? (
             <DangerZone title={t("common.dangerZone")}>
               <form action={deleteInvoice}>
                 <input type="hidden" name="id" value={inv.id} />

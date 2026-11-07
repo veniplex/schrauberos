@@ -365,6 +365,7 @@ export const en: Messages = {
       view: "View invoices",
       edit: "Record and edit invoices",
       delete: "Delete invoices",
+      finalize: "Finalize outgoing invoices",
       export: "Export invoices (CSV, invoice archive and accountant)",
       import: "Import invoices (CSV, creates new invoices)",
     },

@@ -2,7 +2,7 @@
 
 import { formObject } from "@/lib/forms";
 import { defineAction } from "@/server/operations";
-import { deleteInvoiceOperation, markInvoicePaidOperation, reopenInvoiceOperation, saveInvoiceOperation } from "./operations";
+import { cancelInvoiceOperation, deleteInvoiceOperation, finalizeInvoiceOperation, markInvoicePaidOperation, reopenInvoiceOperation, saveInvoiceOperation } from "./operations";
 
 const paths = (id: string) => ["/invoices", "/", `/invoices/${id}`] as const;
 
@@ -23,4 +23,12 @@ export const deleteInvoice = defineAction(deleteInvoiceOperation, {
   revalidate: ["/invoices", "/"],
   redirect: ({ direction }) => `/invoices?dir=${direction}`,
   message: "common.deleted",
+});
+
+export const finalizeInvoice = defineAction(finalizeInvoiceOperation, { revalidate: ({ id }) => paths(id), message: "invoices.flash.finalized" });
+
+export const cancelInvoice = defineAction(cancelInvoiceOperation, {
+  revalidate: ({ id, counterId }) => [...paths(id), ...paths(counterId)],
+  redirect: ({ counterId }) => `/invoices/${counterId}`,
+  message: "invoices.flash.cancelled",
 });

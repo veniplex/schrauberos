@@ -65,7 +65,7 @@ export function snapshotBase(form: HTMLFormElement | null): string {
  * Setzt den Wert wie eine Eingabe des Menschen: über den nativen Setter und ein `input`-Ereignis, damit auch von React gesteuerte Felder (Zustand statt `defaultValue`)
  * den Wert übernehmen – ein bloßes `element.value = …` würde beim nächsten Rendern wieder überschrieben.
  */
-function setValue(element: Control, value: string) {
+export function setControlValue(element: Control, value: string) {
   const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
   const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
   if (setter) setter.call(element, value);
@@ -126,7 +126,7 @@ export function restorePass(form: HTMLFormElement | null, job: RestoreJob): bool
       if (element.value === entry.value) continue;
       job.attempts[index]++;
       changed = true;
-      setValue(element, entry.value as string);
+      setControlValue(element, entry.value as string);
       if (element.value !== entry.value) return true; // gesteuertes Feld: der Wert gilt erst nach dem nächsten Rendern
     }
   }

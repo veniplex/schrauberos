@@ -161,6 +161,8 @@ export const auditEn: typeof auditDe = {
       update: "Invoice changed",
       pay: "Invoice marked as paid",
       reopen: "Invoice reopened",
+      finalize: "Invoice finalized",
+      cancel: "Invoice cancelled with a cancellation document",
       delete: "Invoice deleted",
       export: "Invoices exported (CSV)",
       import: "Invoices imported (CSV)",

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/layout";
+import { LinkButton } from "@/components/ui/buttons";
+import { isFinalized } from "@/modules/office/invoices/domain";
 import { getI18n } from "@/i18n/server";
 import { toDateInput } from "@/lib/dates";
 import { customerContacts, customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
@@ -26,6 +29,21 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
   // Ort des Kunden nur mit `customers.view` (D7); sonst wird er gar nicht gelesen
   const customerCity = (await customerContacts(session, inv.customerId ? [inv.customerId] : [])).get(inv.customerId ?? "")?.city;
   const direction = inv.direction === "outgoing" ? "outgoing" : "incoming";
+
+  // Festgeschriebene Rechnungen sind unveränderlich: kein Formular, sondern der Hinweis (die Operation lehnt das Speichern ohnehin ab)
+  if (isFinalized(inv)) {
+    return (
+      <>
+        <PageHeader breadcrumbs={[{ href: "/invoices", label: t("nav.invoices") }, { href: `/invoices/${inv.id}`, label: inv.number }]} help="office.invoices" title={t("invoices.edit")} description={<span className="font-mono">{inv.number}</span>} />
+        <Card title={t("invoices.finalize.badge")}>
+          <p className="text-sm">{t("invoices.errors.finalized")}</p>
+          <LinkButton href={`/invoices/${inv.id}`} className="mt-4">
+            {t("common.previous")}
+          </LinkButton>
+        </Card>
+      </>
+    );
+  }
 
   return (
     <>

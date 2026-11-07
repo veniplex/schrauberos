@@ -39,7 +39,8 @@ export const permissionHintsEn: typeof permissionHintsDe = {
   invoices: {
     view: "View invoices and their documents.",
     edit: "Record and change invoices and mark them as paid.",
-    delete: "Delete invoices permanently.",
+    delete: "Delete invoices permanently (never finalized ones).",
+    finalize: "Finalize outgoing invoices: immutable and undeletable afterwards, cannot be undone. Never granted automatically.",
     export: "Download invoices as a CSV file, also for the tax accountant.",
     import: "Create invoices from a CSV file.",
   },

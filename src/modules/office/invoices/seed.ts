@@ -27,7 +27,7 @@ async function demo(db: PrismaClient) {
   await inv("outgoing", "2026-0187", customers[0] ? `${customers[0].firstName ?? ""} ${customers[0].lastName}`.trim() : "Kunde", 35, -5, 31250, "open", { customerId: customers[0]?.id, category: "Inspektion" });
   await inv("outgoing", "2026-0188", customers[1]?.company ?? customers[1]?.lastName ?? "Kunde", 20, 10, 128900, "open", { customerId: customers[1]?.id, category: "Reparatur" });
   await inv("outgoing", "2026-0189", customers[2] ? `${customers[2].firstName ?? ""} ${customers[2].lastName}`.trim() : "Kunde", 12, 2, 8900, "open", { customerId: customers[2]?.id, category: "Reifenwechsel" });
-  await inv("outgoing", "2026-0176", customers[0] ? `${customers[0].firstName ?? ""} ${customers[0].lastName}`.trim() : "Kunde", 80, -50, 45600, "paid", { customerId: customers[0]?.id, category: "Reifenlagerung" });
+  await inv("outgoing", "2026-0176", customers[0] ? `${customers[0].firstName ?? ""} ${customers[0].lastName}`.trim() : "Kunde", 80, -50, 45600, "paid", { customerId: customers[0]?.id, category: "Reifenlagerung", finalizedAt: noonOf(atDay(-70)), finalizedByName: "Demo" });
 }
 
 export const seeds: SeedDef[] = [{ id: "invoices", feature: "office.invoices", order: 120, demo }];

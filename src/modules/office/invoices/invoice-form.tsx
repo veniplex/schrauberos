@@ -8,6 +8,7 @@ import { INVOICE_FILE_MAX_BYTES, INVOICE_STATUSES } from "@/modules/office/invoi
 import { useI18n } from "@/i18n/client";
 import { amountsReducer, grossSuggestion } from "./amounts";
 import { saveInvoice } from "./actions";
+import { EInvoicePreview, useEInvoiceReader } from "./einvoice-reader";
 
 export type InvoiceFormInitial = {
   id?: string;
@@ -38,6 +39,8 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
   const [amounts, change] = useReducer(amountsReducer, { net: initial.net, vat: initial.vat, gross: initial.gross, grossTouched: initial.gross !== "" });
   const grossTouched = amounts.grossTouched;
   const suggested = grossSuggestion(amounts.net, amounts.vat);
+  // XML-E-Rechnung als Beleg: Die Angaben erscheinen als Vorschlag (nur Eingangsrechnungen), übernommen wird erst auf Knopfdruck
+  const einvoice = useEInvoiceReader();
 
   return (
     <Form action={saveInvoice} draftKey={`invoice:${initial.id ?? initial.direction}`} className="flex max-w-4xl flex-col gap-5">
@@ -134,8 +137,14 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
           </p>
         ) : null}
         <Field label={t("invoices.sections.file")} name="file" hint={initial.file ? t("invoices.fileReplaceHint") : t("invoices.fileHint")}>
-          <FileInput variant="photo" name="file" accept="application/pdf,image/png,image/jpeg,image/webp,application/xml,text/xml,.xml" maxBytes={INVOICE_FILE_MAX_BYTES} />
+          <FileInput variant="photo" name="file" accept="application/pdf,image/png,image/jpeg,image/webp,application/xml,text/xml,.xml" maxBytes={INVOICE_FILE_MAX_BYTES} onChange={outgoing ? undefined : einvoice.onFileChange} />
         </Field>
+        {outgoing ? null : (
+          <>
+            <p className="mt-2 text-xs text-ink-muted">{t("invoices.einvoice.hint")}</p>
+            <EInvoicePreview state={einvoice.state} onApply={einvoice.apply} />
+          </>
+        )}
         {initial.file ? (
           <Checkbox name="removeFile" label={t("invoices.removeFile")} className="mt-3" />
         ) : null}

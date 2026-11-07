@@ -10,7 +10,7 @@ import { enumParser, zodRowMessages } from "@/server/csv/row";
 import type { ExportDef } from "@/server/csv/types";
 import { moneyCell } from "@/server/csv/writer";
 import { db } from "@/server/db";
-import { ACCOUNTANT_COLUMNS, INVOICE_COLUMNS } from "./exchange-columns";
+import { ACCOUNTANT_COLUMNS, EXPORT_ONLY_COLUMNS, INVOICE_COLUMNS } from "./exchange-columns";
 import { INVOICE_DIRECTIONS, INVOICE_STATUSES, outgoingKeyOf, paymentState } from "./domain";
 import { invoiceImportInput, invoiceRecord, type InvoiceImportFields } from "./operations";
 
@@ -47,7 +47,7 @@ export const invoicesExport: ExportDef = {
     const status = (code: string) => t(`invoices.statuses.${code as (typeof INVOICE_STATUSES)[number]}`);
     async function* rows() {
       for await (const i of paged((page) =>
-        db.invoice.findMany({ ...pageArgs(page), where, orderBy: [{ issueDate: "asc" }, { id: "asc" }], include: { customer: { select: { customerNumber: true } } } }),
+        db.invoice.findMany({ ...pageArgs(page), where, orderBy: [{ issueDate: "asc" }, { id: "asc" }], include: { customer: { select: { customerNumber: true } }, cancels: { select: { number: true } } } }),
       )) {
         yield [
           dir(i.direction),
@@ -64,10 +64,12 @@ export const invoicesExport: ExportDef = {
           i.reference,
           i.notes,
           ...(withCustomer ? [i.customer?.customerNumber ?? null] : []),
+          i.finalizedAt ? formatDay(i.finalizedAt) : null,
+          i.cancels?.number ?? null,
         ];
       }
     }
-    return { columns: columnsFor(session), count: await db.invoice.count({ where }), target: [direction, from, to].filter(Boolean).join(" "), rows: rows() };
+    return { columns: [...columnsFor(session), ...EXPORT_ONLY_COLUMNS], count: await db.invoice.count({ where }), target: [direction, from, to].filter(Boolean).join(" "), rows: rows() };
   },
 };
 
@@ -94,7 +96,7 @@ export const accountantExport: ExportDef = {
     const dir = (code: string) => t(`invoices.tabs.${code as (typeof INVOICE_DIRECTIONS)[number]}`);
     const now = new Date();
     async function* rows() {
-      for await (const i of paged((page) => db.invoice.findMany({ ...pageArgs(page), where, orderBy: [{ issueDate: "asc" }, { number: "asc" }, { id: "asc" }] }))) {
+      for await (const i of paged((page) => db.invoice.findMany({ ...pageArgs(page), where, orderBy: [{ issueDate: "asc" }, { number: "asc" }, { id: "asc" }], include: { cancels: { select: { number: true } } } }))) {
         yield [
           dir(i.direction),
           i.number,
@@ -105,6 +107,8 @@ export const accountantExport: ExportDef = {
           moneyCell(i.grossCents, format),
           t(`invoices.payment.${paymentState(i, now)}`),
           i.paidAt ? formatDay(i.paidAt) : null,
+          i.finalizedAt ? formatDay(i.finalizedAt) : null,
+          i.cancels?.number ?? null,
         ];
       }
     }

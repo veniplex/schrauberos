@@ -365,6 +365,7 @@ export const de = {
       view: "Rechnungen ansehen",
       edit: "Rechnungen erfassen und bearbeiten",
       delete: "Rechnungen löschen",
+      finalize: "Ausgangsrechnungen festschreiben",
       export: "Rechnungen exportieren (CSV, Rechnungsarchiv und Steuerberater)",
       import: "Rechnungen importieren (CSV, legt neue Rechnungen an)",
     },

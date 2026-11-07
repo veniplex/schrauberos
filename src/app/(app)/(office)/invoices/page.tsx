@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Paperclip, Plus } from "lucide-react";
+import { Lock, Paperclip, Plus } from "lucide-react";
 import { EmptyState, StatCard } from "@/components/ui/layout";
 import { ExchangeMenu } from "@/components/exchange/exchange-menu";
 import { PageHeader } from "@/components/ui/page-header";
@@ -152,6 +152,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
               <span className="font-mono text-[13px]">
                 {inv.number}
                 {inv.file ? <Paperclip className="ml-1.5 inline size-3.5 text-ink-muted" aria-label={t("invoices.hasFile")} /> : null}
+                {inv.finalizedAt ? <Lock className="ml-1.5 inline size-3.5 text-ink-muted" aria-label={t("invoices.finalize.badge")} /> : null}
               </span>
             ),
           },

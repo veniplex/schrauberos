@@ -1,4 +1,4 @@
-import { noon } from "@/lib/dates";
+import { noon, todayInput } from "@/lib/dates";
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { logError } from "@/lib/log-safe";
@@ -6,8 +6,9 @@ import { truncateName } from "@/lib/file-delivery";
 import { checkUpload } from "@/lib/upload-sniff";
 import { searchKey } from "@/lib/search-key";
 import { dateText, moneyCents } from "@/lib/zod-fields";
-import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, invoiceFileLocation, outgoingKeyOf } from "@/modules/office/invoices/domain";
-import { defineOperation, fail, failField, mapPrismaError } from "@/server/operations";
+import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, cancelBlock, counterAmounts, finalizeBlock, invoiceFileLocation, isCounterDocument, isFinalized, outgoingKeyOf } from "@/modules/office/invoices/domain";
+import { dayKey } from "@/lib/zone";
+import { defineOperation, fail, failField, mapPrismaError, type Tx } from "@/server/operations";
 import { storeFile } from "@/server/files";
 import { removeInvoiceFile, syncInvoiceFile } from "./files";
 
@@ -107,6 +108,12 @@ export const saveInvoiceOperation = defineOperation({
 
     const data = invoiceRecord(d, d.customerId ?? null);
 
+    if (d.id) {
+      // Festgeschriebene Rechnungen (und Gegenbelege) sind unveränderlich; korrigiert wird per Gegenbeleg
+      const current = await tx.invoice.findUnique({ where: { id: d.id }, select: { finalizedAt: true } });
+      if (!current) fail("notFound");
+      if (isFinalized(current)) fail("inUse", "invoices.errors.finalized");
+    }
     if (d.id && !(await claimRow(tx.invoice, d.id, d.version))) fail("conflict");
     let saved;
     try {
@@ -141,6 +148,16 @@ export const saveInvoiceOperation = defineOperation({
 
 const idInput = z.object({ id: z.string().min(1) });
 
+/**
+ * Der Zahlstatus bleibt auch bei festgeschriebenen Rechnungen änderbar (mit Audit) – nicht aber bei einem stornierten Paar: Original und Gegenbeleg gelten als erledigt und werden nicht mehr als
+ * offen oder bezahlt geführt.
+ */
+async function assertPaymentEditable(tx: Tx, id: string): Promise<void> {
+  const invoice = await tx.invoice.findUnique({ where: { id }, select: { cancelsInvoiceId: true, cancelledBy: { select: { id: true } } } });
+  if (!invoice) fail("notFound");
+  if (isCounterDocument(invoice) || invoice.cancelledBy) fail("inUse", "invoices.errors.cancelledLocked");
+}
+
 /** Schnellaktion: als bezahlt markieren (Datum optional, Standard heute). */
 export const markInvoicePaidOperation = defineOperation({
   name: "invoices.markPaid",
@@ -148,6 +165,7 @@ export const markInvoicePaidOperation = defineOperation({
   input: idInput.extend({ paidAt: dateText().optional() }),
   audit: "invoice.pay",
   run: async ({ input, tx, audit }) => {
+    await assertPaymentEditable(tx, input.id);
     const invoice = await tx.invoice.update({ where: { id: input.id }, data: { status: "paid", paidAt: input.paidAt ? noon(input.paidAt) : new Date() }, select: { number: true } });
     audit({ target: invoice.number, entityId: input.id });
     return { id: input.id };
@@ -160,6 +178,7 @@ export const reopenInvoiceOperation = defineOperation({
   input: idInput,
   audit: "invoice.reopen",
   run: async ({ input, tx, audit }) => {
+    await assertPaymentEditable(tx, input.id);
     const invoice = await tx.invoice.update({ where: { id: input.id }, data: { status: "open", paidAt: null }, select: { number: true } });
     audit({ target: invoice.number, entityId: input.id });
     return { id: input.id };
@@ -172,8 +191,10 @@ export const deleteInvoiceOperation = defineOperation({
   input: idInput,
   audit: "invoice.delete",
   run: async ({ input, tx, audit, afterCommit }) => {
-    const invoice = await tx.invoice.findUnique({ where: { id: input.id }, select: { direction: true, number: true, file: { select: { path: true } } } });
+    const invoice = await tx.invoice.findUnique({ where: { id: input.id }, select: { direction: true, number: true, finalizedAt: true, file: { select: { path: true } } } });
     if (!invoice) fail("notFound");
+    // Festgeschriebene Rechnungen (auch Gegenbelege) werden nie gelöscht; ihre Nummer wird nie wiederverwendet
+    if (isFinalized(invoice)) fail("inUse", "invoices.errors.finalizedDelete");
     await tx.invoice.delete({ where: { id: input.id } });
     audit({ target: invoice.number, entityId: input.id });
     const filePath = invoice.file?.path;
@@ -182,3 +203,99 @@ export const deleteInvoiceOperation = defineOperation({
   },
 });
 
+
+const finalizeErrors = { incoming: "invoices.errors.finalizeIncoming", already: "invoices.errors.finalizeAlready", cancelled: "invoices.errors.finalizeCancelled" } as const;
+
+/**
+ * Festschreiben (`invoices.finalize`, nicht in den Standardrollen): ab dann sind Inhalt, Beträge und Beleg der Ausgangsrechnung unveränderlich und sie ist nicht löschbar. Nicht umkehrbar –
+ * korrigiert wird per Gegenbeleg (`invoices.cancel`). `version` ist Pflicht: Wer festschreibt, hat den Stand gesehen, den er festschreibt.
+ */
+export const finalizeInvoiceOperation = defineOperation({
+  name: "invoices.finalize",
+  permission: "invoices.finalize",
+  input: idInput.extend({ version: z.string().optional() }),
+  audit: "invoice.finalize",
+  run: async ({ input, principal, tx, audit }) => {
+    const invoice = await tx.invoice.findUnique({ where: { id: input.id }, select: { number: true, direction: true, status: true, finalizedAt: true, cancelsInvoiceId: true } });
+    if (!invoice) fail("notFound");
+    const block = finalizeBlock(invoice);
+    if (block) fail("inUse", finalizeErrors[block]);
+    if (!(await claimRow(tx.invoice, input.id, input.version))) fail("conflict");
+    await tx.invoice.update({ where: { id: input.id }, data: { finalizedAt: new Date(), finalizedByName: principal.user.name.slice(0, 120) } });
+    audit({ target: invoice.number, entityId: input.id });
+    return { id: input.id };
+  },
+});
+
+const cancelErrors = {
+  incoming: "invoices.errors.cancelIncoming",
+  notFinalized: "invoices.errors.cancelNotFinalized",
+  counterDocument: "invoices.errors.cancelCounterDocument",
+  already: "invoices.errors.cancelAlready",
+} as const;
+
+/**
+ * Storno per Gegenbeleg (Stornorechnung/Gutschrift, `invoices.edit`): legt eine **eigene, festgeschriebene Rechnung** mit Bezug auf das Original an – Empfänger und Kunde wie das Original, alle
+ * Beträge mit umgekehrtem Vorzeichen, die vom Menschen eingegebene Nummer (Nummernvergabe aus einer Zählerreihe gehört zu den Angeboten und Rechnungen, F3). Das Original wird als storniert
+ * geführt, beide zählen nicht mehr in den offenen Summen. Das Original bleibt inhaltlich unverändert, seine Nummer wird nie wiederverwendet. Nur für festgeschriebene Ausgangsrechnungen; alle anderen
+ * lassen sich korrigieren oder löschen.
+ */
+export const cancelInvoiceOperation = defineOperation({
+  name: "invoices.cancel",
+  permission: "invoices.edit",
+  input: idInput.extend({
+    version: z.string().optional(),
+    number: z.string().trim().min(1).max(60),
+    issueDate: dateText().optional(),
+    reason: z.string().trim().max(500).optional(),
+  }),
+  audit: "invoice.cancel",
+  run: async ({ input, principal, tx, audit }) => {
+    const original = await tx.invoice.findUnique({
+      where: { id: input.id },
+      select: { id: true, number: true, direction: true, partyName: true, partyKey: true, customerId: true, issueDate: true, netCents: true, vatCents: true, grossCents: true, category: true, reference: true, finalizedAt: true, cancelsInvoiceId: true, cancelledBy: { select: { id: true } } },
+    });
+    if (!original) fail("notFound");
+    const block = cancelBlock({ ...original, hasCounterDocument: original.cancelledBy !== null });
+    if (block) fail("inUse", cancelErrors[block]);
+
+    const key = outgoingKeyOf("outgoing", input.number);
+    if (key && (await tx.invoice.findFirst({ where: { outgoingKey: key }, select: { id: true } }))) failField("number", "invoices.errors.numberTaken");
+    const issueDate = input.issueDate ?? todayInput();
+    if (issueDate < dayKey(original.issueDate)) failField("issueDate", "invoices.errors.cancelBeforeIssue");
+
+    if (!(await claimRow(tx.invoice, original.id, input.version))) fail("conflict");
+    let counter;
+    try {
+      counter = await tx.invoice.create({
+        data: {
+          direction: "outgoing",
+          number: input.number,
+          outgoingKey: key,
+          partyName: original.partyName,
+          partyKey: original.partyKey,
+          customerId: original.customerId,
+          issueDate: noon(issueDate),
+          dueDate: null,
+          ...counterAmounts(original),
+          status: "cancelled",
+          paidAt: null,
+          category: original.category,
+          reference: original.reference,
+          notes: input.reason || null,
+          finalizedAt: new Date(),
+          finalizedByName: principal.user.name.slice(0, 120),
+          cancelsInvoiceId: original.id,
+        },
+        select: { id: true },
+      });
+    } catch (error) {
+      // Wettlauf um dieselbe Ausgangsnummer oder um denselben Gegenbeleg: der Unique-Schlüssel entscheidet
+      if (mapPrismaError(error)?.code === "duplicate") failField("number", "invoices.errors.numberTaken");
+      throw error;
+    }
+    await tx.invoice.update({ where: { id: original.id }, data: { status: "cancelled" } });
+    audit({ target: `${input.number} → ${original.number}`, entityId: original.id });
+    return { id: original.id, counterId: counter.id };
+  },
+});

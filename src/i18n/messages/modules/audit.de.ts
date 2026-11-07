@@ -159,6 +159,8 @@ export const auditDe = {
       update: "Rechnung geändert",
       pay: "Rechnung als bezahlt markiert",
       reopen: "Rechnung wieder geöffnet",
+      finalize: "Rechnung festgeschrieben",
+      cancel: "Rechnung per Stornorechnung storniert",
       delete: "Rechnung gelöscht",
       export: "Rechnungen exportiert (CSV)",
       import: "Rechnungen importiert (CSV)",

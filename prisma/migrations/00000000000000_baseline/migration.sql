@@ -557,9 +557,13 @@ CREATE TABLE "Invoice" (
     "category" TEXT,
     "reference" TEXT,
     "notes" TEXT,
+    "finalizedAt" DATETIME,
+    "finalizedByName" TEXT,
+    "cancelsInvoiceId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Invoice_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "Invoice_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Invoice_cancelsInvoiceId_fkey" FOREIGN KEY ("cancelsInvoiceId") REFERENCES "Invoice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -899,6 +903,9 @@ CREATE INDEX "FleetLicenseCheck_employeeId_checkedAt_idx" ON "FleetLicenseCheck"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Invoice_outgoingKey_key" ON "Invoice"("outgoingKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Invoice_cancelsInvoiceId_key" ON "Invoice"("cancelsInvoiceId");
 
 -- CreateIndex
 CREATE INDEX "Invoice_direction_status_idx" ON "Invoice"("direction", "status");

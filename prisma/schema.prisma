@@ -780,11 +780,19 @@ model Invoice {
   // Ablageort / Auftrags- oder Bestellnummer
   reference  String?
   notes      String?
+  // Festgeschrieben (P4b-3, nur Ausgangsrechnungen): Inhalt, Beträge und Beleg sind danach unveränderlich, die Rechnung ist nicht löschbar; nur der Zahlstatus bleibt änderbar.
+  // Korrigiert wird dann per Gegenbeleg (Stornorechnung/Gutschrift). Der Name der festschreibenden Person steht als Text (bleibt, auch wenn das Konto gelöscht wird).
+  finalizedAt      DateTime?
+  finalizedByName  String?
+  // Gegenbeleg: Verweis auf die stornierte Rechnung (je Rechnung höchstens ein Gegenbeleg); null = gewöhnliche Rechnung
+  cancelsInvoiceId String?   @unique
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  file     InvoiceFile?
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  file        InvoiceFile?
+  cancels     Invoice?     @relation("InvoiceStorno", fields: [cancelsInvoiceId], references: [id], onDelete: Restrict)
+  cancelledBy Invoice?     @relation("InvoiceStorno")
 
   @@index([direction, status])
   @@index([issueDate])

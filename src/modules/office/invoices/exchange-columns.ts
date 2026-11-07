@@ -21,6 +21,12 @@ export const INVOICE_COLUMNS: readonly ColumnDef[] = [
   { key: "customerNumber", labelKey: "invoices.exchange.cols.customerNumber", aliases: ["Kundennummer", "Kundennr", "Kd-Nr", "Customer number", "Customer no"] },
 ];
 
+/** Nur im Export, nie im Import: Festschreibung und Storno entstehen ausschließlich durch die Operationen (`invoices.finalize`, `invoices.cancel`). Beim Einlesen einer Exportdatei werden sie als unbekannte Spalten ignoriert. */
+export const EXPORT_ONLY_COLUMNS: readonly ColumnDef[] = [
+  { key: "finalizedAt", labelKey: "invoices.exchange.cols.finalizedAt" },
+  { key: "cancelsNumber", labelKey: "invoices.exchange.cols.cancelsNumber" },
+];
+
 /** Spalten des Steuerberater-Exports (nur Export). */
 export const ACCOUNTANT_COLUMNS = [
   { labelKey: "invoices.exchange.accountant.cols.direction" },
@@ -32,4 +38,6 @@ export const ACCOUNTANT_COLUMNS = [
   { labelKey: "invoices.exchange.accountant.cols.gross" },
   { labelKey: "invoices.exchange.accountant.cols.paymentState" },
   { labelKey: "invoices.exchange.accountant.cols.paidAt" },
+  { labelKey: "invoices.exchange.accountant.cols.finalizedAt" },
+  { labelKey: "invoices.exchange.accountant.cols.cancelsNumber" },
 ] as const;

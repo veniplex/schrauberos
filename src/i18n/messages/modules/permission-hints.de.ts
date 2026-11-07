@@ -38,7 +38,8 @@ export const permissionHintsDe = {
   invoices: {
     view: "Rechnungen und ihre Belege ansehen.",
     edit: "Rechnungen erfassen, ändern und als bezahlt markieren.",
-    delete: "Rechnungen endgültig löschen.",
+    delete: "Rechnungen endgültig löschen (festgeschriebene nie).",
+    finalize: "Ausgangsrechnungen festschreiben: danach unveränderlich und nicht löschbar, nicht umkehrbar. Wird nie automatisch vergeben.",
     export: "Rechnungen als CSV-Datei herunterladen, auch für den Steuerberater.",
     import: "Rechnungen aus einer CSV-Datei neu anlegen.",
   },

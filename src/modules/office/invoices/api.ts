@@ -7,14 +7,14 @@ import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { invoiceTextWhere } from "./queries";
 import { INVOICE_DIRECTIONS, INVOICE_STATUSES } from "./domain";
-import { deleteInvoiceOperation, markInvoicePaidOperation, reopenInvoiceOperation, saveInvoiceOperation } from "./operations";
+import { cancelInvoiceOperation, deleteInvoiceOperation, finalizeInvoiceOperation, markInvoicePaidOperation, reopenInvoiceOperation, saveInvoiceOperation } from "./operations";
 
 /**
  * API-Ressource „Rechnungsarchiv“ (`/api/v1/invoices`). Beträge sind ganze Cent (`grossCents`); Ausgangsrechnungsnummern bleiben eindeutig, Netto + MwSt
  * müssen zum Brutto passen – alles in derselben Operation wie in der Oberfläche. Der Beleg (PDF/Bild) kommt später per Multipart (F11); die API
  * lässt eine vorhandene Datei unberührt.
  */
-type Row = Invoice & { file: InvoiceFile | null };
+type Row = Invoice & { file: InvoiceFile | null; cancelledBy: { id: string } | null };
 
 const cents = z.number().int().min(-2_000_000_000).max(2_000_000_000);
 
@@ -55,6 +55,12 @@ const item = z.object({
   notes: nullableString,
   /** Ob ein Beleg (PDF/Bild) abgelegt ist */
   hasFile: z.boolean(),
+  /** Festgeschrieben: Inhalt, Beträge und Beleg sind unveränderlich, die Rechnung ist nicht löschbar (nur Ausgangsrechnungen); `null` = nicht festgeschrieben */
+  finalizedAt: nullableString,
+  /** Gegenbeleg (Stornorechnung/Gutschrift): die stornierte Rechnung; `null` = gewöhnliche Rechnung */
+  cancelsInvoiceId: nullableString,
+  /** Das Original: der Gegenbeleg, der es storniert hat; `null` = nicht storniert */
+  cancelledByInvoiceId: nullableString,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -76,7 +82,7 @@ export const endpoints = defineResource({
   path: "/invoices",
   read: "invoices.view",
   model: db.invoice as unknown as Delegate<Row>,
-  include: { file: true },
+  include: { file: true, cancelledBy: { select: { id: true } } },
   item,
   version: versionOf,
   toItem: (i): z.input<typeof item> => ({
@@ -97,6 +103,9 @@ export const endpoints = defineResource({
     reference: i.reference,
     notes: i.notes,
     hasFile: !!i.file,
+    finalizedAt: i.finalizedAt ? iso(i.finalizedAt) : null,
+    cancelsInvoiceId: i.cancelsInvoiceId,
+    cancelledByInvoiceId: i.cancelledBy?.id ?? null,
     createdAt: iso(i.createdAt),
     updatedAt: iso(i.updatedAt),
   }),
@@ -160,5 +169,22 @@ export const endpoints = defineResource({
       toInput: (id, b) => ({ id, paidAt: b.paidAt }),
     },
     { name: "reopen", summary: "Reopen a paid invoice", permission: "invoices.edit", operation: reopenInvoiceOperation, toInput: (id) => ({ id }) },
+    {
+      name: "finalize",
+      summary: "Finalize an outgoing invoice: content, amounts and receipt become immutable and the invoice can no longer be deleted (irreversible; correct it with a cancellation document)",
+      permission: "invoices.finalize",
+      operation: finalizeInvoiceOperation,
+      ifMatch: true,
+      toInput: (id, _b, { version }) => ({ id, version }),
+    },
+    {
+      name: "cancel",
+      summary: "Cancel a finalized outgoing invoice with a cancellation document (credit note): creates a new finalized invoice with the given number, negated amounts and a reference to the original",
+      permission: "invoices.edit",
+      operation: cancelInvoiceOperation,
+      ifMatch: true,
+      body: z.strictObject({ number: z.string().trim().min(1).max(60), issueDate: dateOnly.nullable().optional(), reason: z.string().max(500).nullable().optional() }),
+      toInput: (id, b, { version }) => ({ id, version, number: b.number, issueDate: b.issueDate, reason: b.reason }),
+    },
   ],
 });

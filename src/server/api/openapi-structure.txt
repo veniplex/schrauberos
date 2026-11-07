@@ -50,6 +50,8 @@ POST /invoices invoices.create invoices.edit body=direction,number,partyName,cus
 GET /invoices/{id} invoices.get invoices.view
 PATCH /invoices/{id} invoices.update invoices.edit body=direction,number,partyName,customerId,issueDate,dueDate,netCents,vatCents,grossCents,status,paidAt,category,reference,notes
 DELETE /invoices/{id} invoices.delete invoices.delete
+POST /invoices/{id}/cancel invoices.cancel invoices.edit body=number,issueDate,reason
+POST /invoices/{id}/finalize invoices.finalize invoices.finalize
 POST /invoices/{id}/pay invoices.pay invoices.edit body=paidAt
 POST /invoices/{id}/reopen invoices.reopen invoices.edit
 GET /network-connections network-connections.list network.view query=deviceId sort=cableLabel

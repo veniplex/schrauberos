@@ -156,12 +156,12 @@ describe("Export: Inhalt", () => {
 
   it("Geld und Datum: Cent als Dezimalzahl, Tage als JJJJ-MM-TT; negative Beträge bleiben Zahlen", async () => {
     await env.db.invoice.create({
-      data: { direction: "outgoing", number: "A-1", outgoingKey: "A-1", partyName: "Kunde", issueDate: new Date("2026-03-14T12:00:00"), dueDate: new Date("2026-04-13T12:00:00"), netCents: -10000, vatCents: -1900, grossCents: -11900, status: "open" },
+      data: { direction: "outgoing", number: "A-1", outgoingKey: "A-1", partyName: "Kunde", issueDate: new Date("2026-03-14T12:00:00"), dueDate: new Date("2026-04-13T12:00:00"), netCents: -10000, vatCents: -1900, grossCents: -11900, status: "open", finalizedAt: new Date("2026-03-15T12:00:00") },
     });
     await as(["invoices.view", "invoices.export"]);
     const csv = await text(await exportCall("invoices"));
-    assert.equal(lines(csv)[0], "Art;Rechnungsnummer;Geschäftspartner;Rechnungsdatum;Fällig am;Netto;MwSt.;Brutto;Zahlstatus;Bezahlt am;Kategorie;Referenz;Notizen");
-    assert.equal(lines(csv)[1], "Ausgang;A-1;Kunde;2026-03-14;2026-04-13;-100,00;-19,00;-119,00;Offen;;;;");
+    assert.equal(lines(csv)[0], "Art;Rechnungsnummer;Geschäftspartner;Rechnungsdatum;Fällig am;Netto;MwSt.;Brutto;Zahlstatus;Bezahlt am;Kategorie;Referenz;Notizen;Festgeschrieben am;Storno zu Rechnung");
+    assert.equal(lines(csv)[1], "Ausgang;A-1;Kunde;2026-03-14;2026-04-13;-100,00;-19,00;-119,00;Offen;;;;;2026-03-15;");
     const intl = await text(await exportCall("invoices", "?format=international"));
     assert.ok(lines(intl)[1].includes(",-100.00,-19.00,-119.00,"));
   });
@@ -223,9 +223,9 @@ describe("Export: Inhalt", () => {
     const csv = await text(res);
     assert.match(res.headers.get("content-disposition") ?? "", /rechnungen-steuerberater-2026-01-01_2026-03-31\.csv/);
     assert.deepEqual(lines(csv), [
-      "Art;Rechnungsnummer;Rechnungsdatum;Geschäftspartner;Netto;MwSt.;Brutto;Zahlstatus;Bezahlt am",
-      "Eingang;E-1;2026-01-15;P;100,00;19,00;119,00;Bezahlt;2026-02-01",
-      "Ausgang;A-1;2026-02-10;P;100,00;19,00;119,00;Überfällig;",
+      "Art;Rechnungsnummer;Rechnungsdatum;Geschäftspartner;Netto;MwSt.;Brutto;Zahlstatus;Bezahlt am;Festgeschrieben am;Storno zu Rechnung",
+      "Eingang;E-1;2026-01-15;P;100,00;19,00;119,00;Bezahlt;2026-02-01;;",
+      "Ausgang;A-1;2026-02-10;P;100,00;19,00;119,00;Überfällig;;;",
     ]);
     assert.ok(!csv.includes("geheim") && !csv.includes("Kat"));
     assert.equal(lines(await text(await exportCall("accountant", "?from=2026-01-01&to=2026-12-31&direction=outgoing"))).length, 3);
