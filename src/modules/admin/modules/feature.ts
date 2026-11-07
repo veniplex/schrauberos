@@ -12,4 +12,5 @@ export const modulesFeature = defineFeature({
     { id: "modules", href: "/admin/modules", labelKey: "nav.modules", icon: "modules", permission: "modules.manage", order: 130 },
   ],
   routes: ["admin/modules"],
+  auditActions: ["module.enable", "module.disable"],
 });

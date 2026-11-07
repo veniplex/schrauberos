@@ -18,6 +18,7 @@ export const auditEn: typeof auditDe = {
     apiToken: "API tokens",
     backup: "Backups",
     setup: "Setup",
+    secrets: "Secrets",
     system: "System",
     auth: "Sign-in",
     account: "Account",

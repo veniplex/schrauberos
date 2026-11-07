@@ -13,4 +13,15 @@ export const fleetFeature = defineFeature({
   ],
   quickActions: [{ id: "fleet.new", labelKey: "fleet.quick.new", href: "/fleet/new", icon: "fleet", permission: "fleet.edit", order: 60 }],
   routes: ["fleet"],
+  auditActions: [
+    "fleet.create",
+    "fleet.update",
+    "fleet.delete",
+    "fleet.mileageAdd",
+    "fleet.mileageDelete",
+    "fleet.costAdd",
+    "fleet.costDelete",
+    "fleet.licenseCheck",
+    "fleet.licenseCheckDelete",
+  ],
 });

@@ -15,4 +15,5 @@ export const networkFeature = defineFeature({
   ],
   quickActions: [{ id: "network.newDevice", labelKey: "network.quick.newDevice", href: "/network/devices/new", icon: "server", permission: "network.edit", order: 70 }],
   routes: ["network"],
+  auditActions: ["network.create", "network.update", "network.delete"],
 });

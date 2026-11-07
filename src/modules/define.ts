@@ -106,8 +106,17 @@ export type FeatureDef = {
   nav: readonly NavDef[];
   /** Anlegen-Aktionen für das globale „Neu“-Menü (optional). Die Schnellsuche kommt von `search.ts` der Funktion (`searchProviders`, siehe `registry.ts`). */
   quickActions?: readonly QuickActionDef[];
-  /** URL-Präfixe (ohne führenden Slash), die zu dieser Funktion gehören, z. B. "appointments", "admin/users" */
+  /**
+   * URL-Präfixe (ohne führenden Slash), die zu dieser Funktion gehören, z. B. "appointments", "admin/users", **auch ihre Routen unter `api/`** (z. B. "api/customers"):
+   * `architecture.test.ts` ordnet jede Seite und jeden Route Handler unter `src/app` darüber seiner Funktion zu (Route Handler ohne Funktion stehen in `PLATFORM_API_ROUTES`).
+   */
   routes: readonly string[];
+  /**
+   * Audit-Aktionen, die diese Funktion ins Audit-Log schreibt (`audit: "<aktion>"` ihrer Operationen). Die Plattform kennt sie nur über den Katalog
+   * (`src/lib/audit-actions.ts` leitet `AuditAction` daraus ab). Jede Aktion gehört genau einer Funktion oder der Plattform (`PLATFORM_AUDIT_ACTIONS`), braucht Beschriftungen
+   * `audit.actions.<aktion>` und wird irgendwo verwendet (`audit-actions.test.ts`).
+   */
+  auditActions?: readonly string[];
   /** Querschnittsfunktion Dokumentation: Bereichs-ID, unter der die Doku dieser Funktion läuft */
   docsArea?: string;
 };

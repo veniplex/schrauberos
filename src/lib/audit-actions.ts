@@ -1,8 +1,11 @@
+import { FEATURES, type FeatureAuditAction } from "@/modules/catalog";
+
 /**
- * Alle Aktionen, die im Audit-Log festgehalten werden. Für jede muss es eine Beschriftung unter
- * `audit.actions.<aktion>` geben (prüft catalog.test.ts). Gruppe = Teil vor dem Punkt.
+ * Audit-Aktionen der **Plattform** (Anmeldung, Konto, Einrichtung, Geheimnisse, API-Tokens, Dokumentation als Querschnittsfunktion, Systemereignisse).
+ * Alle übrigen Aktionen gehören einer Funktion und stehen in deren `feature.ts` (`auditActions`); der Katalog führt sie zusammen. Jede Aktion gehört genau einer
+ * Stelle, braucht eine Beschriftung unter `audit.actions.<aktion>` und muss verwendet werden (`audit-actions.test.ts`, `catalog.test.ts`). Gruppe = Teil vor dem Punkt.
  */
-export const AUDIT_ACTIONS = [
+export const PLATFORM_AUDIT_ACTIONS = [
   "auth.login",
   "auth.loginFailed",
   "auth.loginThrottled",
@@ -21,72 +24,6 @@ export const AUDIT_ACTIONS = [
   "auth.deviceRevoked",
   "account.password",
   "account.profile",
-  "user.create",
-  "user.update",
-  "user.delete",
-  "user.unlock",
-  "role.create",
-  "role.update",
-  "role.delete",
-  "module.enable",
-  "module.disable",
-  "settings.workshop",
-  "settings.appointments",
-  "settings.tires",
-  "settings.security",
-  "settings.csp",
-  "settings.backupPlan",
-  "settings.updateToken",
-  "appointment.create",
-  "appointment.update",
-  "appointment.status",
-  "appointment.delete",
-  "customer.create",
-  "customer.update",
-  "customer.delete",
-  "customer.export",
-  "customer.import",
-  "vehicle.create",
-  "vehicle.update",
-  "vehicle.delete",
-  "vehicle.transfer",
-  "vehicle.export",
-  "vehicle.import",
-  "tires.create",
-  "tires.update",
-  "tires.stock",
-  "tires.dispose",
-  "tires.delete",
-  "tires.export",
-  "tires.import",
-  "invoice.create",
-  "invoice.update",
-  "invoice.pay",
-  "invoice.reopen",
-  "invoice.delete",
-  "invoice.export",
-  "invoice.import",
-  "invoice.accountantExport",
-  "employee.create",
-  "employee.update",
-  "employee.sensitiveUpdate",
-  "employee.delete",
-  "employee.absenceCreate",
-  "employee.absenceDelete",
-  "employee.qualificationCreate",
-  "employee.qualificationDelete",
-  "fleet.create",
-  "fleet.update",
-  "fleet.delete",
-  "fleet.mileageAdd",
-  "fleet.mileageDelete",
-  "fleet.costAdd",
-  "fleet.costDelete",
-  "fleet.licenseCheck",
-  "fleet.licenseCheckDelete",
-  "network.create",
-  "network.update",
-  "network.delete",
   "docs.create",
   "docs.update",
   "docs.restore",
@@ -94,18 +31,6 @@ export const AUDIT_ACTIONS = [
   "docs.categorySave",
   "docs.categoryDelete",
   "docs.imageUpload",
-  "backup.create",
-  "backup.delete",
-  "backup.download",
-  "backup.restore",
-  "backup.upload",
-  "backup.createFailed",
-  "backup.runNow",
-  "backup.restoreFailed",
-  "backup.uploadFailed",
-  "backup.offsiteSettings",
-  "backup.offsiteFailed",
-  "backup.offsiteFetch",
   "secrets.keyCreated",
   "secrets.keyConfirmed",
   "secrets.reset",
@@ -116,12 +41,19 @@ export const AUDIT_ACTIONS = [
   "apiToken.restoreRevoked",
   "setup.complete",
   "setup.restore",
-  "system.update",
-  "system.updateFailed",
   "system.integrityFailed",
   "system.auditPruned",
 ] as const;
 
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+export type PlatformAuditAction = (typeof PLATFORM_AUDIT_ACTIONS)[number];
+export type AuditAction = PlatformAuditAction | FeatureAuditAction;
+
+/** Audit-Aktionen der Funktionen, wie sie ihre `feature.ts` meldet (Aktion → Funktions-ID). */
+export const FEATURE_AUDIT_ACTIONS: ReadonlyMap<string, string> = new Map(
+  FEATURES.flatMap((f) => (("auditActions" in f ? f.auditActions : []) as readonly string[]).map((action) => [action, `${f.module}.${f.id}`] as const)),
+);
+
+/** Alle Aktionen: Plattform zuerst, dann die der Funktionen in Katalog-Reihenfolge. */
+export const AUDIT_ACTIONS: readonly AuditAction[] = [...PLATFORM_AUDIT_ACTIONS, ...([...FEATURE_AUDIT_ACTIONS.keys()] as FeatureAuditAction[])];
 
 export const AUDIT_GROUPS = [...new Set(AUDIT_ACTIONS.map((a) => a.split(".")[0]))];

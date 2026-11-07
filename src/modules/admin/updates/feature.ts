@@ -12,4 +12,5 @@ export const updatesFeature = defineFeature({
     { id: "updates", href: "/admin/updates", labelKey: "nav.updates", icon: "updates", permission: "updates.manage", order: 136 },
   ],
   routes: ["admin/updates", "api/updates"],
+  auditActions: ["system.update", "system.updateFailed", "settings.updateToken"],
 });

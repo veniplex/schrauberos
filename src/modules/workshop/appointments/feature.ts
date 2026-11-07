@@ -14,4 +14,5 @@ export const appointmentsFeature = defineFeature({
   ],
   quickActions: [{ id: "appointments.new", labelKey: "appointments.quick.new", href: "/appointments?new=1", icon: "calendar", permission: "appointments.create", order: 10 }],
   routes: ["appointments"],
+  auditActions: ["appointment.create", "appointment.update", "appointment.status", "appointment.delete", "settings.appointments"],
 });

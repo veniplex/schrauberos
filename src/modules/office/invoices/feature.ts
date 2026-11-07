@@ -12,5 +12,15 @@ export const invoicesFeature = defineFeature({
     { id: "invoices", href: "/invoices", labelKey: "nav.invoices", icon: "invoices", permission: "invoices.view", order: 30 },
   ],
   quickActions: [{ id: "invoices.new", labelKey: "invoices.quick.new", href: "/invoices/new", icon: "invoices", permission: "invoices.edit", order: 40 }],
-  routes: ["invoices"],
+  routes: ["invoices", "api/invoices"],
+  auditActions: [
+    "invoice.create",
+    "invoice.update",
+    "invoice.pay",
+    "invoice.reopen",
+    "invoice.delete",
+    "invoice.export",
+    "invoice.import",
+    "invoice.accountantExport",
+  ],
 });

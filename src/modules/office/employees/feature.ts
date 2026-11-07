@@ -13,4 +13,14 @@ export const employeesFeature = defineFeature({
   ],
   quickActions: [{ id: "employees.new", labelKey: "employees.quick.new", href: "/employees/new", icon: "employees", permission: "employees.edit", order: 50 }],
   routes: ["employees"],
+  auditActions: [
+    "employee.create",
+    "employee.update",
+    "employee.sensitiveUpdate",
+    "employee.delete",
+    "employee.absenceCreate",
+    "employee.absenceDelete",
+    "employee.qualificationCreate",
+    "employee.qualificationDelete",
+  ],
 });

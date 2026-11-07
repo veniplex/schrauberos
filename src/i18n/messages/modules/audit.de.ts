@@ -16,6 +16,7 @@ export const auditDe = {
     apiToken: "API-Tokens",
     backup: "Backups",
     setup: "Einrichtung",
+    secrets: "Geheimnisse",
     system: "System",
     auth: "Anmeldung",
     account: "Konto",

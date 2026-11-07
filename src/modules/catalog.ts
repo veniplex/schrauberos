@@ -57,6 +57,8 @@ export type FeatureDefinition = (typeof FEATURES)[number];
 export type FeatureId = FeatureDefinition extends infer F ? (F extends { module: string; id: string } ? `${F["module"]}.${F["id"]}` : never) : never;
 export type PermissionGroup = FeatureDefinition["permissions"]["group"];
 export type Permission = FeatureDefinition["permissions"]["keys"][number];
+/** Audit-Aktionen aller Funktionen (`auditActions` ihrer `feature.ts`); die der Plattform stehen in `src/lib/audit-actions.ts`. */
+export type FeatureAuditAction = FeatureDefinition extends infer F ? (F extends { auditActions: readonly (infer A)[] } ? A & string : never) : never;
 
 export const MODULE_IDS = MODULES.map((m) => m.id) as readonly ModuleId[];
 

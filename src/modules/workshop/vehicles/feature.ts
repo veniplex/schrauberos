@@ -12,5 +12,6 @@ export const vehiclesFeature = defineFeature({
     { id: "vehicles", href: "/vehicles", labelKey: "nav.vehicles", icon: "vehicles", permission: "vehicles.view", order: 31 },
   ],
   quickActions: [{ id: "vehicles.new", labelKey: "vehicles.quick.new", href: "/vehicles/new", icon: "vehicles", permission: "vehicles.edit", order: 31 }],
-  routes: ["vehicles"],
+  routes: ["vehicles", "api/vehicles"],
+  auditActions: ["vehicle.create", "vehicle.update", "vehicle.delete", "vehicle.transfer", "vehicle.export", "vehicle.import"],
 });
