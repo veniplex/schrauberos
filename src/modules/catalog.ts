@@ -21,6 +21,7 @@ import { auditFeature } from "./admin/audit/feature";
 import { updatesFeature } from "./admin/updates/feature";
 import { backupFeature } from "./admin/backup/feature";
 import { systemFeature } from "./admin/system/feature";
+import { mailFeature } from "./admin/mail/feature";
 import { featureKey } from "./catalog-logic";
 import type { FeatureDef, PermissionMark } from "./define";
 
@@ -49,6 +50,7 @@ export const FEATURES = [
   auditFeature,
   updatesFeature,
   backupFeature,
+  mailFeature,
   systemFeature,
 ] as const;
 

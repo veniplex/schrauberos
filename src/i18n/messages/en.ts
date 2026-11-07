@@ -24,9 +24,11 @@ import { holidaysEn } from "./modules/holidays.en";
 import { archiveEn } from "./modules/archive.en";
 import { privacyEn } from "./modules/privacy.en";
 import { uiEn } from "./modules/ui.en";
+import { mailEn } from "./modules/mail.en";
 
 export const en: Messages = {
   ui: uiEn,
+  mail: mailEn,
   holidays: holidaysEn,
   archive: archiveEn,
   privacy: privacyEn,
@@ -327,6 +329,7 @@ export const en: Messages = {
     audit: "Audit log",
     modules: "Modules & features",
     system: "System status",
+    mail: "Email sending",
   },
   permissionHints: permissionHintsEn,
   permissions: {
@@ -416,6 +419,10 @@ export const en: Messages = {
     backup: {
       manage: "Manage and restore backups",
       keys: "Create and confirm the recovery key",
+    },
+    mail: {
+      manage: "Set up email sending and view the send log",
+      send: "Send email from the application",
     },
     modules: {
       manage: "Switch modules and features on/off",

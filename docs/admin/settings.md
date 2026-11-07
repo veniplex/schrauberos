@@ -32,6 +32,7 @@ ihre eigenen Einstellungen mit.
   Administrator die Richtlinie hier vorübergehend auf **„nur melden“** stellen: Der Browser blockiert dann nichts mehr und schreibt Verstöße nur in seine Konsole (Notbetrieb, gilt sofort für alle,
   steht im Audit-Log). Danach bitte wieder erzwingen lassen.
 * **Backups:** Zeitplan der automatischen Backups und die Aufbewahrung je Art von Backup (siehe Hilfe „Backups“).
+* **E-Mail:** SMTP-Server für den Versand von Mails aus der Anwendung, Test und Sendeprotokoll (siehe Hilfe „E-Mail-Versand“).
 * **Updates:** Zugang für die Update-Prüfung (siehe Hilfe „Updates“).
 * **Datenschutz:** Die **Aufbewahrungsfristen** in Jahren (Rechnungen und Stornorechnungen, festgeschriebene Rechnungen) und ihre **Bestätigung** – beschrieben im Kapitel *Datenschutz bei Kunden*. Die Standardwerte sind Platzhalter; erst nach Abstimmung mit dem Steuerberater bestätigen. Bis zur Bestätigung (und nach jeder Änderung der Fristen) bleibt die Anonymisierung von Kunden gesperrt.
 * **Mitarbeiter:** Der **Stichtag**, an dem der Resturlaub des Vorjahres verfällt (Standard 31. März) – beschrieben in der Hilfe *Mitarbeiter*.

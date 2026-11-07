@@ -17,6 +17,7 @@ export const auditEn: typeof auditDe = {
   groups: {
     apiToken: "API tokens",
     backup: "Backups",
+    mail: "Email",
     setup: "Setup",
     secrets: "Secrets",
     system: "System",
@@ -55,6 +56,14 @@ export const auditEn: typeof auditDe = {
       offsiteSettings: "Off-site backup set up or changed",
       offsiteFailed: "Off-site backup failed",
       offsiteFetch: "Backup fetched back from the off-site target",
+    },
+    mail: {
+      settings: "Email settings changed",
+      test: "Email connection tested",
+      testSend: "Test email sent",
+      send: "Email queued for sending",
+      sendFailed: "Email sending failed (given up)",
+      resend: "Email queued for sending again",
     },
     secrets: {
       keyCreated: "Recovery key created",

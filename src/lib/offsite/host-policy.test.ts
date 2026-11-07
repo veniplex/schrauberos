@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { allowLoopbackForTests, canonicalHost, isAllowedAddress, isForbiddenHost, offsiteNetwork } from "./host-policy";
+import { allowLoopbackForTests, canonicalHost, isAllowedAddress, isForbiddenHost, isPrivateAddress, offsiteNetwork } from "./host-policy";
 import { normalizeWebdavUrl, validateHost } from "./target";
 
 /**
@@ -81,5 +81,22 @@ describe("Adressrichtlinie für Off-Site-Ziele", () => {
     assert.equal(isAllowedAddress("169.254.169.254"), false);
     assert.equal(isAllowedAddress("::ffff:a9fe:a9fe"), false);
     assert.equal(isAllowedAddress("0.0.0.0"), false);
+  });
+});
+
+describe("Private Netze (Freigabe für Mail-Relays und Webhooks)", () => {
+  it("RFC 1918, Carrier-NAT und IPv6-ULA sind privat – auch als eingebettete IPv4-Adresse –, öffentliche Adressen nicht", () => {
+    for (const ip of ["10.0.0.1", "10.255.255.255", "172.16.0.1", "172.31.255.254", "192.168.1.10", "100.64.0.1", "100.127.255.254", "fd12:3456::1", "fc00::1", "::ffff:192.168.0.5", "::ffff:a00:1"]) assert.equal(isPrivateAddress(ip), true, ip);
+    for (const ip of ["8.8.8.8", "172.15.0.1", "172.32.0.1", "100.63.255.255", "100.128.0.1", "192.169.0.1", "11.0.0.1", "2001:4860:4860::8888", "fe00::1", "::ffff:8.8.8.8", "kein-host", "", "999.1.1.1"]) assert.equal(isPrivateAddress(ip), false, ip);
+  });
+
+  it("Loopback ist nur mit dem Test-Schalter privat; die Sperren (Metadaten, Verbindungs-lokal) bleiben davon unberührt", () => {
+    assert.equal(isPrivateAddress("127.0.0.1"), false);
+    assert.equal(isPrivateAddress("::1"), false);
+    allowLoopbackForTests();
+    assert.equal(isPrivateAddress("127.0.0.1"), true);
+    assert.equal(isPrivateAddress("::1"), true);
+    assert.equal(isPrivateAddress("169.254.169.254"), false);
+    assert.equal(isAllowedAddress("169.254.169.254"), false);
   });
 });

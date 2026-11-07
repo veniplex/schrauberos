@@ -23,10 +23,12 @@ import { holidaysDe } from "./modules/holidays.de";
 import { archiveDe } from "./modules/archive.de";
 import { privacyDe } from "./modules/privacy.de";
 import { uiDe } from "./modules/ui.de";
+import { mailDe } from "./modules/mail.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
   ui: uiDe,
+  mail: mailDe,
   security: securityDe,
   holidays: holidaysDe,
   archive: archiveDe,
@@ -327,6 +329,7 @@ export const de = {
     audit: "Audit-Log",
     modules: "Module & Funktionen",
     system: "Systemstatus",
+    mail: "E-Mail-Versand",
   },
   permissionHints: permissionHintsDe,
   permissions: {
@@ -416,6 +419,10 @@ export const de = {
     backup: {
       manage: "Backups verwalten und wiederherstellen",
       keys: "Wiederherstellungsschlüssel erzeugen und bestätigen",
+    },
+    mail: {
+      manage: "E-Mail-Versand einrichten und Sendeprotokoll ansehen",
+      send: "E-Mails aus der Anwendung versenden",
     },
     modules: {
       manage: "Module und Funktionen ein-/ausschalten",

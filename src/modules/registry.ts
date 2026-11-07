@@ -21,6 +21,8 @@ import { widgets as itDocsWidgets } from "./it/docs/widgets";
 import { widgets as handbookWidgets } from "./handbook/manual/widgets";
 import { settingsTabs as workshopProfileSettings } from "./admin/settings/settings-tab";
 import { settingsTabs as backupSettings } from "./admin/backup/settings-tab";
+import { settingsTabs as mailSettings } from "./admin/mail/settings-tab";
+import { setupChecks as mailChecks } from "./admin/mail/setup-checks";
 import { widgets as backupWidgets } from "./admin/backup/widgets";
 import { setupChecks as settingsChecks } from "./admin/settings/setup-checks";
 import { setupChecks as usersChecks } from "./admin/users/setup-checks";
@@ -71,10 +73,10 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...handbookSearch,
 ];
 
-const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...backupSettings, ...updatesSettings];
+const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
 
 /** Punkte der Einrichtungs-Checkliste (Administration). Neue Funktion mit Einrichtungsschritten: `setup-checks.ts` anlegen und hier eintragen. */
-const ALL_SETUP_CHECKS: SetupCheckDef[] = [...settingsChecks, ...usersChecks, ...backupChecks, ...appointmentsChecks, ...employeesChecks];
+const ALL_SETUP_CHECKS: SetupCheckDef[] = [...settingsChecks, ...usersChecks, ...backupChecks, ...mailChecks, ...appointmentsChecks, ...employeesChecks];
 
 export type NavEntry = { id: string; href: string; labelKey: MessageKey; icon: IconName; module: ModuleId; order: number };
 

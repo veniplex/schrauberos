@@ -156,3 +156,37 @@ export function isLoopbackHost(host: string): boolean {
   const embedded = embeddedV4(g);
   return (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) || (!!embedded && embedded[0] === 127);
 }
+
+/** Private IPv4-Bereiche, die ein Ziel „im eigenen Netz“ ausmachen (RFC 1918 und Carrier-NAT 100.64.0.0/10). */
+const V4_PRIVATE: Array<[[number, number, number, number], number]> = [
+  [[10, 0, 0, 0], 8],
+  [[172, 16, 0, 0], 12],
+  [[192, 168, 0, 0], 16],
+  [[100, 64, 0, 0], 10],
+];
+
+/**
+ * Liegt die Adresse in einem **privaten Netz** (RFC 1918, 100.64.0.0/10, IPv6-ULA `fc00::/7`, auch als eingebettete IPv4-Adresse)? Für Ziele, die erst nach ausdrücklicher Freigabe der
+ * Administration erlaubt sind (ein interner Mail-Relay; später Webhooks) – öffentliche Adressen brauchen sie nicht. Loopback zählt nur in Tests (`allowLoopbackForTests`) als privat, damit sich
+ * der Fall mit einem lokalen Fake-Server durchspielen lässt; im Betrieb ist Loopback ohnehin gesperrt (`isAllowedAddress`).
+ */
+export function isPrivateAddress(ip: string): boolean {
+  const family = isIP(ip.split("%")[0]);
+  const privateV4 = (octets: [number, number, number, number]) => {
+    const value = toInt(...octets);
+    return (offsiteNetwork.allowLoopback && inCidr(value, [127, 0, 0, 0], 8)) || V4_PRIVATE.some(([base, bits]) => inCidr(value, base, bits));
+  };
+  if (family === 4) {
+    const octets = parseV4(ip);
+    return !!octets && privateV4(octets);
+  }
+  if (family === 6) {
+    const g = v6Groups(ip);
+    if (!g) return false;
+    if (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) return offsiteNetwork.allowLoopback;
+    const embedded = embeddedV4(g);
+    if (embedded) return privateV4(embedded);
+    return (g[0] & 0xfe00) === 0xfc00; // fc00::/7
+  }
+  return false;
+}

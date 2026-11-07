@@ -15,6 +15,7 @@ export const auditDe = {
   groups: {
     apiToken: "API-Tokens",
     backup: "Backups",
+    mail: "E-Mail",
     setup: "Einrichtung",
     secrets: "Geheimnisse",
     system: "System",
@@ -53,6 +54,14 @@ export const auditDe = {
       offsiteSettings: "Off-Site-Backup eingerichtet oder geändert",
       offsiteFailed: "Off-Site-Backup fehlgeschlagen",
       offsiteFetch: "Sicherung vom Off-Site-Ziel zurückgeholt",
+    },
+    mail: {
+      settings: "E-Mail-Einstellungen geändert",
+      test: "E-Mail-Verbindung getestet",
+      testSend: "Test-Mail gesendet",
+      send: "E-Mail zum Versand vorgemerkt",
+      sendFailed: "E-Mail-Versand fehlgeschlagen (aufgegeben)",
+      resend: "E-Mail erneut zum Versand vorgemerkt",
     },
     secrets: {
       keyCreated: "Wiederherstellungsschlüssel erzeugt",

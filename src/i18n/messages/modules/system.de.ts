@@ -67,6 +67,7 @@ export const systemDe = {
   names: {
     backup: { auto: "Automatisches Backup", offsite: "Off-Site-Backup übertragen", retention: "Backups aufräumen (Aufbewahrung)" },
     audit: { retention: "Audit-Log aufräumen (Aufbewahrung)" },
+    mail: { prune: "Sendeprotokoll aufräumen (Aufbewahrung)" },
     platform: {
       outbox: "Ereignisse zustellen",
       "outbox-prune": "Zugestellte Ereignisse aufräumen",

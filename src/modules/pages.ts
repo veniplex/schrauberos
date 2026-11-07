@@ -15,6 +15,7 @@ import { pages as roles } from "./admin/roles/pages";
 import { pages as settings } from "./admin/settings/pages";
 import { pages as modules } from "./admin/modules/pages";
 import { pages as backup } from "./admin/backup/pages";
+import { pages as mail } from "./admin/mail/pages";
 import { pages as updates } from "./admin/updates/pages";
 import { pages as audit } from "./admin/audit/pages";
 import { pages as system } from "./admin/system/pages";
@@ -40,6 +41,7 @@ export const ALL_PAGES: readonly PageDef[] = [
   ...settings,
   ...modules,
   ...backup,
+  ...mail,
   ...updates,
   ...audit,
   ...system,

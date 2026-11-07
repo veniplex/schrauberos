@@ -88,6 +88,10 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     manage: "Create, download and restore backups, set up off-site backup.",
     keys: "Generate and confirm the recovery key.",
   },
+  mail: {
+    manage: "Set up the email server, test it, and view the send log.",
+    send: "Send email from the application (e.g. an invoice to a customer). Never assigned automatically.",
+  },
   modules: {
     manage: "Switch modules and features on and off.",
   },

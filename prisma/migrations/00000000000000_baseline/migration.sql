@@ -774,6 +774,24 @@ CREATE TABLE "ApiIdempotencyKey" (
     "expiresAt" DATETIME NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "MailMessage" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT,
+    "userName" TEXT NOT NULL,
+    "toAddresses" TEXT NOT NULL,
+    "subject" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'queued',
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "errorCode" TEXT,
+    "sentAt" DATETIME,
+    "purpose" TEXT,
+    "entityId" TEXT,
+    "body" TEXT,
+    "attachments" TEXT
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
@@ -1016,3 +1034,12 @@ CREATE INDEX "ApiIdempotencyKey_expiresAt_idx" ON "ApiIdempotencyKey"("expiresAt
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ApiIdempotencyKey_tokenId_scope_key_key" ON "ApiIdempotencyKey"("tokenId", "scope", "key");
+
+-- CreateIndex
+CREATE INDEX "MailMessage_createdAt_idx" ON "MailMessage"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "MailMessage_status_createdAt_idx" ON "MailMessage"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "MailMessage_userId_createdAt_idx" ON "MailMessage"("userId", "createdAt");

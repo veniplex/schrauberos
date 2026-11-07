@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { DUE_TONE } from "@/lib/due";
 import { STATUS_TONES } from "@/lib/status-tone";
 import { BACKUP_KIND_TONE } from "@/modules/admin/backup/status-tone";
+import { MAIL_STATUS_TONE } from "@/modules/admin/mail/status-tone";
 import { FEATURE_STATE_TONE } from "@/modules/admin/modules/status-tone";
 import { JOB_STATUS_TONE, JOB_STATUSES } from "@/modules/admin/system/status-tone";
 import { DEVICE_STATUSES, IP_KINDS } from "@/modules/it/network/constants";
@@ -16,6 +17,7 @@ import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants"
 import { STATUS_TONE } from "@/modules/workshop/appointments/status-tone";
 import { TIRE_SEASONS, TIRE_SET_STATUSES } from "@/modules/workshop/tires/constants";
 import { HEALTH_TONE, SEASON_TONE, TIRE_SET_STATUS_TONE } from "@/modules/workshop/tires/status-tone";
+import { MAIL_STATUSES } from "@/lib/mail";
 import { BACKUP_KINDS } from "@/server/backup/kinds";
 
 /**
@@ -36,6 +38,7 @@ const MAPS: Array<[string, Record<string, string>, readonly string[]]> = [
   ["Fälligkeit", DUE_TONE, ["expired", "soon", "ok"]],
   ["Backup-Art", BACKUP_KIND_TONE, BACKUP_KINDS],
   ["Job-Lauf", JOB_STATUS_TONE, JOB_STATUSES],
+  ["Mail-Status", MAIL_STATUS_TONE, MAIL_STATUSES],
   ["Funktion (Module-Seite)", FEATURE_STATE_TONE, ["on", "off", "module-off", "blocked"]],
 ];
 

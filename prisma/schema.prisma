@@ -1089,3 +1089,32 @@ model ApiIdempotencyKey {
   @@unique([tokenId, scope, key])
   @@index([expiresAt])
 }
+
+// E-Mail-Versand (Plattform server/mail): Warteschlange UND Sendeprotokoll in einer Tabelle. Das Protokoll zeigt Zeit, Absender, Empfänger, Betreff, Status und Fehlercode – nie den Inhalt:
+// `body` und `attachments` stehen nur bis zum Versand (danach geleert) bzw. bei Aufgegebenem 30 Tage (zum erneuten Senden). Keine Verknüpfung zu User: das Protokoll überlebt das Löschen eines Kontos.
+model MailMessage {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  // Absender-Benutzer (null = System) und sein Anzeigename zum Zeitpunkt des Versands
+  userId      String?
+  userName    String
+  // Empfänger, durch Komma getrennt (Text, bewusst kein Json-Feld)
+  toAddresses String
+  subject     String
+  // "queued" (wartet oder wartet auf Wiederholung) | "sent" | "failed" (aufgegeben)
+  status      String    @default("queued")
+  attempts    Int       @default(0)
+  // Fehlercode des letzten Versuchs (z. B. "auth", "tls", "recipient"), nie ein Text des Servers
+  errorCode   String?
+  sentAt      DateTime?
+  // Fachlicher Bezug (z. B. "invoice") und ID – nur zur Zuordnung, ohne Inhalt
+  purpose     String?
+  entityId    String?
+  // Inhalt bis zum Versand; Anhänge als Text "relativer Pfad|Dateiname|Typ" je Zeile (Dateien liegen unter /data/files, siehe files.ts)
+  body        String?
+  attachments String?
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}

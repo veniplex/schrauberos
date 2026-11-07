@@ -87,6 +87,10 @@ export const permissionHintsDe = {
     manage: "Backups anlegen, herunterladen und wiederherstellen, Off-Site-Sicherung einrichten.",
     keys: "Den Wiederherstellungsschlüssel erzeugen und bestätigen.",
   },
+  mail: {
+    manage: "Den Mailserver einrichten, testen und das Sendeprotokoll ansehen.",
+    send: "E-Mails aus der Anwendung versenden (z. B. eine Rechnung an einen Kunden). Wird nie automatisch vergeben.",
+  },
   modules: {
     manage: "Module und Funktionen ein- und ausschalten.",
   },

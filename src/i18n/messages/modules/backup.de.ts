@@ -136,7 +136,7 @@ export const backupDe = {
     item_other: "{name}: {count} Einträge",
     backup: "Sicherung der betroffenen Zeilen: {name} (Ordner secret-reset im Datenverzeichnis).",
     keyDropped: "Der bisherige Wiederherstellungsschlüssel gehörte zu einem anderen Server und wurde entfernt – bitte unter Backups → Wiederherstellungsschlüssel einen neuen erzeugen.",
-    consumers: { auth: { totp: "Zwei-Faktor-Anmeldung (die Personen richten sie neu ein)" }, updates: { token: "Update-Token (unter Einstellungen → Updates neu eintragen)" }, backup: { offsite: "Off-Site-Backup (ausgeschaltet; Zugangsdaten und Schlüssel neu einrichten)" } },
+    consumers: { auth: { totp: "Zwei-Faktor-Anmeldung (die Personen richten sie neu ein)" }, updates: { token: "Update-Token (unter Einstellungen → Updates neu eintragen)" }, backup: { offsite: "Off-Site-Backup (ausgeschaltet; Zugangsdaten und Schlüssel neu einrichten)" }, mail: { password: "E-Mail-Versand (ausgeschaltet; unter Einstellungen → E-Mail das Passwort neu eintragen)" } },
     ack: "Verstanden",
   },
   keyIssue: {
