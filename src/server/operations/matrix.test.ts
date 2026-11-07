@@ -44,8 +44,18 @@ let declared = 0;
 let routes: Array<{ file: string; url: string; methods: Array<[string, (request: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>]> }> = [];
 let seq = 0;
 
+/** Neue Funktionen sind von Haus aus aus (`defaultEnabled: false`): Die Matrix schaltet sie ein, sonst hätte niemand ihre Rechte und jede Prüfung liefe in „nicht gefunden“. */
+async function enableDefaultOff() {
+  for (const f of FEATURES) {
+    if ((f as { defaultEnabled?: boolean }).defaultEnabled !== false || ("required" in f && f.required)) continue;
+    const key = `${f.module}.${f.id}`;
+    await env.db.featureSetting.upsert({ where: { key }, update: { enabled: true }, create: { key, enabled: true, updatedByName: "test" } });
+  }
+}
+
 before(async () => {
   env = await createTestEnv();
+  await enableDefaultOff();
   startupState().status = "ready"; // frisch gestartet ist der Zustand „starting“ (die Upload-Route sperrt dann mit 503)
   process.env.UPDATE_API_URL = "http://127.0.0.1:9"; // Update-Prüfung scheitert sofort, kein Netzwerk
   const actionFiles = walk(SRC, (n) => /\.tsx?$/.test(n) && !/\.test\./.test(n)).filter((f) => /\bdefineAction\(/.test(readFileSync(f, "utf8")) && !f.includes(`${path.sep}operations${path.sep}`));
@@ -193,6 +203,7 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
       await signInAs({ admin: true });
       assert.deepEqual(await outcomeOf(() => action({}, form({}))), { notFound: true }, name);
       await env.db.featureSetting.deleteMany();
+      await enableDefaultOff();
       tested++;
     }
     assert.ok(tested > 5);

@@ -16,8 +16,18 @@ let router: typeof import("./router");
 let state: typeof import("./state");
 let endpoints: readonly ApiEndpoint[];
 
+/** Neue Funktionen sind von Haus aus aus (`defaultEnabled: false`): Die Matrix schaltet sie ein, sonst wäre jeder Endpunkt 404. */
+async function enableDefaultOff() {
+  for (const f of FEATURES) {
+    if ((f as { defaultEnabled?: boolean }).defaultEnabled !== false || ("required" in f && f.required)) continue;
+    const key = fullFeatureId(f);
+    await env.db.featureSetting.upsert({ where: { key }, update: { enabled: true }, create: { key, enabled: true, updatedByName: "test" } });
+  }
+}
+
 before(async () => {
   env = await createTestEnv();
+  await enableDefaultOff();
   router = await import("./router");
   state = await import("./state");
   endpoints = (await import("@/modules/api")).apiEndpoints;
@@ -39,6 +49,7 @@ const snapshot = async () => ({
   vehicles: await env.db.vehicle.count(),
   appointments: await env.db.appointment.count(),
   tireSets: await env.db.tireSet.count(),
+  orders: (await env.db.order.count()) + (await env.db.orderApproval.count()) + (await env.db.orderItem.count()) + (await env.db.orderFinding.count()),
   invoices: await env.db.invoice.count(),
   employees: await env.db.employee.count(),
   absences: await env.db.absence.count(),
@@ -119,6 +130,7 @@ describe("Berechtigungs-Matrix: API", () => {
       await env.db.featureSetting.upsert({ where: { key: feature }, update: { enabled: false }, create: { key: feature, enabled: false } });
       for (const e of endpoints.filter((x) => x.feature === feature)) assert.equal((await call(e, token)).status, 404, `${label(e)} (ausgeschaltet)`);
       await env.db.featureSetting.deleteMany();
+      await enableDefaultOff();
     }
     for (const e of endpoints.filter((x) => x.list)) assert.equal((await call(e, token)).status, 200, `${label(e)} (wieder eingeschaltet)`);
     assert.deepEqual(await snapshot(), before);
