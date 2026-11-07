@@ -90,3 +90,27 @@ describe("LiveFilter", () => {
     assert.ok(f.input);
   });
 });
+
+describe("ResetFilterButton", () => {
+  it("leert Text, Kontrollkästchen und stellt Auswahlfelder auf den neutralen Eintrag – versteckte Felder (Sortierung) bleiben – und lädt die Liste ohne Filter", async () => {
+    const { ResetFilterButton } = await import("./live-filter");
+    const pushed: string[] = [];
+    const form = createElement(
+      "form",
+      null,
+      createElement("input", { name: "q", type: "search", defaultValue: "müller" }),
+      createElement("input", { name: "due", type: "checkbox", defaultChecked: true }),
+      createElement("select", { name: "status", defaultValue: "open" }, createElement("option", { value: "" }, "Alle"), createElement("option", { value: "open" }, "Offen")),
+      createElement("input", { name: "sort", type: "hidden", defaultValue: "name" }),
+      createElement(ResetFilterButton, { href: "/customers", children: "Zurücksetzen" }),
+    );
+    view = await mount(await withRouter(form, { pushed }));
+    const root = view.container;
+    await act(() => (root.querySelector("button") as HTMLButtonElement).click());
+    assert.equal((root.querySelector("input[name='q']") as HTMLInputElement).value, "");
+    assert.equal((root.querySelector("input[name='due']") as HTMLInputElement).checked, false);
+    assert.equal((root.querySelector("select") as HTMLSelectElement).value, "");
+    assert.equal((root.querySelector("input[name='sort']") as HTMLInputElement).value, "name");
+    assert.deepEqual(pushed, ["/customers"]);
+  });
+});

@@ -60,28 +60,25 @@ export function LiveFilter() {
 }
 
 /**
- * „Zurücksetzen“ einer `FilterBar`: lädt die Liste ohne Filter (`href`) und stellt die Felder des umgebenden Formulars **nach dem Laden** auf die neuen Standardwerte
- * zurück (`form.reset()`: Die Felder sind unkontrolliert, ein neuer `defaultValue` allein änderte getippten Text nicht – erst nach dem Wechsel der Seite kennen die Felder
- * die Werte der ungefilterten Liste, auch bei Auswahlfeldern mit einem anderen Standard als dem ersten Eintrag).
+ * „Zurücksetzen“ einer `FilterBar`: leert die Felder des umgebenden Formulars **sofort** und lädt die Liste ohne Filter (`href`). Die Felder sind unkontrolliert: Ein neuer
+ * `defaultValue` der Seite ändert getippten Text nicht, und `form.reset()` käme zu früh (die neue Seite trifft erst nach dem Wechsel der Adresse ein) oder stellte bei Auswahlfeldern den
+ * Stand des ersten Aufrufs wieder her. Darum: Text und Kontrollkästchen leeren, Auswahlfelder auf ihren neutralen Eintrag (Wert „“, sonst den ersten) – wie bei jeder Liste mit „Alle …“.
  */
 export function ResetFilterButton({ href, children }: { href: string; children: React.ReactNode }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const form = useRef<HTMLFormElement | null>(null);
-  const resetting = useRef(false);
-  useEffect(() => {
-    if (!pending && resetting.current) {
-      resetting.current = false;
-      form.current?.reset();
-    }
-  }, [pending]);
   return (
     <Button
       variant="ghost"
       aria-busy={pending || undefined}
       onClick={(event) => {
-        form.current = event.currentTarget.closest("form");
-        resetting.current = true;
+        for (const field of Array.from(event.currentTarget.closest("form")?.elements ?? [])) {
+          if (field instanceof HTMLInputElement && field.type !== "hidden" && field.type !== "submit" && field.type !== "button") {
+            if (field.type === "checkbox" || field.type === "radio") field.checked = false;
+            else field.value = "";
+          } else if (field instanceof HTMLTextAreaElement) field.value = "";
+          else if (field instanceof HTMLSelectElement) field.selectedIndex = Math.max(0, Array.from(field.options).findIndex((o) => o.value === ""));
+        }
         startTransition(() => router.replace(href, { scroll: false }));
       }}
     >
