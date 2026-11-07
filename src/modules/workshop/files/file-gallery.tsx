@@ -142,11 +142,15 @@ export function FileGallery({ ownerType, ownerId, files, canUpload }: { ownerTyp
           readOnly
           renderActions={(photo) => {
             const file = byId.get(photo.id);
+            // ohne Recht zum Hochladen, aber mit Recht zum Ändern (z. B. Leitung mit „Dateien entfernen“): Beschriften und Entfernen bleiben möglich
             return file ? (
-              <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
-                <Badge>{label(file)}</Badge>
-                {file.caption ? <span className="min-w-0 break-words text-ink">{file.caption}</span> : null}
-              </p>
+              <div className="flex w-full flex-col gap-1.5">
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+                  <Badge>{label(file)}</Badge>
+                  {file.caption ? <span className="min-w-0 break-words text-ink">{file.caption}</span> : null}
+                </p>
+                <FileActions file={file} />
+              </div>
             ) : null;
           }}
         />

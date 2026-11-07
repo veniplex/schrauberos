@@ -68,6 +68,7 @@ export const systemDe = {
     backup: { auto: "Automatisches Backup", offsite: "Off-Site-Backup übertragen", retention: "Backups aufräumen (Aufbewahrung)" },
     audit: { retention: "Audit-Log aufräumen (Aufbewahrung)" },
     mail: { prune: "Sendeprotokoll aufräumen (Aufbewahrung)" },
+    files: { purge: "Entfernte Dateien endgültig löschen" },
     platform: {
       outbox: "Ereignisse zustellen",
       "outbox-prune": "Zugestellte Ereignisse aufräumen",

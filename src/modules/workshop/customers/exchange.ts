@@ -92,7 +92,7 @@ export const disclosureExport: ExportDef = {
   also: ["customers.view"],
   audit: "customer.disclose",
   filename: () => `auskunft-${formatDay(new Date())}.csv`,
-  open: async ({ session, query, t }) => {
+  open: async ({ query, t }) => {
     const subject = await privacySubject(query.get("customer") ?? "");
     if (!subject) return { error: "common.errors.notFound" };
     const sections = await collectDisclosure(subject);

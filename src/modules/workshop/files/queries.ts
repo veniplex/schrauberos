@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
 import type { AppSession } from "@/server/auth/session";
+import { isOrderOpen } from "@/modules/workshop/orders/public";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
 import { visibleFilesWhere } from "./access";
@@ -63,7 +64,7 @@ export type FileRow = {
 
 function toRow(row: Row, viewer: Viewer & { user: { id: string } }): FileRow {
   const isOrder = row.orderId !== null;
-  const locked = isOrder && !["accepted", "in_progress", "ready"].includes(row.order?.status ?? "");
+  const locked = isOrder && !isOrderOpen(row.order?.status ?? "");
   return {
     id: row.id,
     ownerType: isOrder ? "order" : "vehicle",

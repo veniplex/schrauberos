@@ -21,13 +21,15 @@ export const canSeeVehicles = (actor: Actor): boolean => actor.features.has("wor
 export const canSeeOrders = (actor: Actor): boolean => actor.features.has("workshop.orders") && actor.can("orders.view");
 
 const UNRESTRICTED = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
+/** Ein Auftrag zählt als eingeschränkt, wenn sein Kunde **oder der Halter seines Fahrzeugs** eingeschränkt verarbeitet wird (wie bei den Checklisten: die strengere Auslegung). */
+const ORDER_UNRESTRICTED = { AND: [UNRESTRICTED, { vehicle: { is: UNRESTRICTED } }] };
 
 /** Bedingung für alle Dateien, die der Betrachter sehen darf; `null`, wenn er keine sehen darf. */
 export function visibleFilesWhere(actor: Actor): Prisma.FileAttachmentWhereInput | null {
   if (!actor.can("files.view")) return null;
   const alternatives: Prisma.FileAttachmentWhereInput[] = [];
   if (canSeeVehicles(actor)) alternatives.push({ vehicleId: { not: null }, vehicle: { is: UNRESTRICTED } });
-  if (canSeeOrders(actor)) alternatives.push({ orderId: { not: null }, order: { is: UNRESTRICTED } });
+  if (canSeeOrders(actor)) alternatives.push({ orderId: { not: null }, order: { is: ORDER_UNRESTRICTED } });
   return alternatives.length > 0 ? { archivedAt: null, OR: alternatives } : null;
 }
 
@@ -49,5 +51,7 @@ export async function ownerAccess(principal: Actor, type: FileOwnerType, id: str
   const ref = await orderRef(id, client);
   if (!ref || ref.restricted) fail("notFound");
   if (!ref.open) fail("invalid", "files.errors.orderClosed");
+  const vehicle = await vehicleRef(ref.vehicleId, client);
+  if (!vehicle || vehicle.restricted) fail("notFound");
   return { type, id: ref.id, label: ref.number, dir: `auftraege/${ref.number}` };
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { RateLimiter } from "./rate-limit";
+import { ByteBudget, RateLimiter } from "./rate-limit";
 
 describe("RateLimiter", () => {
   it("erlaubt bis zur Grenze, weist danach mit der Wartezeit ab und gibt nach dem Fenster wieder frei", () => {
@@ -37,5 +37,21 @@ describe("RateLimiter", () => {
     // mitten im Fenster: die ältesten Schlüssel gehen, der neue wird nicht ausgesperrt
     for (const key of ["h", "i", "j", "k"]) assert.equal(limiter.take(key).allowed, true);
     assert.ok((limiter as unknown as { hits: Map<string, unknown> }).hits.size <= 3);
+  });
+});
+
+describe("ByteBudget", () => {
+  it("begrenzt die Bytes je Schlüssel im gleitenden Fenster; die Wartezeit nennt, wann wieder Platz ist", () => {
+    let now = 0;
+    const budget = new ByteBudget({ maxBytes: 100, windowMs: 1000, now: () => now });
+    assert.equal(budget.take("u", 60).allowed, true);
+    now = 300;
+    assert.equal(budget.take("u", 30).allowed, true);
+    const refused = budget.take("u", 20);
+    assert.deepEqual(refused, { allowed: false, retryAfterMs: 700 }, "wenn die ersten 60 Bytes herausfallen (t = 1000)");
+    assert.equal(budget.take("andere", 100).allowed, true, "eigenes Fenster je Schlüssel");
+    now = 1000;
+    assert.equal(budget.take("u", 20).allowed, true);
+    assert.equal(budget.take("u", 101).allowed, false, "eine einzelne Anfrage über der Grenze");
   });
 });

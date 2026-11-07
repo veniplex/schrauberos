@@ -70,6 +70,7 @@ export const systemEn: typeof systemDe = {
     backup: { auto: "Automatic backup", offsite: "Transfer off-site backup", retention: "Clean up backups (retention)" },
     audit: { retention: "Clean up audit log (retention)" },
     mail: { prune: "Clean up send log (retention)" },
+    files: { purge: "Permanently delete removed files" },
     platform: {
       outbox: "Deliver events (outbox)",
       "outbox-prune": "Clean up delivered events",

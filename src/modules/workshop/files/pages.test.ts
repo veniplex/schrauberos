@@ -109,6 +109,18 @@ describe("Abschnitt an Fahrzeug und Auftrag", () => {
     assert.match(text, /Annahme: Front/);
   });
 
+  it("mit files.delete, aber ohne files.upload: Fotos und Dokumente lassen sich beschriften und entfernen (kein Upload-Feld) – gleiche Fähigkeit für beide", async () => {
+    const { sections } = await import("./sections");
+    const order = sections.find((s) => s.host === "orders/detail")!;
+    const manager = await login(["files.view", "files.delete", "vehicles.view", "orders.view"]);
+    const root = await render(await order.Component({ entityId: orderId, session: manager }));
+    assert.equal(root.querySelectorAll("input[type='file']").length, 0, "kein Upload ohne files.upload");
+    const photoCards = root.querySelectorAll("img");
+    assert.ok(photoCards.length > 0);
+    assert.ok(root.querySelectorAll("input[name='caption']").length >= photoCards.length + 1, "jedes Foto und das Dokument bieten Beschriften");
+    assert.ok(Array.from(root.querySelectorAll("button")).filter((b) => /Entfernen/.test(b.textContent ?? "")).length >= photoCards.length + 1, "und Entfernen");
+  });
+
   it("bei einem Kunden mit eingeschränkter Verarbeitung erscheint der Abschnitt gar nicht; an einem abgeschlossenen Auftrag nur die Ansicht", async () => {
     const { sections } = await import("./sections");
     const order = sections.find((s) => s.host === "orders/detail")!;

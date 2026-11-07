@@ -352,3 +352,148 @@ describe("Auslieferung und Upload-Route", () => {
     env.signOut();
   });
 });
+
+describe("Kontingent und Löschlauf", () => {
+  const removedAgo = async (id: string, days: number) => env.db.fileAttachment.update({ where: { id }, data: { archivedAt: new Date(Date.now() - days * 86_400_000) } });
+
+  it("entfernte Dateien zählen im Kontingent mit, bis der Löschlauf sie löst – Hochladen und Entfernen füllt den Datenträger nicht unbegrenzt", async () => {
+    const { MAX_FILES_PER_OWNER } = await import("./constants");
+    const created = out(await upload(mechanic));
+    const row = await env.db.fileAttachment.findUniqueOrThrow({ where: { id: created.id } });
+    // das Kontingent des Auftrags ist bis auf eine Datei gefüllt (die Zeilen sind echt genug: der Zähler zählt Zeilen)
+    await env.db.fileAttachment.createMany({
+      data: Array.from({ length: MAX_FILES_PER_OWNER - 2 }, (_, i) => ({ orderId, name: `x${i}`, mime: "image/png", size: 1, path: `auftraege/A-2026-0001/fuell-${i}.png`, sha256: "0", uploadedById: mechanic.user.id, uploadedByName: "Tom" })),
+    });
+    out(await upload(mechanic)); // die letzte freie Stelle
+    assert.equal(failure(await upload(mechanic)).key, "files.errors.tooMany");
+    // Entfernen schafft keinen Platz (die Datei liegt noch auf dem Datenträger)
+    out(await ops.archiveFileOperation.execute(mechanic, { id: created.id }));
+    assert.equal(failure(await upload(mechanic)).key, "files.errors.tooMany", "entfernte Dateien zählen mit");
+    // der Löschlauf löst sie nach der Frist; erst dann ist wieder Platz
+    const { purgeRemovedFiles } = await import("./purge");
+    assert.equal(await purgeRemovedFiles(new Date()), 0, "noch innerhalb der Frist");
+    await removedAgo(created.id, 31);
+    assert.equal(await purgeRemovedFiles(new Date()), 1);
+    out(await upload(mechanic));
+    assert.ok(row.id);
+  });
+
+  it("Löschlauf: die Datei verschwindet vom Datenträger (ein Backup-Hardlink bleibt unberührt), die Zeile bleibt ohne Namen und Beschriftung; wiederholbar", async () => {
+    const { linkSync, existsSync: exists } = await import("node:fs");
+    const created = out(await upload(mechanic, { name: "Müller Hans.png", caption: "Herr Müller" }));
+    const row = await env.db.fileAttachment.findUniqueOrThrow({ where: { id: created.id } });
+    const full = path.join(env.dir, "files", ...row.path.split("/"));
+    const backupLink = path.join(env.dir, "backup-link.png");
+    linkSync(full, backupLink);
+    out(await ops.archiveFileOperation.execute(mechanic, { id: created.id }));
+    const { purgeRemovedFiles } = await import("./purge");
+    assert.equal(await purgeRemovedFiles(new Date()), 0, "frisch entfernt: bleibt");
+    assert.ok(exists(full));
+    await removedAgo(created.id, 31);
+    assert.equal(await purgeRemovedFiles(new Date()), 1);
+    assert.equal(exists(full), false, "unter /data/files gelöscht");
+    assert.ok(readFileSync(backupLink).length > 0, "der Verweis des Backups bleibt");
+    const after = await env.db.fileAttachment.findUniqueOrThrow({ where: { id: created.id } });
+    assert.ok(after.purgedAt);
+    assert.equal(after.caption, null);
+    assert.ok(!after.name.includes("Müller"));
+    assert.equal(await purgeRemovedFiles(new Date()), 0, "wiederholbar: nichts mehr zu tun");
+    // eine bereits fehlende Datei ist kein Fehler
+    const second = out(await upload(mechanic));
+    out(await ops.archiveFileOperation.execute(mechanic, { id: second.id }));
+    await removedAgo(second.id, 40);
+    rmSync(path.join(env.dir, "files"), { recursive: true, force: true });
+    assert.equal(await purgeRemovedFiles(new Date()), 1);
+  });
+
+  it("der Job ist angemeldet und gehört der Funktion", async () => {
+    const { jobs } = await import("./jobs");
+    assert.deepEqual(jobs.map((j) => [j.id, j.feature]), [["files.purge", "workshop.files"]]);
+  });
+});
+
+describe("Idempotenz-Schlüssel: nur für dieselbe Datei am selben Ziel", () => {
+  it("anderes Ziel, andere Art oder entfernte Datei: keyReuse statt stillem Erfolg; die Wiederholung gilt auch nach dem Schließen des Auftrags", async () => {
+    const first = out(await upload(mechanic, { uploadKey: "k-ziel" }));
+    assert.equal(failure(await upload(mechanic, { uploadKey: "k-ziel", ownerType: "vehicle", ownerId: vehicleId })).fields?.file?.key, "files.errors.keyReuse", "anderes Ziel");
+    assert.equal(failure(await upload(mechanic, { uploadKey: "k-ziel", category: "damage" })).fields?.file?.key, "files.errors.keyReuse", "andere Art");
+    // Auftrag inzwischen abgeschlossen: die Wiederholung (verlorene Antwort) liefert den vorhandenen Eintrag
+    await env.db.order.update({ where: { id: orderId }, data: { status: "picked_up" } });
+    const replay = out(await upload(mechanic, { uploadKey: "k-ziel" }));
+    assert.deepEqual([replay.id, replay.replayed], [first.id, true]);
+    await env.db.order.update({ where: { id: orderId }, data: { status: "in_progress" } });
+    // entfernt: der Schlüssel liefert nicht mehr die unsichtbare Datei
+    out(await ops.archiveFileOperation.execute(mechanic, { id: first.id }));
+    assert.equal(failure(await upload(mechanic, { uploadKey: "k-ziel" })).fields?.file?.key, "files.errors.keyReuse", "entfernte Datei");
+  });
+});
+
+describe("Beschriften und Entfernen: Rechte und Sperren", () => {
+  it("wer files.delete hat (ohne files.upload), darf beschriften und entfernen – auch ohne Recht zum Hochladen; am archivierten Fahrzeug bleibt das erlaubt, am geschlossenen Auftrag nicht", async () => {
+    const manager = await sessionFor(["files.view", "files.delete", "vehicles.view", "orders.view"]);
+    const onVehicle = out(await upload(mechanic, { ownerType: "vehicle", ownerId: vehicleId }));
+    const onOrder = out(await upload(mechanic));
+    const version = async (id: string) => versionOf(await env.db.fileAttachment.findUniqueOrThrow({ where: { id } }));
+    assert.equal(failure(await upload(manager)).code, "forbidden", "hochladen darf die Leitung nicht");
+    out(await ops.updateFileOperation.execute(manager, { id: onOrder.id, version: await version(onOrder.id), category: "damage", caption: "Beschriftet von der Leitung" }));
+    // archiviertes Fahrzeug: neue Dateien abgelehnt, Beschriften und Entfernen erlaubt
+    await env.db.vehicle.update({ where: { id: vehicleId }, data: { archivedAt: new Date() } });
+    assert.equal(failure(await upload(mechanic, { ownerType: "vehicle", ownerId: vehicleId })).key, "files.errors.vehicleArchived");
+    out(await ops.updateFileOperation.execute(manager, { id: onVehicle.id, version: await version(onVehicle.id), category: "photo", caption: "Archiviertes Fahrzeug" }));
+    out(await ops.archiveFileOperation.execute(manager, { id: onVehicle.id }));
+    // geschlossener Auftrag: gesperrt
+    await env.db.order.update({ where: { id: orderId }, data: { status: "picked_up" } });
+    assert.equal(failure(await ops.archiveFileOperation.execute(manager, { id: onOrder.id })).key, "files.errors.orderClosed");
+    assert.equal(failure(await ops.updateFileOperation.execute(manager, { id: onOrder.id, version: await version(onOrder.id), category: "photo" })).key, "files.errors.orderClosed");
+  });
+
+  it("Art. 18: Dateien am Auftrag sind auch unsichtbar, wenn nur der Halter des Fahrzeugs eingeschränkt ist (wie bei den Checklisten)", async () => {
+    const customer = await env.db.customer.create({ data: { lastName: "Halter", processingRestrictedAt: new Date() } });
+    const vehicle = await env.db.vehicle.create({ data: { plate: "B HA 1", plateNorm: "BHA1", customerId: customer.id } });
+    const order = await env.db.order.create({ data: { number: "A-2026-0077", status: "in_progress", vehicleId: vehicle.id } });
+    await env.db.fileAttachment.create({ data: { orderId: order.id, name: "x.png", mime: "image/png", size: 1, path: "auftraege/A-2026-0077/x.png", sha256: "0", uploadedById: mechanic.user.id, uploadedByName: "Tom" } });
+    assert.equal((await queries.filesOf(mechanic, { type: "order", id: order.id })).length, 0, "Auftragskunde frei, Halter eingeschränkt: unsichtbar");
+    assert.equal(failure(await upload(mechanic, { ownerId: order.id })).code, "notFound", "und nichts neu anhängbar");
+  });
+});
+
+describe("Auslieferung: Zwischenspeicher und Drossel", () => {
+  const send = async (url: string, init: { method?: "GET" | "POST"; headers?: Record<string, string>; body?: FormData } = {}) => {
+    const request = new NextRequest(`http://localhost${url}`, { method: init.method ?? "GET", headers: init.headers, body: init.body });
+    if (url === "/api/files") return (await import("@/app/api/files/route")).POST(request);
+    return (await import("@/app/api/files/[id]/route")).GET(request, { params: Promise.resolve({ id: url.split("/").pop()!.split("?")[0] }) });
+  };
+
+  it("Cache-Control ist private, no-cache (Rechte wirken sofort) mit ETag; If-None-Match ergibt 304 – erst nach der Rechteprüfung", async () => {
+    const created = out(await upload(mechanic));
+    const user = await env.user({ username: "cache-viewer", roles: [await env.role({ permissions: MECHANIC })] });
+    await env.signIn(user);
+    const first = await send(`/api/files/${created.id}`);
+    assert.equal(first.headers.get("cache-control"), "private, no-cache");
+    const etag = first.headers.get("etag")!;
+    assert.ok(etag);
+    const again = await send(`/api/files/${created.id}`, { headers: { "if-none-match": etag } });
+    assert.equal(again.status, 304);
+    assert.equal(again.headers.get("cache-control"), "private, no-cache");
+    out(await ops.archiveFileOperation.execute(lead, { id: created.id }));
+    assert.equal((await send(`/api/files/${created.id}`, { headers: { "if-none-match": etag } })).status, 404, "entfernt: nie 304");
+    env.signOut();
+  });
+
+  it("die Oberfläche ist je Konto gedrosselt: nach zu vielen Anfragen in der Stunde 429 mit Retry-After; andere Konten sind nicht betroffen", async () => {
+    const user = await env.user({ username: "heavy", roles: [await env.role({ permissions: MECHANIC })] });
+    const other = await env.user({ username: "light", roles: [await env.role({ permissions: MECHANIC })] });
+    await env.signIn(user);
+    const headers = { "x-requested-with": "schrauberos", "content-length": "400" };
+    let status = 0;
+    for (let i = 0; i < 205 && status !== 429; i++) status = (await send("/api/files", { method: "POST", headers, body: new FormData() })).status;
+    assert.equal(status, 429);
+    const refused = await send("/api/files", { method: "POST", headers, body: new FormData() });
+    assert.equal(refused.status, 429);
+    assert.ok(Number(refused.headers.get("retry-after")) >= 1);
+    env.signOut();
+    await env.signIn(other);
+    assert.notEqual((await send("/api/files", { method: "POST", headers, body: new FormData() })).status, 429);
+    env.signOut();
+  });
+});

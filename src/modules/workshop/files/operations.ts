@@ -4,6 +4,7 @@ import { claimRow } from "@/lib/concurrency";
 import { truncateName } from "@/lib/file-delivery";
 import { sanitizeImage } from "@/lib/image-sanitize";
 import { checkUpload } from "@/lib/upload-sniff";
+import { isOrderOpen } from "@/modules/workshop/orders/public";
 import { db } from "@/server/db";
 import { removeFile, storeFile } from "@/server/files";
 import { defineOperation, fail, failField } from "@/server/operations";
@@ -16,8 +17,9 @@ import { CAPTION_MAX, FILE_CATEGORIES, FILE_EXTENSIONS, FILE_MAX_BYTES, FILE_OWN
  *  - Fotos laufen durch `sanitizeImage`: **Bildpunkte aus dem Dateikopf** (Grenze gegen Dekompressionsbomben), **Exif/GPS, XMP, Kommentare und Anhängsel entfernt**, die Drehung bleibt;
  *  - die Datei entsteht in `prepare` (außerhalb der Transaktion) und wird in `finish` wieder entfernt, wenn die Transaktion scheitert (Rollback-Aufräumen wie bei der Freigabe-Unterschrift);
  *  - **Idempotenz:** derselbe `uploadKey` (Header `Idempotency-Key`) derselben Person liefert den vorhandenen Eintrag – keine Dublette, auch nicht bei verlorener Antwort oder gleichzeitigem Wiederholen;
- *    derselbe Schlüssel mit anderem Inhalt wird abgelehnt.
- * Dateien werden nie überschrieben oder verändert (Backups nutzen Hardlinks) und nie gelöscht: **Entfernen** setzt `archivedAt`.
+ *    derselbe Schlüssel mit anderem Inhalt, an anderem Eigentümer, in anderer Art oder für eine inzwischen entfernte Datei wird abgelehnt (`keyReuse`);
+ *  - **Kontingent:** höchstens `MAX_FILES_PER_OWNER` Dateien je Fahrzeug/Auftrag – **entfernte zählen bis zum Löschlauf mit** (sonst ließe sich der Datenträger über Hochladen und Entfernen füllen); die Oberfläche wird zusätzlich je Konto und Stunde gedrosselt.
+ * Dateien werden nie überschrieben oder verändert (Backups nutzen Hardlinks): **Entfernen** setzt `archivedAt`; ein Löschlauf (`jobs.ts`, `purge.ts`) löst entfernte Dateien nach einer Frist endgültig vom Datenträger.
  */
 
 const uploadKeyField = z.string().regex(/^[A-Za-z0-9._:~-]{1,128}$/, { error: "validation.invalid" });
@@ -46,20 +48,25 @@ export const uploadFileOperation = defineOperation({
   input: uploadFileInput,
   audit: "files.upload",
   prepare: async ({ input: d, principal }): Promise<Prepared> => {
+    // Wiederholung mit demselben Schlüssel zuerst (auch wenn der Auftrag inzwischen geschlossen ist): der vorhandene Eintrag, solange er zum selben Ziel gehört und nicht entfernt ist
+    if (d.uploadKey) {
+      const same = await db.fileAttachment.findUnique({ where: { uploadedById_uploadKey: { uploadedById: principal.user.id, uploadKey: d.uploadKey } }, select: { id: true, sha256: true, category: true, vehicleId: true, orderId: true, archivedAt: true } });
+      if (same) {
+        const sameTarget = (d.ownerType === "vehicle" ? same.vehicleId : same.orderId) === d.ownerId && same.category === d.category;
+        if (!sameTarget || same.archivedAt !== null) failField("file", "files.errors.keyReuse");
+        const hash = createHash("sha256").update(d.bytes).digest("hex");
+        if (same.sha256 !== hash) failField("file", "files.errors.keyReuse");
+        return { existingId: same.id, path: null, mime: "", size: 0, width: null, height: null, sha256: hash, strippedBytes: 0, label: "" };
+      }
+    }
     const owner = await ownerAccess(principal, d.ownerType, d.ownerId);
     if (d.bytes.length === 0) failField("file", "files.errors.empty");
     if (d.bytes.length > FILE_MAX_BYTES) failField("file", "files.errors.tooLarge");
     const checked = checkUpload(d.bytes, d.declaredType, FILE_TYPES);
     if (!checked.ok) failField("file", checked.reason === "mismatch" ? "files.errors.mismatch" : "files.errors.type");
     const sha256 = createHash("sha256").update(d.bytes).digest("hex");
-    if (d.uploadKey) {
-      const same = await db.fileAttachment.findUnique({ where: { uploadedById_uploadKey: { uploadedById: principal.user.id, uploadKey: d.uploadKey } }, select: { id: true, sha256: true } });
-      if (same) {
-        if (same.sha256 !== sha256) failField("file", "files.errors.keyReuse");
-        return { existingId: same.id, path: null, mime: checked.mime, size: 0, width: null, height: null, sha256, strippedBytes: 0, label: owner.label };
-      }
-    }
-    if ((await db.fileAttachment.count({ where: d.ownerType === "vehicle" ? { vehicleId: owner.id, archivedAt: null } : { orderId: owner.id, archivedAt: null } })) >= MAX_FILES_PER_OWNER) fail("invalid", "files.errors.tooMany");
+    // Kontingent: entfernte Dateien zählen bis zum Löschlauf mit (purgedAt noch leer)
+    if ((await db.fileAttachment.count({ where: d.ownerType === "vehicle" ? { vehicleId: owner.id, purgedAt: null } : { orderId: owner.id, purgedAt: null } })) >= MAX_FILES_PER_OWNER) fail("invalid", "files.errors.tooMany");
 
     let content: Buffer = Buffer.from(d.bytes);
     let width: number | null = null;
@@ -145,7 +152,7 @@ export const updateFileOperation = defineOperation({
     const row = await tx.fileAttachment.findFirst({ where: { id: d.id, ...where }, select: { id: true, uploadedById: true, vehicle: { select: { plate: true } }, order: { select: { number: true, status: true } } } });
     if (!row) fail("notFound");
     if (!mayChange(principal, row)) fail("forbidden");
-    if (row.order && !["accepted", "in_progress", "ready"].includes(row.order.status)) fail("invalid", "files.errors.orderClosed");
+    if (row.order && !isOrderOpen(row.order.status)) fail("invalid", "files.errors.orderClosed");
     if (!(await claimRow(tx.fileAttachment, d.id, d.version))) fail("conflict");
     await tx.fileAttachment.update({ where: { id: d.id }, data: { category: d.category, caption: d.caption || null } });
     audit({ target: `${row.vehicle?.plate ?? row.order?.number ?? ""} · ${d.category}`, entityId: d.id });
@@ -168,7 +175,7 @@ export const archiveFileOperation = defineOperation({
     const row = await tx.fileAttachment.findFirst({ where: { id: d.id, ...where }, select: { id: true, uploadedById: true, category: true, vehicle: { select: { plate: true } }, order: { select: { number: true, status: true } } } });
     if (!row) fail("notFound");
     if (!mayChange(principal, row)) fail("forbidden");
-    if (row.order && !["accepted", "in_progress", "ready"].includes(row.order.status)) fail("invalid", "files.errors.orderClosed");
+    if (row.order && !isOrderOpen(row.order.status)) fail("invalid", "files.errors.orderClosed");
     // bedingt: von zwei gleichzeitigen Aufrufen entfernt genau einer
     const done = await tx.fileAttachment.updateMany({ where: { id: d.id, archivedAt: null }, data: { archivedAt: new Date(), archivedByName: byName(principal) } });
     if (done.count === 0) fail("notFound");

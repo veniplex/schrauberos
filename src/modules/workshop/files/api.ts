@@ -15,7 +15,7 @@ import { fileForDelivery, getFile, listFiles, type FileRow } from "./queries";
  * API-Ressource `/files` (Dokumente & Fotos an Fahrzeugen und Aufträgen):
  *  - `GET /files`, `GET /files/{id}`: Metadaten; sichtbar ist, was die Rechte des Tokens für Fahrzeug bzw. Auftrag und `files.view` ergeben – Dateien von Kunden mit eingeschränkter Verarbeitung (Art. 18)
  *    und entfernte Dateien gibt es nicht (404),
- *  - `GET /files/{id}/content`: der Inhalt als Binärantwort (Foto/PDF; Kopfzeilen `nosniff` und `sandbox` wie in der Oberfläche, Download mit Dateiname),
+ *  - `GET /files/{id}/content`: der Inhalt als Binärantwort (Foto/PDF; Kopfzeile `nosniff`, Content-Disposition mit Dateiname; die Content-Security-Policy ist im Betrieb die des Proxys für `/api/v1` (`default-src 'none'; frame-ancestors 'none'`: es läuft nichts), die `sandbox`-Richtlinie von `deliveryHeaders` gilt nur, wo kein Proxy davorsteht (Next verwirft den Kopf einer Route still, wenn der Proxy ihn schon gesetzt hat)),
  *  - `POST /files`: **Multipart-Upload** (`multipart/form-data`: `ownerType`, `ownerId`, `category`, `caption` und die Datei im Feld `file`) – dieselbe Operation wie in der Oberfläche: Inhalt statt gemeldetem Typ,
  *    Bildpunktgrenze, **Exif/GPS wird auch hier serverseitig entfernt**; der `Idempotency-Key` verhindert Dubletten,
  *  - `PATCH /files/{id}` (Beschriftung, Art; `If-Match`) und `DELETE /files/{id}` (Entfernen = Archivieren; die Datei bleibt unverändert auf dem Datenträger).
@@ -110,7 +110,7 @@ export const endpoints: ApiEndpoint[] = [
     operationId: "files.content",
     summary: "Download the file itself (binary; add ?download=1 to force a download)",
     operations: [],
-    download: { description: "The file's bytes. Content-Type is the detected type (image/jpeg, image/png or application/pdf); the response carries nosniff and a sandbox Content-Security-Policy. Metadata such as Exif/GPS was removed when the photo was uploaded." },
+    download: { description: "The file's bytes. Content-Type is the detected type (image/jpeg, image/png or application/pdf); the response carries nosniff and a restrictive Content-Security-Policy (default-src 'none': nothing executes). Metadata such as Exif/GPS was removed when the photo was uploaded." },
     handler: async (call) => {
       if (!ID_SHAPE.test(call.params.id)) throw apiProblem("not_found");
       const file = await fileForDelivery(call.principal, call.params.id);
