@@ -88,6 +88,10 @@
   --tap-row: 0px;
   --input-font: 0.875rem;
 
+  /* Höhe der klebenden Kopfzeile (Mobil-Kopfleiste unter 1024 px: 56 px plus Aussparung der Kamera/Statusleiste; Desktop-Kopfleiste h-14 = 3,5 rem, dort ist die Aussparung 0).
+     Wer darunter kleben oder dorthin scrollen soll (Kalender-Tageskopf, Wochenstreifen, `scroll-padding-top`), nimmt dieses Token. */
+  --sticky-top: calc(3.5rem + env(safe-area-inset-top, 0px));
+
   /* Bewegung */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 120ms;

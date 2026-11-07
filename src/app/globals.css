@@ -52,7 +52,7 @@ html {
   /* Die Scrollleiste behält ihren Platz: Ein Dialog sperrt das Scrollen (overflow hidden), ohne dass der Inhalt dahinter um die Leistenbreite springt */
   scrollbar-gutter: stable;
   /* Springen per Tastatur, Fehlerzusammenfassung, Anker: Die klebende Kopfzeile (3,5 rem) und die Aktionsleiste eines Formulars verdecken das fokussierte Feld nicht (WCAG 2.4.11) */
-  scroll-padding-top: calc(3.5rem + env(safe-area-inset-top));
+  scroll-padding-top: var(--sticky-top);
 }
 html[data-form-actions] {
   scroll-padding-bottom: 6rem;

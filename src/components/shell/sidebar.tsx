@@ -158,8 +158,9 @@ export function Sidebar({
       <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface lg:flex">{content(account)}</aside>
 
       {/* Handy und Tablet (< 1024 px): Kopfzeile mit Menü-Knopf, Suche, „Neu“ und Konto; die Navigation liegt im Seitenfach */}
-      <div className="no-print lg:hidden">
-        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b border-line bg-surface/90 px-3 pt-[env(safe-area-inset-top)] backdrop-blur">
+      {/* `contents`: Der Wrapper bildet keinen eigenen Kasten – sonst wäre er nur so hoch wie die Kopfzeile, und `sticky` hätte nirgends Platz zum Kleben */}
+      <div className="no-print contents lg:hidden">
+        <header className="sticky top-0 z-30 flex min-h-(--sticky-top) items-center gap-2 border-b border-line bg-surface/90 px-3 pt-[env(safe-area-inset-top)] backdrop-blur">
           <Button variant="secondary" size="icon" aria-label={t("nav.menu")} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}>
             <MenuIcon className="size-4" aria-hidden />
           </Button>
