@@ -586,10 +586,111 @@ CREATE TABLE "Invoice" (
     "finalizedAt" DATETIME,
     "finalizedByName" TEXT,
     "cancelsInvoiceId" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'manual',
+    "docType" TEXT NOT NULL DEFAULT 'invoice',
+    "offerStatus" TEXT,
+    "validUntil" DATETIME,
+    "acceptedAt" DATETIME,
+    "acceptedByName" TEXT,
+    "serviceFrom" DATETIME,
+    "serviceTo" DATETIME,
+    "introText" TEXT,
+    "footerText" TEXT,
+    "paymentDays" INTEGER,
+    "paymentMethod" TEXT,
+    "partyStreet" TEXT,
+    "partyZip" TEXT,
+    "partyCity" TEXT,
+    "buyerReference" TEXT,
+    "buyerEmail" TEXT,
+    "taxNote" TEXT,
+    "exempt" BOOLEAN NOT NULL DEFAULT false,
+    "vehicleId" TEXT,
+    "vehicleLabel" TEXT,
+    "mileageKm" INTEGER,
+    "orderId" TEXT,
+    "sourceDocId" TEXT,
+    "deductedCents" INTEGER NOT NULL DEFAULT 0,
+    "paidCents" INTEGER NOT NULL DEFAULT 0,
+    "sentAt" DATETIME,
+    "sentCount" INTEGER NOT NULL DEFAULT 0,
+    "createdByName" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Invoice_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Invoice_cancelsInvoiceId_fkey" FOREIGN KEY ("cancelsInvoiceId") REFERENCES "Invoice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "Invoice_cancelsInvoiceId_fkey" FOREIGN KEY ("cancelsInvoiceId") REFERENCES "Invoice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Invoice_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Invoice_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Invoice_sourceDocId_fkey" FOREIGN KEY ("sourceDocId") REFERENCES "Invoice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InvoiceItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "invoiceId" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "kind" TEXT NOT NULL DEFAULT 'labor',
+    "description" TEXT NOT NULL,
+    "unit" TEXT NOT NULL DEFAULT '',
+    "quantityMilli" INTEGER NOT NULL,
+    "unitCents" INTEGER NOT NULL,
+    "taxBp" INTEGER NOT NULL,
+    "discountBp" INTEGER NOT NULL DEFAULT 0,
+    "refType" TEXT,
+    "refId" TEXT,
+    CONSTRAINT "InvoiceItem_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InvoicePayment" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "invoiceId" TEXT NOT NULL,
+    "paidAt" DATETIME NOT NULL,
+    "amountCents" INTEGER NOT NULL,
+    "method" TEXT NOT NULL,
+    "note" TEXT,
+    "recordedByName" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "InvoicePayment_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InvoiceSnapshot" (
+    "invoiceId" TEXT NOT NULL PRIMARY KEY,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sName" TEXT NOT NULL,
+    "sStreet" TEXT,
+    "sZip" TEXT,
+    "sCity" TEXT,
+    "sPhone" TEXT,
+    "sEmail" TEXT,
+    "sWebsite" TEXT,
+    "sTaxNumber" TEXT,
+    "sVatId" TEXT,
+    "sBankName" TEXT,
+    "sIban" TEXT,
+    "sBic" TEXT,
+    "sDirector" TEXT,
+    "sRegisterCourt" TEXT,
+    "sRegisterNumber" TEXT,
+    "sSmallBusiness" BOOLEAN NOT NULL DEFAULT false,
+    "rName" TEXT NOT NULL,
+    "rStreet" TEXT,
+    "rZip" TEXT,
+    "rCity" TEXT,
+    "rEmail" TEXT,
+    "rCustomerNumber" TEXT,
+    CONSTRAINT "InvoiceSnapshot_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InvoiceDeduction" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "finalId" TEXT NOT NULL,
+    "partialId" TEXT NOT NULL,
+    "finalKey" TEXT,
+    CONSTRAINT "InvoiceDeduction_finalId_fkey" FOREIGN KEY ("finalId") REFERENCES "Invoice" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "InvoiceDeduction_partialId_fkey" FOREIGN KEY ("partialId") REFERENCES "Invoice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -1266,6 +1367,30 @@ CREATE INDEX "Invoice_dueDate_idx" ON "Invoice"("dueDate");
 
 -- CreateIndex
 CREATE INDEX "Invoice_customerId_idx" ON "Invoice"("customerId");
+
+-- CreateIndex
+CREATE INDEX "Invoice_source_docType_finalizedAt_idx" ON "Invoice"("source", "docType", "finalizedAt");
+
+-- CreateIndex
+CREATE INDEX "Invoice_orderId_idx" ON "Invoice"("orderId");
+
+-- CreateIndex
+CREATE INDEX "Invoice_sourceDocId_idx" ON "Invoice"("sourceDocId");
+
+-- CreateIndex
+CREATE INDEX "InvoiceItem_invoiceId_position_idx" ON "InvoiceItem"("invoiceId", "position");
+
+-- CreateIndex
+CREATE INDEX "InvoicePayment_invoiceId_paidAt_idx" ON "InvoicePayment"("invoiceId", "paidAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InvoiceDeduction_finalKey_key" ON "InvoiceDeduction"("finalKey");
+
+-- CreateIndex
+CREATE INDEX "InvoiceDeduction_partialId_idx" ON "InvoiceDeduction"("partialId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InvoiceDeduction_finalId_partialId_key" ON "InvoiceDeduction"("finalId", "partialId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "InvoiceFile_invoiceId_key" ON "InvoiceFile"("invoiceId");

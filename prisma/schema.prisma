@@ -379,6 +379,7 @@ model Vehicle {
   tireSets     TireSet[]
   appointments Appointment[]
   orders       Order[]
+  invoices     Invoice[]
   // Dokumente & Fotos (F6): Fahrzeuge mit Dateien sind nicht löschbar (archivieren)
   files        FileAttachment[]
   // Checklisten (F7): Fahrzeuge mit Checklisten sind nicht löschbar (archivieren)
@@ -836,6 +837,50 @@ model Invoice {
   finalizedByName  String?
   // Gegenbeleg: Verweis auf die stornierte Rechnung (je Rechnung höchstens ein Gegenbeleg); null = gewöhnliche Rechnung
   cancelsInvoiceId String?   @unique
+
+  // ── Rechnungserstellung (F3, office.billing) ──
+  // Herkunft: manual = von Hand erfasst (Archiv); billing = in der Rechnungserstellung angelegt (Entwurf ohne Nummer bis zum Festschreiben/Ausstellen)
+  source         String    @default("manual")
+  // Belegart: invoice | partial (Abschlag) | final (Schlussrechnung) | credit (Stornorechnung/Gutschrift) | offer (Angebot) | confirmation (Auftragsbestätigung). Angebote und Auftragsbestätigungen sind keine Buchungsbelege:
+  // sie stehen nie in der Ausgangsliste und zählen in keiner Summe
+  docType        String    @default("invoice")
+  // nur Angebote: open | accepted | rejected (abgelaufen wird aus validUntil berechnet)
+  offerStatus    String?
+  validUntil     DateTime?
+  acceptedAt     DateTime?
+  acceptedByName String?
+  // Leistungsdatum bzw. Leistungszeitraum (§ 14 UStG)
+  serviceFrom    DateTime?
+  serviceTo      DateTime?
+  introText      String?
+  footerText     String?
+  // Zahlungsziel in Tagen ab Rechnungsdatum (die Fälligkeit entsteht beim Festschreiben); Zahlungsart: transfer | cash | card | other
+  paymentDays    Int?
+  paymentMethod  String?
+  // Anschrift des Empfängers (Name steht in partyName); bei Belegen der Rechnungserstellung vom Kunden vorbelegt und bis zum Festschreiben änderbar
+  partyStreet    String?
+  partyZip       String?
+  partyCity      String?
+  // Käuferreferenz/Leitweg-ID (nur für die XRechnung nötig) und E-Mail des Empfängers (XRechnung, Versand)
+  buyerReference String?
+  buyerEmail     String?
+  // Hinweis zur Steuerbefreiung (nur bei Positionen mit 0 %)
+  taxNote        String?
+  // Kleinunternehmer (§ 19 UStG) zum Zeitpunkt der Erstellung; maßgeblich ist nach dem Festschreiben der Schnappschuss
+  exempt         Boolean   @default(false)
+  // Fahrzeug (Anzeige auf dem Beleg, Voraussetzung für „Angebot → Auftrag“), Auftrag und Ursprungsbeleg (Angebot → Auftragsbestätigung/Auftrag)
+  vehicleId      String?
+  vehicleLabel   String?
+  mileageKm      Int?
+  orderId        String?
+  sourceDocId    String?
+  // Summe der angerechneten Abschläge (brutto, Schlussrechnung) und der bisherigen Zahlungen; zu zahlen = Brutto − angerechnet − gezahlt
+  deductedCents  Int       @default(0)
+  paidCents      Int       @default(0)
+  // Versand per E-Mail: wann zuletzt und wie oft (die Adresse steht nur im Sendeprotokoll)
+  sentAt         DateTime?
+  sentCount      Int       @default(0)
+  createdByName  String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -843,11 +888,107 @@ model Invoice {
   file        InvoiceFile?
   cancels     Invoice?     @relation("InvoiceStorno", fields: [cancelsInvoiceId], references: [id], onDelete: Restrict)
   cancelledBy Invoice?     @relation("InvoiceStorno")
+  vehicle     Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  order       Order?       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  sourceDoc   Invoice?     @relation("InvoiceSource", fields: [sourceDocId], references: [id], onDelete: Restrict)
+  derivedDocs Invoice[]    @relation("InvoiceSource")
+  items       InvoiceItem[]
+  payments    InvoicePayment[]
+  snapshot    InvoiceSnapshot?
+  // Schlussrechnung: die angerechneten Abschlagsrechnungen; Abschlag: in welchen Schlussrechnungen vorgesehen
+  deductions  InvoiceDeduction[] @relation("FinalDeductions")
+  deductedIn  InvoiceDeduction[] @relation("DeductedPartial")
 
   @@index([direction, status])
   @@index([issueDate])
   @@index([dueDate])
   @@index([customerId])
+  @@index([source, docType, finalizedAt])
+  @@index([orderId])
+  @@index([sourceDocId])
+}
+
+// Position eines Beleges der Rechnungserstellung (wie OrderItem: Netto-Einzelpreis in Cent, Menge in Tausendsteln, Sätze in Basispunkten, src/lib/line-items.ts). Löschen nur mit dem Entwurf.
+model InvoiceItem {
+  id            String  @id @default(cuid())
+  invoiceId     String
+  position      Int
+  // labor | part | other
+  kind          String  @default("labor")
+  description   String
+  unit          String  @default("")
+  quantityMilli Int
+  unitCents     Int
+  taxBp         Int
+  discountBp    Int     @default(0)
+  refType       String?
+  refId         String?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, position])
+}
+
+// Zahlungseingang zu einer festgeschriebenen Rechnung (Teilzahlungen); Korrekturen als Entfernen mit Audit
+model InvoicePayment {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  paidAt         DateTime
+  amountCents    Int
+  // transfer | cash | card | other
+  method         String
+  note           String?
+  recordedByName String
+  createdAt      DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId, paidAt])
+}
+
+// Unveränderlicher Schnappschuss von Absender (Werkstattprofil) und Empfänger (Kunde) zum Zeitpunkt des Festschreibens bzw. Ausstellens: ändert sich später das Profil oder der Kunde, ändert sich der Beleg nicht.
+// Wird nur angelegt, nie geändert (keine Operation schreibt hier außer dem Festschreiben).
+model InvoiceSnapshot {
+  invoiceId       String   @id
+  createdAt       DateTime @default(now())
+  sName           String
+  sStreet         String?
+  sZip            String?
+  sCity           String?
+  sPhone          String?
+  sEmail          String?
+  sWebsite        String?
+  sTaxNumber      String?
+  sVatId          String?
+  sBankName       String?
+  sIban           String?
+  sBic            String?
+  sDirector       String?
+  sRegisterCourt  String?
+  sRegisterNumber String?
+  sSmallBusiness  Boolean  @default(false)
+  rName           String
+  rStreet         String?
+  rZip            String?
+  rCity           String?
+  rEmail          String?
+  rCustomerNumber String?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// Anrechnung einer Abschlagsrechnung in einer Schlussrechnung. `finalKey` (= Kennung des Abschlags) ist erst nach dem Festschreiben der Schlussrechnung gesetzt und eindeutig: ein Abschlag wird nie zweimal angerechnet.
+model InvoiceDeduction {
+  id         String  @id @default(cuid())
+  finalId    String
+  partialId  String
+  finalKey   String? @unique
+
+  final   Invoice @relation("FinalDeductions", fields: [finalId], references: [id], onDelete: Cascade)
+  partial Invoice @relation("DeductedPartial", fields: [partialId], references: [id], onDelete: Restrict)
+
+  @@unique([finalId, partialId])
+  @@index([partialId])
 }
 
 // Datei (PDF/Bild) zur Rechnung – bewusst eigenes Modell, damit Listen die Binärdaten nie mitladen
@@ -1180,6 +1321,8 @@ model Order {
   files       FileAttachment[]
   // Checklisten (F7)
   checklists  Checklist[]
+  // Belege der Rechnungserstellung (F3)
+  invoices    Invoice[]
 
   @@index([status, acceptedAt])
   @@index([vehicleId])
