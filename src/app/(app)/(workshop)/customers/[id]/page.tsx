@@ -54,7 +54,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className="flex flex-col gap-5 md:col-span-2">
+        <div className="min-w-0 flex flex-col gap-5 md:col-span-2">
           {canVehicles ? (
           <Card
             title={t("customers.vehicles")}
@@ -142,7 +142,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="min-w-0 flex flex-col gap-5">
           <Card title={t("customers.contact")}>
             <DefinitionList
               items={[

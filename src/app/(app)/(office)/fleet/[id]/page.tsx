@@ -78,7 +78,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
       />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className="flex flex-col gap-5 md:col-span-2">
+        <div className="min-w-0 flex flex-col gap-5 md:col-span-2">
           <Card title={t("fleet.sections.duesNow")}>
             {dues.length === 0 ? (
               <p className="text-sm text-ink-muted">{t("fleet.noDues")}</p>
@@ -178,7 +178,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
           </Card>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="min-w-0 flex flex-col gap-5">
           <Card title={t("fleet.sections.vehicle")}>
             <DefinitionList
               items={[

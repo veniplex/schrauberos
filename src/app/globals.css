@@ -60,6 +60,9 @@ html[data-form-actions] {
 
 body {
   overflow-x: clip;
+  /* Querformat mit Aussparung (Notch): Inhalt, Kopfzeile und Leisten bleiben neben der Kamera; die Hintergrundfarbe der Seite füllt den Streifen. Unten und oben regeln die Bausteine selbst (Kopfzeile, Aktionsleiste, Toast, Blatt, Seitenfach). */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   background: var(--bg);
   color: var(--ink);
   font-family: var(--ff-sans);
@@ -67,6 +70,22 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Lange Wörter, Adressen, E-Mails, FIN und Kennzeichen sprengen weder Karten noch Meldungen noch die schmale Handy-Spalte. In Tabellenzellen nur `break-word`: `anywhere` ließe die Spalten auf ein Zeichen schrumpfen (die Tabelle scrollt stattdessen). */
+.card,
+.toast-viewport > *,
+dd,
+.field-hint,
+.field-error,
+.md {
+  overflow-wrap: anywhere;
+}
+.table th,
+.table td,
+.md th,
+.md td {
+  overflow-wrap: break-word;
 }
 
 h1, h2, h3, h4 {
@@ -289,6 +308,8 @@ form.card > .form-actions {
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
   padding-bottom: calc(1rem + env(safe-area-inset-bottom) + var(--toast-lift, 0px));
   pointer-events: none;
 }
@@ -315,7 +336,9 @@ html[data-form-actions] {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .animate-spin {
+  /* Spinner, Skeleton und Fortschrittsbalken stehen still (der Spinner bleibt als Symbol sichtbar, der Skeleton als ruhige Fläche) */
+  .animate-spin,
+  .animate-pulse {
     animation: none !important;
   }
   .nav-progress::before {

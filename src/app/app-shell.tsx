@@ -70,7 +70,7 @@ export async function AppShell({ session, children }: { session: AppSession; chi
       account={<UserMenu {...user} />}
       accountCompact={<UserMenu {...user} compact />}
     >
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[88rem] px-4 py-6 outline-none sm:px-6 lg:py-8">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[88rem] px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] outline-none sm:px-6 lg:py-8 lg:pb-8">
         <FlashNotice />
         <RecoveryBanner user={{ id: session.user.id, isAdmin: session.user.isAdmin }} />
         <SecretsBanner user={{ isAdmin: session.user.isAdmin }} />

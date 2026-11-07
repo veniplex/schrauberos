@@ -63,3 +63,46 @@ describe("Touch-Fundament", () => {
     assert.deepEqual(direct, []);
   });
 });
+
+describe("Touch-Feinschliff (P3-1)", () => {
+  const ui = (file: string) => readFileSync(path.join(SRC, "components", "ui", file), "utf8");
+
+  it("Kästchen: 20 px Fläche, ganze Zeile (Label) als Ziel", () => {
+    assert.match(ui("form-fields.tsx"), /<label className=\{clsx\("flex min-h-\(--tap-row\) min-w-\(--tap-row\)[^"]*"[\s\S]{0,300}type="checkbox" className="size-5 /);
+  });
+
+  it("reduzierte Bewegung stoppt Spinner, Skeleton und Fortschrittsbalken", () => {
+    const block = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(globals);
+    assert.ok(block, "Media-Query fehlt");
+    assert.match(block[1], /\.animate-spin,\s*\.animate-pulse\s*\{\s*animation: none !important/);
+    assert.match(block[1], /\.nav-progress::before\s*\{\s*animation: none !important/);
+    assert.match(block[1], /animation-iteration-count: 1 !important/);
+  });
+
+  it("lange Wörter: Karten, Meldungen und Beschreibungen brechen überall, Tabellenzellen nur im Notfall (sonst schrumpften die Spalten)", () => {
+    assert.match(globals, /\.card,\s*\.toast-viewport > \*,[\s\S]*?\{\s*overflow-wrap: anywhere;/);
+    assert.match(globals, /\.table th,\s*\.table td,[\s\S]*?\{\s*overflow-wrap: break-word;/);
+  });
+
+  it("Safe-Area: Querformat-Aussparung seitlich, Toast, Blatt, Seitenfach und Aktionsleiste unten", () => {
+    assert.match(globals, /body \{[^}]*padding-left: env\(safe-area-inset-left[^}]*padding-right: env\(safe-area-inset-right/);
+    assert.match(globals, /\.toast-viewport \{[^}]*padding-left: max\(1rem, env\(safe-area-inset-left[^}]*safe-area-inset-bottom/);
+    assert.match(globals, /dialog\.modal,\s*dialog\.modal\.confirm-dialog \{[^}]*padding-bottom: env\(safe-area-inset-bottom\)/);
+    assert.match(globals, /dialog\.drawer \{[^}]*env\(safe-area-inset-bottom\) env\(safe-area-inset-left\)/);
+    assert.match(globals, /\.form-actions \{[^}]*padding-bottom: max\(0\.75rem, env\(safe-area-inset-bottom\)\)/);
+    const layout = readFileSync(path.join(SRC, "app", "layout.tsx"), "utf8");
+    assert.match(layout, /viewportFit: "cover"/);
+  });
+
+  it("Detailseiten: Spalten des Rasters haben min-w-0 (eine breite Tabelle sprengt sonst die Handy-Spalte)", () => {
+    const missing: string[] = [];
+    for (const file of walk(path.join(SRC, "app")).filter((f) => /\[(id|subnetId)\]/.test(f) && f.endsWith("page.tsx"))) {
+      const source = readFileSync(file, "utf8");
+      const grid = source.indexOf('className="grid grid-cols-1 gap-5 md:grid-cols-3"');
+      if (grid < 0) continue;
+      const children = [...source.slice(grid).matchAll(/\n {8}<div className="([^"]*)">/g)].slice(0, 2);
+      if (children.length < 2 || children.some((c) => !c[1].includes("min-w-0"))) missing.push(path.relative(SRC, file));
+    }
+    assert.deepEqual(missing, []);
+  });
+});

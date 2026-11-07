@@ -88,7 +88,7 @@ export async function DataTable<R>({
       {/* Karten (unter md) */}
       <div className="md:hidden">
         {sortable.length > 0 ? (
-          <nav aria-label={t("common.sortBy")} className="flex flex-wrap items-center gap-1.5 border-b border-line px-4 py-2">
+          <nav aria-label={t("common.sortBy")} className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2">
             <span className="text-xs text-ink-muted">{t("common.sortBy")}</span>
             {sortable.map((c) => {
               const active = sort?.key === c.sort;

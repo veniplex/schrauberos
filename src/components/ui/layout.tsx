@@ -87,7 +87,7 @@ export function StatusBadge({ tone, children, className }: { tone: StatusTone; c
 export function ChipLink({ active, className, ...props }: ComponentProps<typeof Link> & { active?: boolean }) {
   const { children, ...rest } = props;
   return (
-    <Link {...rest} aria-current={active ? "true" : undefined} className={clsx("badge relative min-h-(--tap-chip) px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)}>
+    <Link {...rest} aria-current={active ? "true" : undefined} className={clsx("badge relative min-h-(--tap-chip) max-w-full px-3 py-1 text-sm", active ? "badge-accent" : "badge-neutral hover:bg-surface-hover", className)}>
       {children}
       <LinkPending className="absolute right-0.5 top-1/2 size-3 -translate-y-1/2" />
     </Link>

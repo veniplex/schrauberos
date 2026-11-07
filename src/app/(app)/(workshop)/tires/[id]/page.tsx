@@ -135,7 +135,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
       ) : null}
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className="flex flex-col gap-5 md:col-span-2">
+        <div className="min-w-0 flex flex-col gap-5 md:col-span-2">
           <Card title={t("tires.sections.tires")}>
             <div className="grid grid-cols-2 gap-3">{GRID.map(tile)}</div>
             {spare ? <div className="mt-3">{tile("SPARE")}</div> : null}
@@ -168,7 +168,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
           </Card>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="min-w-0 flex flex-col gap-5">
           <Card title={t("tires.sections.storage")}>
             <DefinitionList
               items={[

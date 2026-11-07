@@ -59,7 +59,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className="flex flex-col gap-5 md:col-span-2">
+        <div className="min-w-0 flex flex-col gap-5 md:col-span-2">
           <Card
             title={t("employees.sections.absences")}
             padded={false}
@@ -151,7 +151,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           </Card>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="min-w-0 flex flex-col gap-5">
           <Card title={t("employees.sections.person")}>
             <DefinitionList
               items={[

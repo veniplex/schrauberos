@@ -82,7 +82,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className="md:col-span-2">
+        <div className="min-w-0 md:col-span-2">
           <Card title={t("invoices.sections.file")} padded={false}>
             {inv.file ? (
               <>
@@ -114,7 +114,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </Card>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="min-w-0 flex flex-col gap-5">
           <Card title={t("invoices.sections.amounts")}>
             <p className="text-3xl font-semibold tabular">{eur(inv.grossCents)}</p>
             <p className="mt-1 text-sm text-ink-muted tabular">

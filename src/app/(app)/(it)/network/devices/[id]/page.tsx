@@ -83,7 +83,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       ) : null}
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className="flex flex-col gap-5 md:col-span-2">
+        <div className="min-w-0 flex flex-col gap-5 md:col-span-2">
           <Card
             title={t("network.sections.ips")}
             padded={false}
@@ -202,7 +202,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
           </Card>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="min-w-0 flex flex-col gap-5">
           <Card title={t("network.sections.device")}>
             <DefinitionList
               items={[
