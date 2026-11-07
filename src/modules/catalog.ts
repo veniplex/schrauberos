@@ -22,7 +22,7 @@ import { updatesFeature } from "./admin/updates/feature";
 import { backupFeature } from "./admin/backup/feature";
 import { systemFeature } from "./admin/system/feature";
 import { featureKey } from "./catalog-logic";
-import type { FeatureDef } from "./define";
+import type { FeatureDef, PermissionMark } from "./define";
 
 /**
  * Der Katalog: alle Module und Funktionen der Anwendung – rein statisch (keine UI, keine DB).
@@ -78,6 +78,10 @@ export const isPermission = (value: string): value is Permission => FEATURE_OF_P
 
 /** Rechte der Verwaltung, die nur Administratoren vergeben dürfen (Markierung `adminOnly` in der `feature.ts`). */
 export const ADMIN_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(FEATURES.flatMap((f) => (f.permissions as FeatureDef["permissions"]).adminOnly ?? []));
+/** Rechte mit Kennzeichnung nach Regel 9 (Export, Import …): Recht → Kennzeichen. Sie stehen in keiner Standardrolle. */
+export const MARKED_PERMISSIONS: ReadonlyMap<string, PermissionMark> = new Map(
+  FEATURES.flatMap((f) => Object.entries((f.permissions as FeatureDef["permissions"]).marked ?? {}).flatMap(([mark, keys]) => (keys ?? []).map((k) => [k, mark as PermissionMark] as const))),
+);
 export const isAdminOnly = (permission: string): boolean => ADMIN_ONLY_PERMISSIONS.has(permission);
 
 export const fullFeatureId = (f: { module: string; id: string }) => featureKey(f) as FeatureId;

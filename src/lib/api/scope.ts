@@ -1,11 +1,11 @@
-import { FEATURES, MODULES, featureOfPermission, fullFeatureId, isAdminOnly, isPermission } from "@/modules/catalog";
+import { FEATURES, MARKED_PERMISSIONS, MODULES, featureOfPermission, fullFeatureId, isAdminOnly, isPermission } from "@/modules/catalog";
 import type { Actor } from "@/lib/rbac";
 
 /**
  * Wirksame Rechte eines API-Tokens (reine Logik, getestet).
  *
  *  - **Nie** in einem Token: Rechte der Verwaltung (`adminOnly`), alle Rechte der Plattform-/Verwaltungsfunktionen (Pflichtfunktionen: Benutzer,
- *    Rollen, Einstellungen, Module, Backups, Updates, Audit, später API selbst) und die ausdrücklich gesperrten Rechte (`API_NEVER`).
+ *    Rollen, Einstellungen, Module, Backups, Updates, Audit, später API selbst) die ausdrücklich gesperrten Rechte (`API_NEVER`) und die gekennzeichneten Rechte des Datenaustauschs (Export/Import).
  *    Das gilt auch, wenn ein Administrator das Token erzeugt.
  *  - Beim Erzeugen: Der Scope darf höchstens die Rechte enthalten, die der Erzeuger selbst hat (Rechte-Hierarchie).
  *  - Bei **jeder Anfrage**: wirksam = Scope ∩ aktuelle Rechte des Besitzers (ohne gesperrte Rechte). Verliert der Besitzer ein Recht, verliert es
@@ -20,8 +20,14 @@ const PLATFORM_PERMISSIONS: ReadonlySet<string> = new Set(
   FEATURES.filter((f) => ("required" in f && f.required) || MODULES.some((m) => m.id === f.module && "required" in m && m.required)).flatMap((f) => [...f.permissions.keys]),
 );
 
+/** Gekennzeichnete Rechte des Datenaustauschs (CSV-Export/-Import): sie gelten nur für Sitzungen, nie für ein Token (Regel 9; die API hat dafür keine Endpunkte). */
+const isExchangePermission = (permission: string): boolean => {
+  const mark = MARKED_PERMISSIONS.get(permission);
+  return mark === "export" || mark === "import";
+};
+
 /** Darf dieses Recht nie in einem Token stehen? */
-export const isApiForbidden = (permission: string): boolean => isAdminOnly(permission) || PLATFORM_PERMISSIONS.has(permission) || API_NEVER.has(permission);
+export const isApiForbidden = (permission: string): boolean => isAdminOnly(permission) || PLATFORM_PERMISSIONS.has(permission) || API_NEVER.has(permission) || isExchangePermission(permission);
 
 /** Ist die Funktion Plattform/Verwaltung (nie API-Ressource)? */
 export const isPlatformFeature = (featureId: string): boolean =>

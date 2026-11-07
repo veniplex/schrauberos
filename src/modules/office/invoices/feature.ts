@@ -7,7 +7,7 @@ export const invoicesFeature = defineFeature({
   descriptionKey: "invoices.feature.description",
   order: 30,
   uses: ["workshop.customers"],
-  permissions: { group: "invoices", keys: ["invoices.view", "invoices.edit", "invoices.delete"] },
+  permissions: { group: "invoices", keys: ["invoices.view", "invoices.edit", "invoices.delete", "invoices.export", "invoices.import"], marked: { export: ["invoices.export"], import: ["invoices.import"] } },
   nav: [
     { id: "invoices", href: "/invoices", labelKey: "nav.invoices", icon: "invoices", permission: "invoices.view", order: 30 },
   ],

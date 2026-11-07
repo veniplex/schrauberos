@@ -3,3 +3,4 @@
  * (und nur, wenn sie die Funktion in `requires`/`uses` ihrer feature.ts deklariert haben).
  */
 export { customerDisplayName } from "./domain";
+export { findCustomerIdsByNumber, numberKey } from "./lookup";

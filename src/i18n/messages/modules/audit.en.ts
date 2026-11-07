@@ -128,12 +128,16 @@ export const auditEn: typeof auditDe = {
       create: "Customer created",
       update: "Customer changed",
       delete: "Customer deleted",
+      export: "Customers exported (CSV)",
+      import: "Customers imported (CSV)",
     },
     vehicle: {
       create: "Vehicle created",
       update: "Vehicle changed",
       delete: "Vehicle deleted",
       transfer: "Vehicle transferred",
+      export: "Vehicles exported (CSV)",
+      import: "Vehicles imported (CSV)",
     },
     tires: {
       create: "Tyre set created",
@@ -141,6 +145,8 @@ export const auditEn: typeof auditDe = {
       stock: "Tyre set booked in/out",
       dispose: "Tyre set marked as disposed",
       delete: "Tyre set deleted",
+      export: "Tyre sets exported (CSV)",
+      import: "Tyre sets imported (CSV)",
     },
     invoice: {
       create: "Invoice created",
@@ -148,6 +154,9 @@ export const auditEn: typeof auditDe = {
       pay: "Invoice marked as paid",
       reopen: "Invoice reopened",
       delete: "Invoice deleted",
+      export: "Invoices exported (CSV)",
+      import: "Invoices imported (CSV)",
+      accountantExport: "Invoices exported for the accountant (CSV)",
     },
     employee: {
       create: "Employee created",

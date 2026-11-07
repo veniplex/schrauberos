@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
-import { isPlatformFeature } from "@/lib/api/scope";
+import { isApiForbidden, isPlatformFeature } from "@/lib/api/scope";
 import { createTestEnv, type TestEnv } from "@/test/harness";
-import { API_EXCEPTIONS } from "./api-exceptions";
+import { API_EXCEPTIONS, NOT_API_OPERATIONS } from "./api-exceptions";
 import { FEATURES, featureOfPermission, fullFeatureId } from "./catalog";
 
 /**
@@ -95,6 +95,21 @@ describe("API: Registrierung und Ausnahmeliste", () => {
       assert.ok(reason.length >= 30, `${name}: Begründung fehlt`);
     }
     assert.deepEqual(stale, []);
+  });
+
+  it("Datenaustausch (CSV-Export/-Import) ist keine API-Ressource: kein Endpunkt, kein Token-Recht, jeder Eintrag der Ausnahmeliste ist eine Import-Operation", async () => {
+    const { EXPORTS, IMPORTS } = await import("./exchange");
+    const covered = new Set(endpoints.flatMap((e) => e.operations));
+    const importOperations = new Set(IMPORTS.map((d) => d.operation.name));
+    assert.deepEqual([...importOperations].sort(), Object.keys(NOT_API_OPERATIONS).sort(), "jede Import-Operation steht mit Begründung in NOT_API_OPERATIONS");
+    for (const [name, reason] of Object.entries(NOT_API_OPERATIONS)) {
+      assert.ok(!covered.has(name), `${name}: darf keinen API-Endpunkt haben`);
+      assert.ok(reason.length >= 30, `${name}: Begründung fehlt`);
+    }
+    for (const def of [...EXPORTS, ...IMPORTS]) {
+      assert.ok(!endpoints.some((e) => e.permission === def.permission), `${def.permission}: ein Endpunkt verlangt ein Datenaustausch-Recht`);
+      assert.ok(isApiForbidden(def.permission), `${def.permission}: darf in keinem Token-Scope stehen`);
+    }
   });
 
   it("jeder Endpunkt, der Operationen nennt, nennt nur bekannte", () => {

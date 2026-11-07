@@ -126,12 +126,16 @@ export const auditDe = {
       create: "Kunde angelegt",
       update: "Kunde geändert",
       delete: "Kunde gelöscht",
+      export: "Kunden exportiert (CSV)",
+      import: "Kunden importiert (CSV)",
     },
     vehicle: {
       create: "Fahrzeug angelegt",
       update: "Fahrzeug geändert",
       delete: "Fahrzeug gelöscht",
       transfer: "Fahrzeug umgeschrieben",
+      export: "Fahrzeuge exportiert (CSV)",
+      import: "Fahrzeuge importiert (CSV)",
     },
     tires: {
       create: "Reifensatz angelegt",
@@ -139,6 +143,8 @@ export const auditDe = {
       stock: "Reifensatz ein-/ausgebucht",
       dispose: "Reifensatz als entsorgt markiert",
       delete: "Reifensatz gelöscht",
+      export: "Reifensätze exportiert (CSV)",
+      import: "Reifensätze importiert (CSV)",
     },
     invoice: {
       create: "Rechnung angelegt",
@@ -146,6 +152,9 @@ export const auditDe = {
       pay: "Rechnung als bezahlt markiert",
       reopen: "Rechnung wieder geöffnet",
       delete: "Rechnung gelöscht",
+      export: "Rechnungen exportiert (CSV)",
+      import: "Rechnungen importiert (CSV)",
+      accountantExport: "Rechnungen für den Steuerberater exportiert (CSV)",
     },
     employee: {
       create: "Mitarbeiter angelegt",

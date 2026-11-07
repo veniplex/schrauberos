@@ -6,6 +6,7 @@ import { vehiclesDe } from "./modules/vehicles.de";
 import { appointmentsDe } from "./modules/appointments.de";
 import { tiresDe } from "./modules/tires.de";
 import { customersDe } from "./modules/customers.de";
+import { exchangeDe } from "./modules/exchange.de";
 import { usersDe } from "./modules/users.de";
 import { recoveryDe } from "./modules/recovery.de";
 import { securityDe } from "./modules/security.de";
@@ -266,6 +267,7 @@ export const de = {
   appointments: appointmentsDe,
   tires: tiresDe,
   customers: customersDe,
+  exchange: exchangeDe,
   users: usersDe,
   recovery: recoveryDe,
   roles: rolesDe,
@@ -303,16 +305,22 @@ export const de = {
       edit: "Reifensätze bearbeiten",
       stock: "Reifensätze ein-/ausbuchen",
       delete: "Reifensätze löschen",
+      export: "Reifensätze exportieren (CSV)",
+      import: "Reifensätze importieren (CSV, legt neue Sätze an)",
     },
     customers: {
       view: "Kunden ansehen",
       edit: "Kunden bearbeiten",
       delete: "Kunden löschen",
+      export: "Kunden exportieren (CSV, personenbezogene Daten)",
+      import: "Kunden importieren (CSV, legt neue Kunden an)",
     },
     vehicles: {
       view: "Fahrzeuge ansehen",
       edit: "Fahrzeuge bearbeiten",
       delete: "Fahrzeuge löschen",
+      export: "Fahrzeuge exportieren (CSV)",
+      import: "Fahrzeuge importieren (CSV, legt neue Fahrzeuge an)",
     },
     network: {
       view: "Netzwerk-Dokumentation ansehen",
@@ -323,6 +331,8 @@ export const de = {
       view: "Rechnungen ansehen",
       edit: "Rechnungen erfassen und bearbeiten",
       delete: "Rechnungen löschen",
+      export: "Rechnungen exportieren (CSV, Rechnungsarchiv und Steuerberater)",
+      import: "Rechnungen importieren (CSV, legt neue Rechnungen an)",
     },
     employees: {
       view: "Mitarbeiter ansehen",

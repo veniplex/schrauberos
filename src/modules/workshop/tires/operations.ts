@@ -9,7 +9,8 @@ const optInt = (min: number, max: number) => z.coerce.number().int().min(min).ma
 
 const tireRows = z.record(z.string(), z.object({ dot: z.string().optional(), tread: z.string().optional(), condition: z.string().optional() }));
 
-const tireSetInput = z
+/** Eingabe eines Reifensatzes – auch die Prüfung der Zeilen des CSV-Imports (`exchange.ts`). */
+export const tireSetInput = z
   .object({
     id: z.string().optional(),
     version: z.string().optional(),
@@ -37,16 +38,12 @@ const tireSetInput = z
     for (const [field, kind] of Object.entries(errors)) ctx.addIssue({ code: "custom", message: kind === "dot" ? "tires.errors.dot" : "tires.errors.tread", path: [field] });
   });
 
-type TireSetInput = z.output<typeof tireSetInput>;
+export type TireSetInput = z.output<typeof tireSetInput>;
 
-/** Gemeinsamer Ablauf von Anlegen und Ändern (je ein eigenes Recht, daher zwei Operationen). */
-async function saveTireSetRun({ input: d, tx, audit }: RunContext<TireSetInput, undefined>): Promise<{ id: string }> {
-  const { tires } = parseTireRows(d.tires as Partial<Record<TirePosition, RawTireRow>>, d.spare);
-  const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true } });
-  if (!vehicle) failFields({ vehicleId: { key: "validation.required" } });
-
-  const data = {
-    vehicleId: vehicle.id,
+/** Die Felder der Tabelle zu einer geprüften Eingabe (Anlegen, Ändern und CSV-Import gleich); die Einzelreifen kommen aus `parseTireRows`. */
+export function tireSetRecord(d: TireSetInput, vehicleId: string) {
+  return {
+    vehicleId,
     season: d.season,
     status: d.status,
     brand: d.brand ?? null,
@@ -61,6 +58,15 @@ async function saveTireSetRun({ input: d, tx, audit }: RunContext<TireSetInput, 
     ...(d.storedAt ? { storedAt: new Date(`${d.storedAt}T12:00:00`) } : {}),
     notes: d.notes ?? null,
   };
+}
+
+/** Gemeinsamer Ablauf von Anlegen und Ändern (je ein eigenes Recht, daher zwei Operationen). */
+async function saveTireSetRun({ input: d, tx, audit }: RunContext<TireSetInput, undefined>): Promise<{ id: string }> {
+  const { tires } = parseTireRows(d.tires as Partial<Record<TirePosition, RawTireRow>>, d.spare);
+  const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true } });
+  if (!vehicle) failFields({ vehicleId: { key: "validation.required" } });
+
+  const data = tireSetRecord(d, vehicle.id);
 
   let id: string;
   if (d.id) {

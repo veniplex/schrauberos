@@ -7,6 +7,7 @@ import { vehiclesEn } from "./modules/vehicles.en";
 import { appointmentsEn } from "./modules/appointments.en";
 import { tiresEn } from "./modules/tires.en";
 import { customersEn } from "./modules/customers.en";
+import { exchangeEn } from "./modules/exchange.en";
 import { usersEn } from "./modules/users.en";
 import { recoveryEn } from "./modules/recovery.en";
 import { securityEn } from "./modules/security.en";
@@ -265,6 +266,7 @@ export const en: Messages = {
   appointments: appointmentsEn,
   tires: tiresEn,
   customers: customersEn,
+  exchange: exchangeEn,
   users: usersEn,
   recovery: recoveryEn,
   security: securityEn,
@@ -303,16 +305,22 @@ export const en: Messages = {
       edit: "Edit tyre sets",
       stock: "Book tyre sets in and out",
       delete: "Delete tyre sets",
+      export: "Export tyre sets (CSV)",
+      import: "Import tyre sets (CSV, creates new sets)",
     },
     customers: {
       view: "View customers",
       edit: "Edit customers",
       delete: "Delete customers",
+      export: "Export customers (CSV, personal data)",
+      import: "Import customers (CSV, creates new customers)",
     },
     vehicles: {
       view: "View vehicles",
       edit: "Edit vehicles",
       delete: "Delete vehicles",
+      export: "Export vehicles (CSV)",
+      import: "Import vehicles (CSV, creates new vehicles)",
     },
     network: {
       view: "View network documentation",
@@ -323,6 +331,8 @@ export const en: Messages = {
       view: "View invoices",
       edit: "Record and edit invoices",
       delete: "Delete invoices",
+      export: "Export invoices (CSV, invoice archive and accountant)",
+      import: "Import invoices (CSV, creates new invoices)",
     },
     employees: {
       view: "View employees",

@@ -19,3 +19,16 @@ export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
   "docs.saveCategory": "Kapitel der Dokumentation (Sichtbarkeit je Rolle) sind Konfiguration in der Oberfläche.",
   "docs.deleteCategory": "Kapitel der Dokumentation (Sichtbarkeit je Rolle) sind Konfiguration in der Oberfläche.",
 };
+
+/**
+ * Operationen, die nicht über eine Server Action der Oberfläche laufen und deshalb nicht in der Liste oben stehen müssen – und trotzdem **nie** API-Ressourcen sind
+ * (Vertragstest `src/modules/api.test.ts` prüft: kein Endpunkt nennt sie, jeder Eintrag ist eine Import-Operation des Datenaustauschs). Export und Import (CSV) laufen über
+ * `/api/exchange/<art>` mit Sitzung und eigenem Recht je Datenart (`<funktion>.export`/`<funktion>.import`, in keiner Standardrolle), nicht über Token: Eine Massenübernahme
+ * oder ein Massenabzug personenbezogener Daten gehört nicht in eine Integration, die sich ein Token ausstellt – dafür gibt es die Ressourcen der API mit ihren Seiten und Grenzen.
+ */
+export const NOT_API_OPERATIONS: Readonly<Record<string, string>> = {
+  "customers.import": "CSV-Import der Kunden (Datenaustausch): nur mit Sitzung und eigenem Recht customers.import; keine API-Ressource.",
+  "vehicles.import": "CSV-Import der Fahrzeuge (Datenaustausch): nur mit Sitzung und eigenem Recht vehicles.import; keine API-Ressource.",
+  "tires.import": "CSV-Import der Reifensätze (Datenaustausch): nur mit Sitzung und eigenem Recht tires.import; keine API-Ressource.",
+  "invoices.import": "CSV-Import ins Rechnungsarchiv (Datenaustausch): nur mit Sitzung und eigenem Recht invoices.import; keine API-Ressource.",
+};

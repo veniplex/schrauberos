@@ -3,7 +3,8 @@ import { claimRow } from "@/lib/concurrency";
 import { defineOperation, fail } from "@/server/operations";
 import { customerDisplayName, customerHasLinks } from "./domain";
 
-const customerInput = z
+/** Eingabe eines Kunden – auch die Prüfung der Zeilen des CSV-Imports (`exchange.ts`). */
+export const customerInput = z
   .object({
     id: z.string().optional(),
     version: z.string().optional(),
@@ -22,25 +23,32 @@ const customerInput = z
     if (!d.lastName && !d.company) ctx.addIssue({ code: "custom", message: "customers.errors.nameRequired", path: ["lastName"] });
   });
 
+export type CustomerFields = z.output<typeof customerInput>;
+
+/** Die Felder der Tabelle zu einer geprüften Eingabe (Anlegen, Ändern und CSV-Import gleich). */
+export function customerRecord(d: CustomerFields) {
+  return {
+    customerNumber: d.customerNumber ?? null,
+    firstName: d.firstName ?? null,
+    // Bei reinen Firmenkunden dient der Firmenname als Nachname (Sortierung/Suche)
+    lastName: d.lastName ?? d.company!,
+    company: d.company ?? null,
+    email: d.email ?? null,
+    phone: d.phone ?? null,
+    street: d.street ?? null,
+    zip: d.zip ?? null,
+    city: d.city ?? null,
+    notes: d.notes ?? null,
+  };
+}
+
 export const saveCustomerOperation = defineOperation({
   name: "customers.save",
   permission: "customers.edit",
   input: customerInput,
   audit: (input) => (input.id ? "customer.update" : "customer.create"),
   run: async ({ input: { id, version, ...d }, tx, audit }) => {
-    const data = {
-      customerNumber: d.customerNumber ?? null,
-      firstName: d.firstName ?? null,
-      // Bei reinen Firmenkunden dient der Firmenname als Nachname (Sortierung/Suche)
-      lastName: d.lastName ?? d.company!,
-      company: d.company ?? null,
-      email: d.email ?? null,
-      phone: d.phone ?? null,
-      street: d.street ?? null,
-      zip: d.zip ?? null,
-      city: d.city ?? null,
-      notes: d.notes ?? null,
-    };
+    const data = customerRecord(d);
     if (id && !(await claimRow(tx.customer, id, version))) fail("conflict");
     const saved = id ? await tx.customer.update({ where: { id }, data }) : await tx.customer.create({ data });
     audit({ target: customerDisplayName(saved), entityId: saved.id });

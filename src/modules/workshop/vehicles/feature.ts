@@ -7,7 +7,7 @@ export const vehiclesFeature = defineFeature({
   descriptionKey: "vehicles.feature.description",
   order: 31,
   uses: ["workshop.customers", "workshop.tires", "workshop.appointments"],
-  permissions: { group: "vehicles", keys: ["vehicles.view", "vehicles.edit", "vehicles.delete"] },
+  permissions: { group: "vehicles", keys: ["vehicles.view", "vehicles.edit", "vehicles.delete", "vehicles.export", "vehicles.import"], marked: { export: ["vehicles.export"], import: ["vehicles.import"] } },
   nav: [
     { id: "vehicles", href: "/vehicles", labelKey: "nav.vehicles", icon: "vehicles", permission: "vehicles.view", order: 31 },
   ],

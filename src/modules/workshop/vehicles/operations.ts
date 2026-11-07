@@ -11,7 +11,8 @@ const noon = (day: string) => new Date(`${day}T12:00:00`);
 /** Häkchen und Knopf des Formulars („1“, „on“) und Wahrheitswerte der API; fehlt der Wert, gilt `false`. */
 const flag = z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean());
 
-const vehicleInput = z.object({
+/** Eingabe eines Fahrzeugs – auch die Prüfung der Zeilen des CSV-Imports (`exchange.ts`). */
+export const vehicleInput = z.object({
   id: z.string().optional(),
   version: z.string().optional(),
   // nur beim Anlegen: Halter (optional). Spätere Wechsel laufen über den Halterwechsel.
@@ -49,6 +50,29 @@ const vehicleInput = z.object({
   allowDuplicate: flag.optional(),
 });
 
+export type VehicleFields = z.output<typeof vehicleInput>;
+
+/** Die Felder der Tabelle zu einer geprüften Eingabe (Anlegen, Ändern und CSV-Import gleich); ohne Halter und Herkunft. */
+export function vehicleRecord(d: Pick<VehicleFields, "plate" | "make" | "model" | "vin" | "year" | "mileageKm" | "fuel" | "hsn" | "tsn" | "firstRegistration" | "inspectionDue" | "extraInspectionKind" | "extraInspectionDue" | "notes">) {
+  return {
+    plate: formatPlate(d.plate),
+    plateNorm: normalizePlate(d.plate),
+    make: d.make ?? null,
+    model: d.model ?? null,
+    vin: d.vin ?? null,
+    year: d.year ?? null,
+    mileageKm: d.mileageKm ?? null,
+    fuel: d.fuel ?? null,
+    hsn: d.hsn ?? null,
+    tsn: d.tsn ?? null,
+    firstRegistration: d.firstRegistration ? noon(d.firstRegistration) : null,
+    inspectionDue: d.inspectionDue ?? null,
+    extraInspectionKind: d.extraInspectionKind ?? null,
+    extraInspectionDue: d.extraInspectionDue ? noon(d.extraInspectionDue) : null,
+    notes: d.notes ?? null,
+  };
+}
+
 export const saveVehicleOperation = defineOperation({
   name: "vehicles.save",
   permission: "vehicles.edit",
@@ -73,23 +97,7 @@ export const saveVehicleOperation = defineOperation({
 
     if (customerId && !(await tx.customer.findUnique({ where: { id: customerId }, select: { id: true } }))) failField("customerId", "validation.invalid");
 
-    const data = {
-      plate: formatPlate(plate),
-      plateNorm,
-      make: d.make ?? null,
-      model: d.model ?? null,
-      vin: d.vin ?? null,
-      year: d.year ?? null,
-      mileageKm: d.mileageKm ?? null,
-      fuel: d.fuel ?? null,
-      hsn: d.hsn ?? null,
-      tsn: d.tsn ?? null,
-      firstRegistration: d.firstRegistration ? noon(d.firstRegistration) : null,
-      inspectionDue: d.inspectionDue ?? null,
-      extraInspectionKind: d.extraInspectionKind ?? null,
-      extraInspectionDue: d.extraInspectionDue ? noon(d.extraInspectionDue) : null,
-      notes: d.notes ?? null,
-    };
+    const data = vehicleRecord({ plate, ...d });
 
     let savedId: string;
     if (id) {

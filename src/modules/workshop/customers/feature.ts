@@ -7,7 +7,7 @@ export const customersFeature = defineFeature({
   descriptionKey: "customers.feature.description",
   order: 30,
   uses: ["workshop.vehicles", "workshop.tires", "workshop.appointments"],
-  permissions: { group: "customers", keys: ["customers.view", "customers.edit", "customers.delete"] },
+  permissions: { group: "customers", keys: ["customers.view", "customers.edit", "customers.delete", "customers.export", "customers.import"], marked: { export: ["customers.export"], import: ["customers.import"] } },
   nav: [
     { id: "customers", href: "/customers", labelKey: "nav.customers", icon: "customers", permission: "customers.view", order: 30 },
   ],

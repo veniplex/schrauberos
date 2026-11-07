@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import { de } from "@/i18n/messages/de";
 import { en } from "@/i18n/messages/en";
-import { ADMIN_ONLY_PERMISSIONS, ALL_PERMISSIONS, FEATURES, MODULES, fullFeatureId } from "./catalog";
+import { ADMIN_ONLY_PERMISSIONS, ALL_PERMISSIONS, FEATURES, MARKED_PERMISSIONS, MODULES, fullFeatureId } from "./catalog";
 import { DEFAULT_ROLES } from "./default-roles";
 import { featureKey } from "./catalog-logic";
 
@@ -105,6 +105,17 @@ describe("Katalog", () => {
     }
     for (const p of ["users.manage", "roles.manage", "backup.manage", "updates.manage", "modules.manage", "settings.manage"]) assert.ok(ADMIN_ONLY_PERMISSIONS.has(p), `${p} muss adminOnly sein`);
     for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(!ADMIN_ONLY_PERMISSIONS.has(p), `${role.key}: ${p} ist adminOnly`);
+  });
+
+  it("gekennzeichnete Rechte (Export, Import …) gehören zur eigenen Funktion und stecken in keiner Standardrolle (Regel 9); jedes Recht mit Namen .export/.import ist gekennzeichnet", () => {
+    for (const f of FEATURES) {
+      const marked = (f.permissions as { marked?: Record<string, readonly string[]> }).marked ?? {};
+      for (const [mark, keys] of Object.entries(marked)) for (const p of keys) assert.ok((f.permissions.keys as readonly string[]).includes(p), `${p} (${mark}) nicht in der Gruppe`);
+    }
+    assert.ok(MARKED_PERMISSIONS.size >= 8, "mindestens die Rechte für Export und Import je Datenart");
+    for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(!MARKED_PERMISSIONS.has(p) || p === "employees.sensitive", `${role.key}: ${p} ist gekennzeichnet (${MARKED_PERMISSIONS.get(p)}) und gehört in keine Standardrolle`);
+    // Gegenprobe zum Namensmuster: die Kennzeichnung steht im Katalog, ein vergessenes Recht fällt trotzdem auf
+    for (const p of ALL_PERMISSIONS) if (/\.(export|import)$/.test(p)) assert.ok(MARKED_PERMISSIONS.has(p), `${p} fehlt unter permissions.marked`);
   });
 
   it("jede Audit-Aktion hat eine Beschriftung", () => {

@@ -11,32 +11,65 @@ import { removeInvoiceFile, syncInvoiceFile } from "./files";
 
 const noon = (d: string) => new Date(`${d}T12:00:00`);
 
+/** Die Felder einer Rechnung, wie Formular und CSV-Import sie kennen (ohne Kennung, Version, Beleg und Kunden-Verknüpfung). */
+const invoiceShape = {
+  direction: z.enum(INVOICE_DIRECTIONS),
+  number: z.string().trim().min(1).max(60),
+  partyName: z.string().trim().min(1).max(120),
+  issueDate: dateText(),
+  dueDate: dateText().optional(),
+  net: moneyCents("invoices.errors.amount").optional(),
+  vat: moneyCents("invoices.errors.amount").optional(),
+  gross: moneyCents("invoices.errors.amount"),
+  status: z.enum(INVOICE_STATUSES).default("open"),
+  paidAt: dateText().optional(),
+  category: z.string().max(60).optional(),
+  reference: z.string().max(120).optional(),
+  notes: z.string().max(2000).optional(),
+};
+
+type AmountFields = { gross: number; net?: number; vat?: number; dueDate?: string; issueDate: string };
+function refineInvoice(d: AmountFields, ctx: z.RefinementCtx) {
+  if (d.gross === 0) ctx.addIssue({ code: "custom", message: "invoices.errors.amount", path: ["gross"] });
+  else if (!amountsConsistent(d.net ?? null, d.vat ?? null, d.gross)) ctx.addIssue({ code: "custom", message: "invoices.errors.sumMismatch", path: ["gross"] });
+  if (d.dueDate && d.dueDate < d.issueDate) ctx.addIssue({ code: "custom", message: "invoices.errors.dueBeforeIssue", path: ["dueDate"] });
+}
+
 const saveInput = z
   .object({
     id: z.string().optional(),
     version: z.string().optional(),
-    direction: z.enum(INVOICE_DIRECTIONS),
-    number: z.string().trim().min(1).max(60),
-    partyName: z.string().trim().min(1).max(120),
+    ...invoiceShape,
     customerId: z.string().optional(),
-    issueDate: dateText(),
-    dueDate: dateText().optional(),
-    net: moneyCents("invoices.errors.amount").optional(),
-    vat: moneyCents("invoices.errors.amount").optional(),
-    gross: moneyCents("invoices.errors.amount"),
-    status: z.enum(INVOICE_STATUSES).default("open"),
-    paidAt: dateText().optional(),
-    category: z.string().max(60).optional(),
-    reference: z.string().max(120).optional(),
-    notes: z.string().max(2000).optional(),
     file: z.custom<File>((value) => value instanceof File).optional(),
     removeFile: z.boolean(),
   })
-  .superRefine((d, ctx) => {
-    if (d.gross === 0) ctx.addIssue({ code: "custom", message: "invoices.errors.amount", path: ["gross"] });
-    else if (!amountsConsistent(d.net ?? null, d.vat ?? null, d.gross)) ctx.addIssue({ code: "custom", message: "invoices.errors.sumMismatch", path: ["gross"] });
-    if (d.dueDate && d.dueDate < d.issueDate) ctx.addIssue({ code: "custom", message: "invoices.errors.dueBeforeIssue", path: ["dueDate"] });
-  });
+  .superRefine(refineInvoice);
+
+/** Eingabe einer Rechnung im CSV-Import: dieselben Felder und Prüfungen wie das Formular (Beträge, Summe, Fälligkeit), ohne Beleg. */
+export const invoiceImportInput = z.object(invoiceShape).superRefine(refineInvoice);
+export type InvoiceImportFields = z.output<typeof invoiceImportInput>;
+
+/** Die Felder der Tabelle zu einer geprüften Eingabe (Anlegen, Ändern und CSV-Import gleich). */
+export function invoiceRecord(d: InvoiceImportFields, customerId: string | null) {
+  return {
+    direction: d.direction,
+    number: d.number,
+    outgoingKey: outgoingKeyOf(d.direction, d.number),
+    partyName: d.partyName,
+    customerId: d.direction === "outgoing" ? customerId : null,
+    issueDate: noon(d.issueDate),
+    dueDate: d.dueDate ? noon(d.dueDate) : null,
+    netCents: d.net ?? null,
+    vatCents: d.vat ?? null,
+    grossCents: d.gross,
+    status: d.status,
+    paidAt: d.status === "paid" ? noon(d.paidAt ?? d.issueDate) : null,
+    category: d.category ?? null,
+    reference: d.reference ?? null,
+    notes: d.notes ?? null,
+  };
+}
 
 export const saveInvoiceOperation = defineOperation({
   name: "invoices.save",
@@ -70,24 +103,7 @@ export const saveInvoiceOperation = defineOperation({
 
     if (d.customerId && !(await tx.customer.findUnique({ where: { id: d.customerId }, select: { id: true } }))) failField("customerId", "validation.invalid");
 
-    const status = d.status;
-    const data = {
-      direction: d.direction,
-      number: d.number,
-      outgoingKey,
-      partyName: d.partyName,
-      customerId: d.direction === "outgoing" ? (d.customerId ?? null) : null,
-      issueDate: noon(d.issueDate),
-      dueDate: d.dueDate ? noon(d.dueDate) : null,
-      netCents: d.net ?? null,
-      vatCents: d.vat ?? null,
-      grossCents: d.gross,
-      status,
-      paidAt: status === "paid" ? noon(d.paidAt ?? d.issueDate) : null,
-      category: d.category ?? null,
-      reference: d.reference ?? null,
-      notes: d.notes ?? null,
-    };
+    const data = invoiceRecord(d, d.customerId ?? null);
 
     if (d.id && !(await claimRow(tx.invoice, d.id, d.version))) fail("conflict");
     let saved;

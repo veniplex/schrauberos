@@ -71,6 +71,13 @@ export type QuickActionDef = {
   order: number;
 };
 
+/**
+ * Kennzeichnung von Rechten, die nie automatisch in einer Standardrolle landen (Regel 9): sensible Daten, Export/Import, Versand, Anzeigen von Geheimnissen, Zugriff über die API.
+ * Die Markierung steht im Katalog (`permissions.marked` der `feature.ts`), nicht im Namen; `catalog.test.ts` prüft sie gegen `DEFAULT_ROLES`. Wer sie vergeben will, tut das bewusst in der Rollenmaske.
+ */
+export const PERMISSION_MARKS = ["sensitive", "export", "import", "send", "reveal", "api"] as const;
+export type PermissionMark = (typeof PERMISSION_MARKS)[number];
+
 export type FeatureDef = {
   /** ID innerhalb des Moduls, z. B. "tires". Vollständige ID: "<modul>.<id>" */
   id: string;
@@ -95,7 +102,7 @@ export type FeatureDef = {
    * `adminOnly`: Rechte der Verwaltung (Benutzer, Rollen, Einstellungen, Backups …), die nur Administratoren vergeben dürfen –
    * ein Nicht-Admin kann sie weder Rollen hinzufügen noch Konten zuweisen (siehe `src/lib/rbac.ts`).
    */
-  permissions: { group: string; keys: readonly string[]; adminOnly?: readonly string[] };
+  permissions: { group: string; keys: readonly string[]; adminOnly?: readonly string[]; marked?: Readonly<Partial<Record<PermissionMark, readonly string[]>>> };
   nav: readonly NavDef[];
   /** Anlegen-Aktionen für das globale „Neu“-Menü (optional). Die Schnellsuche kommt von `search.ts` der Funktion (`searchProviders`, siehe `registry.ts`). */
   quickActions?: readonly QuickActionDef[];
