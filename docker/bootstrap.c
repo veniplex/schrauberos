@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +53,21 @@
 
 #define RESTART_CODE 42
 #define POINTER_MAX 4096
+#define PATH_CAP (POINTER_MAX + 64) /* Pfade aus dem Zeiger (höchstens POINTER_MAX) plus feste Anhänge */
+
+/* snprintf mit geprüftem Ergebnis: 1 = passt, 0 = wäre abgeschnitten worden (dann ist nichts Brauchbares geschrieben) */
+static int fmt(char *out, size_t cap, const char *format, ...) __attribute__((format(printf, 3, 4)));
+static int fmt(char *out, size_t cap, const char *format, ...) {
+  va_list ap;
+  va_start(ap, format);
+  int n = vsnprintf(out, cap, format, ap);
+  va_end(ap);
+  if (n < 0 || (size_t)n >= cap) {
+    if (cap) out[0] = 0;
+    return 0;
+  }
+  return 1;
+}
 
 /* Konstanten; die Tests (docker/test) überschreiben sie mit -D, ein Produktions-Build (-DSOS_PRODUCTION) nie */
 #if defined(SOS_PRODUCTION) && (defined(SOS_BUILTIN_DIR) || defined(SOS_VERIFY_TIMEOUT_SECONDS) || defined(SOS_QUIESCE_MILLIS) || defined(SOS_CRASH_WINDOW_SECONDS))
@@ -113,11 +129,11 @@ static uint64_t monotonic_ms(void) {
 
 /* Datenverzeichnis ohne Schrägstrich am Ende (DATA_DIR oder /data) */
 static const char *data_dir(void) {
-  static char dir[PATH_MAX - 128];
+  static char dir[POINTER_MAX - 256];
   if (dir[0]) return dir;
   const char *d = getenv("DATA_DIR");
   if (!d || !*d || strlen(d) >= sizeof dir) d = "/data";
-  snprintf(dir, sizeof dir, "%s", d);
+  fmt(dir, sizeof dir, "%s", d);
   size_t n = strlen(dir);
   while (n > 1 && dir[n - 1] == '/') dir[--n] = 0;
   return dir;
@@ -139,8 +155,8 @@ static void anchor_init(sos_anchor *a) {
 /* ───────── Marker (Daten für den Launcher der eingebauten Version; nie blockierend, nie einem Link folgend) ───────── */
 
 static void write_marker(const char *name, const char *content) {
-  char path[PATH_MAX];
-  snprintf(path, sizeof path, "%s/app/%s", data_dir(), name);
+  char path[PATH_CAP];
+  if (!fmt(path, sizeof path, "%s/app/%s", data_dir(), name)) return;
   unlink(path); /* auch ein untergeschobener Link oder eine FIFO unter diesem Namen verschwindet */
   int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0644);
   if (fd < 0) return;
@@ -163,8 +179,8 @@ static void write_marker(const char *name, const char *content) {
  * bedeutet „eingebaute Version“, ohne Marker (Ungültigkeit ist kein Angriffsziel). Öffnen ohne zu blockieren (kein mkfifo-Aussperren), ohne Link, nur reguläre Datei, kleine Datei.
  */
 static int read_pointer(char *version, size_t version_cap, char *dir, size_t dir_cap) {
-  char path[PATH_MAX];
-  snprintf(path, sizeof path, "%s/app/active", data_dir());
+  char path[PATH_CAP];
+  if (!fmt(path, sizeof path, "%s/app/active", data_dir())) return 0;
   int fd = open(path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
   if (fd < 0) return 0;
   struct stat st;
@@ -189,15 +205,13 @@ static int read_pointer(char *version, size_t version_cap, char *dir, size_t dir
   if (strlen(buf) != len) return 0; /* NUL im Inhalt */
   for (size_t i = 0; i < len; i++)
     if ((unsigned char)buf[i] < 0x20 || buf[i] == 0x7f) return 0; /* nur eine Zeile, keine Steuerzeichen */
-  char prefix[PATH_MAX];
-  int pl = snprintf(prefix, sizeof prefix, "%s/app/versions/", data_dir());
-  if (pl < 0 || (size_t)pl >= sizeof prefix || len <= (size_t)pl || strncmp(buf, prefix, (size_t)pl) != 0) return 0;
+  char prefix[PATH_CAP];
+  if (!fmt(prefix, sizeof prefix, "%s/app/versions/", data_dir())) return 0;
+  size_t pl = strlen(prefix);
+  if (len <= pl || strncmp(buf, prefix, pl) != 0) return 0;
   uint32_t parts[3];
   if (!sos_version_parse(buf + pl, parts)) return 0;
-  if (strlen(buf + pl) >= version_cap || len >= dir_cap) return 0;
-  snprintf(version, version_cap, "%s", buf + pl);
-  snprintf(dir, dir_cap, "%s", buf);
-  return 1;
+  return fmt(version, version_cap, "%s", buf + pl) && fmt(dir, dir_cap, "%s", buf);
 }
 
 /* ───────── Ruhezustand ───────── */
@@ -396,11 +410,10 @@ static pid_t spawn_launcher(const char *dir) {
   }
   child_reset_signals();
 
-  char loader_file[PATH_MAX], loader_rel[256], loader[PATH_MAX], libs[PATH_MAX], node[PATH_MAX], launcher[PATH_MAX];
-  snprintf(loader_file, sizeof loader_file, "%s/runtime/loader", dir);
-  snprintf(libs, sizeof libs, "%s/runtime/lib", dir);
-  snprintf(node, sizeof node, "%s/runtime/node", dir);
-  snprintf(launcher, sizeof launcher, "%s/launcher.mjs", dir);
+  char loader_file[PATH_CAP], loader_rel[256], loader[PATH_CAP + 256], libs[PATH_CAP], node[PATH_CAP], launcher[PATH_CAP];
+  if (!fmt(loader_file, sizeof loader_file, "%s/runtime/loader", dir) || !fmt(libs, sizeof libs, "%s/runtime/lib", dir) || !fmt(node, sizeof node, "%s/runtime/node", dir) ||
+      !fmt(launcher, sizeof launcher, "%s/launcher.mjs", dir))
+    _exit(126);
   if (chdir(dir) != 0) _exit(126);
   FILE *f = fopen(loader_file, "r");
   int have_loader = 0;
@@ -412,7 +425,7 @@ static pid_t spawn_launcher(const char *dir) {
     fclose(f);
   }
   if (have_loader) {
-    snprintf(loader, sizeof loader, "%s/runtime/%s", dir, loader_rel);
+    if (!fmt(loader, sizeof loader, "%s/runtime/%s", dir, loader_rel)) _exit(126);
     char *args[] = {loader, "--library-path", libs, node, launcher, NULL};
     execv(loader, args);
   } else {
@@ -522,19 +535,19 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < sizeof HANDLED_SIGNALS / sizeof HANDLED_SIGNALS[0]; i++) sigaction(HANDLED_SIGNALS[i], &sa, NULL);
 
   int force_builtin = 0, crashes = 0;
-  char last_dir[PATH_MAX] = "";
+  char last_dir[POINTER_MAX + 1] = "";
 
   for (;;) {
     if (terminating) return 0;
 
-    char dir[PATH_MAX] = BUILTIN_DIR, version[32] = "";
+    char dir[POINTER_MAX + 1] = BUILTIN_DIR, version[32] = "";
     int installed = 0;
     if (!force_builtin) {
-      char target[PATH_MAX];
+      char target[POINTER_MAX + 1];
       struct stat st;
       if (read_pointer(version, sizeof version, target, sizeof target) && lstat(target, &st) == 0) {
         installed = 1;
-        snprintf(dir, sizeof dir, "%s", target);
+        fmt(dir, sizeof dir, "%s", target);
       }
     }
 
@@ -579,7 +592,7 @@ int main(int argc, char **argv) {
           }
         }
       }
-      if (!installed) snprintf(dir, sizeof dir, "%s", BUILTIN_DIR);
+      if (!installed) fmt(dir, sizeof dir, "%s", BUILTIN_DIR);
     }
 
     fprintf(stderr, "[bootstrap] Starte Launcher aus %s\n", dir);
@@ -610,7 +623,7 @@ int main(int argc, char **argv) {
       /* Absturzfenster an der Laufzeit des Launchers, nicht an der Prüfzeit */
       int quick = monotonic_ms() - spawned < CRASH_WINDOW_SECONDS * 1000u;
       crashes = (strcmp(dir, last_dir) == 0 && quick) ? crashes + 1 : 1;
-      snprintf(last_dir, sizeof last_dir, "%s", dir);
+      fmt(last_dir, sizeof last_dir, "%s", dir);
       if (crashes >= 2) {
         fprintf(stderr, "[bootstrap] Launcher aus %s stürzt wiederholt ab (Code %d) – nehme die eingebaute Version.\n", dir, code);
         write_marker("launcher-crash", dir);

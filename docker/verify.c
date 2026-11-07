@@ -307,7 +307,8 @@ int sos_seal_parse(const uint8_t *buf, size_t len, const sos_anchor *anchor, con
   for (int i = 0; i < 7; i++) {
     size_t nl = strlen(names[i]);
     if (pos + nl + 1 > body_end || memcmp(buf + pos, names[i], nl) != 0 || buf[pos + nl] != ' ') {
-      *reason = "body:field";
+      static const char *const reasons[7] = {"body:version", "body:base", "body:arch", "body:tree-sha512", "body:tree-size", "body:tree-entries", "body:tree-bytes"};
+      *reason = reasons[i];
       return SOS_E_SEAL;
     }
     const uint8_t *start = buf + pos + nl + 1;
@@ -803,7 +804,7 @@ static int open_error(sos_result *r, const char *path) {
   return fail_r(r, SOS_E_IO, "io", path);
 }
 
-static int read_regular(int dirfd, const char *name, uint64_t max, uint8_t **out, size_t *len, int *state) {
+static int read_regular(int dirfd, const char *name, uint64_t max, uint8_t **out, size_t *len, int *state, int *setid) {
   /* state: 0 ok · 1 fehlt/keine reguläre Datei · 2 zu groß · 3 E/A · 4 Größe wich ab */
   struct stat st;
   *out = NULL;
@@ -814,6 +815,7 @@ static int read_regular(int dirfd, const char *name, uint64_t max, uint8_t **out
   struct stat fs;
   if (fstat(fd, &fs) != 0) { close(fd); return *state = 3, -1; }
   if (!S_ISREG(fs.st_mode)) { close(fd); return *state = 1, -1; }
+  *setid = (fs.st_mode & 07000) != 0;
   if ((uint64_t)fs.st_size > max) { close(fd); return *state = 2, -1; }
   size_t want = (size_t)fs.st_size;
   uint8_t *buf = malloc(want + 1);
@@ -918,12 +920,16 @@ int sos_verify_path(const char *dir_in, const char *data_dir_in, const sos_ancho
   if (dirfd < 0) { rc = open_error(r, dir); goto done; }
 
   /* 4) Siegel */
-  int state = 0;
+  int state = 0, setid = 0;
   size_t seal_len = 0;
-  if (read_regular(dirfd, "SOS-SEAL", SOS_SEAL_MAX, &seal_buf, &seal_len, &state) != 0) {
+  struct stat root_st;
+  if (fstat(dirfd, &root_st) != 0) { rc = fail_r(r, SOS_E_IO, "io", ""); goto done; }
+  if (root_st.st_mode & 07000) { rc = fail_r(r, SOS_E_DIFFERS, "setid", ""); goto done; }
+  if (read_regular(dirfd, "SOS-SEAL", SOS_SEAL_MAX, &seal_buf, &seal_len, &state, &setid) != 0) {
     rc = state == 1 ? fail_r(r, SOS_E_SEAL, "seal-missing", "") : state == 2 ? fail_r(r, SOS_E_SEAL, "too-large", "") : fail_r(r, SOS_E_IO, "io", "SOS-SEAL");
     goto done;
   }
+  if (setid) { rc = fail_r(r, SOS_E_DIFFERS, "setid", "SOS-SEAL"); goto done; }
   sos_seal seal;
   const char *why = "";
   rc = sos_seal_parse(seal_buf, seal_len, a, o->check_expiry, &seal, &why);
@@ -937,8 +943,9 @@ int sos_verify_path(const char *dir_in, const char *data_dir_in, const sos_ancho
   size_t tree_len = 0;
   struct stat tst;
   if (fstatat(dirfd, "SOS-TREE", &tst, AT_SYMLINK_NOFOLLOW) != 0 || !S_ISREG(tst.st_mode)) { rc = fail_r(r, SOS_E_TREE, "tree-missing", ""); goto done; }
+  if (tst.st_mode & 07000) { rc = fail_r(r, SOS_E_DIFFERS, "setid", "SOS-TREE"); goto done; }
   if ((uint64_t)tst.st_size != seal.tree_size) { rc = fail_r(r, SOS_E_TREE, "tree-size", ""); goto done; }
-  if (read_regular(dirfd, "SOS-TREE", seal.tree_size, &tree_buf, &tree_len, &state) != 0) {
+  if (read_regular(dirfd, "SOS-TREE", seal.tree_size, &tree_buf, &tree_len, &state, &setid) != 0) {
     rc = state == 1 ? fail_r(r, SOS_E_TREE, "tree-missing", "") : state == 2 || state == 4 ? fail_r(r, SOS_E_TREE, state == 2 ? "tree-size" : "tree-hash", "") : fail_r(r, SOS_E_IO, "io", "SOS-TREE");
     goto done;
   }
