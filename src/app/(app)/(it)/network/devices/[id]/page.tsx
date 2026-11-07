@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
 import { Menu, MenuLink } from "@/components/ui/menu";
-import { Badge, Card, DefinitionList, EmptyState, Table, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
+import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { DUE_TONE } from "@/lib/due";
 import { LinkButton } from "@/components/ui/buttons";
@@ -118,30 +119,19 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             {ips.length === 0 ? (
               <EmptyState title={t("network.noIps")} />
             ) : (
-              <Table caption={t("network.sections.ips")} className="min-w-[32rem]">
-                  <thead>
-                    <tr>
-                      <th>{t("network.cols.address")}</th>
-                      <th>{t("network.cols.hostname")}</th>
-                      <th>{t("network.cols.mac")}</th>
-                      <th>{t("network.cols.subnet")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ips.map((ip) => (
-                      <tr key={ip.id}>
-                        <td className="font-mono text-[13px]">{ip.address}</td>
-                        <td className="text-sm">{ip.hostname ?? <span className="text-ink-muted">–</span>}</td>
-                        <td className="font-mono text-[13px]">{ip.mac ?? <span className="font-sans text-ink-muted">–</span>}</td>
-                        <td className="text-sm">
-                          <TextLink href={`/network/ip/${ip.subnetId}`}>
-                            {ip.subnet.name}
-                          </TextLink>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+              <DataTable
+                bare
+                caption={t("network.sections.ips")}
+                rows={ips}
+                rowKey={(ip) => ip.id}
+                minWidth="32rem"
+                columns={[
+                  { id: "address", header: t("network.cols.address"), priority: "primary", cell: (ip) => <span className="font-mono text-[13px]">{ip.address}</span> },
+                  { id: "hostname", header: t("network.cols.hostname"), cell: (ip) => ip.hostname ?? <span className="text-ink-muted">–</span> },
+                  { id: "mac", header: t("network.cols.mac"), cell: (ip) => (ip.mac ? <span className="font-mono text-[13px]">{ip.mac}</span> : <span className="text-ink-muted">–</span>) },
+                  { id: "subnet", header: t("network.cols.subnet"), cell: (ip) => <TextLink href={`/network/ip/${ip.subnetId}`}>{ip.subnet.name}</TextLink> },
+                ]}
+              />
             )}
           </Card>
 
@@ -174,30 +164,27 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             {links.length === 0 ? (
               <EmptyState title={t("network.noConnections")} />
             ) : (
-              <Table caption={t("network.sections.connections")} className="min-w-[32rem]">
-                  <thead>
-                    <tr>
-                      <th>{t("network.cols.port")}</th>
-                      <th>{t("network.cols.connectedTo")}</th>
-                      <th>{t("network.cols.otherPort")}</th>
-                      <th>{t("network.cols.cable")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {links.map((l) => (
-                      <tr key={l.id}>
-                        <td className="font-mono text-[13px]">{l.port ?? "–"}</td>
-                        <td>
-                          <Link href={`/network/devices/${l.other.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                            {l.other.name}
-                          </Link>
-                        </td>
-                        <td className="font-mono text-[13px]">{l.otherPort ?? "–"}</td>
-                        <td className="text-sm">{l.cable ?? <span className="text-ink-muted">–</span>}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+              <DataTable
+                bare
+                caption={t("network.sections.connections")}
+                rows={links}
+                rowKey={(l) => l.id}
+                minWidth="32rem"
+                columns={[
+                  { id: "port", header: t("network.cols.port"), priority: "primary", cell: (l) => <span className="font-mono text-[13px]">{l.port ?? "–"}</span> },
+                  {
+                    id: "other",
+                    header: t("network.cols.connectedTo"),
+                    cell: (l) => (
+                      <Link href={`/network/devices/${l.other.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center font-medium hover:underline">
+                        {l.other.name}
+                      </Link>
+                    ),
+                  },
+                  { id: "otherPort", header: t("network.cols.otherPort"), cell: (l) => <span className="font-mono text-[13px]">{l.otherPort ?? "–"}</span> },
+                  { id: "cable", header: t("network.cols.cable"), cell: (l) => l.cable ?? <span className="text-ink-muted">–</span> },
+                ]}
+              />
             )}
           </Card>
         </div>

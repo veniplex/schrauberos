@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, Table, TextLink, StatusBadge } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
+import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { IP_KIND_TONE } from "@/modules/it/network/status-tone";
 import type { IpKind } from "@/modules/it/network/constants";
@@ -85,46 +86,35 @@ export default async function SubnetPage({
             {ips.length === 0 ? (
               <EmptyState title={t("network.ipsEmpty")} />
             ) : (
-              <Table caption={t("network.sections.addresses", { count: ips.length })} className="min-w-[40rem]">
-                  <thead>
-                    <tr>
-                      <th>{t("network.cols.address")}</th>
-                      <th>{t("network.fields.ipKind")}</th>
-                      <th>{t("network.fields.device")}</th>
-                      <th>{t("network.cols.hostname")}</th>
-                      <th>{t("network.cols.mac")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ips.map((ip) => (
-                      <tr key={ip.id} className="row-link">
-                        <td className="font-mono text-[13px] whitespace-nowrap">
-                          {canEdit ? (
-                            <Link href={`${base}?edit=${ip.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                              {ip.address}
-                            </Link>
-                          ) : (
-                            ip.address
-                          )}
-                        </td>
-                        <td>
-                          <StatusBadge tone={IP_KIND_TONE[ip.kind as IpKind] ?? "neutral"}>{td(`enums.ipKind.${ip.kind}`, ip.kind)}</StatusBadge>
-                        </td>
-                        <td className="text-sm">
-                          {ip.device ? (
-                            <TextLink href={`/network/devices/${ip.device.id}`}>
-                              {ip.device.name}
-                            </TextLink>
-                          ) : (
-                            <span className="text-ink-muted">–</span>
-                          )}
-                        </td>
-                        <td className="text-sm">{ip.hostname ?? <span className="text-ink-muted">–</span>}</td>
-                        <td className="font-mono text-[13px]">{ip.mac ?? <span className="font-sans text-ink-muted">–</span>}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+              <DataTable
+                bare
+                caption={t("network.sections.addresses", { count: ips.length })}
+                rows={ips}
+                rowKey={(ip) => ip.id}
+                minWidth="40rem"
+                columns={[
+                  {
+                    id: "address",
+                    header: t("network.cols.address"),
+                    priority: "primary",
+                    cell: (ip) => (
+                      <span className="font-mono text-[13px] whitespace-nowrap">
+                        {canEdit ? (
+                          <Link href={`${base}?edit=${ip.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center font-medium hover:underline">
+                            {ip.address}
+                          </Link>
+                        ) : (
+                          ip.address
+                        )}
+                      </span>
+                    ),
+                  },
+                  { id: "kind", header: t("network.fields.ipKind"), cell: (ip) => <StatusBadge tone={IP_KIND_TONE[ip.kind as IpKind] ?? "neutral"}>{td(`enums.ipKind.${ip.kind}`, ip.kind)}</StatusBadge> },
+                  { id: "device", header: t("network.fields.device"), cell: (ip) => (ip.device ? <TextLink href={`/network/devices/${ip.device.id}`}>{ip.device.name}</TextLink> : <span className="text-ink-muted">–</span>) },
+                  { id: "hostname", header: t("network.cols.hostname"), cell: (ip) => ip.hostname ?? <span className="text-ink-muted">–</span> },
+                  { id: "mac", header: t("network.cols.mac"), cell: (ip) => (ip.mac ? <span className="font-mono text-[13px]">{ip.mac}</span> : <span className="text-ink-muted">–</span>) },
+                ]}
+              />
             )}
           </Card>
         </div>

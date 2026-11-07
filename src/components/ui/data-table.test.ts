@@ -57,6 +57,14 @@ async function table(props: Record<string, unknown> = {}) {
 }
 
 describe("DataTable", () => {
+  it("bare: keine eigene Karte (Unterliste in einer Karte), Tabelle und Karten wie sonst", async () => {
+    const root = await table({ bare: true });
+    assert.equal(root.querySelector(".card"), null);
+    assert.ok(root.querySelector("table"));
+    assert.equal(root.querySelectorAll("li").length, 2);
+    const framed = await table();
+    assert.ok(framed.querySelector(".card"));
+  });
   it("Tabelle: Beschriftung, aria-sort nur an sortierbaren Spalten, Aktionsspalte ohne sichtbaren Kopf; ohne Überlauf kein Tab-Stopp (Verhalten: scroll-area.test.ts)", async () => {
     const root = await table();
     const t = root.querySelector("table");

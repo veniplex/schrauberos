@@ -52,6 +52,7 @@ export async function DataTable<R>({
   footer,
   empty,
   className,
+  bare = false,
 }: {
   caption: string;
   columns: Array<DataColumn<R>>;
@@ -65,6 +66,8 @@ export async function DataTable<R>({
   footer?: ReactNode;
   empty?: ReactNode;
   className?: string;
+  /** Ohne eigene Karte: für eine Liste innerhalb einer Karte (Unterlisten auf Detailseiten) – sonst läge eine Karte in der Karte. */
+  bare?: boolean;
 }) {
   const { t } = await getI18n();
   const primary = columns.find((c) => c.priority === "primary") ?? columns[0];
@@ -75,14 +78,14 @@ export async function DataTable<R>({
 
   if (rows.length === 0 && empty) {
     return (
-      <Card padded={false} className={clsx("overflow-hidden", className)}>
+      <Frame bare={bare} className={className}>
         {empty}
-      </Card>
+      </Frame>
     );
   }
 
   return (
-    <Card as="div" padded={false} className={clsx("overflow-hidden", className)}>
+    <Frame bare={bare} className={className}>
       {summary ? <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{summary}</p> : null}
 
       {/* Karten (unter md) */}
@@ -209,6 +212,15 @@ export async function DataTable<R>({
         </ScrollArea>
       </div>
       {footer}
+    </Frame>
+  );
+}
+
+function Frame({ bare, className, children }: { bare: boolean; className?: string; children: ReactNode }) {
+  if (bare) return <div className={className}>{children}</div>;
+  return (
+    <Card as="div" padded={false} className={clsx("overflow-hidden", className)}>
+      {children}
     </Card>
   );
 }
