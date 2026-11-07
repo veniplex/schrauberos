@@ -71,6 +71,7 @@ export const appointmentsDe = {
   feed: {
     calendarName: "Termine und Fristen",
     cancelled: "Abgesagt",
+    truncated: "Hinweis: Dieser Kalender zeigt höchstens {max} Einträge – es gibt mehr. Gezeigt werden die nächsten Termine und Fristen; weiter entfernte bzw. ältere fehlen.",
     absent: "Abwesend: {name}",
     inspection: "Prüfung fällig: {vehicle}",
     extraInspection: "{kind} fällig: {vehicle}",

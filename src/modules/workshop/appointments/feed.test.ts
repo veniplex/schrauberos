@@ -314,14 +314,18 @@ describe("Inhalt und Rechte des Besitzers", () => {
   it("fehlt ein Fachrecht, fehlt dieser Teil – der Feed bleibt gültig: nur Termine / nur Abwesenheiten / nur Fristen / gar nichts", async () => {
     const onlyAppointments = await feedOf(["appointments.view"]);
     assert.ok(events(onlyAppointments) > 0 && !summaries(onlyAppointments).some((l) => l.startsWith("Abwesend") || l.includes("fällig")));
-    const onlyAbsences = await feedOf(["employees.view"]);
-    assert.deepEqual(summaries(onlyAbsences).sort(), ["Abwesend: Max Mustermann", "Abwesend: Max Mustermann"]);
-    const onlyVehicles = await feedOf(["vehicles.view"]);
-    assert.ok(summaries(onlyVehicles).every((l) => l.includes("fällig")) && !summaries(onlyVehicles).some((l) => l.includes("Fuhrpark")));
-    const onlyFleet = await feedOf(["fleet.view"]);
-    assert.ok(summaries(onlyFleet).length === 2 && summaries(onlyFleet).every((l) => l.includes("Fuhrpark")));
-    const none = await feedOf(["tires.view"]);
-    assert.equal(events(none), 0);
+    // jeder Feed setzt appointments.view voraus; die übrigen Teile kommen nur mit ihrem eigenen Recht dazu
+    const notAppointment = (l: string) => !l.includes("Räderwechsel") && !l.includes("Termin") && !l.includes("Über Mitternacht") && !l.includes("Gerade noch drin") && !l.includes("Abgesagt");
+    const onlyAbsences = await feedOf(["appointments.view", "employees.view"]);
+    assert.deepEqual(summaries(onlyAbsences).filter((l) => l.startsWith("Abwesend")).sort(), ["Abwesend: Max Mustermann", "Abwesend: Max Mustermann"]);
+    assert.ok(!summaries(onlyAbsences).some((l) => l.includes("fällig")));
+    const onlyVehicles = await feedOf(["appointments.view", "vehicles.view"]);
+    assert.ok(summaries(onlyVehicles).filter(notAppointment).every((l) => l.includes("fällig")) && !summaries(onlyVehicles).some((l) => l.includes("Fuhrpark") || l.startsWith("Abwesend")));
+    const onlyFleet = await feedOf(["appointments.view", "fleet.view"]);
+    assert.equal(summaries(onlyFleet).filter((l) => l.includes("Fuhrpark")).length, 2);
+    assert.ok(!summaries(onlyFleet).some((l) => l.includes("Prüfung fällig") || l.startsWith("Abwesend")));
+    const none = await feedOf(["appointments.view"]);
+    assert.ok(!summaries(none).some((l) => l.includes("fällig") || l.startsWith("Abwesend")));
     assert.ok(none.startsWith("BEGIN:VCALENDAR") && none.includes("END:VCALENDAR"));
   });
 
@@ -334,14 +338,16 @@ describe("Inhalt und Rechte des Besitzers", () => {
     assert.ok(!summaries(await body(await call(`${token}.ics`))).some((l) => l.startsWith("Abwesend")));
     await env.db.featureSetting.upsert({ where: { key: "workshop.appointments" }, update: { enabled: false }, create: { key: "workshop.appointments", enabled: false, updatedByName: "test" } });
     try {
-      assert.equal(events(await body(await call(`${token}.ics`))), 0, "Termine verschwinden, wenn die Funktion aus ist");
+      assert.equal((await call(`${token}.ics`)).status, 401, "ohne die Terminfunktion gibt es keinen Feed (dieselbe 401)");
     } finally {
       await env.db.featureSetting.delete({ where: { key: "workshop.appointments" } });
     }
+    assert.equal((await call(`${token}.ics`)).status, 200, "die Adresse bleibt bestehen und gilt nach dem Wiedereinschalten wieder");
+    assert.equal(await env.db.calendarFeedToken.count({ where: { userId: user.id } }), 1);
   });
 
   it("Besitzersprache: ein Konto mit englischer Oberfläche bekommt englische Texte im Feed", async () => {
-    const { user } = await owner(["employees.view"]);
+    const { user } = await owner(["appointments.view", "employees.view"]);
     await env.db.user.update({ where: { id: user.id }, data: { locale: "en" } });
     const token = await plant(user.id);
     assert.ok(summaries(await body(await call(`${token}.ics`))).includes("Absent: Max Mustermann"));
@@ -360,16 +366,182 @@ describe("Inhalt und Rechte des Besitzers", () => {
     }
   });
 
-  it("Obergrenze: mehr als 5000 Einträge werden auf 5000 begrenzt (die frühesten bleiben)", async () => {
+  it("Obergrenze: mehr als 5000 Einträge werden auf 5000 gekürzt – es bleiben die NÄCHSTEN (ab heute), die ältesten vergangenen fallen zuerst weg; Hinweis-Eintrag und X-Truncated zeigen es", async () => {
     const base = new Date("2026-12-01T06:00:00Z").getTime();
+    // 5003 kommende Massentermine: die spätesten drei fallen weg, ein Termin aus der Vergangenheit (Mai) fällt ganz weg
     await env.db.appointment.createMany({ data: Array.from({ length: 5003 }, (_, i) => ({ title: `Massentermin ${i}`, startsAt: new Date(base + i * 60_000), endsAt: new Date(base + i * 60_000 + 30_000) })) });
     try {
-      const text = await feedOf(["appointments.view"]);
-      assert.equal(events(text), feed.FEED_MAX_EVENTS);
-      assert.ok(summaries(text).includes("Massentermin 0"));
+      const { user } = await owner(["appointments.view"]);
+      const token = await plant(user.id);
+      const res = await call(`${token}.ics`);
+      assert.equal(res.headers.get("x-truncated"), "1");
+      const text = await body(res);
+      const lines = summaries(text);
+      assert.equal(events(text), feed.FEED_MAX_EVENTS + 1, "5000 Einträge plus der Hinweis");
+      assert.ok(lines.some((l) => l.startsWith("Hinweis: Dieser Kalender zeigt höchstens 5000 Einträge")));
+      assert.ok(lines.includes("Massentermin 0") && !lines.includes("Massentermin 5002"), "kommende zuerst, die spätesten fallen weg");
+      assert.ok(!lines.some((l) => l.startsWith("Gerade noch drin")), "Vergangenes fällt vor Kommendem weg");
+      assert.ok(lines.some((l) => l.startsWith("Räderwechsel")), "ein naher kommender Termin bleibt");
     } finally {
       await env.db.appointment.deleteMany({ where: { title: { startsWith: "Massentermin" } } });
     }
+    // 4999 kommende Massentermine + mehrere vergangene: der Rest wird mit den JÜNGSTEN vergangenen aufgefüllt
+    const past = new Date("2026-10-01T06:00:00Z").getTime();
+    await env.db.appointment.createMany({ data: Array.from({ length: 4990 }, (_, i) => ({ title: `Massentermin ${i}`, startsAt: new Date(base + i * 60_000), endsAt: new Date(base + i * 60_000 + 30_000) })) });
+    await env.db.appointment.createMany({ data: Array.from({ length: 30 }, (_, i) => ({ title: `Vergangen ${i}`, startsAt: new Date(past + i * 3_600_000), endsAt: new Date(past + i * 3_600_000 + 1_800_000) })) });
+    try {
+      const lines = summaries(await feedOf(["appointments.view"]));
+      assert.ok(lines.includes("Vergangen 29"), "der jüngste vergangene bleibt");
+      assert.ok(!lines.includes("Vergangen 0"), "der älteste vergangene fällt zuerst weg");
+      assert.ok(lines.includes("Massentermin 4989"), "alle kommenden bleiben");
+    } finally {
+      await env.db.appointment.deleteMany({ where: { OR: [{ title: { startsWith: "Massentermin" } }, { title: { startsWith: "Vergangen" } }] } });
+    }
     assert.ok(vehicleId);
+  });
+
+  it("ein Feed unter der Grenze trägt weder Hinweis noch X-Truncated", async () => {
+    const { user } = await owner(["appointments.view"]);
+    const res = await call(`${await plant(user.id)}.ics`);
+    assert.equal(res.headers.get("x-truncated"), null);
+    assert.ok(!(await body(res)).includes("notice-truncated"));
+  });
+
+  it("Fristen und Abwesenheiten sind stabil: dieselben Daten an einem anderen Tag ergeben dieselbe Datei (DTSTAMP der Fristen fest), SEQUENCE steht an jedem Eintrag", async () => {
+    const { user } = await owner(ALL);
+    const token = await plant(user.id);
+    const first = await (await call(`${token}.ics`)).text();
+    state.feedCache.clear();
+    state.feedRuntime.now = () => NOW.getTime() + 86_400_000; // einen Tag später
+    try {
+      const nextDay = await (await call(`${token}.ics`)).text();
+      const stamps = (text: string) => text.split("\r\n").filter((l) => l.startsWith("DTSTAMP:") || l.startsWith("LAST-MODIFIED:") || l.startsWith("SEQUENCE:") || l.startsWith("UID:deadline"));
+      assert.ok(first.includes("UID:deadline-vehicle-"), "es gibt Fristen");
+      assert.deepEqual(stamps(nextDay), stamps(first), "Änderungszeiten, Revisionen und Fristen ändern sich nicht von Tag zu Tag");
+      assert.ok(first.includes("DTSTAMP:20200101T000000Z"), "feste Zeit der abgeleiteten Einträge");
+    } finally {
+      state.feedRuntime.now = () => NOW.getTime();
+    }
+    const vevents = first.split("BEGIN:VEVENT").slice(1);
+    assert.ok(vevents.length > 0 && vevents.every((e) => /\r\nSEQUENCE:\d+\r\n/.test(e)), "jeder Eintrag hat eine SEQUENCE");
+  });
+
+  it("SEQUENCE wächst mit der Änderung eines Termins", async () => {
+    const { user } = await owner(["appointments.view"]);
+    const token = await plant(user.id);
+    const row = await env.db.appointment.create({ data: { title: "Sequenztermin", startsAt: new Date("2026-11-20T08:00:00Z"), endsAt: new Date("2026-11-20T09:00:00Z") } });
+    try {
+      const seqOf = (text: string) => Number(new RegExp(`UID:appointment-${row.id}@schrauberos[\\s\\S]*?SEQUENCE:(\\d+)`).exec(text)![1]);
+      const before = seqOf(await body(await call(`${token}.ics`)));
+      await env.db.appointment.update({ where: { id: row.id }, data: { title: "Sequenztermin verschoben", updatedAt: new Date(Date.now() + 3_600_000) } });
+      state.feedCache.clear();
+      const after = seqOf(await body(await call(`${token}.ics`)));
+      assert.ok(after > before, `${after} > ${before}`);
+    } finally {
+      await env.db.appointment.delete({ where: { id: row.id } });
+    }
+  });
+});
+
+describe("Kalender-Abo nur mit appointments.view (und aktiver Terminfunktion)", () => {
+  it("ohne appointments.view derselbe 401 wie bei jedem ungültigen Token (gleiche Köpfe und Körper); verliert die Rolle das Recht, erlischt die Adresse beim nächsten Abruf (Audit)", async () => {
+    const { user } = await owner(["employees.view"]);
+    const planted = await plant(user.id);
+    const wrong = await call(`cal_${"x".repeat(43)}.ics`);
+    const denied = await call(`${planted}.ics`);
+    assert.equal(denied.status, 401);
+    assert.equal(await denied.text(), await wrong.text());
+    assert.deepEqual([...denied.headers].sort(), [...wrong.headers].sort());
+    assert.equal(await env.db.calendarFeedToken.count({ where: { userId: user.id } }), 0, "die Adresse ist erloschen");
+    const entry = await env.db.auditLog.findFirst({ where: { action: "appointment.feedRevoke", actorId: user.id }, orderBy: { createdAt: "desc" } });
+    assert.ok(entry, "Audit-Eintrag");
+    assert.match(entry!.target ?? "", /\(Recht entzogen\)$/);
+    assert.ok(!(entry!.target ?? "").includes(planted), "nie das Token");
+  });
+
+  it("ein Konto, das das Recht verliert, verliert die Adresse; ein Administrator behält sie (alle Rechte)", async () => {
+    const { session, user } = await owner(["appointments.view"]);
+    const token = await subscribe(session);
+    assert.equal((await call(`${token}.ics`)).status, 200);
+    const role = await env.db.userRole.findFirstOrThrow({ where: { userId: user.id } });
+    await env.db.rolePermission.delete({ where: { roleId_permission: { roleId: role.roleId, permission: "appointments.view" } } });
+    assert.equal((await call(`${token}.ics`)).status, 401);
+    assert.equal(await env.db.calendarFeedToken.count({ where: { userId: user.id } }), 0);
+    const admin = await env.user({ username: `adm-${++counter}`, roles: [await env.role({ isAdmin: true, permissions: [] })] });
+    assert.equal((await call(`${await plant(admin.id)}.ics`)).status, 200);
+  });
+});
+
+describe("Erzeugung begrenzt, ETag und 304", () => {
+  it("ETag aus dem Inhalt; If-None-Match (auch Liste, schwach, *) → 304 ohne Inhalt, die Köpfe bleiben; ein anderer ETag → 200", async () => {
+    const { user } = await owner(["appointments.view"]);
+    const token = await plant(user.id);
+    const first = await call(`${token}.ics`);
+    const etag = first.headers.get("etag")!;
+    assert.match(etag, /^"[A-Za-z0-9_-]{27}"$/);
+    await first.text();
+    for (const header of [etag, `W/${etag}`, `"fremd", ${etag}`, "*"]) {
+      const res = await call(`${token}.ics`, { "if-none-match": header });
+      assert.equal(res.status, 304, header);
+      assert.equal(await res.text(), "");
+      assert.equal(res.headers.get("etag"), etag);
+      assert.equal(res.headers.get("cache-control"), "private, no-store");
+      assert.equal(res.headers.get("x-content-type-options"), "nosniff");
+    }
+    assert.equal((await call(`${token}.ics`, { "if-none-match": '"anderer"' })).status, 200);
+  });
+
+  it("die Rechteprüfung kommt vor 304: ein ungültiges Token bekommt nie 304, auch mit passendem ETag", async () => {
+    const { user } = await owner(["appointments.view"]);
+    const token = await plant(user.id);
+    const etag = (await call(`${token}.ics`)).headers.get("etag")!;
+    await env.db.calendarFeedToken.deleteMany({ where: { userId: user.id } });
+    assert.equal((await call(`${token}.ics`, { "if-none-match": etag })).status, 401);
+  });
+
+  it("höchstens ein vollständiger Aufbau je 30 s je Token: dazwischen kommt die zuletzt gebaute Datei (auch bei Änderungen), danach wird neu gebaut; Rechteänderung baut sofort neu", async () => {
+    const { user } = await owner(["appointments.view", "employees.view"]);
+    const token = await plant(user.id);
+    const row = await env.db.appointment.create({ data: { title: "Zwischenspeichertermin", startsAt: new Date("2026-11-21T08:00:00Z"), endsAt: new Date("2026-11-21T09:00:00Z") } });
+    try {
+      const a = await body(await call(`${token}.ics`));
+      assert.ok(summaries(a).includes("Zwischenspeichertermin"));
+      await env.db.appointment.update({ where: { id: row.id }, data: { title: "Geändert" } });
+      state.feedRuntime.now = () => NOW.getTime() + 10_000;
+      assert.ok(summaries(await body(await call(`${token}.ics`))).includes("Zwischenspeichertermin"), "nach 10 s: noch die gebaute Datei (kein neuer Aufbau)");
+      state.feedRuntime.now = () => NOW.getTime() + 31_000;
+      assert.ok(summaries(await body(await call(`${token}.ics`))).includes("Geändert"), "nach 31 s: neu gebaut");
+      // eine Rechteänderung gilt sofort
+      const role = await env.db.userRole.findFirstOrThrow({ where: { userId: user.id } });
+      await env.db.rolePermission.delete({ where: { roleId_permission: { roleId: role.roleId, permission: "employees.view" } } });
+      state.feedRuntime.now = () => NOW.getTime() + 32_000;
+      assert.ok(!summaries(await body(await call(`${token}.ics`))).some((l) => l.startsWith("Abwesend")), "Rechte werden nicht aus dem Zwischenspeicher bedient");
+    } finally {
+      state.feedRuntime.now = () => NOW.getTime();
+      await env.db.appointment.delete({ where: { id: row.id } });
+    }
+  });
+
+  it("gleichzeitige Abrufe desselben Tokens teilen sich einen Aufbau", async () => {
+    const { user } = await owner(["appointments.view"]);
+    const token = await plant(user.id);
+    const responses = await Promise.all(Array.from({ length: 8 }, () => call(`${token}.ics`)));
+    const etags = new Set(responses.map((r) => r.headers.get("etag")));
+    assert.equal(etags.size, 1);
+    assert.equal(state.feedCache.size >= 1, true);
+  });
+
+  it("der Zwischenspeicher ist begrenzt: zu große Einträge werden nicht gehalten, der älteste geht zuerst", () => {
+    const cache = new state.FeedCache(10_000);
+    const entry = (n: number) => ({ builtAt: n, rightsKey: "k", etag: `"${n}"`, truncated: false, body: "x".repeat(n) });
+    cache.set("a", entry(1_000));
+    cache.set("b", entry(1_000));
+    cache.set("c", entry(1_000)); // 6 000 Bytes
+    assert.equal(cache.size, 3);
+    cache.set("d", entry(2_400)); // 4 800 mehr: der älteste (a) muss weichen
+    assert.equal(cache.get("a"), undefined);
+    assert.ok(cache.get("d"));
+    cache.set("huge", entry(4_000)); // über einem Viertel des Speichers: wird nicht gehalten
+    assert.equal(cache.get("huge"), undefined);
   });
 });

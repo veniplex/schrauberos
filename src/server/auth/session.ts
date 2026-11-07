@@ -28,7 +28,8 @@ import {
   SESSION_COOKIE,
   sessionCookieName,
 } from "@/lib/session-cookie";
-import { ALL_PERMISSIONS, featureOfPermission, type Permission } from "@/modules/catalog";
+import { featureOfPermission, type Permission } from "@/modules/catalog";
+import { grantedPermissions } from "@/server/auth/permissions";
 import { getActiveFeatureIds } from "@/modules/features";
 
 const SESSION_DAYS = 14;
@@ -445,8 +446,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   // Ausgeschaltete Funktionen: ihre Rechte fallen für alle weg (auch für Administratoren).
   // Da jede Seite, Action und API-Route über Rechte schützt, sperrt das die Funktion überall.
   const features = await getActiveFeatureIds();
-  const granted: string[] = isAdmin ? ALL_PERMISSIONS : roles.flatMap((r) => r.permissions.map((p) => p.permission));
-  const permissions = new Set(granted.filter((p) => features.has(featureOfPermission(p) ?? "")));
+  const permissions = grantedPermissions(roles, features);
   const u = row.user;
   const twoFactor = !!u.twoFactor?.enabledAt;
   return {

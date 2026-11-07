@@ -2,6 +2,7 @@ import "server-only";
 import { getHolidays } from "@/server/holidays";
 import { getWorkshop } from "@/server/workshop";
 import { db } from "@/server/db";
+import type { Prisma } from "@/generated/prisma/client";
 import { appointmentWindow } from "./domain";
 import { buildAppointmentHints, touchedDays, type AppointmentHint, type HintBooking } from "./hints";
 import { staffWithAccount, userAbsentBetween } from "@/modules/office/employees/public";
@@ -153,30 +154,35 @@ export type FeedAppointment = {
 };
 
 /**
- * Termine für das Kalender-Abo (F10), die den Zeitraum `from`…`to` (Zeitpunkte, `to` ausgeschlossen) berühren, nach Beginn sortiert, höchstens `take`. Verlangt `appointments.view`. **Nur, was ein
+ * Termine für das Kalender-Abo (F10), die den Zeitraum `from`…`to` (Zeitpunkte, `to` ausgeschlossen) berühren, nach Beginn sortiert, höchstens `take` kommende (Ende ab anchor) und `take` vergangene. Verlangt `appointments.view`. **Nur, was ein
  * Kalender außerhalb der Anwendung zeigen darf:** Bezeichnung, Zeit, Status, Terminart, Kennzeichen und Fahrzeug; der **Anzeigename** des Kunden nur mit `customers.view` (sonst werden Kundenspalten gar nicht
  * gelesen); **nie Notizen, Telefon, Arbeitsplatz oder Zuständige**. Termine, deren Kunde oder Fahrzeughalter eingeschränkt verarbeitet wird (Art. 18 DSGVO), gibt es nicht.
  */
-export async function appointmentsForFeed(viewer: Viewer, from: Date, to: Date, take: number): Promise<FeedAppointment[]> {
+export async function appointmentsForFeed(viewer: Viewer, from: Date, to: Date, take: number, anchor: Date = from): Promise<FeedAppointment[]> {
   if (!viewer.can("appointments.view")) return [];
   const withCustomer = viewer.can("customers.view");
   const unrestricted = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
-  const rows = await db.appointment.findMany({
-    where: { startsAt: { lt: to }, endsAt: { gt: from }, AND: [unrestricted, { OR: [{ vehicleId: null }, { vehicle: { is: unrestricted } }] }] },
-    orderBy: [{ startsAt: "asc" }, { id: "asc" }],
-    take,
-    select: {
-      id: true,
-      title: true,
-      startsAt: true,
-      endsAt: true,
-      status: true,
-      updatedAt: true,
-      type: { select: { name: true } },
-      vehicle: { select: { plate: true, make: true, model: true, ...(withCustomer ? { customer: { select: customerNameSelect } } : {}) } },
-      ...(withCustomer ? { customer: { select: customerNameSelect } } : {}),
-    },
-  });
+  const restriction = { AND: [unrestricted, { OR: [{ vehicleId: null }, { vehicle: { is: unrestricted } }] }] };
+  const find = (where: Prisma.AppointmentWhereInput, direction: "asc" | "desc") =>
+    db.appointment.findMany({
+      where: { AND: [where, restriction] },
+      orderBy: [{ startsAt: direction }, { id: direction }],
+      take,
+      select: {
+        id: true,
+        title: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        updatedAt: true,
+        type: { select: { name: true } },
+        vehicle: { select: { plate: true, make: true, model: true, ...(withCustomer ? { customer: { select: customerNameSelect } } : {}) } },
+        ...(withCustomer ? { customer: { select: customerNameSelect } } : {}),
+      },
+    });
+  // Über der Grenze (take) bleiben die NÄCHSTEN Termine: kommende (Ende ab anchor, aufsteigend) und vergangene (jüngste zuerst) werden getrennt gelesen und hier zusammengeführt
+  const [upcoming, past] = await Promise.all([find({ startsAt: { lt: to }, endsAt: { gte: anchor } }, "asc"), anchor > from ? find({ startsAt: { lt: to }, endsAt: { gt: from, lt: anchor } }, "desc") : Promise.resolve([])]);
+  const rows = [...past.reverse(), ...upcoming];
   return rows.map((a) => {
     const row = a as typeof a & { customer?: Parameters<typeof customerDisplayName>[0] | null; vehicle: ((typeof a)["vehicle"] & { customer?: Parameters<typeof customerDisplayName>[0] | null }) | null };
     const owner = row.vehicle?.customer ?? row.customer ?? null;

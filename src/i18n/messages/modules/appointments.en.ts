@@ -70,6 +70,7 @@ export const appointmentsEn: typeof appointmentsDe = {
   feed: {
     calendarName: "Appointments and deadlines",
     cancelled: "Cancelled",
+    truncated: "Note: This calendar shows at most {max} entries – there are more. The next appointments and deadlines are shown; entries further away or older are missing.",
     absent: "Absent: {name}",
     inspection: "Inspection due: {vehicle}",
     extraInspection: "{kind} due: {vehicle}",

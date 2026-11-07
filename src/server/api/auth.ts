@@ -4,10 +4,11 @@ import { problemOf } from "@/lib/api/problem";
 import { effectivePermissions } from "@/lib/api/scope";
 import { bearerToken, hashApiToken, tokenHint } from "@/lib/api/token";
 import { clientIp } from "@/lib/client-ip";
-import { ALL_PERMISSIONS, featureOfPermission, type Permission } from "@/modules/catalog";
+import type { Permission } from "@/modules/catalog";
 import { getActiveFeatureIds } from "@/modules/features";
 import { isBehindProxy } from "@/server/auth/network";
 import { authPolicy } from "@/server/auth/policy";
+import { grantedPermissions } from "@/server/auth/permissions";
 import type { AppSession } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { problemResponse, setApiAuthenticator, type ApiAuthResult } from "@/server/operations";
@@ -72,8 +73,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthR
   // Aktuelle Rechte des Besitzers (wie in der Sitzung: auf aktive Funktionen eingeschränkt), geschnitten mit dem Scope des Tokens
   const features = await getActiveFeatureIds();
   const roles = row.user.roles.map((r) => r.role);
-  const granted: string[] = roles.some((r) => r.isAdmin) ? ALL_PERMISSIONS : roles.flatMap((r) => r.permissions.map((p) => p.permission));
-  const owner = new Set(granted.filter((p) => features.has(featureOfPermission(p) ?? "")));
+  const owner = grantedPermissions(roles, features);
   const permissions = effectivePermissions(
     row.scope.map((s) => s.permission),
     owner,
