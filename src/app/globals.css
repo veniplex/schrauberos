@@ -49,6 +49,13 @@ html {
   overflow-x: clip;
   /* Mindestbreite 320 px: darunter scrollt die Seite, statt Inhalte abzuschneiden */
   min-width: 320px;
+  /* Die Scrollleiste behält ihren Platz: Ein Dialog sperrt das Scrollen (overflow hidden), ohne dass der Inhalt dahinter um die Leistenbreite springt */
+  scrollbar-gutter: stable;
+  /* Springen per Tastatur, Fehlerzusammenfassung, Anker: Die klebende Kopfzeile (3,5 rem) und die Aktionsleiste eines Formulars verdecken das fokussierte Feld nicht (WCAG 2.4.11) */
+  scroll-padding-top: calc(3.5rem + env(safe-area-inset-top));
+}
+html[data-form-actions] {
+  scroll-padding-bottom: 6rem;
 }
 
 body {
@@ -88,7 +95,9 @@ h1, h2, h3, h4 {
 
   /* Buttons: default · hover · focus-visible · active · disabled · loading (aria-busy) */
   .btn {
-    @apply relative inline-flex min-h-(--tap) min-w-(--tap) items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-3.5 py-1.5 text-sm font-medium;
+    /* Einzeilig ab 640 px; darunter (Handy, 200 % Schrift) darf die Beschriftung umbrechen, statt die Seite zu sprengen oder abgeschnitten zu werden */
+    @apply relative inline-flex min-h-(--tap) min-w-(--tap) max-w-full items-center justify-center gap-2 rounded-md border border-transparent px-3.5 py-1.5 text-center text-sm font-medium sm:whitespace-nowrap;
+    text-wrap: balance;
     transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out),
       transform var(--dur-fast) var(--ease-out);
     cursor: pointer;
@@ -281,7 +290,8 @@ form.card > .form-actions {
 .toast-viewport > * {
   width: min(100%, 28rem);
 }
-html[data-form-actions] .toast-viewport {
+/* Hub über der Aktionsleiste: Fallback, solange die gemessene Höhe fehlt (FormActions setzt --toast-lift inline am Wurzelelement) */
+html[data-form-actions] {
   --toast-lift: 4.5rem;
 }
 @media (min-width: 1024px) {
@@ -323,8 +333,8 @@ html[data-form-actions] .toast-viewport {
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
 .md h1 { @apply mb-3 mt-8 text-2xl font-semibold; }
-.md h2 { @apply mb-2 mt-8 border-b border-line pb-1 text-xl font-semibold; scroll-margin-top: 5rem; }
-.md h3 { @apply mb-2 mt-6 text-lg font-semibold; scroll-margin-top: 5rem; }
+.md h2 { @apply mb-2 mt-8 border-b border-line pb-1 text-xl font-semibold; }
+.md h3 { @apply mb-2 mt-6 text-lg font-semibold; }
 .md h4 { @apply mb-1 mt-4 font-semibold; }
 .md p { @apply my-3; }
 .md a { @apply text-accent-text underline underline-offset-2; }

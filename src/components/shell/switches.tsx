@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { setLocale, setTheme } from "@/server/actions/preferences";
-import { LOCALES, type Locale } from "@/i18n/config";
+import { LOCALES, LOCALE_LABELS, type Locale } from "@/i18n/config";
 import type { Theme } from "@/lib/constants";
 import { useI18n } from "@/i18n/client";
 import { SegmentedControl } from "@/components/ui/segmented";
@@ -43,7 +43,7 @@ export function LocaleSwitch({ current }: { current: Locale }) {
       value={current}
       busy={pending}
       onChange={(value) => start(() => setLocale(fieldForm("locale", value)))}
-      options={LOCALES.map((value) => ({ value, label: value.toUpperCase() }))}
+      options={LOCALES.map((value) => ({ value, label: value.toUpperCase(), title: LOCALE_LABELS[value], lang: value }))}
     />
   );
 }

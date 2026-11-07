@@ -52,6 +52,15 @@ export type HelpGroup = { module: ModuleId; nameKey: MessageKey; topics: HelpTop
 /** Was die Hilfe von der Anmeldung braucht (`AppSession` erfüllt das). */
 type HelpAccess = { features: ReadonlySet<string>; can: (permission: Permission) => boolean };
 
+/**
+ * Darf diese Anmeldung das Kapitel `id` aufrufen? Kapitel einer Funktion nur bei aktiver Funktion und vorhandenem Leserecht (sonst 404); allgemeine Kapitel der Plattform
+ * (`arbeiten-in-der-anwendung` …) immer. Der Hilfe-Knopf im Seitenkopf erscheint nur, wenn das stimmt – Bearbeiten-Seiten verlangen oft nur `*.edit`, das Kapitel `*.view`.
+ */
+export function helpTopicVisible(id: string, session: HelpAccess): boolean {
+  const topic = ALL_HELP_TOPICS.find((t) => t.id === id);
+  return topic ? session.features.has(topic.feature) && session.can(topic.permission) : true;
+}
+
 const featureOrder = (id: string) => FEATURES.find((f) => fullFeatureId(f) === id)?.order ?? 0;
 
 /**

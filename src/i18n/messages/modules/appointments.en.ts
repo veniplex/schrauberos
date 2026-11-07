@@ -23,6 +23,7 @@ export const appointmentsEn: typeof appointmentsDe = {
       title: "Bays",
       hint: "Lifts, parking spots or tyre bays. They appear as columns in the day view.",
       name: "Name",
+      namePlaceholder: "Lift 3",
       new: "Add bay",
       confirmDelete: "Delete bay? Existing appointments are kept without a bay.",
     },

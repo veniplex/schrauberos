@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Checkbox, ColorPicker, Field, FileInput, Form, FormActions, FormFieldError, Input, Select } from "@/components/ui/form";
 import { Alert, Card } from "@/components/ui/layout";
-import { ACCENT_PRESETS, isHexColor } from "@/lib/color";
+import { ACCENT_PRESETS, ACCENT_PRESET_NAMES, isHexColor } from "@/lib/color";
 import { accentTextContrast } from "@/lib/color-contrast";
 import { WEEKDAYS } from "@/lib/constants";
 import type { OpeningHours } from "@/lib/opening-hours";
@@ -86,7 +86,7 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
             ) : null}
           </Field>
           <Field label={t("settings.workshop.accent")} name="accentColor" hint={t("settings.workshop.accentHint")} group>
-            <ColorPicker name="accentColor" value={accent} presets={ACCENT_PRESETS} onChange={setAccent} customLabel={t("settings.workshop.accentCustom")} />
+            <ColorPicker name="accentColor" value={accent} presets={ACCENT_PRESETS.map((value, i) => ({ value, label: t(`settings.workshop.accentNames.${ACCENT_PRESET_NAMES[i]}`) }))} onChange={setAccent} customLabel={t("settings.workshop.accentCustom")} />
           </Field>
           {lowContrast ? <Alert tone="warning">{t("settings.workshop.accentLowContrast")}</Alert> : null}
         </div>

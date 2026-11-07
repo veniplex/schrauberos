@@ -8,7 +8,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { SegmentedLinks } from "@/components/ui/segmented";
 import { getI18n } from "@/i18n/server";
-import { clampPage, listLinks, parseListParams } from "@/lib/list-params";
+import { clampPage, listLinks, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { TIRE_SEASONS, TIRE_SET_STATUSES } from "@/modules/workshop/tires/constants";
 import { formatTireSize } from "@/modules/workshop/tires/domain";
@@ -107,6 +107,7 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
       />
 
       <FilterBar
+        keep={sortFields(list, DEFAULT)}
         columns="sm:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]"
         active={hasFilter}
         extrasOpen={Boolean(filters.status || filters.season)}

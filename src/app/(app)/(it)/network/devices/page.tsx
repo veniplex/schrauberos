@@ -8,7 +8,7 @@ import { LinkButton } from "@/components/ui/buttons";
 import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { getI18n } from "@/i18n/server";
-import { clampPage, listLinks, parseListParams } from "@/lib/list-params";
+import { clampPage, listLinks, parseListParams, sortFields } from "@/lib/list-params";
 import { DEVICE_STATUSES, DEVICE_TYPES } from "@/modules/it/network/constants";
 import { warrantyState } from "@/modules/it/network/domain";
 import { requirePermission } from "@/server/auth/session";
@@ -84,6 +84,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
       />
 
       <FilterBar
+        keep={sortFields(list, DEFAULT)}
         columns="sm:grid-cols-[minmax(0,1fr)_10rem_10rem_10rem_auto]"
         active={Boolean(filters.q || type || status || sp.location)}
         extrasOpen={Boolean(type || status || sp.location)}

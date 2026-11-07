@@ -10,7 +10,7 @@ import { SegmentedLinks } from "@/components/ui/segmented";
 import { TabNav } from "@/components/ui/tab-nav";
 import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
-import { clampPage, listHref, listLinks, parseListParams } from "@/lib/list-params";
+import { clampPage, listHref, listLinks, parseListParams, sortFields } from "@/lib/list-params";
 import { employeeName } from "@/modules/office/employees/public";
 import { FLEET_STATUSES, type FleetStatus } from "@/modules/office/fleet/domain";
 import { FLEET_STATUS_TONE } from "@/modules/office/fleet/status-tone";
@@ -96,6 +96,7 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
       />
 
       <FilterBar
+        keep={sortFields(list, DEFAULT)}
         columns="sm:grid-cols-[minmax(0,1fr)_11rem_auto]"
         active={Boolean(q || status !== "current")}
         extrasOpen={status !== "current"}

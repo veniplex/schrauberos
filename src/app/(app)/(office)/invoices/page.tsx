@@ -11,7 +11,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { currentYear, nowDate } from "@/lib/dates";
-import { clampPage, listHref, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { clampPage, listHref, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { INVOICE_DIRECTIONS, paymentState, type InvoiceDirection } from "@/modules/office/invoices/domain";
 import { invoiceSums, invoiceYears } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";
@@ -107,6 +107,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       </div>
 
       <FilterBar
+        keep={sortFields(list, DEFAULT, ORDER_PARAM)}
         columns="sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto]"
         active={Boolean(q || state || sp.year)}
         extrasOpen={Boolean(state || sp.year)}

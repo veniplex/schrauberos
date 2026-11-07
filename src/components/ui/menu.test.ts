@@ -50,9 +50,11 @@ describe("Menu", () => {
     const m = await mountMenu();
     await act(() => m.trigger().click());
     (m.root.querySelector("a") as HTMLElement).focus();
-    await act(() => void document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    const escape = new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    await act(() => void document.dispatchEvent(escape));
     assert.equal(m.trigger().getAttribute("aria-expanded"), "false");
     assert.ok(document.activeElement === m.trigger(), "Fokus am Auslöser");
+    assert.equal(escape.defaultPrevented, true, "Escape ist verbraucht: ein umgebendes modales Dialogfenster (Seitenfach) schließt nicht mit");
   });
 
   it("Klick daneben schließt; ein zweiter Klick auf den Knopf auch", async () => {

@@ -183,6 +183,8 @@ export async function DataTable<R>({
               {rows.map((row) => {
                 const href = rowHref?.(row) ?? null;
                 return (
+                  // `relative` am `tr` ist der Bezug des gestreckten Links (`after:absolute` an der Hauptzelle). Mit Playwright in Chromium **und WebKit** geprüft (Klick in jede Zeile trifft ihren
+                  // Link, Verweise in anderen Zellen liegen darüber, kein Überlauf): kein zusätzlicher Kniff nötig. Fiele der Bezug je aus, wäre die ganze Tabelle ein Link – dann hier `[transform:translateZ(0)]` ergänzen.
                   <tr key={rowKey(row)} className={clsx("relative", href && "row-link")}>
                     {columns.map((c) => {
                       const main = c === primary;
@@ -195,7 +197,7 @@ export async function DataTable<R>({
                           ) : (
                             c.cell(row)
                           )}
-                          {main && c.sub ? <div className="text-xs font-normal text-ink-muted">{c.sub(row)}</div> : null}
+                          {main && c.sub ? <div className="text-xs font-normal text-ink-muted [&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10">{c.sub(row)}</div> : null}
                         </td>
                       );
                     })}

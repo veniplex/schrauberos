@@ -6,6 +6,7 @@ import { LinkButton } from "./buttons";
 /**
  * Seitenwahl unter einer Liste: „1–25 von 230“, Vorherige/Nächste Seite, „Seite 2 von 10“. Erscheint nur, wenn es mehr als eine Seite gibt.
  * `hrefFor(page)` baut die Adresse der Seite (Filter und Sortierung bleiben erhalten, siehe `listHref`).
+ * Der Name der Knöpfe beginnt mit dem sichtbaren Text („Weiter: Nächste Seite“) – die Sprachsteuerung sagt, was man liest („Label im Namen“).
  */
 export async function Pagination({ page, pageSize, total, hrefFor }: { page: number; pageSize: number; total: number; hrefFor: (page: number) => string }) {
   const pages = pageCount(total, pageSize);
@@ -21,7 +22,7 @@ export async function Pagination({ page, pageSize, total, hrefFor }: { page: num
       </p>
       <div className="flex items-center gap-2">
         {page > 1 ? (
-          <LinkButton href={hrefFor(page - 1)} variant="secondary" rel="prev" aria-label={t("common.previousPage")}>
+          <LinkButton href={hrefFor(page - 1)} variant="secondary" rel="prev" aria-label={`${t("common.previous")}: ${t("common.previousPage")}`}>
             <ChevronLeft className="size-4" aria-hidden />
             <span className="max-sm:sr-only">{t("common.previous")}</span>
           </LinkButton>
@@ -30,7 +31,7 @@ export async function Pagination({ page, pageSize, total, hrefFor }: { page: num
           {t("common.pageOf", { page, pages })}
         </span>
         {page < pages ? (
-          <LinkButton href={hrefFor(page + 1)} variant="secondary" rel="next" aria-label={t("common.nextPage")}>
+          <LinkButton href={hrefFor(page + 1)} variant="secondary" rel="next" aria-label={`${t("common.next")}: ${t("common.nextPage")}`}>
             <span className="max-sm:sr-only">{t("common.next")}</span>
             <ChevronRight className="size-4" aria-hidden />
           </LinkButton>

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { SubmitButton } from "@/components/ui/buttons";
-import { Input } from "@/components/ui/form";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { SearchInput } from "@/components/ui/form";
 import { Alert, Card, EmptyState, NavLink, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { Markdown } from "@/components/ui/markdown";
@@ -37,7 +37,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
             {s.topics.map((topic) => (
               <li key={topic.id}>
                 <NavLink href={`/help/${topic.id}`} active={topic.id === current?.id} className="min-h-(--tap-row) py-1.5">
-                  {topic.page.title}
+                  <span lang="de">{topic.page.title}</span>
                 </NavLink>
               </li>
             ))}
@@ -56,10 +56,14 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
           {t("help.germanOnly")}
         </Alert>
       ) : null}
-      <form action="/help" role="search" className="mb-4 flex flex-wrap items-center gap-3">
-        <Input name="q" defaultValue={search} placeholder={t("help.searchPlaceholder")} aria-label={t("help.searchPlaceholder")} className="min-w-56 flex-1 sm:max-w-sm" />
-        <SubmitButton variant="secondary">{t("common.search")}</SubmitButton>
-      </form>
+      <FilterBar
+        action="/help"
+        columns="sm:grid-cols-[minmax(0,1fr)_auto]"
+        submitLabel={t("common.search")}
+        active={Boolean(search)}
+        resetHref="/help"
+        search={<SearchInput name="q" defaultValue={search} placeholder={t("help.searchPlaceholder")} aria-label={t("help.searchPlaceholder")} />}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_14rem]">
         <Disclosure title={t("help.contents")} className="lg:hidden">
@@ -71,9 +75,14 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
           <>
             <Card as="article" className="min-w-0">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{current.section.title}</p>
-              <h2 className="mb-4 text-xl font-semibold">{current.page.title}</h2>
+              <h2 lang="de" className="mb-4 text-xl font-semibold">
+                {current.page.title}
+              </h2>
               {current.page.headings.length > 1 ? <PageToc title={t("help.onThisPage")} items={current.page.headings} placement="inline" /> : null}
-              <Markdown source={current.page.body} taskLabels={{ done: t("common.taskDone"), open: t("common.taskOpen") }} />
+              {/* Die Kapitel gibt es nur auf Deutsch: Hilfetechnik liest sie auch in einer englischen Oberfläche deutsch vor */}
+              <div lang="de">
+                <Markdown source={current.page.body} taskLabels={{ done: t("common.taskDone"), open: t("common.taskOpen") }} />
+              </div>
             </Card>
 
             {current.page.headings.length > 1 ? <PageToc title={t("help.onThisPage")} items={current.page.headings} placement="aside" /> : null}
@@ -88,7 +97,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
                 {hits.map((hit) => (
                   <li key={hit.id}>
                     <TextLink href={`/help/${hit.id}`} className="font-medium">
-                      {hit.page.title}
+                      <span lang="de">{hit.page.title}</span>
                     </TextLink>
                     <span className="ml-2 text-sm text-ink-muted">{hit.section.title}</span>
                   </li>

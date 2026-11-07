@@ -8,7 +8,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
-import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { normalizePlate } from "@/lib/plate";
 import { requirePermission } from "@/server/auth/session";
@@ -66,6 +66,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
       />
 
       <FilterBar
+        keep={sortFields(list, DEFAULT)}
         columns="sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
         active={Boolean(q || noOwnerOnly)}
         extrasOpen={noOwnerOnly}

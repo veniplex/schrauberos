@@ -37,6 +37,34 @@ describe("numberInputMode", () => {
   });
 });
 
+describe("ColorPicker", () => {
+  it("benannte Vorschläge heißen wie ihre Farbe (nicht wie der Hex-Wert); die gewählte ist aria-pressed; Hex-Werte ohne Namen bleiben möglich", async () => {
+    const dom = installDom();
+    let view: MountedView | null = null;
+    try {
+      const { ColorPicker } = await import("./form");
+      const picked: string[] = [];
+      view = await mount(
+        createElement(ColorPicker, {
+          name: "accentColor",
+          value: "#0f766e",
+          presets: [{ value: "#2459c9", label: "Blau" }, { value: "#0f766e", label: "Petrol" }, "#15803d"],
+          onChange: (c: string) => picked.push(c),
+          customLabel: "Eigene Farbe wählen",
+        }),
+      );
+      const buttons = [...view.container.querySelectorAll<HTMLButtonElement>("button")];
+      assert.deepEqual(buttons.map((b) => b.getAttribute("aria-label")), ["Blau", "Petrol", "#15803d"]);
+      assert.deepEqual(buttons.map((b) => b.getAttribute("aria-pressed")), ["false", "true", "false"]);
+      await act(() => buttons[0].click());
+      assert.deepEqual(picked, ["#2459c9"]);
+    } finally {
+      await view?.unmount();
+      await dom.close();
+    }
+  });
+});
+
 describe("autoFocus der Eingabebausteine", () => {
   let view: MountedView | null = null;
   afterEach(async () => {

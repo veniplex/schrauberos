@@ -2,11 +2,21 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
-export type SegmentOption<T extends string> = { value: T; label: ReactNode; /** Zugänglicher Name, wenn `label` nur ein Symbol ist */ title?: string };
+export type SegmentOption<T extends string> = {
+  value: T;
+  label: ReactNode;
+  /** Zugänglicher Name, wenn `label` nur ein Symbol oder ein Kürzel ist (er beginnt mit dem sichtbaren Text) */
+  title?: string;
+  /** Sprache des Namens, wenn sie von der der Oberfläche abweicht (Sprachumschalter: „English“ in einer deutschen Oberfläche) */
+  lang?: string;
+};
 
-/** Umschalter mit wenigen, gleichrangigen Werten (Sprache, Darstellung). */
+/**
+ * Umschalter mit wenigen, gleichrangigen Werten (Sprache, Darstellung) als Optionsgruppe (`radiogroup`): **Pfeiltasten** wählen die nächste/vorige Option (die Auswahl
+ * folgt dem Fokus), Tab erreicht nur die gewählte (Roving-Tabindex) – wie bei jeder Optionsgruppe.
+ */
 export function SegmentedControl<T extends string>({
   label,
   value,
@@ -20,16 +30,29 @@ export function SegmentedControl<T extends string>({
   onChange: (value: T) => void;
   busy?: boolean;
 }) {
+  const group = useRef<HTMLDivElement>(null);
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    if (step === 0) return;
+    const index = options.findIndex((o) => o.value === value);
+    const target = (index + step + options.length) % options.length;
+    event.preventDefault();
+    onChange(options[target].value);
+    // der Fokus folgt der Auswahl (auch wenn die Änderung erst nach einer Serverantwort sichtbar wird)
+    group.current?.querySelectorAll<HTMLElement>("[role='radio']")[target]?.focus();
+  }
   return (
-    <div role="radiogroup" aria-label={label} aria-busy={busy} className="flex gap-0.5 rounded-md bg-surface-2 p-0.5">
+    <div ref={group} role="radiogroup" aria-label={label} aria-busy={busy} onKeyDown={onKeyDown} className="flex gap-0.5 rounded-md bg-surface-2 p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           role="radio"
           aria-checked={value === o.value}
+          tabIndex={value === o.value ? 0 : -1}
           aria-label={o.title}
           title={o.title}
+          lang={o.lang}
           onClick={() => onChange(o.value)}
           className={clsx(
             "grid min-h-(--tap-sm) min-w-(--tap-sm) cursor-pointer place-items-center rounded-sm px-2 text-xs font-medium transition-colors",

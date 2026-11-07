@@ -7,7 +7,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { SearchInput, Select } from "@/components/ui/form";
 import { getI18n } from "@/i18n/server";
 import { AUDIT_GROUPS } from "@/lib/audit-actions";
-import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { contains, searchWhere } from "@/server/search";
@@ -42,6 +42,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       <PageHeader title={t("audit.title")} description={t("audit.description")} help="admin.audit" />
 
       <FilterBar
+        keep={sortFields(list, DEFAULT)}
         columns="sm:grid-cols-[minmax(0,1fr)_14rem_auto]"
         active={Boolean(q || group)}
         extrasOpen={Boolean(group)}

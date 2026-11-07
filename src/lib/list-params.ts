@@ -41,6 +41,14 @@ export function listHref(base: string, query: Record<string, string | number | n
 }
 
 /**
+ * Die Sortierung als Formularfelder (`FilterBar keep`): Ein Filter-Formular sendet sonst nur seine eigenen Felder, und die gewählte Sortierung ginge beim Filtern verloren.
+ * Standardwerte entfallen (wie in `listLinks`); `dirParam`: Name des Richtungsparameters.
+ */
+export function sortFields(current: Pick<ListParams, "sort" | "dir">, defaults: { sort: string; dir: SortDir }, dirParam = "dir"): Record<string, string> {
+  return current.sort === defaults.sort && current.dir === defaults.dir ? {} : { sort: current.sort, [dirParam]: current.dir };
+}
+
+/**
  * Die Adress-Bauer einer Liste: `sortHref(key, dir)` (zurück auf Seite 1) und `pageHref(page)` (Sortierung bleibt); `filters` sind die übrigen Abfrageparameter.
  * Die Standardwerte (`defaults`) werden weggelassen, damit die Adresse kurz und stabil bleibt. `dirParam`: Name des Richtungsparameters, wenn `dir` schon etwas anderes bedeutet.
  */

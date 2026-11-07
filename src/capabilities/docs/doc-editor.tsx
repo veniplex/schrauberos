@@ -194,7 +194,7 @@ export function DocEditor({
           </div>
         ) : null}
       </div>
-      {uploadError ? <FieldError>{uploadError}</FieldError> : null}
+      {uploadError ? <FieldError live>{uploadError}</FieldError> : null}
       <p className="text-xs text-ink-muted">{t("docs.markdownHint")}</p>
 
       <Checkbox name="pinned" defaultChecked={initial.pinned} label={t("docs.fields.pinned")} />

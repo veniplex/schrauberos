@@ -1,19 +1,21 @@
 import assert from "node:assert/strict";
 import { after, afterEach, before, describe, it } from "node:test";
 import { createElement, type ReactElement } from "react";
-import { installFakes } from "@/test/harness";
+import { createTestEnv, type TestEnv } from "@/test/harness";
 import { installDom, mount, type MountedView, type TestDom } from "@/test/dom";
 
 /** Die kleinen Bausteine (P2a-5, P2a-8) in einem echten Renderer: Zustandsmarke, Links, Kennzahl, Hinweis, Reiter, Seitenkopf, Inhaltsverzeichnis. */
 let dom: TestDom;
 let view: MountedView | null = null;
+let env: TestEnv;
 
-before(() => {
-  installFakes();
+before(async () => {
+  env = await createTestEnv(); // Fakes für next/* und eine temporäre Datenbank (der Seitenkopf prüft das Recht auf das Hilfekapitel)
   dom = installDom();
 });
 after(async () => {
   await dom.close();
+  env.cleanup();
 });
 afterEach(async () => {
   await view?.unmount();
@@ -96,7 +98,13 @@ describe("TabNav und SegmentedLinks", () => {
 });
 
 describe("PageHeader", () => {
+  async function signInWith(permissions: string[]) {
+    const role = await env.role({ key: `r-${Math.random()}`, permissions });
+    await env.signIn(await env.user({ username: `u${Math.random().toString(36).slice(2, 8)}`, roles: [role] }));
+  }
+
   it("Pfad ab sm, darunter der Rücksprung; Hilfe-Knopf mit Namen; ohne back/help nur die Überschrift", async () => {
+    await signInWith(["customers.view", "customers.edit"]);
     const { PageHeader } = await import("./page-header");
     const root = await show(
       await PageHeader({ title: "Müller", back: { href: "/customers", label: "Kunden" }, help: "workshop.customers", description: "Kunde seit 2020", actions: h("button", { type: "button" }, "Bearbeiten") }),
@@ -112,6 +120,37 @@ describe("PageHeader", () => {
     assert.equal(bare.querySelector("nav"), null);
     assert.equal(bare.querySelector("a"), null);
   });
+  it("der Hilfe-Knopf erscheint nur, wenn das Kapitel für die Anmeldung sichtbar ist (Leserecht, aktive Funktion) – sonst führte er auf eine 404-Seite", async () => {
+    const { PageHeader } = await import("./page-header");
+    // Bearbeiten-Seiten verlangen oft nur *.edit, das Kapitel aber *.view
+    await signInWith(["customers.edit"]);
+    const noRead = await show(await PageHeader({ title: "Bearbeiten", help: "workshop.customers", actions: h("span", null, "x") }));
+    assert.equal(noRead.querySelector("a[href^='/help/']"), null, "ohne customers.view kein Knopf");
+    await view?.unmount();
+
+    await signInWith(["customers.view"]);
+    const withRead = await show(await PageHeader({ title: "Bearbeiten", help: "workshop.customers" }));
+    assert.ok(withRead.querySelector("a[href='/help/workshop.customers']"));
+    await view?.unmount();
+
+    // allgemeine Kapitel der Plattform sind für jeden angemeldeten Benutzer da; ohne Anmeldung nichts
+    const general = await show(await PageHeader({ title: "Konto", help: "arbeiten-in-der-anwendung" }));
+    assert.ok(general.querySelector("a[href='/help/arbeiten-in-der-anwendung']"));
+    await view?.unmount();
+    env.signOut();
+    const anonymous = await show(await PageHeader({ title: "Konto", help: "arbeiten-in-der-anwendung" }));
+    assert.equal(anonymous.querySelector("a"), null);
+  });
+
+  it("Pfad als gültige Liste: nur Listenelemente als Kinder, Trenner stehen im Element nach jedem Vorfahren (nicht nach dem letzten)", async () => {
+    const { PageHeader } = await import("./page-header");
+    const root = await show(await PageHeader({ title: "Bearbeiten", breadcrumbs: [{ href: "/a", label: "A" }, { href: "/a/b", label: "B" }, { href: "/a/b/c", label: "C" }] }));
+    const list = root.querySelector("ol")!;
+    assert.deepEqual([...list.children].map((c) => c.tagName), ["LI", "LI", "LI"], "ein ol enthält nur li");
+    assert.deepEqual([...list.children].map((li) => li.querySelector(".lucide-chevron-right") !== null), [true, true, false]);
+    assert.equal(list.querySelector(".lucide-chevron-right")?.getAttribute("aria-hidden"), "true");
+  });
+
   it("mehrere Vorfahren: der ganze Pfad, der Rücksprung geht zum nächsten", async () => {
     const { PageHeader } = await import("./page-header");
     const root = await show(await PageHeader({ title: "Bearbeiten", breadcrumbs: [{ href: "/customers", label: "Kunden" }, { href: "/customers/1", label: "Müller" }] }));

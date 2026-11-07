@@ -52,7 +52,7 @@ async function BaysCards() {
       <Card title={t("appointments.settings.bays.new")}>
         <form action={saveBay} className="flex flex-wrap items-end gap-3">
           <Field label={t("appointments.settings.bays.name")} htmlFor="new-bay" className="min-w-48 flex-1" required>
-            <Input id="new-bay" name="name" required maxLength={60} placeholder="Hebebühne 3" />
+            <Input id="new-bay" name="name" required maxLength={60} placeholder={t("appointments.settings.bays.namePlaceholder")} />
           </Field>
           <SubmitButton>{t("common.add")}</SubmitButton>
         </form>

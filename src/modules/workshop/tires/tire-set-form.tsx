@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Copy } from "lucide-react";
-import { Checkbox, Field, FieldLabel, Form, FormActions, FormFieldError, Input, Select, Textarea } from "@/components/ui/form";
+import { Checkbox, Field, FieldLabel, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { Button } from "@/components/ui/buttons";
-import { Card, Plate, Table } from "@/components/ui/layout";
+import { Card, Plate } from "@/components/ui/layout";
 import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
 import { useI18n } from "@/i18n/client";
@@ -148,64 +148,61 @@ export function TireSetForm({
         }
       >
         <p className="mb-3 text-sm text-ink-muted">{t("tires.dotHint")}</p>
-        <Table caption={t("tires.sections.tires")} className="min-w-[34rem]">
-            <thead>
-              <tr>
-                <th>{t("tires.fields.position")}</th>
-                <th>{t("tires.fields.dot")}</th>
-                <th>{t("tires.fields.tread")}</th>
-                <th>{t("tires.fields.condition")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {positions.map((pos) => (
-                <tr key={pos}>
-                  <td className="whitespace-nowrap font-medium">{td(`enums.position.${pos}`, pos)}</td>
-                  <td className="w-32">
-                    <Input
-                      name={`tire.${pos}.dot`}
-                      aria-label={`${td(`enums.position.${pos}`, pos)} – ${t("tires.fields.dot")}`}
-                      value={rows[pos].dot}
-                      onChange={(e) => setRow(pos, { dot: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                      inputMode="numeric"
-                      placeholder="2321"
-                      maxLength={4}
-                    />
-                    <FormFieldError name={`tire.${pos}.dot`} />
-                  </td>
-                  <td className="w-32">
-                    <Input
-                      name={`tire.${pos}.tread`}
-                      aria-label={`${td(`enums.position.${pos}`, pos)} – ${t("tires.fields.tread")}`}
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="15"
-                      inputMode="decimal"
-                      value={rows[pos].tread}
-                      onChange={(e) => setRow(pos, { tread: e.target.value })}
-                      placeholder="6.5"
-                    />
-                    <FormFieldError name={`tire.${pos}.tread`} />
-                  </td>
-                  <td>
-                    <Select
-                      name={`tire.${pos}.condition`}
-                      aria-label={`${td(`enums.position.${pos}`, pos)} – ${t("tires.fields.condition")}`}
-                      value={rows[pos].condition}
-                      onChange={(e) => setRow(pos, { condition: e.target.value })}
-                    >
-                      {TIRE_CONDITIONS.map((c) => (
-                        <option key={c} value={c}>
-                          {td(`enums.condition.${c}`, c)}
-                        </option>
-                      ))}
-                    </Select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+        {/* Eine Gruppe je Position: ab md eine Zeile unter gemeinsamer Kopfzeile (die Beschriftungen entfallen dort optisch), darunter Karten mit beschrifteten Feldern – kein Seitwärtsscrollen am Handy */}
+        <div role="group" aria-label={t("tires.sections.tires")}>
+          <div aria-hidden className="hidden gap-3 border-b border-line pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted md:grid md:grid-cols-[7rem_8rem_8rem_minmax(0,1fr)]">
+            <span>{t("tires.fields.position")}</span>
+            <span>{t("tires.fields.dot")}</span>
+            <span>{t("tires.fields.tread")}</span>
+            <span>{t("tires.fields.condition")}</span>
+          </div>
+          <div className="flex flex-col gap-3 md:gap-0">
+            {positions.map((pos) => (
+              <div
+                key={pos}
+                role="group"
+                aria-label={td(`enums.position.${pos}`, pos)}
+                className="grid grid-cols-2 gap-3 rounded-md border border-line p-3 md:grid-cols-[7rem_8rem_8rem_minmax(0,1fr)] md:items-start md:rounded-none md:border-0 md:border-b md:px-0 md:py-2"
+              >
+                <p className="col-span-2 font-medium md:col-span-1 md:pt-2">{td(`enums.position.${pos}`, pos)}</p>
+                <Field label={t("tires.fields.dot")} htmlFor={`tire-${pos}-dot`} name={`tire.${pos}.dot`} labelClassName="md:sr-only">
+                  <Input
+                    id={`tire-${pos}-dot`}
+                    name={`tire.${pos}.dot`}
+                    value={rows[pos].dot}
+                    onChange={(e) => setRow(pos, { dot: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                    inputMode="numeric"
+                    placeholder="2321"
+                    maxLength={4}
+                  />
+                </Field>
+                <Field label={t("tires.fields.tread")} htmlFor={`tire-${pos}-tread`} name={`tire.${pos}.tread`} labelClassName="md:sr-only">
+                  <Input
+                    id={`tire-${pos}-tread`}
+                    name={`tire.${pos}.tread`}
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="15"
+                    inputMode="decimal"
+                    value={rows[pos].tread}
+                    onChange={(e) => setRow(pos, { tread: e.target.value })}
+                    placeholder="6.5"
+                  />
+                </Field>
+                <Field label={t("tires.fields.condition")} htmlFor={`tire-${pos}-condition`} name={`tire.${pos}.condition`} className="col-span-2 md:col-span-1" labelClassName="md:sr-only">
+                  <Select id={`tire-${pos}-condition`} name={`tire.${pos}.condition`} value={rows[pos].condition} onChange={(e) => setRow(pos, { condition: e.target.value })}>
+                    {TIRE_CONDITIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {td(`enums.condition.${c}`, c)}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+            ))}
+          </div>
+        </div>
         <Checkbox name="spare" checked={spare} onChange={(e) => setSpare(e.target.checked)} label={t("tires.fields.spare")} className="mt-3" />
       </Card>
 
@@ -221,7 +218,7 @@ export function TireSetForm({
             </Select>
           </Field>
           <Field label={t("tires.fields.location")} htmlFor="storageLocation" hint={t("tires.fields.locationHint")}>
-            <Input id="storageLocation" name="storageLocation" list="tire-locations" defaultValue={initial.storageLocation} maxLength={120} placeholder="Halle A / Regal 3 / Fach 2" />
+            <Input id="storageLocation" name="storageLocation" list="tire-locations" defaultValue={initial.storageLocation} maxLength={120} placeholder={t("tires.fields.locationPlaceholder")} />
             <datalist id="tire-locations">
               {locations.map((l) => (
                 <option key={l} value={l} />

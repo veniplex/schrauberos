@@ -8,7 +8,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
-import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { DEPARTMENTS, employeeName } from "@/modules/office/employees/domain";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -73,6 +73,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
       />
 
       <FilterBar
+        keep={sortFields(list, DEFAULT)}
         columns="sm:grid-cols-[minmax(0,1fr)_11rem_10rem_auto]"
         active={Boolean(q || department || status !== "active")}
         extrasOpen={Boolean(department || status !== "active")}

@@ -122,6 +122,10 @@ export function QuickSearch() {
         role="search"
         aria-label={t("nav.search")}
         onKeyDown={onKeyDown}
+        // Wandert der Fokus aus Feld und Ergebnissen hinaus (Tab), schließt die Ergebnisfläche – sonst bliebe sie offen und ließe sich nicht mehr per Tastatur schließen (Escape wirkt nur im Bereich)
+        onBlur={(event) => {
+          if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setPopup(false);
+        }}
         className={clsx(
           "lg:relative lg:block lg:w-full lg:max-w-md lg:p-0 lg:shadow-none",
           expanded ? "fixed inset-x-0 top-0 z-50 flex items-center gap-2 bg-surface px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] shadow-pop" : "hidden",

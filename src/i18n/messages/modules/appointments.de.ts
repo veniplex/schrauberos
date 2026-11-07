@@ -22,6 +22,7 @@ export const appointmentsDe = {
       title: "Arbeitsplätze",
       hint: "Hebebühnen, Stellplätze oder Reifenplätze. Sie erscheinen als Spalten in der Tagesansicht.",
       name: "Name",
+      namePlaceholder: "Hebebühne 3",
       new: "Arbeitsplatz hinzufügen",
       confirmDelete: "Arbeitsplatz löschen? Bestehende Termine bleiben ohne Arbeitsplatz erhalten.",
     },

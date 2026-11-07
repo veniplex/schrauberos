@@ -57,14 +57,12 @@ async function table(props: Record<string, unknown> = {}) {
 }
 
 describe("DataTable", () => {
-  it("Tabelle: Beschriftung, fokussierbarer Scroll-Rahmen, aria-sort nur an sortierbaren Spalten, Aktionsspalte ohne sichtbaren Kopf", async () => {
+  it("Tabelle: Beschriftung, aria-sort nur an sortierbaren Spalten, Aktionsspalte ohne sichtbaren Kopf; ohne Überlauf kein Tab-Stopp (Verhalten: scroll-area.test.ts)", async () => {
     const root = await table();
     const t = root.querySelector("table");
     assert.ok(t);
     assert.equal(t.querySelector("caption")?.textContent, "Kunden");
-    const region = root.querySelector("[role='region']");
-    assert.equal(region?.getAttribute("tabindex"), "0");
-    assert.equal(region?.getAttribute("aria-label"), "Kunden");
+    assert.equal(root.querySelector("[role='region']"), null, "passt die Tabelle hinein, gibt es keine leere Region und keinen zusätzlichen Tab-Stopp");
     const heads = [...t.querySelectorAll("th")];
     assert.deepEqual(heads.map((h) => h.getAttribute("aria-sort")), ["ascending", "none", null, null]);
     assert.match(heads[3].textContent ?? "", /Aktionen/);
@@ -86,6 +84,15 @@ describe("DataTable", () => {
     assert.equal(link?.textContent, "Anna", "der Name des Links bleibt kurz");
     assert.match(row.querySelector("td")?.textContent ?? "", /#a/);
     assert.equal(row.querySelectorAll("a").length, 1);
+  });
+
+  it("Verweise in der Nebenzeile der Hauptspalte liegen über dem gestreckten Zeilenlink (bleiben anklickbar)", async () => {
+    const root = await table({
+      columns: [{ id: "name", header: "Name", priority: "primary", cell: (r: Row) => r.name, sub: (r: Row) => createElement("a", { href: `/v/${r.id}` }, "Fahrzeug") }],
+    });
+    const sub = root.querySelector("tbody td div");
+    assert.ok(sub?.className.includes("[&_a]:relative"), "Verweise stehen in einer eigenen Ebene");
+    assert.ok(sub?.className.includes("[&_a]:z-10"), "und über dem gestreckten Link");
   });
 
   it("Karten (unter md): je Zeile eine Karte mit Titel, beschrifteten Werten ohne `low`-Spalten und der Aktionsleiste", async () => {
@@ -157,6 +164,13 @@ describe("FilterBar", () => {
     const extras = document.getElementById(toggle.getAttribute("aria-controls") ?? "");
     assert.ok(extras?.querySelector("select[name='status']"));
     assert.equal([...root.querySelectorAll("a")].find((a) => a.textContent === "Zurücksetzen")?.getAttribute("href"), "/liste");
+  });
+  it("keep: die gewählte Sortierung bleibt beim Filtern erhalten (versteckte Felder), leere Werte entfallen", async () => {
+    const root = await bar({ keep: { sort: "city", dir: "desc", order: undefined } });
+    assert.deepEqual(
+      [...root.querySelectorAll("form input[type='hidden']")].map((i) => [i.getAttribute("name"), (i as HTMLInputElement).value]),
+      [["sort", "city"], ["dir", "desc"]],
+    );
   });
   it("ohne gesetzten Filter kein „Zurücksetzen“, ohne Zusatzfilter kein Einklapp-Knopf", async () => {
     const root = await bar({});

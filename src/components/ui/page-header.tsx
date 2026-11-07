@@ -1,6 +1,8 @@
 import { ChevronLeft, ChevronRight, CircleHelp } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { getI18n } from "@/i18n/server";
+import { helpTopicVisible } from "@/modules/help";
+import { getSession } from "@/server/auth/session";
 import { LinkButton } from "./buttons";
 import { TextLink } from "./layout";
 
@@ -13,7 +15,7 @@ export type Crumb = { href: string; label: ReactNode };
  *   Zurück-Taste). `breadcrumbs` sind die Vorfahren von oben nach unten (ohne die aktuelle Seite), `back` ist der unmittelbare Vorfahre. Ab `sm` steht der ganze
  *   Pfad, darunter nur „← Vorfahre“.
  * - `help`: Kapitel der Hilfe (`/help/<id>`, Id aus der `help.ts` der Funktion oder ein Allgemein-Kapitel wie `arbeiten-in-der-anwendung`) – ein Hilfe-Knopf in den Aktionen.
- *   Nur setzen, wenn das Kapitel für jeden sichtbar ist, der die Seite sehen darf.
+ *   Der Knopf erscheint nur, wenn das Kapitel für diese Anmeldung sichtbar ist (Funktion aktiv, Leserecht) – sonst führte er auf eine 404-Seite.
  */
 export async function PageHeader({
   title,
@@ -31,6 +33,8 @@ export async function PageHeader({
   help?: string;
 }) {
   const { t } = await getI18n();
+  const session = help ? await getSession() : null;
+  const showHelp = Boolean(help && session && helpTopicVisible(help, session));
   const trail = breadcrumbs ?? (back ? [back] : []);
   const parent = trail[trail.length - 1];
   return (
@@ -39,14 +43,13 @@ export async function PageHeader({
         <nav aria-label={t("common.breadcrumb")} className="mb-2">
           <ol className="hidden flex-wrap items-center gap-x-1 text-sm text-ink-muted sm:flex">
             {trail.map((crumb, i) => (
-              <Fragment key={`${crumb.href}-${i}`}>
-                {i > 0 ? <ChevronRight className="size-3.5 shrink-0" aria-hidden /> : null}
-                <li>
-                  <TextLink href={crumb.href} className="text-ink-muted no-underline hover:text-ink hover:underline">
-                    {crumb.label}
-                  </TextLink>
-                </li>
-              </Fragment>
+              // Trenner im Listenelement (ein `ol` darf nur `li` enthalten), vor allem **nach** jedem Vorfahren: der Pfad endet am nächsten Vorfahren, die aktuelle Seite steht darunter in der Überschrift
+              <li key={`${crumb.href}-${i}`} className="flex items-center gap-x-1">
+                <TextLink href={crumb.href} className="text-ink-muted no-underline hover:text-ink hover:underline">
+                  {crumb.label}
+                </TextLink>
+                {i < trail.length - 1 ? <ChevronRight className="size-3.5 shrink-0" aria-hidden /> : null}
+              </li>
             ))}
           </ol>
           <TextLink href={parent.href} className="gap-1 sm:hidden">
@@ -60,10 +63,10 @@ export async function PageHeader({
           <h1 className="text-2xl font-semibold">{title}</h1>
           {description ? <div className="mt-1 max-w-prose text-sm text-ink-muted">{description}</div> : null}
         </div>
-        {actions || help ? (
+        {actions || showHelp ? (
           <div className="flex flex-wrap items-center gap-2">
             {actions}
-            {help ? (
+            {showHelp ? (
               <LinkButton href={`/help/${help}`} variant="ghost" size="icon" aria-label={t("common.helpForPage")} title={t("common.helpForPage")}>
                 <CircleHelp className="size-4" aria-hidden />
               </LinkButton>

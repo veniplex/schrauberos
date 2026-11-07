@@ -34,3 +34,6 @@ export const ACCENT_PRESETS = [
   "#7e22ce", // Violett
   "#334155", // Schiefer
 ] as const;
+
+/** Namen der Vorschlagsfarben (gleiche Reihenfolge wie `ACCENT_PRESETS`; Schlüssel unter `settings.workshop.accentNames`): Hilfstechnik und Sprachsteuerung nennen Farben, keine Hex-Werte. */
+export const ACCENT_PRESET_NAMES = ["blue", "teal", "green", "orange", "red", "violet", "slate"] as const;

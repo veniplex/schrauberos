@@ -57,6 +57,8 @@ export function Menu({
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      // preventDefault: Escape ist hier verbraucht – ein umgebendes modales <dialog> (Seitenfach, Dialog) darf nicht zugleich schließen
+      event.preventDefault();
       event.stopPropagation();
       setOpenAt(null);
       button.current?.focus();

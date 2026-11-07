@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Badge, EmptyState, Plate } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { DataTable } from "@/components/ui/data-table";
+import { FilterBar } from "@/components/ui/filter-bar";
 import { Pagination } from "@/components/ui/pagination";
 import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
-import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
 import { normalizePlate } from "@/lib/plate";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { contains, searchWhere } from "@/server/search";
-import { Input } from "@/components/ui/form";
+import { SearchInput } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -39,6 +40,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       { where: (term) => ({ customerNumber: contains(term) }) },
       { where: (term) => ({ city: contains(term) }) },
       { where: (term) => ({ phone: contains(term) }) },
+      { where: (term) => ({ email: contains(term) }) },
       { permission: "vehicles.view", where: () => (plate ? { vehicles: { some: { plateNorm: { contains: plate } } } } : { id: "" }) },
     ]) ?? {};
 
@@ -64,12 +66,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <form method="get" role="search" className="mb-5 max-w-lg">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
-          <Input name="q" defaultValue={q} className="pl-9" placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />
-        </div>
-      </form>
+      <FilterBar
+        columns="sm:grid-cols-[minmax(0,1fr)_auto]"
+        keep={sortFields(list, DEFAULT)}
+        active={Boolean(q)}
+        resetHref="/customers"
+        search={<SearchInput name="q" defaultValue={q} placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />}
+      />
 
       <DataTable
         caption={t("customers.title")}

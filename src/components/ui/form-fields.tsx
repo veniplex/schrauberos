@@ -39,12 +39,13 @@ export function FieldHint({ className, id, children }: { className?: string; id?
 
 /**
  * Fehlertext eines Feldes. Außerhalb eines `Form` ist er eine Live-Region (wird angesagt); innerhalb sagt die Fehlerzusammenfassung
- * (`FormErrorSummary`) alle Fehler gesammelt an – eine zweite Ansage je Feld wäre doppelt.
+ * (`FormErrorSummary`) alle Fehler gesammelt an – eine zweite Ansage je Feld wäre doppelt. `live`: für Fehler, die im Browser entstehen und nicht über den Zustand des Formulars
+ * laufen (Bild-Upload im Editor, zu große Datei): Die Zusammenfassung kennt sie nicht, also sagt der Fehler sich selbst an.
  */
-export function FieldError({ as: Tag = "p", className, id, children }: { as?: "p" | "span"; className?: string; id?: string; children: ReactNode }) {
+export function FieldError({ as: Tag = "p", className, id, live, children }: { as?: "p" | "span"; className?: string; id?: string; live?: boolean; children: ReactNode }) {
   const inForm = useFormContext() !== null;
   return (
-    <Tag id={id} role={inForm ? undefined : "alert"} className={clsx("field-error", className)}>
+    <Tag id={id} role={inForm && !live ? undefined : "alert"} className={clsx("field-error", className)}>
       {children}
     </Tag>
   );
@@ -58,6 +59,7 @@ export function FieldError({ as: Tag = "p", className, id, children }: { as?: "p
  * - `htmlFor`: eine feste Id (sonst automatisch). Wer eine eigene `id` am Eingabeelement setzt, trägt sie hier ein.
  * - `group`: Gruppe von Eingaben (Kontrollkästchen, Farbwahl, mehrere Felder): `fieldset` mit `legend`, Fehler/Hinweis hängen an der Gruppe.
  * - Fehler **und** Hinweis bleiben nebeneinander sichtbar (der Fehler zuerst).
+ * - `labelClassName`: Darstellung der Beschriftung (z. B. `md:sr-only`, wenn eine Kopfzeile sie ersetzt – der Name für Hilfstechnik bleibt).
  */
 export function Field({
   label,
@@ -68,6 +70,7 @@ export function Field({
   required,
   group,
   className,
+  labelClassName,
   children,
 }: {
   label: ReactNode;
@@ -78,6 +81,7 @@ export function Field({
   required?: boolean;
   group?: boolean;
   className?: string;
+  labelClassName?: string;
   children: ReactNode;
 }) {
   const auto = useId();
@@ -119,7 +123,7 @@ export function Field({
   return (
     <FieldContext.Provider value={value}>
       <div className={className} data-field={name}>
-        <label id={value.labelId} className="field-label" htmlFor={id}>
+        <label id={value.labelId} className={clsx("field-label", labelClassName)} htmlFor={id}>
           {label}
           {mark}
         </label>
@@ -300,24 +304,28 @@ export function ColorPicker({
 }: {
   name: string;
   value: string;
-  presets: readonly string[];
+  /** Vorschlagsfarben: Hex-Wert oder Wert mit Namen (der Name ist der zugängliche Name des Knopfes – ohne ihn heißt er wie der Hex-Wert) */
+  presets: ReadonlyArray<string | { value: string; label: string }>;
   onChange: (color: string) => void;
   /** Zugänglicher Name der freien Farbwahl */
   customLabel: string;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {presets.map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => onChange(c)}
-          aria-label={c}
-          aria-pressed={value.toLowerCase() === c}
-          className="size-(--tap-sm) cursor-pointer rounded-full border-2 border-surface outline outline-1 outline-line-strong aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ink"
-          style={{ background: c }}
-        />
-      ))}
+      {presets.map((preset) => {
+        const c = typeof preset === "string" ? preset : preset.value;
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            aria-label={typeof preset === "string" ? c : preset.label}
+            aria-pressed={value.toLowerCase() === c}
+            className="size-(--tap-sm) cursor-pointer rounded-full border-2 border-surface outline outline-1 outline-control aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ink"
+            style={{ background: c }}
+          />
+        );
+      })}
       <ColorInput value={value} onChange={(e) => onChange(e.target.value)} aria-label={customLabel} className="size-(--tap-sm) w-(--tap-sm) p-0.5" />
       <input type="hidden" name={name} value={value} />
     </div>

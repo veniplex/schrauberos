@@ -236,7 +236,9 @@ describe("Entwurf: Lebensdauer", () => {
   });
 
   it("verschwindet das Formular mitten im Absenden (Weiterleitung nach dem Speichern), ist der Entwurf erledigt", async () => {
-    const f = await mountDraft(await plain(), { action: () => new Promise(() => {}) });
+    // Die Aktion kommt erst nach dem Entfernen zurück (React verschränkt asynchrone Aktionen: eine nie endende würde alle folgenden Tests blockieren)
+    let release: () => void = () => {};
+    const f = await mountDraft(await plain(), { action: () => new Promise((resolve) => (release = () => resolve({ ok: true }))) });
     await f.type("title", "Wichtig");
     await sleep(DEBOUNCE);
     assert.ok(sessionStorage.getItem(draftKey));
@@ -244,6 +246,8 @@ describe("Entwurf: Lebensdauer", () => {
     await view!.unmount();
     view = null;
     assert.equal(sessionStorage.getItem(draftKey), null);
+    release();
+    await sleep(20);
   });
 
   it("was während des Absendens getippt wird, geht bei einem Fehler nicht verloren", async () => {
@@ -345,6 +349,63 @@ describe("FormActions: Enter im Textfeld", () => {
     const { Form, FormActions } = await import("./form");
     view = await mount(await withProviders(createElement(Form, { action: failing as never }, createElement(FormActions, { submitLabel: "Sichern" }))));
     assert.equal(view.container.querySelectorAll("button[type='submit']").length, 1);
+  });
+});
+
+describe("Fehlerzusammenfassung und Feldfehler", () => {
+  it("Felder in einer benannten Gruppe (Reifenposition) heißen in der Zusammenfassung „Gruppe – Feld“; ein Klick springt in das richtige Feld", async () => {
+    const { Field, Input } = await import("./form");
+    const position = (name: string) =>
+      createElement("div", { role: "group", "aria-label": name, key: name }, createElement(Field as never, { label: "DOT", name: `tire.${name}.dot` }, createElement(Input, { name: `tire.${name}.dot`, defaultValue: "" })));
+    const f = await mountDraft(createElement("div", null, position("Vorne links"), position("Hinten rechts")), {
+      draftKey: undefined,
+      action: async () => ({ fieldErrors: { "tire.Hinten rechts.dot": "Vier Ziffern." } }),
+    });
+    await f.submit();
+    const summary = f.root.querySelector("[data-form-errors]");
+    assert.match(summary?.textContent ?? "", /Hinten rechts – DOT: Vier Ziffern./);
+    await act(() => (f.root.querySelector("[data-form-errors] button") as HTMLButtonElement).click());
+    assert.ok(document.activeElement === f.input("tire.Hinten rechts.dot"));
+  });
+
+  it("FieldError: im Formular sagt die Zusammenfassung an (kein eigener Alarm), `live` für Fehler aus dem Browser (Upload) sagt sich selbst an", async () => {
+    const { FieldError } = await import("./form");
+    const f = await mountDraft(createElement("div", null, createElement(FieldError as never, { id: "a" }, "Vom Server"), createElement(FieldError as never, { id: "b", live: true }, "Upload fehlgeschlagen")));
+    assert.equal(f.root.querySelector("#a")?.getAttribute("role"), null);
+    assert.equal(f.root.querySelector("#b")?.getAttribute("role"), "alert");
+  });
+});
+
+describe("FormActions: Toast-Hub", () => {
+  it("die gemessene Höhe der Aktionsleiste hebt den Toast (--toast-lift); nach dem Entfernen ist der Hub weg", async () => {
+    const { Form, FormActions } = await import("./form");
+    let notify: () => void = () => {};
+    const real = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+      constructor(callback: () => void) {
+        notify = callback;
+      }
+      observe() {}
+      disconnect() {}
+    };
+    const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight");
+    let bar = 72;
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, get: () => bar });
+    try {
+      view = await mount(await withProviders(createElement(Form, { action: failing as never }, createElement(FormActions, { submitLabel: "Sichern" }))));
+      await act(() => notify());
+      assert.equal(document.documentElement.style.getPropertyValue("--toast-lift"), "72px");
+      bar = 120; // Fehlermeldung über den Knöpfen: die Leiste wird höher
+      await act(() => notify());
+      assert.equal(document.documentElement.style.getPropertyValue("--toast-lift"), "120px");
+      await view.unmount();
+      view = null;
+      assert.equal(document.documentElement.style.getPropertyValue("--toast-lift"), "");
+    } finally {
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = real;
+      if (height) Object.defineProperty(HTMLElement.prototype, "offsetHeight", height);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetHeight;
+    }
   });
 });
 

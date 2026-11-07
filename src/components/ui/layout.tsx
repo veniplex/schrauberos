@@ -4,6 +4,7 @@ import { CircleAlert, CircleCheck, Info, TriangleAlert } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import type { StatusTone } from "@/lib/status-tone";
 import { LinkPending } from "./link-pending";
+import { ScrollArea } from "./scroll-area";
 
 /**
  * Die Karte. Mit `title`/`actions` bekommt sie einen Kopf; `padded={false}` für Inhalte, die bis an den Rand reichen (Tabellen, Listen).
@@ -141,7 +142,7 @@ export function DefinitionList({ items }: { items: Array<{ label: ReactNode; val
 
 /**
  * Einfache Tabelle für kleine, feste Inhalte (Kalenderraster, Detail-Unterlisten). Datenlisten mit Zeilenlink, Sortierung, Kartenansicht und Seiten: `DataTable`.
- * Mit waagerechtem Scrollen auf schmalen Bildschirmen (der Rahmen ist per Tastatur fokussierbar, sonst erreicht niemand den verdeckten Teil).
+ * Mit waagerechtem Scrollen auf schmalen Bildschirmen (der Rahmen ist **bei Überlauf** per Tastatur fokussierbar, sonst erreicht niemand den verdeckten Teil; siehe `ScrollArea`).
  * `caption` benennt die Tabelle für Hilfstechnik (nicht sichtbar). `className` geht an die Tabelle (z. B. Mindestbreite), `scrollClassName` an den Rahmen.
  */
 export function Table({
@@ -158,13 +159,18 @@ export function Table({
   caption?: string;
   children: ReactNode;
 }) {
-  return (
-    <div className={clsx("overflow-x-auto", scrollClassName)} {...(caption ? { tabIndex: 0, role: "region", "aria-label": caption } : {})}>
-      <table className={clsx(variant === "list" ? "table" : "w-full border-collapse text-xs", className)}>
-        {caption ? <caption className="sr-only">{caption}</caption> : null}
-        {children}
-      </table>
-    </div>
+  const table = (
+    <table className={clsx(variant === "list" ? "table" : "w-full border-collapse text-xs", className)}>
+      {caption ? <caption className="sr-only">{caption}</caption> : null}
+      {children}
+    </table>
+  );
+  return caption ? (
+    <ScrollArea label={caption} hint={false} className={scrollClassName}>
+      {table}
+    </ScrollArea>
+  ) : (
+    <div className={clsx("overflow-x-auto", scrollClassName)}>{table}</div>
   );
 }
 

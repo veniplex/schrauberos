@@ -81,6 +81,7 @@ export const tiresEn: typeof tiresDe = {
     spare: "Include spare wheel",
     location: "Storage location",
     locationHint: "e.g. hall / rack / slot – locations already in use are suggested.",
+    locationPlaceholder: "Hall A / Rack 3 / Slot 2",
     storedAt: "Stored on",
   },
   errors: {

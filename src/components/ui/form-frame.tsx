@@ -314,8 +314,11 @@ function fieldTarget(form: HTMLFormElement, name: string): { control: HTMLElemen
   const control =
     wrapper?.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea, button, [tabindex='0']") ??
     ((named && !(named instanceof Element) ? (named as unknown as ArrayLike<Element>)[0] : named) as HTMLElement | null);
-  const label = wrapper?.querySelector("label, legend")?.textContent ?? "";
-  return { control: control && !(control instanceof HTMLInputElement && control.type === "hidden") ? control : null, label: label.replace(/\*$/, "").trim() };
+  const own = (wrapper?.querySelector("label, legend")?.textContent ?? "").replace(/\*$/, "").trim();
+  // Felder in einer benannten Gruppe (Reifenposition „Vorne links“) tragen den Namen der Gruppe, sonst hieße vier Mal „DOT“ dasselbe
+  const group = wrapper?.closest("[role='group'][aria-label]")?.getAttribute("aria-label") ?? "";
+  const label = group && own ? `${group} – ${own}` : own;
+  return { control: control && !(control instanceof HTMLInputElement && control.type === "hidden") ? control : null, label };
 }
 
 /**
@@ -405,6 +408,17 @@ export function FormFieldError({ name, className }: { name: string; className?: 
   ) : null;
 }
 
+/** Gemessene Höhen der Aktionsleisten auf der Seite; die größte hebt den Toast (`--toast-lift` am Wurzelelement, Fallback in globals.css) */
+const barHeights = new Map<Element, number>();
+function publishToastLift(element: Element, height: number) {
+  if (height > 0) barHeights.set(element, height);
+  else barHeights.delete(element);
+  const largest = Math.max(0, ...barHeights.values());
+  const root = document.documentElement;
+  if (largest > 0) root.style.setProperty("--toast-lift", `${largest}px`);
+  else root.style.removeProperty("--toast-lift");
+}
+
 /**
  * Unsichtbarer Standard-Absender (Enter im Textfeld): sendet das Formular ohne Zusatzfeld – wie die Hauptaktion, an deren Stelle er steht. Nicht fokussierbar und vor Bedienhilfen
  * verborgen (die sichtbare Hauptaktion ist der eigentliche Knopf); während des Absendens gesperrt wie sie, damit Enter nicht doppelt absendet.
@@ -436,18 +450,25 @@ export function FormActions({
   className?: string;
 }) {
   const { t } = useI18n();
+  const bar = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const root = document.documentElement;
+    const element = bar.current;
     const count = Number(root.dataset.formActions ?? "0") + 1;
     root.dataset.formActions = String(count);
+    // Höhe der Leiste (wächst mit Fehlermeldung, Hinweis oder Zeilenumbruch der Knöpfe) → Hub des Toasts
+    const observer = element && typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => publishToastLift(element, element.offsetHeight)) : null;
+    if (element) observer?.observe(element);
     return () => {
+      observer?.disconnect();
+      if (element) publishToastLift(element, 0);
       const left = Number(root.dataset.formActions ?? "1") - 1;
       if (left > 0) root.dataset.formActions = String(left);
       else delete root.dataset.formActions;
     };
   }, []);
   return (
-    <div className={clsx("form-actions flex flex-col gap-2", className)}>
+    <div ref={bar} className={clsx("form-actions flex flex-col gap-2", className)}>
       <FormMessage />
       <div className="flex flex-wrap items-center justify-end gap-2">
         {/* Enter in einem Textfeld löst den **ersten** Absende-Knopf im Dokument aus: bei zwei Aktionen soll das die Hauptaktion sein, nicht „Speichern und weiter“ (steht aus Gründen der Reihenfolge davor) */}

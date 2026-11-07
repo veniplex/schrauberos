@@ -80,6 +80,7 @@ export const tiresDe = {
     spare: "Ersatzrad mit erfassen",
     location: "Lagerort",
     locationHint: "z. B. Halle / Regal / Fach – bereits genutzte Orte werden vorgeschlagen.",
+    locationPlaceholder: "Halle A / Regal 3 / Fach 2",
     storedAt: "Eingelagert am",
   },
   errors: {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clampPage, listHref, listLinks, pageCount, pageWindow, parseListParams } from "./list-params";
+import { clampPage, listHref, listLinks, pageCount, pageWindow, parseListParams, sortFields } from "./list-params";
 
 const OPTIONS = { sorts: ["name", "city"], sort: "name" } as const;
 
@@ -49,6 +49,12 @@ describe("Adressen", () => {
     assert.equal(links.sortHref("city", "asc"), "/customers?q=m%C3%BCller&sort=city&dir=asc");
     assert.equal(links.pageHref(1), "/customers?q=m%C3%BCller&sort=city&dir=desc");
     assert.equal(links.pageHref(3), "/customers?q=m%C3%BCller&sort=city&dir=desc&page=3");
+  });
+  it("sortFields: die gewählte Sortierung als Formularfelder (für Filter), Standard entfällt, eigener Richtungsparameter", () => {
+    const defaults = { sort: "name", dir: "asc" as const };
+    assert.deepEqual(sortFields({ sort: "name", dir: "asc" }, defaults), {});
+    assert.deepEqual(sortFields({ sort: "city", dir: "desc" }, defaults), { sort: "city", dir: "desc" });
+    assert.deepEqual(sortFields({ sort: "name", dir: "desc" }, defaults, "order"), { sort: "name", order: "desc" });
   });
   it("listLinks mit eigenem Richtungsparameter", () => {
     const links = listLinks("/invoices", { dir: "outgoing" }, { sort: "gross", dir: "desc", page: 1, pageSize: 25 }, { sort: "date", dir: "desc" }, "order");

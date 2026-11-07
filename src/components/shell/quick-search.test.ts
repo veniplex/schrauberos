@@ -60,6 +60,22 @@ async function mountSearch() {
 }
 
 describe("QuickSearch", () => {
+  it("wandert der Fokus aus Feld und Ergebnissen hinaus (Tab), schließt die Ergebnisfläche; innerhalb der Ergebnisse bleibt sie offen", async () => {
+    respond = async () => ({ ok: true, json: async () => ({ groups }) });
+    const s = await mountSearch();
+    await s.type("mu");
+    assert.ok(s.root.querySelector("[aria-label='Suchergebnisse']"), "Ergebnisse offen");
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    // Fokus wandert vom Feld zu einem Treffer: bleibt offen
+    await act(() => void s.input().dispatchEvent(new window.FocusEvent("focusout", { bubbles: true, relatedTarget: s.hits()[0] })));
+    assert.ok(s.root.querySelector("[aria-label='Suchergebnisse']"));
+    // Fokus verlässt die Suche: geschlossen
+    await act(() => void s.hits()[0].dispatchEvent(new window.FocusEvent("focusout", { bubbles: true, relatedTarget: outside })));
+    assert.equal(s.root.querySelector("[aria-label='Suchergebnisse']"), null, "Tab hinaus schließt die Ergebnisse");
+    outside.remove();
+  });
+
   it("Feld mit Suchtastatur (type=search, inputMode, enterKeyHint, 44 px über die Tokens); am Handy öffnet ein Symbol das Feld", async () => {
     respond = async () => ({ ok: true, json: async () => ({ groups }) });
     const s = await mountSearch();
