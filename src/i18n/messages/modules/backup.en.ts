@@ -227,7 +227,7 @@ export const backupEn: typeof backupDe = {
     note: "The files at the target are encrypted with the recovery key: without it they are worthless – to us as well. Keep the key and the target apart.",
     errors: {
       host: "Please enter a valid server name or IP address.",
-      forbiddenHost: "This address is not allowed as a target (link-local or metadata service).",
+      forbiddenHost: "This address is not allowed as a target (this machine itself, link-local or a metadata service). Machines on your own network are allowed.",
       port: "The port must be between 1 and 65535.",
       path: "Please enter a valid directory (without “..”).",
       url: "Please enter a valid address without query or anchor.",

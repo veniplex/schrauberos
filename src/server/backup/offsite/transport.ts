@@ -17,7 +17,9 @@ export type OffsiteErrorCode =
   /** Zeitüberschreitung (keine Daten mehr) */
   | "timeout"
   /** Zugangsdaten oder Einstellungen fehlen */
-  | "config";
+  | "config"
+  /** Die Adresse (oder eine ihrer aufgelösten Adressen) ist als Ziel verboten: der eigene Rechner, Verbindungs-lokal, Metadaten-Dienst */
+  | "forbiddenHost";
 
 /** Fehler beim Zugriff auf das Ziel. `detail` ist eine kurze technische Angabe ohne Geheimnisse (Statuscode, Fehlername); `fingerprint` nennt bei `hostKey` den gesehenen Wert. */
 export class OffsiteError extends Error {

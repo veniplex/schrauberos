@@ -2,6 +2,7 @@ import type { Client as SshClient, SFTPWrapper } from "ssh2";
 import type { Readable, Writable } from "node:stream";
 import { fingerprintFromHex, type RemoteEntry } from "@/lib/offsite/target";
 import { OffsiteError, type OffsiteTransport } from "./transport";
+import { resolvePinned } from "./resolve";
 import { idleGuard } from "./webdav";
 
 /**
@@ -51,6 +52,7 @@ function mapError(error: unknown, extra?: { mismatch: boolean; seen: string }): 
 
 /** Hostschlüssel eines Servers abrufen (zum Bestätigen beim Einrichten): Verbindung bis zum Schlüsselaustausch, dann Abbruch – es werden keine Zugangsdaten gesendet. */
 export async function fetchSftpHostKey(host: string, port: number, timeoutMs = 15_000): Promise<string> {
+  const pin = await resolvePinned(host); // nur die geprüfte Adresse wird verbunden (ZP5-6)
   const { Client } = await loadSsh2();
   return new Promise<string>((resolve, reject) => {
     const client = new Client();
@@ -65,7 +67,7 @@ export async function fetchSftpHostKey(host: string, port: number, timeoutMs = 1
     client.on("error", (error) => settle(() => (seen ? resolve(seen) : reject(mapError(error)))));
     client.on("close", () => settle(() => (seen ? resolve(seen) : reject(new OffsiteError("connect", "Verbindung geschlossen")))));
     client.connect({
-      host,
+      host: pin.address,
       port,
       username: "hostkey-probe",
       readyTimeout: timeoutMs,
@@ -88,6 +90,7 @@ export class SftpTransport implements OffsiteTransport {
 
   static async connect(config: SftpConfig): Promise<SftpTransport> {
     if (!config.credentials.password && !config.credentials.privateKey) throw new OffsiteError("config", "Zugangsdaten");
+    const pin = await resolvePinned(config.host); // aufgelöst und geprüft; verbunden wird nur mit dieser Adresse (ZP5-6)
     const { Client } = await loadSsh2();
     const client = new Client();
     let seen = "";
@@ -104,7 +107,7 @@ export class SftpTransport implements OffsiteTransport {
       );
       client.once("error", (error) => reject(mapError(error, { mismatch, seen })));
       client.connect({
-        host: config.host,
+        host: pin.address,
         port: config.port,
         username: config.username,
         ...(config.credentials.password ? { password: config.credentials.password } : {}),

@@ -12,6 +12,7 @@ import { BACKUP_ARCHIVE_LIMITS, decryptToFile, importBackupFile } from "../resto
 import { getOffsiteMasterKey } from "@/server/recovery-key";
 import { getOffsiteCredentials, getOffsiteSettings, getUploadedNames, isConfigured, saveUploadedNames, type OffsiteCredentials, type OffsiteSettings } from "./settings";
 import { OffsiteError, type OffsiteTransport } from "./transport";
+import { pinnedFetch, resolvePinned } from "./resolve";
 import { SftpTransport } from "./sftp";
 import { WebdavTransport } from "./webdav";
 
@@ -25,7 +26,9 @@ export type TransportFactory = (settings: OffsiteSettings, credentials: OffsiteC
 const defaultFactory: TransportFactory = async (settings, credentials) => {
   if (settings.protocol === "webdav") {
     if (!credentials.password) throw new OffsiteError("config", "Passwort");
-    return new WebdavTransport(settings.url, { username: settings.username, password: credentials.password });
+    // Name auflösen, jede Antwort prüfen und nur mit der geprüften Adresse verbinden (ZP5-6)
+    const pin = await resolvePinned(new URL(settings.url).hostname);
+    return new WebdavTransport(settings.url, { username: settings.username, password: credentials.password }, { fetchImpl: pinnedFetch(pin) });
   }
   return SftpTransport.connect({ host: settings.host, port: settings.port, username: settings.username, path: settings.path, hostKey: settings.hostKey, credentials });
 };

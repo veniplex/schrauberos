@@ -170,6 +170,12 @@ describe("Off-Site: Einstellungen", () => {
   it("Hostschlüssel abrufen: gesperrte Adressen und unerreichbare Server werden abgewiesen", async () => {
     const forbidden = (await actions.fetchHostKey({}, form({ host: "169.254.169.254", port: 22 }))) as { fieldErrors?: Record<string, string> };
     assert.ok(forbidden.fieldErrors?.host);
+    for (const host of ["2852039166", "0xa9fea9fe", "0251.0376.0251.0376", "::ffff:a9fe:a9fe", "fd00:ec2::254", "0"]) {
+      const state = (await actions.fetchHostKey({}, form({ host, port: 22 }))) as { fieldErrors?: Record<string, string> };
+      assert.ok(state.fieldErrors?.host, host);
+      const saved = (await actions.saveOffsite({}, form({ enabled: false, protocol: "sftp", host, port: 22, path: "/b", username: "u", password: "p", hostKey: sftp.fingerprint, hostKeyConfirmed: true, keep: 14 }))) as { fieldErrors?: Record<string, string> };
+      assert.ok(saved.fieldErrors?.host, host);
+    }
     const unreachable = (await actions.fetchHostKey({}, form({ host: "127.0.0.1", port: 9 }))) as { error?: string; hostKey?: string };
     assert.ok(unreachable.error);
     assert.equal(unreachable.hostKey, undefined);

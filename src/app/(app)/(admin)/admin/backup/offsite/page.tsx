@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const size = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
-type Remote = { files: RemoteBackup[] } | { error: "connect" | "auth" | "hostKey" | "server" | "notFound" | "timeout" | "config" };
+type Remote = { files: RemoteBackup[] } | { error: OffsiteError["code"] };
 
 /** Die Liste vom Ziel wird nur auf Wunsch geholt (`?remote=1`): ein langsames Ziel soll die Seite nicht aufhalten. */
 async function loadRemote(): Promise<Remote> {

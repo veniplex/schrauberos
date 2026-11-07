@@ -1,6 +1,8 @@
 /**
  * Ziel des Off-Site-Backups (SFTP oder WebDAV) – reine Prüf- und Planungslogik ohne Netzwerk, Datei- und Datenbankzugriff.
  */
+import { canonicalHost, isForbiddenHost, isLoopbackHost, offsiteNetwork } from "./host-policy";
+
 export const OFFSITE_PROTOCOLS = ["sftp", "webdav"] as const;
 export type OffsiteProtocol = (typeof OFFSITE_PROTOCOLS)[number];
 
@@ -26,25 +28,18 @@ export const HOST_KEY_FINGERPRINT = /^SHA256:[A-Za-z0-9+/]{43}$/;
 export const fingerprintFromHex = (hex: string): string => `SHA256:${Buffer.from(hex, "hex").toString("base64").replace(/=+$/, "")}`;
 
 const HOSTNAME = /^(?=.{1,253}$)[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
-const IPV6 = /^[0-9A-Fa-f:]{2,45}$/;
 
-/** Adressen, die nie Ziel eines Backups sein sollen (Metadaten-Dienste von Cloud-Anbietern, Verbindungs-lokal): auch als Administrator nicht. */
-export function isForbiddenHost(host: string): boolean {
-  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
-  return /^169\.254\./.test(h) || /^fe[89ab][0-9a-f]:/.test(h) || h === "metadata.google.internal" || /^f[cd][0-9a-f]{2}:.*:(a9fe|254):/.test(h) || h === "0.0.0.0" || h === "::";
-}
-
-export function isLoopbackHost(host: string): boolean {
-  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
-  return h === "localhost" || h === "::1" || /^127\./.test(h);
-}
+// Welche Adressen erlaubt sind (Richtlinie, kanonische Schreibweise, IPv4-in-IPv6 …), steht in `host-policy.ts`
+export { isForbiddenHost, isLoopbackHost };
 
 export type TargetProblem = "host" | "port" | "path" | "url" | "scheme" | "credentialsInUrl" | "forbiddenHost" | "hostKey";
 
+/** Ein Host (Name oder Adresse in beliebiger Schreibweise) für SFTP: gültig und nicht verboten. Ohne Namensauflösung – die geschieht beim Verbinden (`resolvePinned`). */
 export function validateHost(host: string): TargetProblem | null {
-  const h = host.trim().replace(/^\[|\]$/g, "");
-  if (!h || (!HOSTNAME.test(h) && !IPV6.test(h))) return "host";
-  return isForbiddenHost(h) ? "forbiddenHost" : null;
+  const canonical = canonicalHost(host);
+  if (!canonical) return "host";
+  if (canonical.kind === "name" && !HOSTNAME.test(canonical.name)) return "host";
+  return isForbiddenHost(host) ? "forbiddenHost" : null;
 }
 
 export const validatePort = (port: number): TargetProblem | null => (Number.isInteger(port) && port >= 1 && port <= 65535 ? null : "port");
@@ -60,7 +55,7 @@ export function normalizeRemotePath(input: string): string | null {
 }
 
 /**
- * WebDAV-Adresse: **nur HTTPS** (Klartext nur für den eigenen Rechner – Entwicklung/Tests), ohne Zugangsdaten, Abfrage und Anker in der Adresse, kein Metadaten-/Verbindungs-lokal-Ziel.
+ * WebDAV-Adresse: **nur HTTPS** (Klartext-HTTP nur für den eigenen Rechner in Tests), ohne Zugangsdaten, Abfrage und Anker in der Adresse, kein Metadaten-/Verbindungs-lokal-Ziel.
  * Gibt die bereinigte Adresse (ohne abschließenden Schrägstrich) zurück.
  */
 export function normalizeWebdavUrl(input: string): { ok: true; url: string } | { ok: false; problem: TargetProblem } {
@@ -70,7 +65,7 @@ export function normalizeWebdavUrl(input: string): { ok: true; url: string } | {
   } catch {
     return { ok: false, problem: "url" };
   }
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopbackHost(url.hostname))) return { ok: false, problem: "scheme" };
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && offsiteNetwork.allowLoopback && isLoopbackHost(url.hostname))) return { ok: false, problem: "scheme" };
   if (url.username || url.password) return { ok: false, problem: "credentialsInUrl" };
   if (url.search || url.hash) return { ok: false, problem: "url" };
   if (isForbiddenHost(url.hostname)) return { ok: false, problem: "forbiddenHost" };

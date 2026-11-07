@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { allowLoopbackForTests } from "@/lib/offsite/host-policy";
 
 /**
  * Kleiner WebDAV-Server im Speicher für Tests (nur `node:http`, nur auf 127.0.0.1): PROPFIND, MKCOL, PUT, GET, DELETE, MOVE mit Basic-Anmeldung.
@@ -25,6 +26,7 @@ const readBody = (request: IncomingMessage): Promise<Buffer> =>
   });
 
 export async function startFakeWebdav(base = "/dav/backups"): Promise<FakeWebdav> {
+  allowLoopbackForTests(); // das Ziel liegt auf 127.0.0.1; im Betrieb ist Loopback als Ziel verboten (lib/offsite/host-policy.ts)
   const files = new Map<string, Buffer>();
   const modified = new Map<string, string>();
   const requests: FakeWebdav["requests"] = [];

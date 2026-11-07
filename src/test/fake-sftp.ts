@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import ssh2 from "ssh2";
 import { fingerprintFromHex } from "@/lib/offsite/target";
+import { allowLoopbackForTests } from "@/lib/offsite/host-policy";
 
 /**
  * SFTP-Server im Speicher für Tests, gebaut mit dem Server-Teil von `ssh2` (nur auf 127.0.0.1): Passwort-Anmeldung, Dateien und Ordner im Speicher,
@@ -25,6 +26,7 @@ const S_IFREG = 0o100000;
 const S_IFDIR = 0o040000;
 
 export async function startFakeSftp(): Promise<FakeSftp> {
+  allowLoopbackForTests(); // das Ziel liegt auf 127.0.0.1; im Betrieb ist Loopback als Ziel verboten (lib/offsite/host-policy.ts)
   const hostKey = utils.generateKeyPairSync("ed25519");
   const parsed = utils.parseKey(hostKey.public);
   const key = Array.isArray(parsed) ? parsed[0] : parsed;
