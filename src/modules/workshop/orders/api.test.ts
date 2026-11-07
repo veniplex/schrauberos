@@ -15,6 +15,8 @@ let full: string;
 let vehicleId: string;
 
 const FULL_SCOPE = ["orders.view", "orders.create", "orders.edit", "orders.close", "orders.prices"];
+/** zusätzlich: Termine sehen (nötig, um einen Termin mit einem Auftrag zu verknüpfen) */
+const WITH_APPOINTMENTS = [...FULL_SCOPE, "appointments.view"];
 
 before(async () => {
   env = await createTestEnv();
@@ -30,7 +32,7 @@ beforeEach(async () => {
   for (const table of ["apiIdempotencyKey", "orderEvent", "orderApproval", "orderFinding", "orderItem", "order", "counter", "auditLog", "vehicle", "customer"] as const) {
     await (env.db[table] as unknown as { deleteMany(): Promise<unknown> }).deleteMany();
   }
-  full = (await makeToken(env, { ownerPermissions: [...FULL_SCOPE, "orders.reopen"], scope: FULL_SCOPE, rateLimitPerMinute: 6000 })).token;
+  full = (await makeToken(env, { ownerPermissions: [...WITH_APPOINTMENTS, "orders.reopen"], scope: WITH_APPOINTMENTS, rateLimitPerMinute: 6000 })).token;
   const owner = await env.db.customer.create({ data: { lastName: "Muster", nameKey: "muster" } });
   vehicleId = (await env.db.vehicle.create({ data: { plate: "B AB 1", plateNorm: "BAB1", customerId: owner.id, mileageKm: 1000 } })).id;
 });
@@ -137,5 +139,130 @@ describe("Aufträge über die API", () => {
     assert.equal((await call(full, "POST", "/orders", { vehicleId, appointmentId: appointment.id })).status, 409);
     const filtered = await call(full, "GET", `/orders?appointmentId=${appointment.id}&status=accepted`);
     assert.equal(filtered.json.data.length, 1);
+  });
+});
+
+describe("Fix-Runde 12b: Positionen verlustfrei, eingeschränkte Kunden überall 404", () => {
+  const prepareArticle = async (stockMilli = 10_000) => {
+    await env.db.featureSetting.upsert({ where: { key: "workshop.parts" }, update: { enabled: true }, create: { key: "workshop.parts", enabled: true, updatedByName: "test" } });
+    await env.db.stockMovement.deleteMany();
+    await env.db.article.deleteMany();
+    return env.db.article.create({ data: { number: "OF-1", name: "Ölfilter", searchKey: "of-1 ölfilter", stockMilli } });
+  };
+  const toWorking = async (order: Json) => {
+    const started = await call(full, "POST", `/orders/${order.id}/status`, { status: "in_progress" }, ifMatch(order));
+    assert.equal(started.status, 200);
+    return started.json.data as Json;
+  };
+
+  it("H1: lesen → ändern → zurückschicken erhält den Artikelverweis; der Abschluss bucht ab", async () => {
+    const article = await prepareArticle();
+    try {
+      let order = await toWorking(await newOrder());
+      const first = await call(
+        full,
+        "POST",
+        `/orders/${order.id}/items`,
+        {
+          items: [
+            { description: "Arbeit", unit: "Std.", kind: "labor", quantityMilli: 1000, unitCents: 8500, taxBp: 1900 },
+            { description: "Ölfilter", unit: "Stk", kind: "part", quantityMilli: 2000, unitCents: 1250, taxBp: 1900, refType: "article", refId: article.id },
+          ],
+        },
+        ifMatch(order),
+      );
+      assert.equal(first.status, 200, JSON.stringify(first.json));
+      const read = (await call(full, "GET", `/order-items?orderId=${order.id}`)).json.data as Json[];
+      assert.deepEqual(read.map((i) => [i.kind, i.refType, i.refId]), [["labor", null, null], ["part", "article", article.id]]);
+
+      // genau das Gelesene (samt id, orderId, position, null-Verweisen) mit einer Änderung zurückschicken
+      const changed = read.map((item) => (item.kind === "part" ? { ...item, description: "Ölfilter groß" } : item));
+      order = (await call(full, "GET", `/orders/${order.id}`)).json.data;
+      const again = await call(full, "POST", `/orders/${order.id}/items`, { items: changed }, ifMatch(order));
+      assert.equal(again.status, 200, JSON.stringify(again.json));
+      const reread = (await call(full, "GET", `/order-items?orderId=${order.id}`)).json.data as Json[];
+      assert.deepEqual(reread.map((i) => [i.position, i.kind, i.description, i.quantityMilli, i.unitCents, i.refType, i.refId]), [
+        [0, "labor", "Arbeit", 1000, 8500, null, null],
+        [1, "part", "Ölfilter groß", 2000, 1250, "article", article.id],
+      ]);
+
+      order = (await call(full, "GET", `/orders/${order.id}`)).json.data;
+      assert.equal((await call(full, "POST", `/orders/${order.id}/close`, undefined, ifMatch(order))).status, 200);
+      assert.equal((await env.db.article.findUniqueOrThrow({ where: { id: article.id } })).stockMilli, 8000, "der Abschluss hat abgebucht");
+      assert.equal(await env.db.stockMovement.count({ where: { articleId: article.id, kind: "order" } }), 1);
+    } finally {
+      await env.db.featureSetting.update({ where: { key: "workshop.parts" }, data: { enabled: false } });
+    }
+  });
+
+  it("H1: unbekannter Artikel ist 422 (Feld items.0.refId), Typ ohne Kennung ebenso; ein abgelehnter Körper ändert nichts", async () => {
+    const article = await prepareArticle();
+    try {
+      const order = await toWorking(await newOrder());
+      const line = { description: "Ölfilter", unit: "Stk", kind: "part", quantityMilli: 1000, unitCents: 1250, taxBp: 1900 };
+      const unknown = await call(full, "POST", `/orders/${order.id}/items`, { items: [{ ...line, refType: "article", refId: "gibtsnicht" }] }, ifMatch(order));
+      assert.equal(unknown.status, 422);
+      assert.ok(unknown.json.fields?.["items.0.refId"], JSON.stringify(unknown.json));
+      const half = await call(full, "POST", `/orders/${order.id}/items`, { items: [{ ...line, refType: "article" }] }, ifMatch(order));
+      assert.equal(half.status, 422);
+      assert.equal(await env.db.orderItem.count({ where: { orderId: order.id } }), 0, "ein abgelehnter Körper ändert nichts");
+      const ok = await call(full, "POST", `/orders/${order.id}/items`, { items: [{ ...line, refType: "article", refId: article.id }] }, ifMatch(order));
+      assert.equal(ok.status, 200);
+    } finally {
+      await env.db.featureSetting.update({ where: { key: "workshop.parts" }, data: { enabled: false } });
+    }
+  });
+
+  it("M2: bei einem Kunden mit eingeschränkter Verarbeitung ist jeder Weg 404 – auch das Anlegen einer (unveränderlichen) Freigabe – und es entsteht nichts", async () => {
+    const order = await newOrder();
+    const items = [{ description: "Arbeit", unit: "Std.", kind: "labor", quantityMilli: 1000, unitCents: 8500, taxBp: 1900 }];
+    const saved = await call(full, "POST", `/orders/${order.id}/items`, { items }, ifMatch(order));
+    assert.equal(saved.status, 200);
+    const owner = (await env.db.vehicle.findUniqueOrThrow({ where: { id: vehicleId } })).customerId!;
+    await env.db.customer.update({ where: { id: owner }, data: { processingRestrictedAt: new Date() } });
+    const version = `"${order.version}"`;
+    const stale = { "if-match": version };
+    const events = await env.db.orderEvent.count();
+    const audits = await env.db.auditLog.count();
+
+    const approval = await call(full, "POST", "/order-approvals", { orderId: order.id, amountCents: 24000, reason: "Kondensator", method: "phone", approverName: "Erika Muster" });
+    assert.equal(approval.status, 404, JSON.stringify(approval.json));
+    const typed = await call(full, "POST", "/order-approvals", { orderId: order.id, amountCents: 100, reason: "x", method: "typed", approverName: "Hans" });
+    assert.equal(typed.status, 404);
+    assert.equal(await env.db.orderApproval.count(), 0, "keine Freigabe angelegt");
+
+    assert.equal((await call(full, "GET", `/order-approvals?orderId=${order.id}`)).json.data.length, 0);
+    assert.equal((await call(full, "PATCH", `/orders/${order.id}`, { request: "neu" }, stale)).status, 404);
+    assert.equal((await call(full, "POST", `/orders/${order.id}/status`, { status: "in_progress" }, stale)).status, 404);
+    assert.equal((await call(full, "POST", `/orders/${order.id}/close`, undefined, stale)).status, 404);
+    assert.equal((await call(full, "POST", `/orders/${order.id}/items`, { items }, stale)).status, 404);
+    assert.equal((await call(full, "POST", `/orders/${order.id}/findings`, { text: "Befund" })).status, 404);
+    assert.equal((await call(full, "POST", "/orders", { vehicleId })).status, 422, "neuer Auftrag für das Fahrzeug des Kunden: gesperrt");
+    assert.equal(await env.db.orderFinding.count(), 0);
+    assert.equal(await env.db.orderEvent.count(), events, "kein Verlaufseintrag");
+    assert.equal(await env.db.auditLog.count(), audits, "kein Audit-Eintrag");
+    const row = await env.db.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.deepEqual([row.status, row.request], ["accepted", "Ölwechsel"]);
+
+    // Einschränkung aufgehoben: dieselbe Freigabe geht
+    await env.db.customer.update({ where: { id: owner }, data: { processingRestrictedAt: null } });
+    assert.equal((await call(full, "POST", "/order-approvals", { orderId: order.id, amountCents: 24000, reason: "Kondensator", method: "phone", approverName: "Erika Muster" })).status, 201);
+  });
+
+  it("M2: ein Auftrag ohne Kunde (Laufkundschaft) ist für die API normal erreichbar", async () => {
+    const lone = await env.db.vehicle.create({ data: { plate: "B LO 1", plateNorm: "BLO1" } });
+    const created = await call(full, "POST", "/orders", { vehicleId: lone.id });
+    assert.equal(created.status, 201);
+    assert.equal((await call(full, "POST", "/order-approvals", { orderId: created.json.data.id, amountCents: 100, reason: "x", method: "phone", approverName: "A" })).status, 201);
+  });
+
+  it("N4: ein Termin lässt sich über die API nur mit appointments.view verknüpfen (422, ohne etwas über den Termin zu verraten)", async () => {
+    const appointment = await env.db.appointment.create({ data: { title: "HU", startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), vehicleId } });
+    const blind = (await makeToken(env, { ownerPermissions: FULL_SCOPE, scope: FULL_SCOPE, rateLimitPerMinute: 6000 })).token;
+    const refused = await call(blind, "POST", "/orders", { vehicleId, appointmentId: appointment.id });
+    assert.equal(refused.status, 422);
+    const unknown = await call(blind, "POST", "/orders", { vehicleId, appointmentId: "gibtsnicht" });
+    assert.deepEqual(unknown.json.fields, refused.json.fields);
+    assert.equal(await env.db.order.count(), 0);
   });
 });

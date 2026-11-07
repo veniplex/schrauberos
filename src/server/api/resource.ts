@@ -52,6 +52,8 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
   toItem: (row: Row) => Record<string, unknown>;
   /** Version der Zeile für ETag/If-Match (Tabellen mit `updatedAt`); ohne: keine ETags */
   version?: (row: Row) => string;
+  /** Zustand, der die Antwort ändert, ohne die Version zu ändern (siehe `etagOf`): geht nur in den ETag zum Lesen ein, nie in die Prüfung von `If-Match` */
+  etagExtra?: (row: Row) => string;
   list: {
     filters: Q;
     where?: (filters: z.output<Q>) => object;
@@ -66,6 +68,11 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
     /** API-Körper → rohe Eingabe der Operation */
     toInput: (body: z.output<B>, ctx: Ctx<Row>) => unknown;
     rename?: Rename;
+    /**
+     * Vorbedingung **vor** dem Anlegen für Ressourcen, die an ein Elternobjekt aus dem Körper gehängt werden (z. B. Freigabe an einen Auftrag): `false` heißt, das Elternobjekt gibt es für die
+     * API nicht (außerhalb des Scopes, z. B. Kunde mit eingeschränkter Verarbeitung) – 404 wie beim Lesen, nichts wird angelegt.
+     */
+    parentVisible?: (body: z.output<B>) => Promise<boolean>;
   };
   update?: {
     permission: Permission;
@@ -132,7 +139,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
   const itemResult = (row: Row, status: number, extra: Record<string, string> = {}): ApiResult => ({
     status,
     body: { data: cfg.toItem(row) },
-    headers: { ...(cfg.version ? { etag: etagOf(cfg.version(row)) } : {}), ...extra },
+    headers: { ...(cfg.version ? { etag: etagOf(cfg.version(row), cfg.etagExtra?.(row)) } : {}), ...extra },
   });
 
   const endpoints: ApiEndpoint[] = [];
@@ -197,6 +204,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       status: 201,
       etag: !!cfg.version,
       handler: async (call) => {
+        if (create.parentVisible && !(await create.parentVisible(call.body as z.output<B>))) throw notFound();
         const raw = create.toInput(compact(call.body as Record<string, unknown>) as z.output<B>, { params: call.params, call });
         const { id } = await runApiOperation(create.operation, call.principal, raw, create.rename);
         // Festgeschrieben: scheitert das Nachlesen, bleibt dies die Antwort (und die Wiederholung legt nichts doppelt an)

@@ -47,7 +47,14 @@ const createBody = z.strictObject({
   mileageKm: z.number().int().min(0).max(9_999_999).nullable().optional(),
 });
 
+/**
+ * Eine Position zum Ersetzen. Sie ist **die Form von `GET /order-items`**: Lesen, ändern, zurückschicken erhält alles – auch den Verweis auf eine andere Funktion (`refType`/`refId`, z. B.
+ * der Artikel aus Teile & Lager; nur damit bucht der Abschluss ab). `id`, `orderId` und `position` werden beim Lesen geliefert und hier ignoriert (die Reihenfolge ist die des Arrays).
+ */
 const lineBody = z.strictObject({
+  id: z.string().max(64).optional(),
+  orderId: z.string().max(64).optional(),
+  position: z.number().int().optional(),
   description: z.string().min(1).max(300),
   unit: z.string().max(20).optional(),
   kind: z.enum(ORDER_ITEM_KINDS).optional(),
@@ -58,7 +65,26 @@ const lineBody = z.strictObject({
   /** Steuersatz in Basispunkten (19 % = 1900) */
   taxBp: z.number().int().min(0).max(10_000),
   discountBp: z.number().int().min(0).max(10_000).optional(),
+  /** Verweis einer anderen Funktion (beide oder keiner; `refType: "article"` meint einen Artikel, ein unbekannter Artikel ist 422) */
+  refType: z.string().min(1).max(20).nullable().optional(),
+  refId: z.string().min(1).max(64).nullable().optional(),
 });
+
+/** Körper → Eingabe der Operation: nur die Felder, die die Operation kennt (`null` und die Nur-Lese-Felder `id`, `orderId`, `position` entfallen). */
+const itemsInput = (items: Array<z.output<typeof lineBody>>): string =>
+  JSON.stringify(
+    items.map((item) => ({
+      description: item.description,
+      unit: item.unit,
+      kind: item.kind,
+      quantityMilli: item.quantityMilli,
+      unitCents: item.unitCents,
+      taxBp: item.taxBp,
+      discountBp: item.discountBp,
+      ...(item.refType != null ? { refType: item.refType } : {}),
+      ...(item.refId != null ? { refId: item.refId } : {}),
+    })),
+  );
 
 export const orderEndpoints = defineResource({
   feature: "workshop.orders",
@@ -142,7 +168,7 @@ export const orderEndpoints = defineResource({
       operation: saveItemsOperation,
       body: z.strictObject({ items: z.array(lineBody).max(200) }),
       ifMatch: true,
-      toInput: (id, b, { version }) => ({ id, version, items: JSON.stringify(b.items) }),
+      toInput: (id, b, { version }) => ({ id, version, items: itemsInput(b.items as Array<z.output<typeof lineBody>>) }),
     },
     {
       name: "findings",
@@ -262,6 +288,8 @@ export const approvalEndpoints = defineResource({
       ...(b.method === "typed" ? { signature: `typed:${b.approverName}` } : {}),
     }),
     rename: { id: "orderId", amount: "amountCents" },
+    // Aufträge eingeschränkter Kunden (Art. 18) gibt es für die API nicht – auch nicht zum Anlegen einer (unveränderlichen) Freigabe
+    parentVisible: async (b) => (await db.order.count({ where: { id: b.orderId, ...UNRESTRICTED } })) > 0,
   },
 });
 
