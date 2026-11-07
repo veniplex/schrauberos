@@ -77,6 +77,23 @@ describe("Authentifizierung", () => {
     assert.equal(new Set(bodies).size, 1);
   });
 
+  it("Pflicht-2FA für Administratoren (ZP5-5): das Token eines Administrators ohne zweiten Faktor wird abgelehnt, mit zweitem Faktor und für andere Konten gilt es", async () => {
+    const admin = await makeToken(env, owner({ admin: true }));
+    const plain = await makeToken(env, owner());
+    assert.equal((await call(apiRequest("GET", "/customers", { token: admin.token }))).status, 200, "Pflicht aus: gilt");
+    await env.db.appSetting.create({ data: { key: "auth.require2faAdmins", value: "true" } });
+    try {
+      assert.equal((await call(apiRequest("GET", "/customers", { token: admin.token }))).status, 401, "Pflicht an, kein zweiter Faktor: abgelehnt");
+      assert.equal((await call(apiRequest("GET", "/customers", { token: plain.token }))).status, 200, "Nicht-Administratoren sind nicht betroffen");
+      assert.equal((await env.db.apiToken.findUniqueOrThrow({ where: { id: admin.id } })).revokedAt, null, "das Token wird nicht widerrufen");
+      await env.db.twoFactor.create({ data: { userId: admin.userId, secret: "v1:x:y:z", enabledAt: new Date() } });
+      assert.equal((await call(apiRequest("GET", "/customers", { token: admin.token }))).status, 200, "zweiter Faktor eingerichtet: gilt wieder");
+    } finally {
+      await env.db.appSetting.deleteMany({ where: { key: "auth.require2faAdmins" } });
+      await env.db.twoFactor.deleteMany({ where: { userId: admin.userId } });
+    }
+  });
+
   it("Besitzer gelöscht: das Token ist weg", async () => {
     const { token, userId } = await makeToken(env, owner());
     assert.equal((await call(apiRequest("GET", "/customers", { token }))).status, 200);

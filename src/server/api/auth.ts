@@ -6,6 +6,7 @@ import { clientIp } from "@/lib/client-ip";
 import { ALL_PERMISSIONS, featureOfPermission, type Permission } from "@/modules/catalog";
 import { getActiveFeatureIds } from "@/modules/features";
 import { isBehindProxy } from "@/server/auth/network";
+import { authPolicy } from "@/server/auth/policy";
 import type { AppSession } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { problemResponse, setApiAuthenticator, type ApiAuthResult } from "@/server/operations";
@@ -46,10 +47,13 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthR
 
   const row = await db.apiToken.findUnique({
     where: { tokenHash: hashApiToken(token) },
-    include: { scope: true, user: { include: { roles: { include: { role: { include: { permissions: true } } } } } } },
+    include: { scope: true, user: { include: { roles: { include: { role: { include: { permissions: true } } } }, twoFactor: { select: { enabledAt: true } } } } },
   });
   const now = apiRuntime.now();
   if (!row || row.revokedAt || row.expiresAt.getTime() <= now || !row.user.active || row.user.mustChangePassword) return reject(request);
+  // Verlangt die Richtlinie den zweiten Faktor für Administratoren, gilt das auch für ihre Tokens: Ein Administrator-Konto, das ihn noch nicht eingerichtet hat, darf die Pflicht
+  // nicht über die Programmierschnittstelle umgehen (die Sitzung kommt nur bis „Mein Konto“) – sein Token wird bis zur Einrichtung abgelehnt, nicht widerrufen.
+  if (row.user.roles.some((r) => r.role.isAdmin) && !row.user.twoFactor?.enabledAt && (await authPolicy()).requireTwoFactorForAdmins) return reject(request);
 
   if (!row.lastUsedAt || now - row.lastUsedAt.getTime() > LAST_USED_EVERY_MS) {
     // atomar und ohne updatedAt: gleichzeitige Anfragen schreiben höchstens einmal
