@@ -7,6 +7,7 @@ import { getActiveFeatureIds } from "@/modules/features";
 import { apiGrantablePermissions } from "@/server/api/doc";
 import { isBehindProxy } from "@/server/auth/network";
 import { requirePermission } from "@/server/auth/session";
+import { listServiceAccounts } from "@/server/api/service-accounts";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -16,14 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
 /** Neues API-Token: Rechte je Ressource (nichts vorgewählt), Ablauf, optionale Adressbereiche, erneute Passwortabfrage. Nur Rechte, die die Schnittstelle nutzt und die man selbst hat. */
 export default async function NewApiTokenPage() {
   const session = await requirePermission("api.manage");
-  const [i18n, features, behindProxy] = await Promise.all([getI18n(), getActiveFeatureIds(), isBehindProxy()]);
+  const [i18n, features, behindProxy, accounts] = await Promise.all([getI18n(), getActiveFeatureIds(), isBehindProxy(), listServiceAccounts()]);
   const { t, td } = i18n;
   const groups = scopeGroups(apiGrantablePermissions(features), (p) => session.permissions.has(p as never), { td });
   const markLabels = { send: t("api.tokens.marks.send"), sensitive: t("api.tokens.marks.sensitive"), export: t("api.tokens.marks.export"), import: t("api.tokens.marks.import"), reveal: t("api.tokens.marks.reveal"), api: t("api.tokens.marks.api") };
   return (
     <>
       <PageHeader back={{ href: "/admin/api", label: t("api.title") }} title={t("api.tokens.new")} help="admin.api" />
-      <TokenForm groups={groups} markLabels={markLabels} behindProxy={behindProxy} />
+      <TokenForm groups={groups} markLabels={markLabels} behindProxy={behindProxy} accounts={accounts.filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))} />
     </>
   );
 }

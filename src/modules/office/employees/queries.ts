@@ -124,7 +124,8 @@ export async function staffWorkPatterns(viewer: Viewer): Promise<Map<string, str
 export async function linkableAccounts(viewer: Viewer, currentUserId?: string | null): Promise<Array<{ id: string; name: string; username: string }>> {
   requireAccess(viewer);
   return db.user.findMany({
-    where: { active: true, OR: [{ employee: { is: null } }, ...(currentUserId ? [{ id: currentUserId }] : [])] },
+    // Dienstkonten (nur API-Tokens, `authSource = "service"`) sind keine Personen und nie einem Mitarbeiter zuordenbar
+    where: { active: true, authSource: { not: "service" }, OR: [{ employee: { is: null } }, ...(currentUserId ? [{ id: currentUserId }] : [])] },
     select: { id: true, name: true, username: true },
     orderBy: { name: "asc" },
   });

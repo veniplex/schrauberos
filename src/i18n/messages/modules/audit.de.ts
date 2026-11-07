@@ -14,6 +14,7 @@ export const auditDe = {
   page: "Seite {page} von {pages}",
   groups: {
     apiToken: "API-Tokens",
+    serviceAccount: "Dienstkonten",
     calendarFeed: "Kalender-Abo",
     backup: "Backups",
     mail: "E-Mail",
@@ -49,6 +50,12 @@ export const auditDe = {
       create: "API-Token erzeugt",
       revoke: "API-Token widerrufen",
       restoreRevoked: "API-Tokens nach Wiederherstellung widerrufen",
+    },
+    serviceAccount: {
+      create: "Dienstkonto angelegt",
+      enable: "Dienstkonto eingeschaltet",
+      disable: "Dienstkonto ausgeschaltet (Tokens enden)",
+      delete: "Dienstkonto gelöscht (Tokens enden)",
     },
     calendarFeed: {
       restoreRevoked: "Kalender-Abo-Adressen nach Wiederherstellung gelöscht",

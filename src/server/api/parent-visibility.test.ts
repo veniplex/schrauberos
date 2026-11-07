@@ -160,9 +160,10 @@ describe("Webhooks melden nichts zu Sachen eingeschränkter Kunden", () => {
     await env.db.webhookDelivery.create({ data: { webhookId: hook.id, eventId: "evt_late", type: "order.closed", entityId: O.id, eventAt: when } });
     await env.db.webhookDelivery.deleteMany({ where: { eventId: "evt_n" } });
     const summary = await deliverDue({ isRestricted: isRestrictedEntity });
-    assert.equal(summary.failed, 1);
+    assert.equal(summary.suppressed, 1);
+    assert.equal(summary.failed, 0, "die Unterdrückung ist kein Ausfall");
     const late = await env.db.webhookDelivery.findFirstOrThrow({ where: { eventId: "evt_late" } });
-    assert.deepEqual([late.status, late.lastError, late.attempts], ["failed", "restricted", 1]);
+    assert.deepEqual([late.status, late.lastError, late.attempts], ["suppressed", "restricted", 1]);
     assert.equal(late.lastStatus, null, "es wurde nichts gesendet");
   });
 });

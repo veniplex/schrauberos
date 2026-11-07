@@ -33,6 +33,7 @@ export const usersDe = {
   roleLocked: "Nur Administratoren können diese Rolle vergeben oder entziehen.",
   linkedEmployee: "Mitarbeiter: {name}",
   sourceLocal: "Lokal",
+  sourceService: "Dienstkonto",
   active: "Aktiv",
   inactive: "Deaktiviert",
   fields: {
@@ -54,6 +55,7 @@ export const usersDe = {
     noTwoFactor: "Dieses Konto hat keine eingeschaltete Zwei-Faktor-Anmeldung.",
     selfDeactivate: "Das eigene Konto kann nicht deaktiviert werden.",
     selfDelete: "Das eigene Konto kann nicht gelöscht werden.",
+    serviceAccount: "Dienstkonten werden unter Verwaltung → API & Webhooks → Dienstkonten verwaltet.",
     usernameTaken: "Dieser Benutzername ist bereits vergeben.",
   },
 };

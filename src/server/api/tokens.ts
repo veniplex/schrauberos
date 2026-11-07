@@ -2,13 +2,16 @@ import "server-only";
 import { z } from "zod";
 import { parseNetList } from "@/lib/api/cidr";
 import { checkTokenScope } from "@/lib/api/scope";
+import { actorOf } from "@/lib/rbac";
 import { generateApiToken, hashApiToken, tokenHint } from "@/lib/api/token";
-import { MARKED_PERMISSIONS } from "@/modules/catalog";
+import { FEATURES, MARKED_PERMISSIONS, fullFeatureId } from "@/modules/catalog";
 import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { isBehindProxy } from "@/server/auth/network";
+import { SERVICE_SOURCE } from "@/server/auth/providers";
 import { db } from "@/server/db";
 import { defineOperation, fail, failField } from "@/server/operations";
-import { loadActor } from "@/server/rbac/hierarchy";
+import { loadActor, toRights } from "@/server/rbac/hierarchy";
+import { apiGrantablePermissions } from "./doc";
 import { apiRuntime } from "./state";
 
 /**
@@ -21,7 +24,10 @@ import { apiRuntime } from "./state";
  *    (`acknowledgeMarked`) in einen Scope: Sie lösen Unumkehrbares oder Ausgehendes aus.
  *  - Optional: Beschränkung auf Adressbereiche (CIDR). Sie wirkt nur mit der Einstellung „Hinter Reverse-Proxy“ (sonst ließe sich der Header fälschen); ohne sie wird die Beschränkung beim Anlegen abgelehnt.
  *  - Das Klartext-Token steht **nur** im Ergebnis der Erzeugung (nie im Audit-Log, nie in Logs). Gespeichert wird der SHA-256-Hash.
- *  - Besitzer ist der Erzeuger. Ablauf ist Pflicht (höchstens 365 Tage).
+ *  - **Besitzer** ist der Erzeuger („Mein Konto“) **oder ein Dienstkonto** (`ownerId`, `service-accounts.ts`): Ein Token am Dienstkonto überlebt Passwortwechsel, „Überall abmelden“ und Notzugang des Erzeugers und endet
+ *    mit dem Dienstkonto; sein Scope darf höchstens die Rechte enthalten, die **Erzeuger und Dienstkonto** haben. Ein Token am eigenen Konto endet mit dem Passwortwechsel (Widerruf des Zugangs) und bleibt an die
+ *    Zwei-Faktor-Pflicht für Administratoren gebunden. Ablauf ist Pflicht (höchstens 365 Tage).
+ *  - Der Scope darf nur Rechte enthalten, zu denen die Schnittstelle Endpunkte hat (`apiGrantablePermissions`) – die Oberfläche bietet nur diese an, der Server setzt es durch.
  */
 export const TOKEN_MAX_DAYS = 365;
 export const TOKEN_DEFAULT_DAYS = 90;
@@ -41,6 +47,8 @@ const createInput = z.object({
   rateLimitPerMinute: rateField,
   /** Adressbereiche (CIDR; Zeilen oder Komma getrennt), leer = keine Beschränkung */
   allowedNets: z.string().max(2000).default(""),
+  /** Besitzer: ein Dienstkonto (Kennung); ohne Angabe das eigene Konto */
+  ownerId: z.string().min(1).max(40).optional(),
   /** Ausdrückliche Bestätigung, wenn der Scope gekennzeichnete Rechte enthält (Versand, Festschreiben …) */
   acknowledgeMarked: z.boolean().default(false),
   /** Passwort der handelnden Person (erneute Abfrage) */
@@ -74,6 +82,21 @@ export const createApiTokenOperation = defineOperation({
     const scope = [...new Set(input.scope)];
     const denial = checkTokenScope(actor, scope);
     if (denial) failField("scope", denial === "notSubset" ? "api.errors.scopeNotSubset" : denial === "forbidden" ? "api.errors.scopeForbidden" : "validation.invalid");
+    // nur Rechte, zu denen die Schnittstelle Endpunkte hat (auch ausgeschalteter Funktionen: sie lassen sich später einschalten)
+    const grantable = new Set(apiGrantablePermissions(new Set(FEATURES.map((f) => fullFeatureId(f) as string))));
+    if (scope.some((p) => !grantable.has(p))) failField("scope", "api.errors.scopeNoEndpoint");
+
+    // Besitzer: das eigene Konto oder ein (aktives) Dienstkonto – dessen Rechte (Rollen) begrenzen den Scope zusätzlich
+    let ownerId = principal.user.id;
+    let ownerName = principal.user.name;
+    if (input.ownerId && input.ownerId !== principal.user.id) {
+      const account = await tx.user.findUnique({ where: { id: input.ownerId }, include: { roles: { include: { role: { include: { permissions: true } } } } } });
+      if (!account || account.authSource !== SERVICE_SOURCE || !account.active) failField("ownerId", "validation.invalid");
+      const accountActor = actorOf(account.id, account.roles.map((r) => toRights(r.role)));
+      if (!scope.every((p) => accountActor.rights.has(p))) failField("scope", "api.errors.scopeNotAccount");
+      ownerId = account.id;
+      ownerName = account.name;
+    }
     if (scope.some((p) => MARKED_PERMISSIONS.has(p)) && !input.acknowledgeMarked) failField("acknowledgeMarked", "api.errors.markedNeedsAck");
 
     const expiresAt = new Date(apiRuntime.now() + input.expiresInDays * 86_400_000);
@@ -82,7 +105,7 @@ export const createApiTokenOperation = defineOperation({
         name: input.name,
         tokenHash: prepared.hash,
         hint: prepared.hint,
-        userId: principal.user.id,
+        userId: ownerId,
         expiresAt,
         createdByName: principal.user.name,
         rateLimitPerMinute: input.rateLimitPerMinute,
@@ -92,7 +115,7 @@ export const createApiTokenOperation = defineOperation({
       },
       select: { id: true },
     });
-    audit({ target: `${input.name} (${prepared.hint})`, entityId: row.id });
+    audit({ target: `${input.name} (${prepared.hint})${ownerId === principal.user.id ? "" : ` – Dienstkonto ${ownerName}`}`, entityId: row.id });
     // Das Klartext-Token verlässt die Operation nur in diesem Ergebnis
     return { id: row.id, token: prepared.token, hint: prepared.hint, expiresAt };
   },
@@ -120,6 +143,8 @@ export type ApiTokenInfo = {
   hint: string;
   userId: string;
   ownerName: string;
+  /** Das Token gehört einem Dienstkonto (nicht einer Person) */
+  ownerIsService: boolean;
   allowedNets: string | null;
   scope: string[];
   expiresAt: Date;
@@ -131,7 +156,7 @@ export type ApiTokenInfo = {
 
 /** Alle Tokens (ohne Hash) für die Verwaltungsoberfläche. */
 export async function listApiTokens(): Promise<ApiTokenInfo[]> {
-  const rows = await db.apiToken.findMany({ include: { scope: true, user: { select: { name: true } } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }] });
+  const rows = await db.apiToken.findMany({ include: { scope: true, user: { select: { name: true, authSource: true } } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }] });
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -139,6 +164,7 @@ export async function listApiTokens(): Promise<ApiTokenInfo[]> {
     hint: r.hint,
     userId: r.userId,
     ownerName: r.user.name,
+    ownerIsService: r.user.authSource === SERVICE_SOURCE,
     allowedNets: r.allowedNets,
     scope: r.scope.map((s) => s.permission).sort(),
     expiresAt: r.expiresAt,

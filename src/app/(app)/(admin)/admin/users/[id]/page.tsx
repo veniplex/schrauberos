@@ -33,7 +33,9 @@ export default async function EditUserPage({ params, searchParams }: { params: P
   if (!user) notFound();
   const isSelf = user.id === session.user.id;
   // Rechte-Hierarchie: nur Konten ändern, deren Rechte man selbst vollständig hat; Rollen, die man nicht vergeben darf, sind gesperrt
-  const readOnly = checkManageUser(actor, user.roles.map((r) => toRights(r.role))) !== null;
+  const isService = user.authSource === "service";
+  // Ein Dienstkonto (nur für API-Tokens) wird nicht hier, sondern unter „API & Webhooks → Dienstkonten“ verwaltet
+  const readOnly = isService || checkManageUser(actor, user.roles.map((r) => toRights(r.role))) !== null;
   const lockedRoleIds = roles.filter((r) => checkGrantRole(actor, toRights(r)) !== null).map((r) => r.id);
 
   return (
@@ -57,7 +59,7 @@ export default async function EditUserPage({ params, searchParams }: { params: P
         }
       />
       <div className="flex flex-col gap-4">
-        {readOnly ? <Alert tone="warning">{t("users.readOnlyNotice")}</Alert> : null}
+        {isService ? <Alert tone="info">{t("users.errors.serviceAccount")}</Alert> : readOnly ? <Alert tone="warning">{t("users.readOnlyNotice")}</Alert> : null}
         {sp.unlocked ? <Alert tone="success">{t("users.unlocked")}</Alert> : null}
         {sp.twoFactorReset ? <Alert tone="success">{t("users.twoFactorResetDone")}</Alert> : null}
         {!readOnly && user.lockedUntil && user.lockedUntil > nowDate() ? (

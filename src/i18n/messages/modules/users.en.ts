@@ -35,6 +35,7 @@ export const usersEn: typeof usersDe = {
   roleLocked: "Only administrators can grant or revoke this role.",
   linkedEmployee: "Employee: {name}",
   sourceLocal: "Local",
+  sourceService: "Service account",
   active: "Active",
   inactive: "Disabled",
   fields: {
@@ -56,6 +57,7 @@ export const usersEn: typeof usersDe = {
     noTwoFactor: "This account does not have two-factor sign-in turned on.",
     selfDeactivate: "You cannot disable your own account.",
     selfDelete: "You cannot delete your own account.",
+    serviceAccount: "Service accounts are managed under Administration → API & webhooks → Service accounts.",
     usernameTaken: "This username is already taken.",
   },
 };

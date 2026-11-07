@@ -44,7 +44,7 @@ export async function appointmentFormOptions(options: { employees?: boolean; ass
   const [types, bays, staff] = await Promise.all([
     db.appointmentType.findMany({ where: { OR: [{ active: true }, ...(options.typeId ? [{ id: options.typeId }] : [])] }, orderBy: { sortOrder: "asc" } }),
     db.bay.findMany({ where: { OR: [{ active: true }, ...(options.bayId ? [{ id: options.bayId }] : [])] }, orderBy: { sortOrder: "asc" } }),
-    options.employees ? staffWithAccount() : db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    options.employees ? staffWithAccount() : db.user.findMany({ where: { active: true, authSource: { not: "service" } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   let users = staff;
   if (options.assigneeId && !users.some((u) => u.id === options.assigneeId)) {

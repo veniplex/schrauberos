@@ -58,7 +58,7 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
   }
   if (d.typeId && d.typeId !== current?.typeId && !(await tx.appointmentType.findFirst({ where: { id: d.typeId, active: true }, select: { id: true } }))) failField("typeId", "validation.invalid");
   if (d.bayId && d.bayId !== current?.bayId && !(await tx.bay.findFirst({ where: { id: d.bayId, active: true }, select: { id: true } }))) failField("bayId", "validation.invalid");
-  if (d.assigneeId && d.assigneeId !== current?.assigneeId && !(await tx.user.findFirst({ where: { id: d.assigneeId, active: true }, select: { id: true } }))) failField("assigneeId", "validation.invalid");
+  if (d.assigneeId && d.assigneeId !== current?.assigneeId && !(await tx.user.findFirst({ where: { id: d.assigneeId, active: true, authSource: { not: "service" } }, select: { id: true } }))) failField("assigneeId", "validation.invalid");
   if (d.tireSetId) {
     // Der Reifensatz muss existieren und zum gewählten Fahrzeug gehören
     const set = await tx.tireSet.findUnique({ where: { id: d.tireSetId }, select: { vehicleId: true } });

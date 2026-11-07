@@ -4,6 +4,8 @@ import { definePages } from "@/modules/types";
 export const pages = definePages("admin.api", [
   { path: "/admin/api", kind: "list", permission: "api.manage", key: true },
   { path: "/admin/api/tokens/new", kind: "new", permission: "api.manage" },
+  { path: "/admin/api/accounts", kind: "list", permission: "api.manage", key: true },
+  { path: "/admin/api/accounts/new", kind: "new", permission: "api.manage" },
   { path: "/admin/api/webhooks", kind: "list", permission: "api.manage" },
   { path: "/admin/api/webhooks/new", kind: "new", permission: "api.manage" },
   { path: "/admin/api/webhooks/[id]", kind: "detail", permission: "api.manage", params: { id: { table: "Webhook" } } },

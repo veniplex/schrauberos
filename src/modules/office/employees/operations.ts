@@ -64,7 +64,8 @@ export const saveEmployeeOperation = defineOperation({
     }
     if (d.userId) {
       const user = await tx.user.findUnique({ where: { id: d.userId }, include: { employee: { select: { id: true, firstName: true, lastName: true } } } });
-      if (!user) failField("userId", "validation.invalid");
+      // ein Dienstkonto ist keine Person
+      if (!user || user.authSource === "service") failField("userId", "validation.invalid");
       if (user.employee && user.employee.id !== id) {
         // der Name des anderen Mitarbeiters nur mit `employees.view` (sonst erfährt ein Token mit nur `employees.edit` Namen aus der Fehlermeldung)
         if (!principal.can("employees.view")) failField("userId", "employees.errors.userTakenHidden");

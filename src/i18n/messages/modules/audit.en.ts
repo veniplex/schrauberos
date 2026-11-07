@@ -16,6 +16,7 @@ export const auditEn: typeof auditDe = {
   page: "Page {page} of {pages}",
   groups: {
     apiToken: "API tokens",
+    serviceAccount: "Service accounts",
     calendarFeed: "Calendar subscription",
     backup: "Backups",
     mail: "Email",
@@ -51,6 +52,12 @@ export const auditEn: typeof auditDe = {
       create: "API token created",
       revoke: "API token revoked",
       restoreRevoked: "API tokens revoked after restore",
+    },
+    serviceAccount: {
+      create: "Service account created",
+      enable: "Service account switched on",
+      disable: "Service account switched off (tokens end)",
+      delete: "Service account deleted (tokens end)",
     },
     calendarFeed: {
       restoreRevoked: "Calendar subscription addresses deleted after restore",

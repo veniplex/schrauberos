@@ -72,11 +72,12 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                     <StatusBadge tone="warning">{t("users.adminRightsBadge")}</StatusBadge>
                   </span>
                 ) : null}
+                {u.authSource === "service" ? <Badge tone="info">{t("users.sourceService")}</Badge> : null}
                 {u.roles.length ? u.roles.map((r) => <Badge key={r.roleId} tone={r.role.isAdmin ? "accent" : "neutral"}>{r.role.name}</Badge>) : <span className="text-ink-muted">–</span>}
               </div>
             ),
           },
-          { id: "source", header: t("users.cols.source"), priority: "low", cell: (u) => <span className="text-sm text-ink-muted">{u.authSource === "local" ? t("users.sourceLocal") : u.authSource}</span> },
+          { id: "source", header: t("users.cols.source"), priority: "low", cell: (u) => <span className="text-sm text-ink-muted">{u.authSource === "local" ? t("users.sourceLocal") : u.authSource === "service" ? t("users.sourceService") : u.authSource}</span> },
           {
             id: "lastLogin",
             header: t("users.cols.lastLogin"),

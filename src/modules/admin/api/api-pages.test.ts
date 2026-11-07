@@ -155,6 +155,53 @@ describe("Seiten", () => {
     assert.ok(root.querySelector('textarea[name="allowedNets"]'));
   });
 
+  it("Dienstkonten: Anlegen mit Passwortabfrage, Liste, Formular mit Rollen; das Konto ist in der Benutzerliste gekennzeichnet und dort nicht änderbar; Token-Formular bietet es als Besitzer an; ohne api.manage nicht erreichbar", async () => {
+    await admin();
+    const role = await env.role({ key: "buero-pages", permissions: ["customers.view"] });
+    const wrong = await actions.createServiceAccount({}, form({ name: "Portal", roleId: [role.id], password: "falsch" }));
+    assert.ok(wrong && "fieldErrors" in wrong && wrong.fieldErrors?.password, "Passwort wird als Feld bemängelt");
+    assert.equal(await env.db.user.count({ where: { authSource: "service" } }), 0);
+    assert.equal(await redirectOf(() => actions.createServiceAccount({}, form({ name: "Portal", roleId: [role.id], password: PASSWORD }))), "/admin/api/accounts");
+    const account = await env.db.user.findFirstOrThrow({ where: { authSource: "service" } });
+    assert.equal(account.passwordHash, null);
+
+    const { default: List } = await import("@/app/(app)/(admin)/admin/api/accounts/page");
+    const list = plain((await render(await List())).textContent);
+    assert.match(list, /Portal/);
+    assert.match(list, /kein Passwort und keine Anmeldung/);
+    await unmountView();
+    const { default: NewAccount } = await import("@/app/(app)/(admin)/admin/api/accounts/new/page");
+    const root = await render(await NewAccount());
+    assert.ok(root.querySelector('input[type="password"][name="password"]'), "erneute Passwortabfrage");
+    assert.ok(root.querySelector('input[name="roleId"]'), "Rollen zur Wahl");
+    const offered = [...root.querySelectorAll('input[name="roleId"]')].map((el) => (el as HTMLInputElement).value);
+    const adminIds = (await env.db.role.findMany({ where: { isAdmin: true }, select: { id: true } })).map((r) => r.id);
+    assert.ok(adminIds.length > 0 && offered.length > 0 && adminIds.every((id) => !offered.includes(id)), "keine Administrator-Rolle zur Wahl");
+    await unmountView();
+
+    // Token-Formular: Besitzer wählbar
+    const { default: NewToken } = await import("@/app/(app)/(admin)/admin/api/tokens/new/page");
+    const tokenForm = await render(await NewToken());
+    assert.ok(tokenForm.querySelector('select[name="ownerId"]'), "Besitzer wählbar, sobald es ein Dienstkonto gibt");
+    assert.match(plain(tokenForm.textContent), /Portal \(Dienstkonto\)/);
+    await unmountView();
+
+    // Benutzerliste: gekennzeichnet; Detailseite: nicht änderbar
+    const { default: Users } = await import("@/app/(app)/(admin)/admin/users/page");
+    assert.match(plain((await render(await Users({ searchParams: Promise.resolve({}) } as never))).textContent), /Dienstkonto/);
+    await unmountView();
+    const { default: UserPage } = await import("@/app/(app)/(admin)/admin/users/[id]/page");
+    const detail = await render(await UserPage({ params: Promise.resolve({ id: account.id }), searchParams: Promise.resolve({}) } as never));
+    assert.match(plain(detail.textContent), /Dienstkonten werden unter/);
+    assert.ok(!detail.querySelector('input[name="password"]'), "kein Passwortfeld für ein Dienstkonto");
+    await unmountView();
+
+    // ohne api.manage: weg
+    await login({ permissions: ["customers.view"] });
+    assert.equal(await redirectOf(() => List()), "/forbidden");
+    assert.equal(await redirectOf(() => actions.createServiceAccount({}, form({ name: "X", roleId: [role.id], password: PASSWORD }))), "/forbidden");
+  });
+
   it("Webhooks: Liste mit Zustand und Zustellprotokoll; Detailseite mit Geheimnis-Bereich, Test, Löschen; nie das Geheimnis; Rechte", async () => {
     await admin();
     const created = (await actions.saveWebhook({}, form({ name: "Buchhaltung", url: "https://hook.example.org/x?token=GEHEIM", events: ["order.closed"], password: PASSWORD }))) as { created?: { id: string; secret: string } };

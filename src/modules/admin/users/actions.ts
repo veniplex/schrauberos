@@ -62,6 +62,8 @@ const saveUserOperation = defineOperation({
     const roles = await loadRoles(tx, d.roleIds);
     const existing = d.id ? await tx.user.findUnique({ where: { id: d.id }, include: withRoles }) : null;
     if (d.id && !existing) fail("conflict");
+    // Dienstkonten (nur API-Tokens, ohne Passwort und Anmeldung) ändert man hier nicht: weder Passwort noch Rollen noch „aktiv“ – das geschieht unter „API & Webhooks → Dienstkonten“
+    if (existing?.authSource === "service") fail("forbidden", "users.errors.serviceAccount");
     const before = (existing?.roles ?? []).map((r) => toRights(r.role));
 
     // Rechte-Hierarchie: nur Konten ändern, deren Rechte eine Teilmenge der eigenen sind; nur Rollen vergeben/entziehen, die man

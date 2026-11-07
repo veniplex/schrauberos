@@ -1,6 +1,7 @@
 "use server";
 
 import { formObject } from "@/lib/forms";
+import { createServiceAccountOperation, deleteServiceAccountOperation, setServiceAccountActiveOperation } from "@/server/api/service-accounts";
 import { createApiTokenOperation, revokeApiTokenOperation } from "@/server/api/tokens";
 import { defineAction } from "@/server/operations";
 import { deleteWebhookOperation, redeliverOperation, rotateWebhookSecretOperation, saveWebhookOperation, setWebhookEnabledOperation, testWebhookOperation } from "./operations";
@@ -18,6 +19,8 @@ export const createApiToken = defineAction(createApiTokenOperation, {
     acknowledgeMarked: flag(fd, "acknowledgeMarked"),
     // Passwörter nie kürzen
     password: String(fd.get("password") ?? ""),
+    // Besitzer: leer = das eigene Konto
+    ownerId: String(fd.get("ownerId") ?? "") || undefined,
   }),
   revalidate: ["/admin/api"],
   message: "api.tokens.created",
@@ -63,3 +66,19 @@ export const testWebhook = defineAction(testWebhookOperation, {
 });
 
 export const redeliver = defineAction(redeliverOperation, { revalidate: ["/admin/api/webhooks", ["/admin/api/webhooks/[id]", "page"]], message: "api.webhooks.redelivered" });
+
+/** Dienstkonto anlegen (Passwortabfrage in der Operation); Rollen als Mehrfachfeld `roleId`. */
+export const createServiceAccount = defineAction(createServiceAccountOperation, {
+  form: (fd) => ({ name: String(fd.get("name") ?? ""), roleIds: [...new Set(fd.getAll("roleId").map(String))], password: String(fd.get("password") ?? "") }),
+  revalidate: ["/admin/api/accounts"],
+  redirect: "/admin/api/accounts",
+  message: "api.accounts.created",
+});
+
+export const setServiceAccountActive = defineAction(setServiceAccountActiveOperation, {
+  form: (fd) => ({ id: String(fd.get("id") ?? ""), active: fd.get("active") === "true", password: String(fd.get("password") ?? "") }),
+  revalidate: ["/admin/api/accounts", "/admin/api"],
+  message: (data, input) => (input.active ? "api.accounts.enabled" : "api.accounts.disabled"),
+});
+
+export const deleteServiceAccount = defineAction(deleteServiceAccountOperation, { revalidate: ["/admin/api/accounts", "/admin/api"], message: "api.accounts.deleted" });

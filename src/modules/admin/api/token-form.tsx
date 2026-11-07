@@ -22,7 +22,7 @@ const EXPIRY_DAYS = [30, 90, 180, 365] as const;
  * Passwortabfrage**. Rechte mit Kennzeichnung (Versand, Festschreiben …) sind markiert und verlangen eine ausdrückliche Bestätigung. Der Klartext des Tokens steht **einmal** in der Antwort der Aktion und nur im
  * Zustand dieser Komponente (`SecretField once`); der Formularzustand trägt ihn nicht weiter. `origin`: Adresse der Anwendung für das Beispiel (ohne sie die geöffnete Adresse).
  */
-export function TokenForm({ groups, markLabels, behindProxy }: { groups: ScopeGroup[]; markLabels: Record<string, string>; behindProxy: boolean }) {
+export function TokenForm({ groups, markLabels, behindProxy, accounts }: { groups: ScopeGroup[]; markLabels: Record<string, string>; behindProxy: boolean; accounts: Array<{ id: string; name: string }> }) {
   const { t } = useI18n();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [created, setCreated] = useState<{ value: string; hint: string; expiresOn: string } | null>(null);
@@ -73,6 +73,18 @@ export function TokenForm({ groups, markLabels, behindProxy }: { groups: ScopeGr
     <Form<TokenState> action={create} className="flex max-w-3xl flex-col gap-5">
       <Card title={t("api.tokens.form.basics")}>
         <div className="grid gap-4">
+          {accounts.length > 0 ? (
+            <Field label={t("api.tokens.form.owner")} htmlFor="token-owner" name="ownerId" hint={t("api.tokens.form.ownerHint")}>
+              <Select id="token-owner" name="ownerId" defaultValue="">
+                <option value="">{t("api.tokens.form.ownerMe")}</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} ({t("api.tokens.list.ownerService")})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : null}
           <Field label={t("api.tokens.form.name")} htmlFor="token-name" name="name" required hint={t("api.tokens.form.nameHint")}>
             <Input id="token-name" name="name" maxLength={50} required autoComplete="off" />
           </Field>

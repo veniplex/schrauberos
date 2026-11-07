@@ -67,7 +67,16 @@ export default async function ApiTokensPage() {
                 </span>
               ),
             },
-            { id: "owner", header: t("api.tokens.list.owner"), cell: (token) => token.ownerName },
+            {
+              id: "owner",
+              header: t("api.tokens.list.owner"),
+              cell: (token) => (
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {token.ownerName}
+                  {token.ownerIsService ? <Badge>{t("api.tokens.list.ownerService")}</Badge> : null}
+                </span>
+              ),
+            },
             {
               id: "rights",
               header: t("api.tokens.list.rights"),

@@ -5,7 +5,7 @@ import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { Prisma, PrismaClient, User } from "@/generated/prisma/client";
 import { db } from "@/server/db";
-import { getAuthProvider } from "./providers";
+import { getAuthProvider, SERVICE_SOURCE } from "./providers";
 import { accountOwner, QueueFullError, verifyPassword } from "./password";
 import { authRuntime } from "./runtime";
 import { loginThrottle, normalizeUsername } from "./throttle";
@@ -210,6 +210,8 @@ export async function login(username: string, password: string, context: LoginCo
 
 /** Der Abschluss einer Anmeldung (Passwort allein oder mit zweitem Faktor): Zeitpunkt, Sitzung, Gerät, persönliche Einstellungen. Hier – und nur hier – entsteht die Sitzung. */
 async function completeLogin(user: User, options: { resetCounters: boolean; presented: PresentedDevice | undefined; remember: boolean }): Promise<void> {
+  // Dienstkonten melden sich nie an (kein Passwort, kein Anmeldeweg; zweite Linie hinter `getAuthProvider`)
+  if (user.authSource === SERVICE_SOURCE) throw new Error("service_account_login");
   await recordSuccess(user.id, options.resetCounters);
   await startSession(user.id);
   // Ein Fehler beim Merken des Geräts macht eine geglückte Anmeldung nicht zum Fehler (die Sitzung steht schon)
@@ -427,7 +429,8 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
       },
     },
   });
-  if (!row || row.expiresAt < new Date() || !row.user.active) return null;
+  // Ein Dienstkonto (`authSource = "service"`, nur für API-Tokens) hat nie eine Sitzung – auch nicht, wenn eine Zeile entstünde
+  if (!row || row.expiresAt < new Date() || !row.user.active || row.user.authSource === SERVICE_SOURCE) return null;
 
   // Leerlauf-Abmeldung (Einstellung, Standard aus): zu lange ohne Anfrage -> die Sitzung endet. Mit eingeschalteter Frist wird die letzte Nutzung minütlich
   // festgehalten (sonst höchstens alle 10 Minuten), die Frist gilt also auf etwa eine Minute genau.

@@ -26,7 +26,11 @@ const externalProviders: Record<string, AuthProvider> = {
   // ldap: ldapProvider,
 };
 
+/** Quelle der Dienstkonten (nur für API-Tokens): kein Passwort, keine Anmeldung, kein Anbieter. */
+export const SERVICE_SOURCE = "service";
+
 export function getAuthProvider(authSource: string): AuthProvider | null {
+  if (authSource === SERVICE_SOURCE) return null;
   if (authSource === "local") return localProvider;
   return externalProviders[authSource] ?? null;
 }
