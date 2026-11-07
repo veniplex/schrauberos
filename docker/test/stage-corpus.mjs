@@ -40,6 +40,32 @@ export function parseJson(stdout) {
   }
 }
 
+/** C-Prüfer und Referenzprüfer auf demselben Verzeichnis; liefert beide Urteile (Code, Grund, Pfad). */
+export async function judgeBoth(binary, c, dataDir) {
+  const versionDir = join(dataDir, "app", "versions", c.args.version);
+  const result = run(binary, cliArgs(c, dataDir), { env: { PATH: process.env.PATH, DATA_DIR: dataDir } });
+  const json = parseJson(result.stdout);
+  const reference = await verifyVersion({
+    ...referenceOptions(c),
+    fs: nodeFs(versionDir),
+    ancestorProbe: () => findNodeModulesAncestor(versionDir, dataDir, async (candidate) => lstat(candidate).then(() => true, () => false)),
+  });
+  return {
+    c: { code: result.status, signal: result.signal, json, stderr: result.stderr },
+    ref: { code: reference.ok ? 0 : reference.code, reason: reference.ok ? undefined : reference.reason, path: reference.ok ? undefined : reference.path, raw: reference },
+  };
+}
+
+/** Beschreibt eine Abweichung zwischen C und Referenzprüfer (oder `null`, wenn beide gleich urteilen). */
+export function disagreement(both) {
+  const { c, ref } = both;
+  if (!c.json) return `keine JSON-Zeile (Exit ${c.code}, Signal ${c.signal}) ${c.stderr.slice(0, 120)}`;
+  if (c.code !== ref.code) return `C: ${c.code} ${c.json.reason}, Referenz: ${ref.code} ${ref.reason}`;
+  if (ref.code !== 0 && c.json.reason !== ref.reason) return `Grund C: ${c.json.reason}, Referenz: ${ref.reason}`;
+  if (ref.code !== 0 && ref.path !== undefined && ref.path !== "" && c.json.path !== sanitize(ref.path)) return `Pfad C: ${JSON.stringify(c.json.path)}, Referenz: ${JSON.stringify(ref.path)}`;
+  return null;
+}
+
 export async function corpusStage(log) {
   const binaries = new Map();
   const binaryFor = (floor) => {

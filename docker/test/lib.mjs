@@ -2,13 +2,13 @@
 // Nur Linux (Dateimodi, Symlinks, FIFOs); unter Windows startet run.mjs alles in WSL.
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, copyFileSync, existsSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSeal, sealFieldsFor } from "../../src/lib/updates/seal.ts";
 import { generateTree, nodeFs, serializeTree } from "../../src/lib/updates/tree.ts";
-import { TEST_RELEASE, TEST_ROOT } from "../../src/lib/updates/testdata/anchor/test-keys.ts";
+import { TEST_RELEASE } from "../../src/lib/updates/testdata/anchor/test-keys.ts";
 
 export const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const buildDir = join(repo, "docker/test/build");
@@ -60,27 +60,21 @@ export function vendorObjects(tag, flags) {
   return out;
 }
 
-const keyFileFor = () => {
-  const file = join(buildDir, "test-release-key.ts");
-  mkdirSync(buildDir, { recursive: true });
-  writeFileSync(file, `export const RELEASE_PUBLIC_KEY = \`${TEST_RELEASE.publicPem}\`;\nexport const ROOT_PUBLIC_KEY = \`${TEST_ROOT.publicPem}\`;\n`);
-  return file;
-};
-
 /** Header mit den Testschlüsseln und der Untergrenze `floor` (eingebaute Version); liefert das Verzeichnis für -I. */
 export function headerDir(floor, { base } = {}) {
   const key = createHash("sha256").update(`${floor}/${base ?? ""}`).digest("hex").slice(0, 12);
   const dir = join(buildDir, `hdr-${key}`);
   if (!existsSync(join(dir, "trust-keys.h"))) {
     mkdirSync(dir, { recursive: true });
-    const r = run(process.execPath, ["--no-warnings", join(repo, "scripts/gen-trust-header.mjs"), "--out", join(dir, "trust-keys.h"), "--version", floor, "--arch", "x64", "--release-key-file", keyFileFor()], { cwd: repo });
-    if (r.status !== 0) throw new Error(`gen-trust-header: ${r.stderr}`);
+    const r = run(process.execPath, ["--no-warnings", join(repo, "docker/test/gen-test-header.mjs"), "--out", join(dir, "trust-keys.h"), "--version", floor, "--arch", "x64"], { cwd: repo });
+    if (r.status !== 0) throw new Error(`gen-test-header: ${r.stderr}`);
   }
   return dir;
 }
 
 /** Das Prüf-/Starterbinary mit Testschlüsseln und gegebener Untergrenze (Produktionsflags, statisch). */
-export function buildStarter(floor, { tag = "prod", extraDefs = [], sanitize = false, name } = {}) {
+export function buildStarter(floor, { tag, extraDefs = [], sanitize = process.env.SOS_SANITIZE === "1", name, production = false } = {}) {
+  tag ??= sanitize ? "asan" : "prod";
   const hdr = headerDir(floor);
   const flags = sanitize ? SANITIZE : STRICT;
   const out = join(buildDir, `${name ?? "bootstrap"}-${tag}-${createHash("sha256").update(floor + extraDefs.join(" ")).digest("hex").slice(0, 8)}`);
@@ -88,7 +82,7 @@ export function buildStarter(floor, { tag = "prod", extraDefs = [], sanitize = f
   compile(
     out,
     [join(repo, "docker/bootstrap.c"), join(repo, "docker/verify.c"), ...objs],
-    [...flags, ...(sanitize ? [] : LINK_STATIC), `-I${hdr}`, `-I${join(repo, "docker")}`, `-I${vendorDir}`, ...extraDefs],
+    [...flags, ...(sanitize ? [] : LINK_STATIC), `-I${hdr}`, `-I${join(repo, "docker")}`, `-I${vendorDir}`, ...(production ? ["-DSOS_PRODUCTION=1"] : []), ...extraDefs],
   );
   return out;
 }
@@ -104,7 +98,7 @@ export function removeTree(dir) {
  * Baut ein echtes Paketverzeichnis `<dataDir>/app/versions/<version>` mit Dateiliste und Siegel (Testschlüssel). `files`: zusätzliche Dateien {pfad: inhalt|{content, mode}}.
  * `runtime/node` ist das übergebene Programm (die Attrappe), `launcher.mjs` die Anweisung für sie.
  */
-export async function makePackage(dataDir, version, { launcherBinary, script = "exit 0\n", files = {}, base = 4, arch = "x64", signer = TEST_RELEASE, dir } = {}) {
+export async function makePackage(dataDir, version, { launcherBinary, script = "exit 0\n", files = {}, sparse = {}, base = 4, arch = "x64", signer = TEST_RELEASE, dir } = {}) {
   const target = dir ?? join(dataDir, "app", "versions", version);
   mkdirSync(join(target, "runtime"), { recursive: true });
   if (launcherBinary) {
@@ -119,6 +113,13 @@ export async function makePackage(dataDir, version, { launcherBinary, script = "
     const { content, mode } = typeof spec === "string" || Buffer.isBuffer(spec) ? { content: spec, mode: 0o644 } : spec;
     writeFileSync(full, content);
     chmodSync(full, mode);
+  }
+  for (const [path, size] of Object.entries(sparse)) {
+    const full = join(target, ...path.split("/"));
+    mkdirSync(dirname(full), { recursive: true });
+    const fd = openSync(full, "w");
+    ftruncateSync(fd, size);
+    closeSync(fd);
   }
   const tree = serializeTree(await generateTree(nodeFs(target)));
   writeFileSync(join(target, "SOS-TREE"), tree);

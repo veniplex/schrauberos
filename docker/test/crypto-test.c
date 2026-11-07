@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "monocypher-ed25519.h"
 #include "monocypher.h"
@@ -222,7 +223,29 @@ static void run_diff(const char *path) {
   printf("Ed25519 gegen node:crypto: %d Fälle (davon %d gültig), alle gleich beurteilt\n", count, accepted_n);
 }
 
+/* --bench MiB: SHA-512-Durchsatz des vendorten Monocypher über einen Puffer (in 256-KiB-Blöcken, wie der Prüfer liest) */
+static void run_bench(long mib) {
+  size_t block = 256 * 1024, total = (size_t)mib << 20;
+  uint8_t *buf = malloc(block);
+  for (size_t i = 0; i < block; i++) buf[i] = (uint8_t)(i * 2654435761u >> 24);
+  crypto_sha512_ctx ctx;
+  uint8_t d[64];
+  struct timespec a, b;
+  crypto_sha512_init(&ctx);
+  clock_gettime(CLOCK_MONOTONIC, &a);
+  for (size_t done = 0; done < total; done += block) crypto_sha512_update(&ctx, buf, block);
+  crypto_sha512_final(&ctx, d);
+  clock_gettime(CLOCK_MONOTONIC, &b);
+  double s = (double)(b.tv_sec - a.tv_sec) + (double)(b.tv_nsec - a.tv_nsec) / 1e9;
+  printf("SHA-512 (Monocypher): %ld MiB in %.3f s = %.0f MB/s\n", mib, s, (double)total / 1e6 / s);
+  free(buf);
+}
+
 int main(int argc, char **argv) {
+  if (argc == 3 && strcmp(argv[1], "--bench") == 0) {
+    run_bench(atol(argv[2]));
+    return 0;
+  }
   for (int i = 1; i + 1 < argc; i += 2) {
     if (strcmp(argv[i], "--rfc") == 0) run_rfc(argv[i + 1]);
     else if (strcmp(argv[i], "--sha-short") == 0 || strcmp(argv[i], "--sha-long") == 0) run_nist(argv[i + 1]);
