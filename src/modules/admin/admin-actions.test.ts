@@ -48,9 +48,10 @@ describe("setEnabled (Module & Funktionen)", () => {
   it("schaltet eine Funktion aus und wieder ein, protokolliert und meldet es", async () => {
     assert.equal(await modules.setEnabled(form({ key: "office.fleet", enabled: "false" })), undefined);
     assert.equal((await env.db.featureSetting.findUniqueOrThrow({ where: { key: "office.fleet" } })).enabled, false);
-    assert.equal(lastFlash()?.key, "common.saved");
+    assert.equal(lastFlash()?.key, "modules.switchedOff", "der Toast sagt „Ausgeschaltet.“");
     assert.ok(env.browser.revalidated.includes("/"));
     await modules.setEnabled(form({ key: "office.fleet", enabled: "true" }));
+    assert.equal(lastFlash()?.key, "modules.switchedOn", "… und „Eingeschaltet.“");
     assert.equal((await env.db.featureSetting.findUniqueOrThrow({ where: { key: "office.fleet" } })).enabled, true);
     const entries = await env.db.auditLog.findMany({ orderBy: { createdAt: "asc" } });
     assert.deepEqual(entries.map((e) => [e.action, e.target]), [["module.disable", "office.fleet"], ["module.enable", "office.fleet"]]);

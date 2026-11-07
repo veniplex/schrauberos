@@ -79,8 +79,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="md:col-span-2">
           <Card title={t("invoices.sections.file")} padded={false}>
             {inv.file ? (
               <>

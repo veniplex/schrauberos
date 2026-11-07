@@ -79,8 +79,8 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="flex flex-col gap-5 xl:col-span-2">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="flex flex-col gap-5 md:col-span-2">
           <Card
             title={t("network.sections.ips")}
             padded={false}

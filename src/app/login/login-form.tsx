@@ -10,10 +10,10 @@ export function LoginForm({ next }: { next: string }) {
   return (
     <Form action={loginAction} className="flex flex-col gap-4">
       <input type="hidden" name="next" value={next} />
-      <Field label={t("auth.username")} htmlFor="username" name="username">
+      <Field label={t("auth.username")} htmlFor="username" name="username" required>
         <Input id="username" name="username" autoComplete="username" autoCapitalize="none" autoFocus required />
       </Field>
-      <Field label={t("auth.password")} htmlFor="password" name="password">
+      <Field label={t("auth.password")} htmlFor="password" name="password" required>
         <Input id="password" name="password" type="password" autoComplete="current-password" maxLength={128} required />
       </Field>
       <FormMessage />

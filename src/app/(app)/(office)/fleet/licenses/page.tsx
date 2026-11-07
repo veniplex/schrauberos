@@ -122,7 +122,7 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
                     {canEdit ? (
                       <form action={deleteLicenseCheck}>
                         <input type="hidden" name="id" value={c.id} />
-                        <ConfirmSubmitButton message={t("fleet.deleteConfirm")} aria-label={t("common.delete")}>
+                        <ConfirmSubmitButton message={t("fleet.deleteConfirm")} label={t("common.delete")}>
                           <Trash2 className="size-3.5" aria-hidden />
                         </ConfirmSubmitButton>
                       </form>

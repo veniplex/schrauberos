@@ -34,6 +34,8 @@
 
 html {
   overflow-x: clip;
+  /* Mindestbreite 320 px: darunter scrollt die Seite, statt Inhalte abzuschneiden */
+  min-width: 320px;
 }
 
 body {

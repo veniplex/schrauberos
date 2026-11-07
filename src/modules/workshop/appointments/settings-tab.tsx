@@ -41,7 +41,7 @@ async function BaysCards() {
               </form>
               <form action={deleteBay}>
                 <input type="hidden" name="id" value={b.id} />
-                <ConfirmSubmitButton message={t("appointments.settings.bays.confirmDelete")} aria-label={t("common.delete")}>
+                <ConfirmSubmitButton message={t("appointments.settings.bays.confirmDelete")} label={t("common.delete")}>
                   <Trash2 className="size-3.5" aria-hidden />
                 </ConfirmSubmitButton>
               </form>
@@ -51,7 +51,7 @@ async function BaysCards() {
       </Card>
       <Card title={t("appointments.settings.bays.new")}>
         <form action={saveBay} className="flex flex-wrap items-end gap-3">
-          <Field label={t("appointments.settings.bays.name")} htmlFor="new-bay" className="min-w-48 flex-1">
+          <Field label={t("appointments.settings.bays.name")} htmlFor="new-bay" className="min-w-48 flex-1" required>
             <Input id="new-bay" name="name" required maxLength={60} placeholder="Hebebühne 3" />
           </Field>
           <SubmitButton>{t("common.add")}</SubmitButton>
@@ -94,7 +94,7 @@ async function TypesCards() {
               </form>
               <form action={deleteAppointmentType}>
                 <input type="hidden" name="id" value={v.id} />
-                <ConfirmSubmitButton message={t("appointments.settings.types.confirmDelete")} aria-label={t("common.delete")}>
+                <ConfirmSubmitButton message={t("appointments.settings.types.confirmDelete")} label={t("common.delete")}>
                   <Trash2 className="size-3.5" aria-hidden />
                 </ConfirmSubmitButton>
               </form>

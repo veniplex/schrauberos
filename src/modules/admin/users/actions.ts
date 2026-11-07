@@ -114,7 +114,8 @@ export const saveUser = defineAction(saveUserOperation, {
     mustChangePassword: fd.get("mustChangePassword") === "on",
   }),
   revalidate: ["/admin/users"],
-  redirect: ({ userId }) => `/admin/users?saved=${userId}`,
+  redirect: "/admin/users",
+  message: "common.saved", // der Toast meldet das Speichern (kein `?saved=` mehr in der Adresse)
 });
 
 const idInput = z.object({ id: z.string().min(1) });

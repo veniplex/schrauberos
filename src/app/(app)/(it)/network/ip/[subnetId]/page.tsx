@@ -75,8 +75,8 @@ export default async function SubnetPage({
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="md:col-span-2">
           <Card title={t("network.sections.addresses", { count: ips.length })} padded={false}>
             {ips.length === 0 ? (
               <EmptyState title={t("network.ipsEmpty")} />

@@ -66,8 +66,8 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="flex flex-col gap-5 xl:col-span-2">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="flex flex-col gap-5 md:col-span-2">
           <Card
             title={t("employees.sections.absences")}
             padded={false}
@@ -107,7 +107,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                         <form action={deleteAbsence}>
                           <input type="hidden" name="id" value={a.id} />
                           <input type="hidden" name="returnTo" value={returnTo} />
-                          <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} aria-label={t("common.delete")}>
+                          <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} label={t("common.delete")}>
                             <Trash2 className="size-3.5" aria-hidden />
                           </ConfirmSubmitButton>
                         </form>
@@ -140,7 +140,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                         {canEdit ? (
                           <form action={deleteQualification}>
                             <input type="hidden" name="id" value={q.id} />
-                            <ConfirmSubmitButton message={t("employees.qualificationDeleteConfirm")} aria-label={t("common.delete")}>
+                            <ConfirmSubmitButton message={t("employees.qualificationDeleteConfirm")} label={t("common.delete")}>
                               <Trash2 className="size-3.5" aria-hidden />
                             </ConfirmSubmitButton>
                           </form>

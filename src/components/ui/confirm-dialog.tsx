@@ -109,12 +109,16 @@ export function ConfirmDialog({
  * (mit diesem Knopf als Absender, `name`/`value`/`formAction` gelten also weiter).
  * `message` erklärt die Folgen; der Titel ist die Beschriftung der Aktion mit Fragezeichen („Kunde löschen?“), die Bestätigung trägt dieselbe Beschriftung –
  * bei reinen Symbolknöpfen der `aria-label`. `title`/`confirmLabel` überschreiben das.
+ *
+ * `label`: Symbolknopf mit Beschriftung (Löschen in Tabellenzeilen). Unter `md` steht der **Text sichtbar** neben dem Symbol (Touch: kein Raten, was das Symbol tut), am
+ * Desktop nur das Symbol mit dem Text für Screenreader (`sr-only`) und als `title` – es gibt bewusst keinen eigenen Tooltip-Baustein.
  */
 export function ConfirmSubmitButton({
   message,
   title,
   confirmLabel,
   typeToConfirm,
+  label,
   children,
   variant = "danger",
   size = "sm",
@@ -127,19 +131,21 @@ export function ConfirmSubmitButton({
   title?: string;
   confirmLabel?: string;
   typeToConfirm?: string;
+  label?: string;
   children: ReactNode;
 }) {
   const { t } = useI18n();
   const { pending } = useFormStatus();
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
-  const action = confirmLabel ?? (typeof children === "string" ? children : props["aria-label"]);
+  const action = confirmLabel ?? label ?? (typeof children === "string" ? children : props["aria-label"]);
   return (
     <>
       <button
         {...props}
         ref={button}
         type="submit"
+        title={label}
         disabled={pending || props.disabled}
         aria-busy={pending || undefined}
         className={clsx(buttonClass(variant, size), className)}
@@ -150,6 +156,7 @@ export function ConfirmSubmitButton({
       >
         {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
         {children}
+        {label ? <span className="md:sr-only">{label}</span> : null}
       </button>
       <ConfirmDialog
         open={open}

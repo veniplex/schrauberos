@@ -73,8 +73,8 @@ export default async function VehiclePage({
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="flex flex-col gap-5 xl:col-span-2">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="flex flex-col gap-5 md:col-span-2">
           {session.can("tires.view") ? (
             <Card
               title={t("nav.tires")}

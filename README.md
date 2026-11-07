@@ -136,7 +136,7 @@ src/
     catalog.ts            Katalog aller Module und Funktionen (Quelle der Wahrheit)
     define.ts             Typen und defineModule()/defineFeature()
     features.ts           Aktivierung: Schalter lesen/schreiben (Datenbank)
-    registry.ts           sammelt Dashboard-Bausteine und Einstellungs-Reiter der Funktionen ein
+    registry.ts           sammelt Dashboard-Bausteine, Einstellungs-Reiter und Suchanbieter (`<funktion>/search.ts`) der Funktionen ein; `quickActionsFor` (Neu-Menü) liest die `quickActions` der `feature.ts`
     jobs.ts               sammelt die geplanten Jobs und Outbox-Abnehmer der Funktionen (`<funktion>/jobs.ts`) ein
     api.ts                sammelt die API-Endpunkte der Funktionen (`<funktion>/api.ts`) ein; api-exceptions.ts: UI-Aktionen ohne API-Pendant
     default-roles.ts      mitgelieferte Rollen
@@ -171,6 +171,33 @@ Einstellungs-Reiter und die Seite „Module & Funktionen“.
 * Die Sitzung filtert die Rechte einer Person nach den **wirksamen** Funktionen. Ausgeschaltete Funktionen haben deshalb schlicht
   keine Rechte: `requirePermission()` liefert **404**, Navigation, Widgets und Einstellungs-Reiter erscheinen nicht, Server
   Actions und API-Routen scheitern an derselben Prüfung. **Daten bleiben beim Ausschalten erhalten.**
+
+### Navigation, Schnellsuche und „Neu“
+
+Der Anwendungsrahmen (`src/app/app-shell.tsx`, `src/components/shell/sidebar.tsx`) baut die Navigation aus dem Katalog: Modulgruppen mit Titel (auch bei einem Eintrag), Einträge eingerückt, **Übersicht** oben, **Hilfe** am Ende, Reihenfolge nach
+`nav.order` (Verwaltung: Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit-Log, Systemstatus). Aktiv ist der **längste** passende Eintrag (`src/lib/nav-active.ts`); die aktive Gruppe ist nicht einklappbar. Eingeklappte Gruppen
+merkt das Cookie `so_nav` (`src/lib/nav-state.ts`, vom Server mitgelesen, Einstellung ohne Geheimnis). Unter 1024 px liegt die Navigation im `Drawer` (natives modales `<dialog>`: Escape, Fokusfalle und -rückgabe, `dvh`, Safe-Area, schließt bei
+Navigation und wenn das Fenster 1024 px erreicht), die Kopfzeile trägt Suche, „Neu“ und Konto; `viewport-fit=cover` macht die Safe-Area nutzbar. Die Symbole kommen **je Gruppe** (`nav-icons`) und werden auf dem Server zu Elementen.
+
+**Schnellsuche** (`QuickSearch`, `/api/search`) und **„Neu“-Menü** (`NewMenu`) kennen keine Funktion: Die Funktionen liefern `searchProviders` (`<funktion>/search.ts`) und `quickActions` (`feature.ts`), `registry.ts` filtert nach Aktivierung und
+Recht (wie Widgets) und aggregiert (`searchFor`, `quickActionsFor`; ein fehlerhafter Anbieter nimmt die Treffer der anderen nicht mit). Die Route verlangt Sitzung und mindestens einen passenden Anbieter (sonst 403). Architektur- und Verhaltenstest:
+`src/modules/search.test.ts` (Vertrag, Trennung, Rechte-/Aktivierungsfilter, Kapitelsichtbarkeit der Dokumentation).
+
+### Formulare, Rückfragen und Meldungen (UI-Rahmen)
+
+* **`Field`** erzeugt die Id (`useId`) und gibt sie über einen Kontext an `Input`/`Select`/`Textarea`/`SearchCombobox`/`FileInput` weiter (`aria-describedby` für Fehler und Hinweis – beide bleiben sichtbar –, `aria-invalid`, `aria-required`);
+  `group` macht ein `fieldset` mit `legend` (Kontrollkästchen, Farbwahl). `name="…"` holt den Fehler des Feldes von selbst aus dem umgebenden `Form`.
+* **`Form`/`FormCard`** führen die Server Action selbst aus (`useActionState`) und liefern: **Fehlerzusammenfassung** (`role="alert"`, Fokus, Einträge springen ins Feld), **Eingabe bleibt bei Fehlern** (React setzt Formulare nach jeder Aktion
+  zurück; der Rahmen stellt die abgesendeten Werte nach dem Zurücksetzen wieder her – nie Passwort- und Dateifelder), **Netzwerkfehler** als Zustand (`TypeError`/offline → „Keine Verbindung“, Eingabe bleibt), **Entwurf** in `sessionStorage`
+  (`draftKey`; nie Passwörter, Dateien, Felder mit `data-no-draft`; gelöscht beim Absenden, bei „Verwerfen“ und beim Abmelden über `clearFormDrafts`; stellt nur wieder her, wenn die `version` des Datensatzes passt), `warnOnLeave` (`beforeunload`),
+  Erfolgsmeldung als Toast und `noValidate` (die Prüfung macht der Server mit übersetzten Meldungen). Die Fehlertexte kommen aus `fieldErrors()` (`src/lib/field-errors.ts`: Zod-Fehler → Schlüssel `validation.*` mit Grenzen; eigene Schlüssel
+  per `.regex(re, { error: "validation.vin" })` bzw. `ctx.addIssue({ code: "custom", message: "<Schlüssel>", params })`). **Formulare in Zeilen/Tabellen** ohne `Field`: `Input name="…"` zeigt den Fehler über `FormFieldError name="…"`.
+* **`FormActions`** (sticky in der Dokumentfolge, nie `fixed`; auf Touch rückt sie bei geöffneter Tastatur in den Fluss; hebt den Toast über sich) mit Abbrechen, Hauptaktion und optional **„Speichern und weiter“** (`secondaryLabel`, sendet `_next=1`;
+  die Aktion entscheidet über `redirectNext` in `defineAction`, `_next` kommt nie in die Eingabe der Operation). Beispiel: Kunde anlegen → `/vehicles/new?customer=<id>`.
+* **`ConfirmDialog`/`ConfirmSubmitButton`** ersetzen `window.confirm` (natives `<dialog>`, Titel = Aktion mit Fragezeichen, Bestätigung trägt die Aktionsbeschriftung, `typeToConfirm` für folgenreiche Aktionen wie die Backup-Wiederherstellung, `label` für
+  Symbolknöpfe: unter `md` sichtbarer Text, am Desktop `sr-only` plus `title`); `SubmitSwitch` ist der Ein-/Aus-Schalter mit Rückfrage beim Ausschalten (Module & Funktionen). `UrlModal` fragt bei ungespeicherten Eingaben „Änderungen verwerfen?“.
+* **`Menu`** ist ein Popover im Offenlegungsmuster (kein `role="menu"`; Escape gibt den Fokus an den Knopf zurück); **`SearchCombobox`** ist die Combobox mit `aria-activedescendant`, Option-Ids, Trefferansage, Ladefehler und „neu anlegen“ bei keinem Treffer
+  (`VehiclePicker` der Fahrzeuge baut darauf auf).
 
 ### Regeln für sauber getrennten Code
 
@@ -310,8 +337,8 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
   nehmen deshalb einen optionalen Client (`setSetting(key, value, tx)`, `setFeatureOverride(…, tx)`). Bearbeiten-Formulare: `claimRow(tx.modell, id, version)` in der Transaktion.
 * **Adapter Server Action** (`defineAction`): versteht `useActionState` (`(prev, formData)` → `ActionState`) **und** `<form action>` (`(formData)`). Ohne Formularzustand (Löschen,
   Statuswechsel, Schalter) kommt die Rückmeldung als **Flash** (UX-06): Cookie `so_flash` (unter HTTPS `__Host-so_flash`) mit **nur einem Meldungsschlüssel** und einfachen Platzhaltern;
-  `FlashNotice` im Anwendungsrahmen übersetzt und zeigt ihn einmal (`FlashMessage`, löscht das Cookie; Erfolg blendet aus, Fehler bleiben). Der Toast (P2a-2) ersetzt diesen
-  minimalen Meldungsbereich. `redirect()`/`notFound()` werden nie verschluckt (`unstable_rethrow`, Test). Anmeldung/Recht prüft der Adapter wie bisher mit `requireSession`/`requirePermission`
+  `FlashNotice` im Anwendungsrahmen übersetzt ihn und übergibt ihn einmal an den **Toast** (`FlashMessage` löscht das Cookie; `components/ui/toast.tsx`: Erfolg mindestens 5 s, Fehler bleiben stehen,
+  zwei immer vorhandene Live-Regionen, unten über Safe-Area und `FormActions`). Dieselbe Quelle nutzt `Form` für `state.message`. Es gibt kein `?saved=`/`?error=` mehr in Adressen. `redirect()`/`notFound()` werden nie verschluckt (`unstable_rethrow`, Test). Anmeldung/Recht prüft der Adapter wie bisher mit `requireSession`/`requirePermission`
   (ohne Sitzung `/login`, `mustChangePassword` → `/account`, falsches Recht `/forbidden`, ausgeschaltete Funktion 404); der Kern prüft das Recht zusätzlich.
 * **Adapter API** (`runApiOperation` in `src/server/operations/api.ts`): übersetzt Ergebnis und Fehler einer Operation in HTTP-Semantik (Problem-Format, Statuscodes). Pipeline und Ressourcen: Abschnitt „Programmierschnittstelle“. Formular- und API-Eingabeschemas bleiben getrennt (Formular: Text-Schemas wie `moneyCents`, `dateText` aus `src/lib/zod-fields.ts`; API: JSON-Typen, Geld als Cent); geteilt wird die Domänenebene (Prüfung, Audit).
 * **Audit:** `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Beschriftungen `audit.actions.*`) oder `audit: false` mit `auditReason` (Begründung Pflicht). Fehlschläge außerhalb der
@@ -611,6 +638,11 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
    **Hilfe:** `help.ts` (`export const help: HelpTopicDef[]` mit `id`, `feature`, `permission`, `doc`), Kapitel als Markdown unter
    `docs/workshop/warranty.md` (nur Bedienung in der App, kein Entwicklerthema), `help.ts` in **`src/modules/help.ts`** eintragen.
    Eine Funktion darf mehrere Kapitel beitragen (`id` dann mit Zusatz, z. B. `workshop.warranty.claims`).
+6b. **Schnellsuche und Neu-Menü:** `search.ts` (`export const searchProviders: SearchProviderDef[]`: `feature`, `permission` aus der eigenen Rechte-Gruppe, `groupKey`, `search(query, { session, limit })`;
+    Textsuche über `contains()`, Rechte und Sichtbarkeit des Treffers selbst beachten – Dokumentation über `searchDocPages`) und Eintrag in `ALL_SEARCH_PROVIDERS` in `registry.ts`; `quickActions` in der `feature.ts`
+    (Anlegen-Aktionen, Recht aus der eigenen Gruppe). `src/modules/search.test.ts` verlangt für jede fachliche Funktion einen Anbieter (Definition of Done); ein Eintrag in der Navigation gehört nur Funktionen, die
+    eine eigene Seite brauchen (Navigationskonzept: Aufträge, Angebote & Ausgangsrechnungen, Teile & Lager, Zeiterfassung, Berichte, API & Webhooks; E-Mail, Checklisten, Druck, iCal, „Dokumente & Fotos“ und der Tresor hängen
+    am Fahrzeug, Auftrag bzw. der IT-Dokumentation). Das Symbol des Eintrags steht in `src/components/shell/nav-icons/<modul>.ts` (je Gruppe geladen, keine gemeinsame Tabelle).
 6a. Hintergrundarbeit (Aufräumen, regelmäßige Prüfungen, Zustellung von Ereignissen): `jobs.ts` (`export const jobs: JobDef[]`, `feature` ist die eigene Funktion; Abnehmer für Outbox-Ereignisse als `OutboxHandlerDef`),
     eingetragen in `src/modules/jobs.ts` – siehe „Job-Runner“. Der Job muss wiederholbar sein; ein Beschriftungsschlüssel `system.names.<bereich>.<name>` zeigt ihn im Systemstatus.
 7. Soll eine andere Funktion etwas nutzen, exportiert `public.ts` genau das – und die andere deklariert `requires`/`uses`.
@@ -632,7 +664,8 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 * **UI-Bausteine:** Die Oberfläche besteht aus den Bausteinen in `src/components/ui` – `Button`/`LinkButton`/`SubmitButton`/
   `ConfirmSubmitButton`, `Input`/`SearchInput`/`Select`/`Textarea`/`Checkbox`/`ColorInput`/`ColorPicker`/`FileInput`/`Field`,
   `Card`/`CardLink`/`Table`/`FilterBar`/`Badge`/`ChipLink`/`NavLink`/`Alert`/`EmptyState`/`PageHeader`, `Disclosure`, `Menu`,
-  `SegmentedControl`, `UrlModal`, `StatusPage`, `Skeleton`, `LinkPending`/`NavProgress`. Wer ein Element braucht, nimmt den Baustein; fehlt eine Variante, wird sie **dort** ergänzt, damit
+  `SegmentedControl`, `UrlModal`, `Drawer`, `SubmitSwitch`, `ConfirmDialog`/`ConfirmSubmitButton`, `ToastProvider`/`useToast`, `Form`/`FormCard`/`FormActions`/`FormErrorSummary`/`FormFieldError`,
+  `SearchCombobox`, `StatusPage`, `Skeleton`, `LinkPending`/`NavProgress`. Wer ein Element braucht, nimmt den Baustein; fehlt eine Variante, wird sie **dort** ergänzt, damit
   eine Änderung am Aussehen überall wirkt. `src/components/ui/ui-kit.test.ts` erzwingt das: außerhalb von `components/ui` sind rohe
   `<button>`, `<input>` (außer `type="hidden"`), `<select>`, `<textarea>`, `<table>`, `<label>`, `<details>`, `<dialog>`,
   `window.confirm` und die Klassen der Bausteine (`btn`, `input`, `card`, `badge`, `table`, `plate`, `field-*`) verboten.
@@ -653,7 +686,7 @@ Fake-Browser, `server-only`/`next/cache` sind leer). Der zu testende Code wird *
 `src/server/auth/login.test.ts`). Der **Aktions-Rahmen** hat einen generierten Berechtigungs-Matrixtest (`src/server/operations/matrix.test.ts`) und Architekturregeln (`architecture.test.ts`: jede Action benutzt `defineAction`, `run` bleibt transportneutral). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden), Architekturregeln, Migrations-Läufer (inkl. Verträglichkeit mit der Prisma-CLI), Backups/Restore (echte
 SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle.
-**Komponententests** rendern wirklich (`src/test/dom.ts`: happy-dom + `react-dom/client`; `installDom()`, `mount()`, `act()`): Fokus und Referenzen der Eingabebausteine (`components/ui/form.test.ts`), die Fehlergrenze der
+**Komponententests** rendern wirklich (`src/test/dom.ts`: happy-dom + `react-dom/client`; `installDom()`, `mount()`, `act()`; `src/test/router.ts` liefert `usePathname`/`useRouter` für Komponenten, die sie brauchen): Fokus und Referenzen der Eingabebausteine (`components/ui/form.test.ts`), Formular-Rahmen (`form-frame.test.ts`: Eingabe bleibt bei Fehlern, Fehlerzusammenfassung, Netzwerkfehler, Entwurf), `ConfirmDialog`/`SubmitSwitch`, `SearchCombobox`, `Menu`, die Navigation und Schnellsuche (`components/shell/sidebar.test.ts`, `quick-search.test.ts`), die Fehlergrenze der
 Dashboard-Bausteine (`components/shell/widget-boundary.test.ts`), Status- und Fehlerseiten (`components/ui/status.test.ts`, `components/shell/error-view.test.ts`). Quelltext-Muster-Tests gelten nur für echte Architekturregeln, nicht für Verhalten.
 
 ## Browser-CI (Playwright)
@@ -675,6 +708,7 @@ mit Beispieldaten; `e2e/global-setup.ts`), legt je Standardrolle ein Konto an un
 | `budget.spec.ts` | **JS-Budget** je Route (`e2e/baselines/js-budget.json`, Messung + 10 %, KB entpackt); Überschreitung bricht ab |
 | `screenshots.spec.ts` | Baseline-Screenshots der Schlüsselseiten (`key: true`) × Anzeigegröße × Hell/Dunkel – nur Linux (siehe unten) |
 | `pages-states.spec.ts` | 404-Seiten im Anwendungsrahmen, Wartezustand beim Navigieren |
+| `shell.spec.ts` | Anwendungsrahmen und Formulare: Seitenfach (Handy), Sprunglink, Schnellsuche, Fehlerzusammenfassung mit erhaltener Eingabe, „Änderungen verwerfen?“, „Speichern und Fahrzeug anlegen“; `flash.spec.ts`: Rückfrage-Dialog und Toast nach dem Löschen |
 
 **Routen-Inventur:** Jede Funktion bringt eine `pages.ts` mit (`definePages` aus `src/modules/types.ts`: Pfad wie im App-Verzeichnis, Art – Liste, Detail, neu, bearbeiten,
 Dialog, Druckansicht –, Recht, Seed-Verweise für `[id]`-Platzhalter, `key: true` für Schlüsselseiten), eingesammelt in `src/modules/pages.ts` (dazu `PLATFORM_PAGES`).

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
-import { Alert, Badge, CardLink, PageHeader } from "@/components/ui/layout";
+import { Badge, CardLink, PageHeader } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -14,9 +14,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("nav.roles") };
 }
 
-export default async function RolesPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function RolesPage() {
   await requirePermission("roles.manage");
-  const [{ t, tp }, sp] = await Promise.all([getI18n(), searchParams]);
+  const { t, tp } = await getI18n();
   const roles = await db.role.findMany({
     orderBy: [{ isAdmin: "desc" }, { name: "asc" }],
     include: { permissions: true, _count: { select: { users: true, permissions: true } } },
@@ -33,7 +33,6 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
           </LinkButton>
         }
       />
-      {sp.saved ? <div className="mb-4"><Alert tone="success">{t("common.saved")}</Alert></div> : null}
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {roles.map((r) => (
           <li key={r.id}>

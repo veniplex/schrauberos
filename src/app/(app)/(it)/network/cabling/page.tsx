@@ -98,7 +98,7 @@ async function ConnectionsTab({ canEdit, canDelete }: { canEdit: boolean; canDel
                         <td>
                           <form action={deleteConnection}>
                             <input type="hidden" name="id" value={c.id} />
-                            <ConfirmSubmitButton message={t("network.connectionDeleteConfirm")} aria-label={t("common.delete")}>
+                            <ConfirmSubmitButton message={t("network.connectionDeleteConfirm")} label={t("common.delete")}>
                               <Trash2 className="size-3.5" aria-hidden />
                             </ConfirmSubmitButton>
                           </form>
@@ -151,7 +151,7 @@ async function LocationsTab({ canEdit, canDelete, tp }: { canEdit: boolean; canD
                 {canDelete ? (
                   <form action={deleteLocation}>
                     <input type="hidden" name="id" value={l.id} />
-                    <ConfirmSubmitButton message={t("network.locationDeleteConfirm")} aria-label={t("common.delete")}>
+                    <ConfirmSubmitButton message={t("network.locationDeleteConfirm")} label={t("common.delete")}>
                       <Trash2 className="size-3.5" aria-hidden />
                     </ConfirmSubmitButton>
                   </form>

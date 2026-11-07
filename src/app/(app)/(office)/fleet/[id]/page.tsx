@@ -75,8 +75,8 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="flex flex-col gap-5 xl:col-span-2">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="flex flex-col gap-5 md:col-span-2">
           <Card title={t("fleet.sections.duesNow")}>
             {dues.length === 0 ? (
               <p className="text-sm text-ink-muted">{t("fleet.noDues")}</p>
@@ -104,7 +104,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                           <td className="w-12">
                             <form action={deleteMileage}>
                               <input type="hidden" name="id" value={m.id} />
-                              <ConfirmSubmitButton message={t("fleet.deleteConfirm")} aria-label={t("common.delete")}>
+                              <ConfirmSubmitButton message={t("fleet.deleteConfirm")} label={t("common.delete")}>
                                 <Trash2 className="size-3.5" aria-hidden />
                               </ConfirmSubmitButton>
                             </form>
@@ -156,7 +156,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                             <td className="w-12">
                               <form action={deleteCost}>
                                 <input type="hidden" name="id" value={c.id} />
-                                <ConfirmSubmitButton message={t("fleet.deleteConfirm")} aria-label={t("common.delete")}>
+                                <ConfirmSubmitButton message={t("fleet.deleteConfirm")} label={t("common.delete")}>
                                   <Trash2 className="size-3.5" aria-hidden />
                                 </ConfirmSubmitButton>
                               </form>

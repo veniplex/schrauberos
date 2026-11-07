@@ -22,7 +22,7 @@ Unter **Backups** sichert und stellt die Anwendung ihre Daten wieder her – ohn
 * **Hochladen:** Eine heruntergeladene Sicherung lässt sich wieder hochladen, z. B. beim Umzug auf einen neuen Server. Die Anwendung prüft die Datei streng: Es werden nur
   Ordner und normale Dateien übernommen (keine Verknüpfungen, keine Sonderdateien), und sie muss in den **freien Speicherplatz** passen – auch entpackt: Eine Datei, die sich
   zu einer riesigen Datenbank entpackt, wird abgewiesen. So füllt die Seite den Server nie voll.
-* **Wiederherstellen:** Wählen Sie ein Backup und „Wiederherstellen“. Die Anwendung legt vorher automatisch ein Backup des aktuellen
+* **Wiederherstellen:** Wählen Sie ein Backup und „Wiederherstellen“. Zur Sicherheit fragt ein Fenster nach und verlangt, dass Sie das Wort „wiederherstellen“ eintippen. Die Anwendung legt vorher automatisch ein Backup des aktuellen
   Stands an („Vor Wiederherstellung“) und startet kurz neu. **Alle Änderungen seit dem gewählten Backup gehen dabei verloren.** Auch der Notzugang gehört zu den Daten: Nach der Wiederherstellung eines älteren Backups kann ein gedruckter Wiederherstellungs-Code veraltet sein (er gilt nur, solange er zum Stand der Datenbank passt). Erzeugen Sie dann unter **Mein Konto → Notzugang** einen neuen. **API-Tokens** für die Programmierschnittstelle werden bei der Wiederherstellung **alle widerrufen** (das Backup kennt Widerrufe nicht, die danach geschehen sind): Legen Sie die Tokens der angebundenen Systeme neu an.
   Gegebenenfalls müssen Sie sich danach neu anmelden.
 * **Sicherheitsnetz:** Startet die Anwendung mit den wiederhergestellten Daten nicht, wird automatisch der vorherige Stand

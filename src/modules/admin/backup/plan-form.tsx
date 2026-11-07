@@ -15,7 +15,7 @@ export function BackupPlanForm({ initial, limits }: { initial: { enabled: boolea
       <Card title={t("backup.settings.title")}>
         <div className="flex flex-col gap-4">
           <Checkbox name="enabled" defaultChecked={initial.enabled} label={t("backup.settings.enabled")} />
-          <Field label={t("backup.settings.hour")} htmlFor="hour" name="hour" hint={t("backup.settings.hourHint")} className="sm:max-w-xs">
+          <Field label={t("backup.settings.hour")} htmlFor="hour" name="hour" hint={t("backup.settings.hourHint")} className="sm:max-w-xs" required>
             <Input id="hour" name="hour" type="number" required min={0} max={23} defaultValue={initial.hour} />
           </Field>
         </div>
@@ -26,10 +26,10 @@ export function BackupPlanForm({ initial, limits }: { initial: { enabled: boolea
           {BACKUP_KINDS.map((kind) => (
             <div key={kind} className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr_1fr] sm:items-start">
               <p className="pt-2 text-sm font-medium">{td(`backup.kinds.${kind}`, kind)}</p>
-              <Field label={t("backup.retention.keep")} htmlFor={`keep_${kind}`} name={`keep_${kind}`}>
+              <Field label={t("backup.retention.keep")} htmlFor={`keep_${kind}`} name={`keep_${kind}`} required>
                 <Input id={`keep_${kind}`} name={`keep_${kind}`} type="number" required min={0} max={limits.keep} defaultValue={initial.retention[kind].keep} />
               </Field>
-              <Field label={t("backup.retention.days")} htmlFor={`days_${kind}`} name={`days_${kind}`}>
+              <Field label={t("backup.retention.days")} htmlFor={`days_${kind}`} name={`days_${kind}`} required>
                 <Input id={`days_${kind}`} name={`days_${kind}`} type="number" required min={0} max={limits.days} defaultValue={initial.retention[kind].days} />
               </Field>
             </div>

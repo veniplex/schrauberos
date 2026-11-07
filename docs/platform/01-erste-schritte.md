@@ -25,15 +25,23 @@ zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
 
 ## Die Oberfläche
 
-* **Navigation links:** Oben die **Übersicht** und diese **Hilfe**, darunter die Bereiche **Werkstatt**, **Büro**, **IT & Netzwerk**,
-  das **Handbuch** und die **Verwaltung**. Ein Klick auf den Namen eines Bereichs klappt ihn auf oder zu; der Bereich der
-  aktuellen Seite ist von selbst aufgeklappt. Sie sehen nur, was Ihre Rolle erlaubt – fehlt ein Eintrag, ist er für Sie nicht
-  freigeschaltet.
+* **Navigation links:** Oben die **Übersicht**, darunter die Bereiche **Werkstatt**, **Büro**, **IT & Netzwerk**, das **Handbuch** und die
+  **Verwaltung** – jeder Bereich mit seinem Titel und seinen Einträgen eingerückt darunter – und ganz unten die **Hilfe**. Ein Klick auf
+  den Titel eines Bereichs klappt ihn auf oder zu; die Anwendung merkt sich das für Ihren Browser. Der Bereich der aktuellen Seite
+  bleibt immer offen. Sie sehen nur, was Ihre Rolle erlaubt – fehlt ein Eintrag, ist er für Sie nicht freigeschaltet.
+* **Kopfleiste:** Das **Suchfeld** durchsucht alle Bereiche auf einmal (Kunden, Fahrzeuge, Termine, Reifen, Rechnungen, Mitarbeiter, Fuhrpark,
+  Netzwerk, Handbuch und IT-Dokumentation) und zeigt nur Treffer, die Ihre Rolle sehen darf. Ab zwei Zeichen erscheinen die Treffer als Links;
+  mit der Pfeil-nach-unten-Taste springen Sie in die Liste, **Enter** im Suchfeld öffnet den ersten Treffer, **Escape** schließt die Liste.
+  Rechts daneben legt **Neu** schnell etwas an (Kunde, Termin, Fahrzeug, Rechnung …) – es bietet nur an, was Sie anlegen dürfen.
+* **Tastatur:** Der erste Tabstopp auf jeder Seite ist **Zum Inhalt springen** (überspringt die Navigation).
 * **Übersicht:** Heute anstehende Termine, einzulagernde oder zu prüfende Reifen, offene Rechnungen, Fälligkeiten und angeheftete
   Seiten aus Handbuch und IT-Dokumentation – je nachdem, was Sie sehen dürfen.
 * **Unten in der Navigation:** Ihr Name und Ihre Rollen. Ein Klick öffnet das Benutzer-Menü: Sprache (Deutsch/Englisch),
-  Darstellung (Hell, Dunkel oder wie das Gerät), **Mein Konto** und **Abmelden**.
-* **Am Handy:** Die Navigation klappt hinter dem Menü-Knopf links oben auf.
+  Darstellung (Hell, Dunkel oder wie das Gerät), **Mein Konto** und **Abmelden**. Beim Abmelden werden auch nicht gespeicherte
+  Entwürfe von Formularen aus dem Browser gelöscht.
+* **Handy und Tablet (unter 1024 Pixel Breite):** Die Navigation liegt hinter dem Menü-Knopf links oben und klappt als Seitenfach auf
+  (Schließen-Knopf, Escape oder ein Tipp daneben schließt es; die Seite dahinter bleibt stehen). Suche (Lupe), **Neu** (+) und Ihr Konto
+  (Abmelden) liegen in der Kopfzeile: Die Lupe öffnet ein Suchfeld über die ganze Breite.
 
 ## Die Hilfe
 
@@ -43,7 +51,7 @@ Installation eingeschaltet sind und die Ihre Rolle nutzen darf.
 
 ## Ihr Konto
 
-Im Benutzer-Menü unten in der Navigation finden Sie **Mein Konto**: Name und E-Mail-Adresse ändern, Passwort ändern, Sprache und Darstellung
+Im Benutzer-Menü (unten in der Navigation, am Handy in der Kopfzeile) finden Sie **Mein Konto**: Name und E-Mail-Adresse ändern, Passwort ändern, Sprache und Darstellung
 wählen. Beim Ändern des Passworts werden Sie auf allen anderen Geräten abgemeldet.
 
 ## Zugang verloren: der Wiederherstellungs-Code

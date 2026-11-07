@@ -319,9 +319,9 @@ export function FormErrorSummary() {
   const { tp } = useI18n();
   const form = useFormContext();
   const root = useRef<HTMLDivElement>(null);
-  const errors = form?.state.fieldErrors ?? {};
+  const state = form?.state;
+  const errors = state?.fieldErrors ?? {};
   const names = Object.keys(errors);
-  const signature = names.join("|") + Object.values(errors).join("|");
 
   useEffect(() => {
     const element = root.current;
@@ -334,7 +334,8 @@ export function FormErrorSummary() {
       }
     }
     element.focus();
-  }, [signature]);
+    // bei jeder neuen Antwort (auch mit gleichen Fehlern) erneut: Fokus und Ansage für den nächsten Versuch
+  }, [state]);
 
   if (names.length === 0) return null;
   return (

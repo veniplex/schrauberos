@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Alert, Badge, Card, PageHeader, Table } from "@/components/ui/layout";
+import { Badge, Card, PageHeader, Table } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -15,9 +15,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("nav.users") };
 }
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function UsersPage() {
   const session = await requirePermission("users.view");
-  const [{ t, date }, sp] = await Promise.all([getI18n(), searchParams]);
+  const { t, date } = await getI18n();
   const users = await db.user.findMany({
     orderBy: { name: "asc" },
     include: { roles: { include: { role: { include: { permissions: true } } } } },
@@ -38,7 +38,6 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           ) : null
         }
       />
-      {sp.saved ? <div className="mb-4"><Alert tone="success">{t("common.saved")}</Alert></div> : null}
 
       <Card as="div" padded={false} className="overflow-hidden">
         <Table className="min-w-[44rem]">

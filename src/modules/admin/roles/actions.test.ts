@@ -61,7 +61,7 @@ describe("saveRole – Rechte-Hierarchie", () => {
   it("lässt bestehende Rechte unverändert, die der Aufrufer nicht hat, und ändert nur die Differenz", async () => {
     const target = await env.role({ permissions: ["appointments.view", "invoices.edit"] });
     const result = await redirectOf(() => save(target, { permissions: ["appointments.view", "invoices.edit", "tires.view"] }));
-    assert.match(result ?? "", /^\/admin\/roles\?saved=/);
+    assert.match(result ?? "", /^\/admin\/roles$/);
     assert.deepEqual(await permsOf(target), ["appointments.view", "invoices.edit", "tires.view"]);
   });
 
@@ -91,7 +91,7 @@ describe("saveRole – Rechte-Hierarchie", () => {
 
   it("legt eine Rolle mit eigenen Rechten an (ohne adminOnly)", async () => {
     const result = await redirectOf(() => save(null, { name: "Hilfskraft", permissions: ["appointments.view", "tires.view"] }));
-    assert.match(result ?? "", /^\/admin\/roles\?saved=/);
+    assert.match(result ?? "", /^\/admin\/roles$/);
     const created = await env.db.role.findFirstOrThrow({ where: { name: "Hilfskraft" } });
     assert.deepEqual(await permsOf(created), ["appointments.view", "tires.view"]);
   });
@@ -114,7 +114,7 @@ describe("saveRole – Rechte-Hierarchie", () => {
     await env.signIn(admin2);
     const target = await env.role({ permissions: ["appointments.view"] });
     const result = await redirectOf(() => save(target, { permissions: ["appointments.view", "users.manage", "invoices.edit"] }));
-    assert.match(result ?? "", /^\/admin\/roles\?saved=/);
+    assert.match(result ?? "", /^\/admin\/roles$/);
     assert.deepEqual(await permsOf(target), ["appointments.view", "invoices.edit", "users.manage"]);
   });
 

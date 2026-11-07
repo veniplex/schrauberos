@@ -125,13 +125,13 @@ describe("saveUser – Rechte-Hierarchie", () => {
   it("ändert ein Konto, dessen Rechte eine Teilmenge der eigenen sind (Passwort, Rollen)", async () => {
     const before = await hashOf(basic);
     const target = await redirectOf(() => edit(basic, { password: "neues-pass-456", roleId: [lowRole.id] }));
-    assert.match(target ?? "", /^\/admin\/users\?saved=/);
+    assert.match(target ?? "", /^\/admin\/users$/);
     assert.notEqual(await hashOf(basic), before);
   });
 
   it("legt ein Konto mit zulässiger Rolle an", async () => {
     const target = await redirectOf(() => actions.saveUser({}, form({ username: "neu", name: "Neu", password: "neues-pass-123", roleId: [lowRole.id] })));
-    assert.match(target ?? "", /^\/admin\/users\?saved=/);
+    assert.match(target ?? "", /^\/admin\/users$/);
   });
 
   it("berücksichtigt Rohrechte ausgeschalteter Funktionen: auch dann kein Zugriff auf ein Konto mit deren Rechten", async () => {
@@ -146,7 +146,7 @@ describe("saveUser – Rechte-Hierarchie", () => {
   it("ein Administrator darf weiterhin alles", async () => {
     await env.signIn(admin2);
     const target = await redirectOf(() => edit(victim, { password: "vom-admin-123", roleId: [powerRole.id, adminRole.id] }));
-    assert.match(target ?? "", /^\/admin\/users\?saved=/);
+    assert.match(target ?? "", /^\/admin\/users$/);
     assert.deepEqual(await rolesOf(victim), [powerRole.id, adminRole.id].sort());
   });
 
@@ -243,7 +243,7 @@ describe("deleteUser und saveUser – Schutz der eigenen Person und des letzten 
     // mit einem zweiten aktiven Administrator geht die Rollenänderung
     await env.user({ username: "admin3", roles: [adminRole] });
     const target = await redirectOf(() => edit(admin2, { roleId: [lowRole.id] }));
-    assert.match(target ?? "", /^\/admin\/users\?saved=/);
+    assert.match(target ?? "", /^\/admin\/users$/);
   });
 });
 
@@ -271,6 +271,6 @@ describe("saveUser – gleichzeitiges Bearbeiten", () => {
     const target = await redirectOf(() =>
       actions.saveUser({}, form({ id: basic.id, version: versionOf(fresh), username: basic.username, name: "Neuer Name", active: true, roleId: fresh.roles.map((r) => r.roleId) })),
     );
-    assert.match(target ?? "", /^\/admin\/users\?saved=/);
+    assert.match(target ?? "", /^\/admin\/users$/);
   });
 });

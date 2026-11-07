@@ -62,8 +62,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="flex flex-col gap-5 xl:col-span-2">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="flex flex-col gap-5 md:col-span-2">
           {canVehicles ? (
           <Card
             title={t("customers.vehicles")}

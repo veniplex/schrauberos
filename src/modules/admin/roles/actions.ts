@@ -70,7 +70,8 @@ const saveRoleOperation = defineOperation({
 export const saveRole = defineAction(saveRoleOperation, {
   form: (fd) => ({ ...formObject(fd), permissions: [...new Set(fd.getAll("permission").map(String).filter(isPermission))] }),
   revalidate: ["/admin/roles"],
-  redirect: ({ roleId }) => `/admin/roles?saved=${roleId}`,
+  redirect: "/admin/roles",
+  message: "common.saved", // der Toast meldet das Speichern (kein `?saved=` mehr in der Adresse)
 });
 
 const deleteRoleOperation = defineOperation({

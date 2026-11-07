@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("vehicles.new") };
 }
 
-export default async function NewVehiclePage({ searchParams }: { searchParams: Promise<{ customer?: string }> }) {
+export default async function NewVehiclePage({ searchParams }: { searchParams: Promise<{ customer?: string; plate?: string }> }) {
   await requirePermission("vehicles.edit");
   const [{ t }, sp] = await Promise.all([getI18n(), searchParams]);
   const customer = sp.customer ? await db.customer.findUnique({ where: { id: sp.customer } }) : null;
@@ -24,7 +24,7 @@ export default async function NewVehiclePage({ searchParams }: { searchParams: P
           cancelHref={customer ? `/customers/${customer.id}` : "/vehicles"}
           initial={{
             customer: customer ? { id: customer.id, label: customerDisplayName(customer), sublabel: customer.city ?? undefined } : null,
-            plate: "", make: "", model: "", vin: "", year: "", notes: "",
+            plate: (sp.plate ?? "").trim().slice(0, 14), make: "", model: "", vin: "", year: "", notes: "",
           }}
         />
       </div>

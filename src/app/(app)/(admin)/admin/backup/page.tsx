@@ -95,7 +95,7 @@ export default async function BackupPage() {
                           <RestoreForm name={b.name} label={t("backup.list.restore")} confirm={t("backup.list.confirmRestore", { date: when(b.createdAt) })} />
                           <form action={removeBackup}>
                             <input type="hidden" name="name" value={b.name} />
-                            <ConfirmSubmitButton message={t("backup.list.confirmDelete")} aria-label={t("common.delete")}>
+                            <ConfirmSubmitButton message={t("backup.list.confirmDelete")} label={t("common.delete")}>
                               <Trash2 className="size-3.5" aria-hidden />
                             </ConfirmSubmitButton>
                           </form>
