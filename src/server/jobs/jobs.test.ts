@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import fsp from "node:fs/promises";
+import { after, before, beforeEach, describe, it, mock } from "node:test";
 import { validateSchedule } from "@/lib/jobs/schedule";
 import { FEATURES } from "@/modules/catalog";
 import { featureKey } from "@/modules/catalog-logic";
@@ -47,6 +48,15 @@ function clock(start: string) {
 
 const MIN = 60_000;
 const BERLIN = () => "Europe/Berlin";
+
+/** Wartet auf eine Bedingung (Abfrage in kurzen Abständen, höchstens ~5 s) – statt eine feste Zeit zu schlafen. */
+async function until(condition: () => boolean | Promise<boolean>, what = "Bedingung"): Promise<void> {
+  for (let i = 0; i < 5000; i++) {
+    if (await condition()) return;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  throw new Error(`${what} trat nicht ein`);
+}
 
 function rig(jobs: JobDef[], start = "2026-06-01T10:00:00Z", extra: Partial<Parameters<typeof runnerModule.createJobRunner>[0]> = {}) {
   const c = clock(start);
@@ -157,7 +167,7 @@ describe("Zeitplan und Ausführung", () => {
     ]);
     await runner.sync();
     const first = runner.tick();
-    await new Promise((r) => setTimeout(r, 30));
+    await until(() => runner.isRunning("test.slow"), "Job läuft");
     assert.equal(runner.isRunning("test.slow"), true);
     assert.deepEqual(await runner.tick(), [], "während des Laufs startet kein zweiter");
     release();
@@ -175,7 +185,7 @@ describe("Zeitplan und Ausführung", () => {
     b.c.set("2026-06-01T10:00:00Z");
     await a.runner.sync();
     const running = a.runner.tick();
-    await new Promise((r) => setTimeout(r, 30));
+    await until(() => a.runner.isRunning("test.lock"), "Job läuft");
     assert.deepEqual(await b.runner.tick(), [], "gesperrt");
     assert.equal(calls.calls, 0);
     b.c.advance(5 * MIN + 61_000); // Sperre (Zeitlimit + Reserve) abgelaufen
@@ -190,9 +200,8 @@ describe("Zeitplan und Ausführung", () => {
     await old.runner.sync();
     await env.db.jobState.update({ where: { id: "test.restart" }, data: { nextRunAt: old.c.now() } });
     void old.runner.tick();
-    await new Promise((r) => setTimeout(r, 30));
-    assert.equal((await env.db.jobState.findUniqueOrThrow({ where: { id: "test.restart" } })).lockedUntil !== null, true);
-    assert.equal((await env.db.jobRun.findFirstOrThrow({ where: { jobId: "test.restart" } })).status, "running");
+    await until(async () => (await env.db.jobState.findUniqueOrThrow({ where: { id: "test.restart" } })).lockedUntil !== null, "Sperre gesetzt");
+    assert.equal(await env.db.jobRun.count({ where: { jobId: "test.restart" } }), 0, "ein laufender Job schreibt erst am Ende einen Lauf");
 
     const job = counting("nachgeholt");
     const fresh = rig([{ id: "test.restart", schedule: { cron: "0 3 * * *" }, run: job }]);
@@ -230,9 +239,15 @@ describe("Zeitplan und Ausführung", () => {
     assert.equal(runner.isRunning("test.timeout"), true, "die Funktion läuft noch");
     c.advance(5000);
     assert.deepEqual(await runner.tick(), [], "kein zweiter Lauf, solange der erste hängt");
+    // …aber sichtbar: Vermerk am Job, die Fehlerserie wächst, der nächste Termin rückt nach der Wartezeit weiter
+    const stuck = await env.db.jobState.findUniqueOrThrow({ where: { id: "test.timeout" } });
+    assert.match(stuck.lastMessage ?? "", /Hängt/);
+    assert.equal(stuck.failures, 2);
+    assert.equal(stuck.lastStatus, "error");
     release();
-    await new Promise((r) => setTimeout(r, 10));
+    await until(() => !runner.isRunning("test.timeout"), "Funktion zurückgekehrt");
     assert.equal(runner.isRunning("test.timeout"), false);
+    c.advance(5000);
     assert.equal((await runner.tick()).length, 1);
   });
 
@@ -384,7 +399,7 @@ describe("Outbox-Zustellung", () => {
     const c = handler("t.c", ["customer.*"], async () => void seen.push("c"));
     const e = await event("invoice.paid");
     const summary = await deliver([a, b, c], new Date());
-    assert.deepEqual(summary, { delivered: 1, retried: 0, failed: 0, skipped: 0 });
+    assert.deepEqual(summary, { delivered: 1, retried: 0, failed: 0, skipped: 0, parked: 0 });
     assert.deepEqual(seen.sort(), ['a:invoice.paid:e1:{"n":1}:1', "b:invoice.paid"]);
     const row = await env.db.outboxEvent.findUniqueOrThrow({ where: { id: e.id } });
     assert.ok(row.processedAt);
@@ -408,7 +423,7 @@ describe("Outbox-Zustellung", () => {
       });
       const e = await event("x.y");
       const t0 = new Date("2026-06-01T10:00:00Z");
-      assert.deepEqual(await deliver([ok, flaky], t0), { delivered: 0, retried: 1, failed: 0, skipped: 0 });
+      assert.deepEqual(await deliver([ok, flaky], t0), { delivered: 0, retried: 1, failed: 0, skipped: 0, parked: 0 });
       let row = await env.db.outboxEvent.findUniqueOrThrow({ where: { id: e.id } });
       assert.equal(row.processedAt, null);
       assert.equal(row.attempts, 1);
@@ -416,7 +431,7 @@ describe("Outbox-Zustellung", () => {
       assert.equal(row.availableAt.toISOString(), "2026-06-01T10:00:30.000Z", "erste Wartezeit 30 s");
       assert.equal((await deliver([ok, flaky], new Date("2026-06-01T10:00:10Z"))).retried, 0, "noch in der Wartezeit");
       broken = false;
-      assert.deepEqual(await deliver([ok, flaky], new Date("2026-06-01T10:00:31Z")), { delivered: 1, retried: 0, failed: 0, skipped: 0 });
+      assert.deepEqual(await deliver([ok, flaky], new Date("2026-06-01T10:00:31Z")), { delivered: 1, retried: 0, failed: 0, skipped: 0, parked: 0 });
       assert.deepEqual([good, bad], [1, 2], "der erste Abnehmer wurde nur einmal bedient");
       row = await env.db.outboxEvent.findUniqueOrThrow({ where: { id: e.id } });
       assert.ok(row.processedAt);
@@ -462,16 +477,98 @@ describe("Outbox-Zustellung", () => {
     }
   });
 
-  it("ohne Abnehmer (keiner angemeldet oder Funktion aus) gilt das Ereignis als erledigt; Abnehmer ausgeschalteter Funktionen werden nicht gerufen", async () => {
+  it("ohne angemeldeten Abnehmer gilt das Ereignis als erledigt", async () => {
+    const other = handler("t.other", ["customer.*"], async () => undefined);
+    await event("nobody.cares");
+    assert.deepEqual(await deliver([other], new Date(), []), { delivered: 0, retried: 0, failed: 0, skipped: 1, parked: 0 });
+  });
+
+  it("Abnehmer einer ausgeschalteten Funktion: das Ereignis bleibt offen (geparkt), wird beim Einschalten nachgeholt und verfällt sonst mit der Aufbewahrung", async () => {
     let calls = 0;
     const fleet = handler("t.fleet", ["fleet.*"], async () => void calls++, { feature: "office.fleet" });
-    await event("fleet.changed");
-    await event("nobody.cares");
-    assert.deepEqual(await deliver([fleet], new Date(), []), { delivered: 0, retried: 0, failed: 0, skipped: 2 });
-    assert.equal(calls, 0);
-    await event("fleet.changed");
-    assert.equal((await deliver([fleet], new Date(), ["office.fleet"])).delivered, 1);
+    const t0 = new Date("2026-06-01T10:00:00Z");
+    const e = await event("fleet.changed");
+    assert.deepEqual(await deliver([fleet], t0, []), { delivered: 0, retried: 0, failed: 0, skipped: 0, parked: 1 });
+    assert.equal(calls, 0, "ausgeschaltet: nicht gerufen");
+    let row = await env.db.outboxEvent.findUniqueOrThrow({ where: { id: e.id } });
+    assert.equal(row.processedAt, null, "bleibt offen");
+    assert.equal(row.availableAt.toISOString(), "2026-06-01T10:15:00.000Z", "geparkt: erst in 15 Minuten wieder angesehen (verdrängt keine neuen Ereignisse)");
+    assert.equal((await deliver([fleet], new Date("2026-06-01T10:05:00Z"), [])).parked, 0, "in der Wartezeit nicht erneut angefasst");
+
+    // Funktion wieder an: nachgeholt
+    assert.equal((await deliver([fleet], new Date("2026-06-01T10:16:00Z"), ["office.fleet"])).delivered, 1);
     assert.equal(calls, 1);
+    row = await env.db.outboxEvent.findUniqueOrThrow({ where: { id: e.id } });
+    assert.ok(row.processedAt);
+  });
+
+  it("gemischt: der aktive Abnehmer wird sofort bedient, für den ausgeschalteten bleibt das Ereignis offen; ein geparktes Ereignis verdrängt neue nicht", async () => {
+    const seen: string[] = [];
+    const active = handler("t.active", ["x.*"], async () => void seen.push("active"));
+    const off = handler("t.off", ["x.*"], async () => void seen.push("off"), { feature: "office.fleet" });
+    const first = await event("x.one", { createdAt: new Date("2026-06-01T09:00:00Z") });
+    const t0 = new Date("2026-06-01T10:00:00Z");
+    assert.equal((await deliver([active, off], t0, [])).parked, 1);
+    assert.deepEqual(seen, ["active"]);
+    assert.equal(await env.db.outboxDelivery.count({ where: { eventId: first.id, handler: "t.active" } }), 1);
+    // ein neues Ereignis wird trotz des älteren, geparkten zugestellt
+    await event("x.two");
+    assert.equal((await deliver([active, off], new Date("2026-06-01T10:01:00Z"), [])).parked, 1);
+    assert.deepEqual(seen, ["active", "active"]);
+    // Funktion an: für das erste Ereignis kommt nur noch der ausgeschaltete Abnehmer dran
+    await deliver([active, off], new Date("2026-06-01T10:20:00Z"), ["office.fleet"]);
+    assert.deepEqual(seen.sort(), ["active", "active", "off", "off"]);
+    assert.ok((await env.db.outboxEvent.findUniqueOrThrow({ where: { id: first.id } })).processedAt);
+  });
+
+  it("ein hängender Abnehmer wird nach seinem Zeitlimit als gescheitert gewertet (Signal ausgelöst) und blockiert weder die übrigen Abnehmer noch den Job", async () => {
+    const originalError = console.error;
+    console.error = () => undefined;
+    try {
+      let aborted = false;
+      const hang = handler(
+        "t.hang",
+        ["x.*"],
+        (_message, { signal }) => {
+          signal.addEventListener("abort", () => (aborted = true));
+          return new Promise<void>(() => undefined); // kehrt nie zurück
+        },
+        { timeoutMs: 20 },
+      );
+      const fine = handler("t.fine", ["x.*"], async () => undefined);
+      const e = await event("x.y");
+      const summary = await deliver([hang, fine], new Date("2026-06-01T10:00:00Z"));
+      assert.deepEqual(summary, { delivered: 0, retried: 1, failed: 0, skipped: 0, parked: 0 });
+      assert.equal(aborted, true);
+      const row = await env.db.outboxEvent.findUniqueOrThrow({ where: { id: e.id } });
+      assert.equal(row.lastError, "t.hang: Error", "als Fehler vermerkt (nur Art, keine Daten)");
+      assert.equal(await env.db.outboxDelivery.count({ where: { eventId: e.id, handler: "t.fine" } }), 1, "der andere Abnehmer wurde bedient");
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it("wird der Job abgebrochen (signal), hört die Zustellung nach dem laufenden Ereignis auf", async () => {
+    const seen: string[] = [];
+    const h = handler("t.h", ["x.*"], async (m) => void seen.push(m.type));
+    await event("x.one", { createdAt: new Date("2026-06-01T09:00:00Z") });
+    await event("x.two", { createdAt: new Date("2026-06-01T09:01:00Z") });
+    const controller = new AbortController();
+    controller.abort();
+    const summary = await outbox.deliverOutbox({ handlers: [h], activeFeatures: new Set(), now: new Date(), signal: controller.signal });
+    assert.deepEqual(summary, { delivered: 0, retried: 0, failed: 0, skipped: 0, parked: 0 });
+    assert.deepEqual(seen, []);
+  });
+
+  it("hasPendingOutbox: nur zustellbare Ereignisse zählen (nicht erledigte, aufgegebene oder in der Wartezeit)", async () => {
+    const now = new Date("2026-06-01T10:00:00Z");
+    assert.equal(await outbox.hasPendingOutbox(now), false);
+    await env.db.outboxEvent.create({ data: { type: "t.a", processedAt: now } });
+    await env.db.outboxEvent.create({ data: { type: "t.b", failedAt: now } });
+    await env.db.outboxEvent.create({ data: { type: "t.c", availableAt: new Date(now.getTime() + MIN) } });
+    assert.equal(await outbox.hasPendingOutbox(now), false);
+    await env.db.outboxEvent.create({ data: { type: "t.d", availableAt: new Date(now.getTime() - MIN) } });
+    assert.equal(await outbox.hasPendingOutbox(now), true);
   });
 
   it("räumt zugestellte Ereignisse nach 14 Tagen und aufgegebene nach 60 Tagen samt Zustellvermerken ab", async () => {
@@ -484,9 +581,11 @@ describe("Outbox-Zustellung", () => {
     const oldFailed = await make({ failedAt: new Date(now.getTime() - 61 * DAY) });
     const freshFailed = await make({ failedAt: new Date(now.getTime() - 30 * DAY) });
     const pending = await make({});
-    assert.equal(await outbox.pruneOutbox(now), 2);
+    const oldParked = await make({ createdAt: new Date(now.getTime() - 15 * DAY) });
+    assert.equal(await outbox.pruneOutbox(now), 3, "alt erledigt, alt aufgegeben und seit 14 Tagen offen (Abnehmer-Funktion blieb aus)");
     const left = (await env.db.outboxEvent.findMany()).map((e) => e.id).sort();
     assert.deepEqual(left, [freshDone.id, freshFailed.id, pending.id].sort());
+    void oldParked;
     assert.equal(await env.db.outboxDelivery.count(), 0);
     void oldFailed;
   });
@@ -525,5 +624,279 @@ describe("Aufräumen der Ergebnisse", () => {
     assert.equal(rows.length, registry.allJobs().length);
     await env.db.jobRun.create({ data: { jobId: "backup.auto", status: "ok", message: "m" } });
     assert.equal((await status.recentJobRuns(5))[0].jobId, "backup.auto");
+  });
+});
+
+describe("Nur Auffälliges wird festgehalten, Vorabprüfung, Sperre bei Fehlern", () => {
+  it("ein Erfolg ohne Meldung hinterlässt keinen Lauf (nur den Zustand); Meldung oder Fehler schon", async () => {
+    const quiet = counting();
+    const loud = counting("3 gelöscht");
+    const { runner, c } = rig([
+      { id: "test.quiet", schedule: { every: MIN }, run: quiet },
+      { id: "test.loud", schedule: { every: MIN }, run: loud },
+    ]);
+    await runner.sync();
+    await runner.tick();
+    c.advance(MIN);
+    await runner.tick();
+    assert.equal(quiet.calls, 2);
+    assert.equal(await env.db.jobRun.count({ where: { jobId: "test.quiet" } }), 0, "keine leeren Läufe");
+    assert.equal(await env.db.jobRun.count({ where: { jobId: "test.loud" } }), 2);
+    const state = await env.db.jobState.findUniqueOrThrow({ where: { id: "test.quiet" } });
+    assert.equal(state.lastStatus, "ok");
+    assert.ok(state.lastRunAt, "der Zustand wird trotzdem aktualisiert");
+  });
+
+  it("shouldRun: gibt es nichts zu tun, wird nichts geschrieben (keine Sperre, kein Zustand) – „Jetzt ausführen“ umgeht die Vorabprüfung", async () => {
+    let work = false;
+    const job = counting("erledigt");
+    const { runner } = rig([{ id: "test.pre", schedule: { every: MIN }, shouldRun: async () => work, run: job }]);
+    await runner.sync();
+    const before = await env.db.jobState.findUniqueOrThrow({ where: { id: "test.pre" } });
+    assert.deepEqual(await runner.tick(), []);
+    assert.equal(job.calls, 0);
+    const same = await env.db.jobState.findUniqueOrThrow({ where: { id: "test.pre" } });
+    assert.equal(same.updatedAt.getTime(), before.updatedAt.getTime(), "kein Schreibzugriff");
+    assert.equal(same.lastRunAt, null);
+    work = true;
+    assert.equal((await runner.tick()).length, 1);
+    work = false;
+    assert.equal(job.calls, 1);
+    assert.equal((await runner.runNow("test.pre"))?.status, "ok", "von Hand: ohne Vorabprüfung");
+    assert.equal(job.calls, 2);
+  });
+
+  it("runNow läuft sofort (unabhängig vom Termin) und meldet dem Job manual = true", async () => {
+    const seen: boolean[] = [];
+    const { runner } = rig([{ id: "test.manual", schedule: { cron: "0 3 * * *" }, run: async ({ manual }) => void seen.push(manual) }]);
+    await runner.sync();
+    assert.deepEqual(await runner.tick(), [], "nicht fällig");
+    assert.equal((await runner.runNow("test.manual"))?.status, "ok");
+    assert.deepEqual(seen, [true]);
+    assert.equal(await runner.runNow("test.unbekannt"), null);
+  });
+
+  it("scheitert das Belegen nach dem Update (Datenbankfehler), wird die Sperre sofort wieder freigegeben – nicht erst nach Ablauf", async () => {
+    let failOnce = true;
+    const flaky = new Proxy(env.db, {
+      get(target, prop, receiver) {
+        if (prop === "jobState") {
+          return new Proxy(target.jobState, {
+            get(inner, name) {
+              if (name === "findUniqueOrThrow") {
+                return (...args: unknown[]) => {
+                  if (failOnce) {
+                    failOnce = false;
+                    return Promise.reject(new Error("Datenbank kurz weg"));
+                  }
+                  return (inner.findUniqueOrThrow as (...a: unknown[]) => unknown)(...args);
+                };
+              }
+              const value = Reflect.get(inner, name);
+              return typeof value === "function" ? value.bind(inner) : value;
+            },
+          });
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const job = counting();
+    const originalError = console.error;
+    console.error = () => undefined;
+    try {
+      const { runner } = rig([{ id: "test.claim", schedule: { every: MIN }, timeoutMs: 30 * MIN, run: job }], "2026-06-01T10:00:00Z", { db: flaky });
+      await runner.sync();
+      assert.deepEqual(await runner.tick(), [], "der Takt meldet den Fehler nur im Log");
+      const state = await env.db.jobState.findUniqueOrThrow({ where: { id: "test.claim" } });
+      assert.equal(state.lockedUntil, null, "Sperre freigegeben");
+      assert.equal(runner.isRunning("test.claim"), false);
+      assert.equal((await runner.tick()).length, 1, "schon der nächste Takt führt den Job aus");
+    } finally {
+      console.error = originalError;
+    }
+    assert.equal(job.calls, 1);
+  });
+
+  it("onFailure wird bei Fehlern und bei einer Zeitüberschreitung gerufen (Audit), nicht bei Erfolg", async () => {
+    const seen: string[] = [];
+    let mode: "ok" | "throw" | "hang" = "throw";
+    const hang = new Promise<void>(() => undefined);
+    const originalError = console.error;
+    console.error = () => undefined;
+    try {
+      const { runner, c } = rig([
+        {
+          id: "test.fail",
+          schedule: { every: MIN },
+          timeoutMs: 10,
+          retry: { baseDelayMs: 1000, maxDelayMs: 1000 },
+          run: async () => {
+            if (mode === "throw") throw new Error("x");
+            if (mode === "hang") return hang;
+          },
+          onFailure: async ({ attempt, timedOut }) => void seen.push(`${attempt}:${timedOut}`),
+        },
+      ]);
+      await runner.sync();
+      await runner.tick();
+      c.advance(1000);
+      mode = "hang";
+      await runner.tick();
+      c.advance(1000);
+      mode = "ok";
+      await runner.tick(); // der hängende Lauf ist noch nicht zurück → kein neuer Lauf
+      assert.deepEqual(seen, ["1:false", "2:true"]);
+    } finally {
+      console.error = originalError;
+    }
+  });
+});
+
+describe("Zeitgeber: Start mit Wiederholung, Herzschlag", () => {
+  it("scheitert recover() beim Start einmal, läuft der Zeitgeber trotzdem – der nächste Takt holt Vorbereitung und Jobs nach", async () => {
+    let failing = true;
+    const unstable = new Proxy(env.db, {
+      get(target, prop, receiver) {
+        if (prop === "jobRun") {
+          return new Proxy(target.jobRun, {
+            get(inner, name) {
+              if (name === "updateMany" && failing) {
+                return () => {
+                  failing = false;
+                  return Promise.reject(new Error("Datenbank beim Start nicht erreichbar"));
+                };
+              }
+              const value = Reflect.get(inner, name);
+              return typeof value === "function" ? value.bind(inner) : value;
+            },
+          });
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const job = counting("lief");
+    const originalError = console.error;
+    console.error = () => undefined;
+    const { runner } = rig([{ id: "test.boot", schedule: { every: MIN }, run: job }], "2026-06-01T10:00:00Z", { db: unstable, startDelayMs: 1, tickMs: 5 });
+    try {
+      assert.equal(runner.status().started, false);
+      runner.start();
+      assert.equal(runner.status().started, true);
+      await until(() => job.calls > 0, "Job nach fehlgeschlagenem Start ausgeführt");
+      assert.equal(runner.status().prepared, true);
+      assert.ok(runner.status().lastTickAt, "Herzschlag gesetzt");
+      assert.equal(runner.status().lastError, null, "der Fehler ist nach der Wiederholung weg");
+    } finally {
+      runner.stop();
+      console.error = originalError;
+    }
+    assert.equal(runner.status().started, false);
+  });
+
+  it("kein Takt, solange die Vorbereitung scheitert: der Fehler bleibt im Status sichtbar", async () => {
+    const dead = new Proxy(env.db, {
+      get(target, prop, receiver) {
+        if (prop === "jobRun") return { updateMany: () => Promise.reject(new Error("DB aus")) };
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const job = counting();
+    const originalError = console.error;
+    console.error = () => undefined;
+    const { runner } = rig([{ id: "test.dead", schedule: { every: MIN }, run: job }], "2026-06-01T10:00:00Z", { db: dead as typeof env.db });
+    try {
+      await assert.rejects(runner.beat());
+      assert.equal(job.calls, 0);
+      assert.equal(runner.status().prepared, false);
+      assert.match(runner.status().lastError ?? "", /Vorbereitung/);
+      assert.ok(runner.status().lastTickAt);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it("recover() hält Unterbrechungen als Lauf fest (ein Eintrag je belegtem Job) und gibt die Sperren frei", async () => {
+    await env.db.jobState.create({ data: { id: "test.a", lockedUntil: new Date(Date.now() + 60_000), lockOwner: "alt" } });
+    await env.db.jobState.create({ data: { id: "test.b" } });
+    const { runner } = rig([]);
+    assert.equal(await runner.recover(), 1);
+    const runs = await env.db.jobRun.findMany();
+    assert.deepEqual(runs.map((r) => [r.jobId, r.status]), [["test.a", "interrupted"]]);
+    assert.equal(await runner.recover(), 0, "idempotent");
+    assert.equal(await env.db.jobRun.count(), 1);
+  });
+});
+
+describe("Automatisches Backup: Reihenfolge und Teilfehler (ZP3-A-12)", () => {
+  const settle = async (hour: string, keep: string) => {
+    await env.db.appSetting.upsert({ where: { key: "backup.hour" }, update: { value: hour }, create: { key: "backup.hour", value: hour } });
+    await env.db.appSetting.upsert({ where: { key: "backup.retention.auto.keep" }, update: { value: keep }, create: { key: "backup.retention.auto.keep", value: keep } });
+  };
+
+  it("scheitert nur die Aufbewahrung, bleibt der Lauf ein Erfolg: das Backup ist protokolliert, der Hinweis steht in der Meldung, kein „Backup fehlgeschlagen“", async () => {
+    const job = registry.allJobs().find((j) => j.id === "backup.auto")!;
+    const core = await import("@/server/backup/core");
+    await settle("0", "1");
+    await core.createBackup("auto", undefined, new Date(Date.UTC(2026, 4, 1)));
+    await core.createBackup("auto", undefined, new Date(Date.UTC(2026, 4, 2)));
+    const renameOriginal = fsp.rename;
+    mock.method(fsp, "rename", async (from: string, to: string) => {
+      if (/schrauberos-.*-auto$/.test(String(from))) throw Object.assign(new Error("gesperrt"), { code: "EBUSY" });
+      return renameOriginal(from, to);
+    });
+    const originalError = console.error;
+    console.error = () => undefined;
+    try {
+      const { runner } = rig([job], "2026-06-01T10:00:00Z", { timeZone: () => "UTC" });
+      await runner.sync();
+      const [result] = await runner.tick();
+      assert.equal(result.status, "ok", "das Backup wurde angelegt");
+      assert.match(result.message, /Backup angelegt: schrauberos-.*-auto/);
+      assert.match(result.message, /Aufbewahrung fehlgeschlagen/);
+      assert.equal(await env.db.auditLog.count({ where: { action: "backup.create" } }), 1, "protokolliert, bevor die Aufbewahrung lief");
+      assert.equal(await env.db.auditLog.count({ where: { action: "backup.createFailed" } }), 0);
+      assert.equal((await env.db.jobState.findUniqueOrThrow({ where: { id: "backup.auto" } })).failures, 0);
+      assert.equal((await core.listBackups()).filter((b) => b.kind === "auto").length, 3, "nichts gelöscht");
+    } finally {
+      mock.restoreAll();
+      console.error = originalError;
+      for (const b of await core.listBackups()) await core.deleteBackup(b.name);
+    }
+  });
+
+  it("„Jetzt ausführen“ legt auch außerhalb der Uhrzeit ein Backup an (der Zeitplan tut es erst zur eingestellten Uhrzeit)", async () => {
+    const job = registry.allJobs().find((j) => j.id === "backup.auto")!;
+    const core = await import("@/server/backup/core");
+    await settle("23", "14"); // Uhrzeit nicht erreicht
+    try {
+      const { runner } = rig([job], new Date().toISOString(), { timeZone: () => "UTC" });
+      await runner.sync();
+      await env.db.jobState.update({ where: { id: "backup.auto" }, data: { nextRunAt: new Date(Date.now() - 1000) } });
+      const [idle] = await runner.tick();
+      assert.equal(idle.message, "", "Uhrzeit nicht erreicht: nichts zu tun");
+      assert.equal((await core.listBackups()).length, 0);
+      const forced = await runner.runNow("backup.auto");
+      assert.equal(forced?.status, "ok");
+      assert.match(forced?.message ?? "", /Backup angelegt/);
+      assert.equal((await core.listBackups()).length, 1);
+    } finally {
+      for (const b of await core.listBackups()) await core.deleteBackup(b.name);
+    }
+  });
+
+  it("eine Zeitüberschreitung des Backups wird wie ein Fehlschlag protokolliert (onFailure → Audit, nur der erste der Serie)", async () => {
+    const job = registry.allJobs().find((j) => j.id === "backup.auto")!;
+    const hung: JobDef = { ...job, timeoutMs: 10, run: () => new Promise<void>(() => undefined) };
+    const originalError = console.error;
+    console.error = () => undefined;
+    try {
+      const { runner } = rig([hung], "2026-06-01T10:00:00Z");
+      await runner.sync();
+      const [result] = await runner.tick();
+      assert.deepEqual([result.status, result.message], ["error", "Zeitüberschreitung"]);
+      assert.equal(await env.db.auditLog.count({ where: { action: "backup.createFailed" } }), 1);
+    } finally {
+      console.error = originalError;
+    }
   });
 });

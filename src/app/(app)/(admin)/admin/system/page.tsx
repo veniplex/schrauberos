@@ -4,8 +4,10 @@ import { getI18n } from "@/i18n/server";
 import type { Schedule } from "@/lib/jobs/schedule";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { jobStatusRows, recentJobRuns } from "@/server/jobs/status";
+import { evaluateSystem, problemTone, type SystemProblem } from "@/server/jobs/health";
+import { jobRunner } from "@/server/jobs";
 import { activeFeatureSet } from "@/server/jobs/runner";
+import { jobStatusRows, recentJobRuns } from "@/server/jobs/status";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -27,7 +29,33 @@ export default async function SystemPage() {
   ]);
   const when = (d: Date | string) => date(d, { dateStyle: "short", timeStyle: "medium" });
   const nameOf = (id: string) => td(`system.names.${id}`, id);
-  const failing = jobs.filter((j) => j.failures > 0).length;
+  const runner = jobRunner().status();
+  const problems = evaluateSystem({
+    now: new Date(),
+    jobs: jobs.map((j) => ({ id: j.id, active: !j.feature || active.has(j.feature), failures: j.failures, lastStatus: j.lastStatus, nextRunAt: j.nextRunAt, lockedUntil: j.lockedUntil })),
+    outboxFailed: failed,
+    runner,
+  });
+  const problemText = (p: SystemProblem) => {
+    switch (p.code) {
+      case "failing":
+        return tp("system.problem.failing", p.failures, { job: nameOf(p.jobId) });
+      case "overdue":
+        return t("system.problem.overdue", { job: nameOf(p.jobId) });
+      case "stuck":
+        return t("system.problem.stuck", { job: nameOf(p.jobId) });
+      case "interrupted":
+        return t("system.problem.interrupted", { job: nameOf(p.jobId) });
+      case "outboxFailed":
+        return tp("system.problem.outboxFailed", p.count);
+      case "runnerStale":
+        return t("system.problem.runnerStale", { date: when(p.lastTickAt) });
+      case "runnerDown":
+        return t("system.problem.runnerDown");
+      case "runnerError":
+        return t("system.problem.runnerError");
+    }
+  };
 
   const scheduleText = (schedule: Schedule) => {
     if ("cron" in schedule) return t("system.schedule.cron", { cron: schedule.cron });
@@ -42,7 +70,18 @@ export default async function SystemPage() {
     <>
       <PageHeader title={t("system.title")} description={t("system.description")} />
       <div className="flex max-w-6xl flex-col gap-5">
-        {failing > 0 ? <Alert tone="danger">{tp("system.problems", failing)}</Alert> : <Alert tone="success">{t("system.fine")}</Alert>}
+        {problems.length === 0 ? (
+          <Alert tone="success">{t("system.fine")}</Alert>
+        ) : (
+          <Alert tone={problemTone(problems)}>
+            <ul className="list-disc pl-5">
+              {problems.map((p, i) => (
+                <li key={i}>{problemText(p)}</li>
+              ))}
+            </ul>
+          </Alert>
+        )}
+        <p className="text-xs text-ink-muted">{runner.lastTickAt ? t("system.runner.lastActive", { date: when(runner.lastTickAt) }) : t("system.runner.notYet")}</p>
 
         <Card title={t("system.jobs.title")} padded={false}>
           {jobs.length === 0 ? (

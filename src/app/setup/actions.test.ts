@@ -77,6 +77,21 @@ describe("completeSetup", () => {
     assert.equal((await env.db.workshop.findUniqueOrThrow({ where: { id: "default" } })).timezone, "America/New_York");
   });
 
+  it("stellt die Termine der Cron-Jobs auf die gewählte Zeitzone um (vorher berechnet in der Zeitzone des Prozesses)", async () => {
+    const { jobRunner } = await import("@/server/jobs");
+    process.env.TZ = "UTC";
+    await env.db.jobState.deleteMany();
+    await jobRunner().sync();
+    const nextOf = async () => (await env.db.jobState.findUniqueOrThrow({ where: { id: "audit.retention" } })).nextRunAt!;
+    const hourIn = (zone: string, at: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at);
+    assert.equal(hourIn("UTC", await nextOf()), "03:00");
+
+    const token = tokenMod.ensureSetupToken(true, { log: () => {} })!;
+    assert.equal((await actions.completeSetup({}, setupForm(token))).ok, true);
+    // ohne reschedule() läge der Termin noch auf 03:00 UTC; jetzt auf 03:00 Ortszeit New York
+    assert.equal(hourIn("America/New_York", await nextOf()), "03:00");
+  });
+
   it("falsches oder fehlendes Token: Feldfehler, kein Benutzer, Zeitzone unverändert", async () => {
     tokenMod.ensureSetupToken(true, { log: () => {} });
     for (const bad of ["falsch", "0".repeat(40)]) {

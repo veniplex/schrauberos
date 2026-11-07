@@ -16,9 +16,16 @@ import { DEFAULT_JOB_RETRY, DEFAULT_JOB_TIMEOUT_MS, type JobDef } from "./types"
  *  - **Fehler:** `failures` zählt Fehlschläge in Folge; der nächste Versuch kommt nach einer Wartezeit, die sich je Fehlschlag verdoppelt (mit Obergrenze,
  *    siehe `JobRetry`). Ein Job gibt nie still auf: Der Fehler bleibt in `JobState`/`JobRun` sichtbar, bis ein Lauf gelingt.
  *  - **Sperre gegen Doppelläufe:** Vor dem Lauf wird der Job in der Datenbank belegt (`lockedUntil`, bedingtes Update); ein zweiter Zugriff – auch aus
- *    einem zweiten Takt – scheitert daran. Zusätzlich merkt sich der Prozess laufende Jobs, bis die Funktion wirklich zurückkehrt (auch nach Zeitüberschreitung).
- *  - **Neustart mitten im Lauf:** Es läuft nur ein Prozess (ein Container). `recover()` beim Start markiert daher alle noch „laufenden“ Läufe als unterbrochen,
- *    gibt die Sperren frei und setzt die Jobs auf „sofort“ – die Jobs sind wiederholbar. Läuft versehentlich ein zweiter Prozess, ist `recover()` nicht sicher.
+ *    einem zweiten Takt – scheitert daran. Zusätzlich merkt sich der Prozess laufende Jobs, bis die Funktion wirklich zurückkehrt (auch nach Zeitüberschreitung);
+ *    reagiert ein Job nicht auf `ctx.signal` und hängt, bekommt er für jeden fälligen Termin einen sichtbaren Vermerk (`lastMessage`) und die Fehlerserie wächst.
+ *    Scheitert das Belegen nach dem Update (Datenbankfehler), wird die Sperre sofort wieder freigegeben (best effort), sonst verfällt sie nach Ablauf.
+ *  - **Nur Auffälliges wird festgehalten:** Ein Lauf ohne Fehler und ohne Ergebnismeldung hinterlässt keinen `JobRun` (sonst Zehntausende Zeilen am Tag für den
+ *    15-Sekunden-Takt der Outbox); `JobState` (letzter Lauf, nächster Termin) wird immer aktualisiert. Jobs mit `shouldRun` werden vor dem Belegen billig befragt
+ *    und schreiben nichts, wenn es nichts zu tun gibt.
+ *  - **Neustart mitten im Lauf:** Es läuft nur ein Prozess (ein Container). `recover()` beim Start hält alle noch belegten Jobs als „unterbrochen“ fest (ein `JobRun`
+ *    je Job), gibt die Sperren frei und setzt die Jobs auf „sofort“ – die Jobs sind wiederholbar. Läuft versehentlich ein zweiter Prozess, ist `recover()` nicht sicher.
+ *  - **Start mit Wiederholung:** Der Zeitgeber wird immer gesetzt. `recover()`/`sync()` laufen sofort und – scheitern sie (Datenbank kurz weg) – bei jedem Takt erneut,
+ *    bis es gelingt; kein Takt läuft vorher. `status()` meldet den letzten Takt („Runner zuletzt aktiv“ im Systemstatus).
  *  - **Funktion ausgeschaltet:** Der Job ruht (kein Lauf, kein Eintrag); beim Wiedereinschalten wird er nachgeholt.
  *  - **Testbar:** Uhr, Zeitzone, Aktivierung und Job-Liste werden hineingereicht; `tick()` führt fällige Jobs aus, ohne Zeitgeber.
  */
@@ -41,6 +48,17 @@ export type RunnerOptions = {
 
 export type RunResult = { jobId: string; status: "ok" | "error"; message: string; durationMs: number; attempt: number };
 
+/** Zustand des Zeitgebers (im Prozessspeicher; für den Systemstatus). */
+export type RunnerStatus = {
+  started: boolean;
+  /** `recover()`/`sync()` sind gelungen */
+  prepared: boolean;
+  /** Beginn des letzten Takts (auch wenn er scheiterte) */
+  lastTickAt: Date | null;
+  /** Fehler des letzten Takts bzw. der Vorbereitung (kurz, ohne Nutzdaten); null, wenn alles lief */
+  lastError: string | null;
+};
+
 /** Alle tatsächlich aktiven Funktionen (Schalter aus der Datenbank, Abhängigkeiten aufgelöst) – ohne Sitzung und ohne Anfrage-Zwischenspeicher. */
 export async function activeFeatureSet(db: Pick<PrismaClient, "featureSetting"> = appDb): Promise<ReadonlySet<string>> {
   const rows = await db.featureSetting.findMany();
@@ -51,13 +69,19 @@ const processZone = () => process.env.TZ || Intl.DateTimeFormat().resolvedOption
 const MESSAGE_MAX = 300;
 const LOCK_GRACE_MS = 60_000;
 
+type Flight = { startedAt: number; timeoutMs: number };
+
 export function createJobRunner(options: RunnerOptions) {
   const db = options.db ?? appDb;
   const now = options.now ?? (() => new Date());
   const timeZone = options.timeZone ?? processZone;
   const processId = randomBytes(6).toString("hex");
-  const inFlight = new Set<string>();
+  /** Laufende Jobs dieses Prozesses (bis die Funktion wirklich zurückkehrt – auch nach Zeitüberschreitung) */
+  const inFlight = new Map<string, Flight>();
   let timers: { start?: NodeJS.Timeout; tick?: NodeJS.Timeout } = {};
+  const status: RunnerStatus = { started: false, prepared: false, lastTickAt: null, lastError: null };
+  let preparing: Promise<void> | null = null;
+  let beating = false;
 
   const activeFeatures = options.activeFeatures ?? (() => activeFeatureSet(db));
 
@@ -88,10 +112,14 @@ export function createJobRunner(options: RunnerOptions) {
     }
   }
 
-  /** Beim Start aufrufen (vor dem ersten Takt): unterbrochene Läufe abschließen, Sperren lösen, Jobs wieder fällig stellen. */
+  /** Beim Start aufrufen (vor dem ersten Takt): unterbrochene Läufe festhalten, Sperren lösen, Jobs wieder fällig stellen. */
   async function recover(): Promise<number> {
     const at = now();
+    // Läufe, die ein früherer Stand als „läuft“ angelegt hat
     await db.jobRun.updateMany({ where: { status: "running" }, data: { status: "interrupted", finishedAt: at, message: "Neustart während des Laufs" } });
+    const locked = await db.jobState.findMany({ where: { lockedUntil: { not: null } }, select: { id: true, lockedUntil: true } });
+    if (locked.length === 0) return 0;
+    await db.jobRun.createMany({ data: locked.map((s) => ({ jobId: s.id, startedAt: at, finishedAt: at, status: "interrupted", message: "Neustart während des Laufs" })) });
     const { count } = await db.jobState.updateMany({
       where: { lockedUntil: { not: null } },
       data: { lockedUntil: null, lockOwner: null, lastStatus: "interrupted", lastMessage: "Neustart während des Laufs", nextRunAt: at },
@@ -99,9 +127,45 @@ export function createJobRunner(options: RunnerOptions) {
     return count;
   }
 
+  /**
+   * Der Job hängt noch von einem früheren Lauf, der sein Zeitlimit überschritten hat (er ignoriert `ctx.signal`): Neue Läufe starten erst nach seinem Ende.
+   * Damit das nicht unbemerkt bleibt, steht am Job ein Vermerk, die Fehlerserie wächst und der nächste Termin rückt nach der Wartezeit weiter.
+   */
+  async function noteStuck(job: JobDef, flight: Flight): Promise<void> {
+    const at = now();
+    if (at.getTime() - flight.startedAt <= flight.timeoutMs) return; // läuft noch innerhalb des Zeitlimits: normal, nichts zu melden
+    const retry = job.retry ?? DEFAULT_JOB_RETRY;
+    try {
+      const state = await db.jobState.findUnique({ where: { id: job.id }, select: { failures: true } });
+      const failures = (state?.failures ?? 0) + 1;
+      await db.jobState.update({
+        where: { id: job.id },
+        data: {
+          failures,
+          lastStatus: "error",
+          lastMessage: "Hängt: der Lauf reagiert nicht auf das Zeitlimit; ein neuer Lauf beginnt erst nach seinem Ende",
+          nextRunAt: new Date(at.getTime() + backoffDelay(failures, retry.baseDelayMs, retry.maxDelayMs)),
+        },
+      });
+    } catch (error) {
+      logError(`job:${job.id}:stuck`, error);
+    }
+  }
+
+  /** Gibt die Sperre des Jobs frei, wenn sie noch dieser Prozess hält (best effort: scheitert das, verfällt sie von selbst). */
+  async function releaseLock(jobId: string): Promise<void> {
+    await db.jobState.updateMany({ where: { id: jobId, lockOwner: processId }, data: { lockedUntil: null, lockOwner: null } }).catch(() => undefined);
+  }
+
   async function execute(job: JobDef, force: boolean): Promise<RunResult | null> {
-    if (inFlight.has(job.id)) return null;
+    const flight = inFlight.get(job.id);
+    if (flight) {
+      await noteStuck(job, flight);
+      return null;
+    }
     const started = now();
+    // Vorabprüfung ohne Schreibzugriffe (nicht bei „Jetzt ausführen“)
+    if (!force && job.shouldRun && !(await job.shouldRun({ now: started }))) return null;
     const timeoutMs = job.timeoutMs ?? DEFAULT_JOB_TIMEOUT_MS;
     // Sperre: nur wer das bedingte Update gewinnt, führt den Job aus
     const claim = await db.jobState.updateMany({
@@ -113,22 +177,22 @@ export function createJobRunner(options: RunnerOptions) {
       data: { lockedUntil: new Date(started.getTime() + timeoutMs + LOCK_GRACE_MS), lockOwner: processId },
     });
     if (claim.count !== 1) return null;
-    inFlight.add(job.id);
+    inFlight.set(job.id, { startedAt: started.getTime(), timeoutMs });
 
     let state;
-    let run;
     try {
       state = await db.jobState.findUniqueOrThrow({ where: { id: job.id } });
-      run = await db.jobRun.create({ data: { jobId: job.id, startedAt: started, status: "running", attempt: state.failures + 1 } });
     } catch (error) {
-      inFlight.delete(job.id); // die Sperre in der Datenbank verfällt von selbst
+      inFlight.delete(job.id);
+      await releaseLock(job.id); // sonst bliebe der Job bis zum Ablauf der Sperre (Zeitlimit + 1 min) liegen
       throw error;
     }
     const attempt = state.failures + 1;
 
     const controller = new AbortController();
     let timer: NodeJS.Timeout | undefined;
-    const work = Promise.resolve().then(() => job.run({ now: started, signal: controller.signal, attempt }));
+    let timedOut = false;
+    const work = Promise.resolve().then(() => job.run({ now: started, signal: controller.signal, attempt, manual: force }));
     // Bis die Funktion wirklich zurückkehrt, bleibt der Job für diesen Prozess belegt (auch nach einer Zeitüberschreitung)
     const settled = work.then(
       () => undefined,
@@ -137,41 +201,47 @@ export function createJobRunner(options: RunnerOptions) {
     void settled.then(() => inFlight.delete(job.id));
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        timedOut = true;
         controller.abort();
         reject(new Error("Zeitüberschreitung"));
       }, timeoutMs);
       timer.unref();
     });
 
-    let status: "ok" | "error" = "ok";
+    let outcome: "ok" | "error" = "ok";
     let message = "";
     try {
       const result = await Promise.race([work, timeout]);
       message = result ? stripControl(String(result), MESSAGE_MAX) : "";
     } catch (error) {
-      status = "error";
-      message = error instanceof Error && error.message === "Zeitüberschreitung" ? "Zeitüberschreitung" : describeError(error);
+      outcome = "error";
+      message = timedOut ? "Zeitüberschreitung" : describeError(error);
       logError(`job:${job.id}`, error);
     } finally {
       clearTimeout(timer);
     }
 
     const finished = now();
-    const failures = status === "ok" ? 0 : state.failures + 1;
+    const failures = outcome === "ok" ? 0 : state.failures + 1;
     const retry = job.retry ?? DEFAULT_JOB_RETRY;
-    const next = status === "ok" ? nextRun(job.schedule, finished, timeZone()) : new Date(finished.getTime() + backoffDelay(failures, retry.baseDelayMs, retry.maxDelayMs));
+    const next = outcome === "ok" ? nextRun(job.schedule, finished, timeZone()) : new Date(finished.getTime() + backoffDelay(failures, retry.baseDelayMs, retry.maxDelayMs));
     const durationMs = Math.max(0, finished.getTime() - started.getTime());
     try {
-      await db.jobRun.update({ where: { id: run.id }, data: { status, finishedAt: finished, durationMs, message: message || null } });
+      // Nur Auffälliges (Fehler, Ergebnismeldung) wird als Lauf festgehalten – leere Erfolge sind der Normalfall und schreiben nur den Zustand
+      if (outcome !== "ok" || message) {
+        await db.jobRun.create({ data: { jobId: job.id, startedAt: started, finishedAt: finished, status: outcome, attempt, durationMs, message: message || null } });
+      }
       await db.jobState.update({
         where: { id: job.id },
-        data: { lockedUntil: null, lockOwner: null, lastRunAt: started, lastStatus: status, lastMessage: message || null, failures, nextRunAt: next },
+        data: { lockedUntil: null, lockOwner: null, lastRunAt: started, lastStatus: outcome, lastMessage: message || null, failures, nextRunAt: next },
       });
     } catch (error) {
-      // Die Sperre verfällt von selbst (lockedUntil); der nächste Takt versucht es wieder
+      // Der Zustand ließ sich nicht schreiben: Sperre best effort lösen, sonst verfällt sie von selbst (lockedUntil); der nächste Takt versucht es wieder
       logError(`job:${job.id}:state`, error);
+      await releaseLock(job.id);
     }
-    return { jobId: job.id, status, message, durationMs, attempt };
+    if (outcome === "error" && job.onFailure) await job.onFailure({ attempt, timedOut }).catch((error) => logError(`job:${job.id}:onFailure`, error));
+    return { jobId: job.id, status: outcome, message, durationMs, attempt };
   }
 
   /**
@@ -197,7 +267,10 @@ export function createJobRunner(options: RunnerOptions) {
     return (await Promise.all(runs)).filter((r): r is RunResult => r !== null);
   }
 
-  /** Führt einen Job jetzt aus, unabhängig vom Zeitplan (Statusansicht „Jetzt ausführen“, Tests). Liefert null, wenn er gerade läuft oder unbekannt ist. */
+  /**
+   * Führt einen Job jetzt aus, unabhängig vom Zeitplan („Jetzt ausführen“ in der Verwaltung, Tests). Liefert null, wenn er gerade läuft, unbekannt oder die Funktion
+   * ausgeschaltet ist. Zeit- und Tagesbedingungen des Jobs gelten nicht (`ctx.manual`).
+   */
   async function runNow(jobId: string): Promise<RunResult | null> {
     const job = definitions().find((j) => j.id === jobId);
     if (!job) return null;
@@ -206,30 +279,79 @@ export function createJobRunner(options: RunnerOptions) {
     return execute(job, true);
   }
 
-  /** Startet den Zeitgeber (Takte laufen im Hintergrund und halten den Prozess nicht am Leben). */
+  /** `recover()` und `sync()` einmal erfolgreich (gleichzeitige Aufrufe teilen sich den Versuch; ein Fehlschlag wird beim nächsten Aufruf wiederholt). */
+  function prepare(): Promise<void> {
+    if (status.prepared) return Promise.resolve();
+    preparing ??= (async () => {
+      try {
+        await recover();
+        await sync();
+        status.prepared = true;
+        status.lastError = null;
+      } catch (error) {
+        status.lastError = `Vorbereitung: ${describeError(error)}`;
+        throw error;
+      } finally {
+        preparing = null;
+      }
+    })();
+    return preparing;
+  }
+
+  /** Ein Takt des Zeitgebers: vorbereiten (falls noch nicht gelungen), dann fällige Jobs. Überschneidet sich nie mit dem vorigen Takt. */
+  async function beat(): Promise<void> {
+    if (beating) return;
+    beating = true;
+    status.lastTickAt = now();
+    try {
+      await prepare();
+      await tick();
+      status.lastError = null;
+    } catch (error) {
+      status.lastError ??= describeError(error);
+      throw error;
+    } finally {
+      beating = false;
+    }
+  }
+
+  /**
+   * Startet den Zeitgeber (Takte laufen im Hintergrund und halten den Prozess nicht am Leben). Die Timer werden **immer** gesetzt; ein Fehler bei
+   * `recover()`/`sync()` (Datenbank kurz nicht erreichbar) beendet den Runner nicht, sondern wird beim nächsten Takt wiederholt.
+   */
   function start(): void {
-    if (timers.start || timers.tick) return;
-    const run = () => void tick().catch((error) => logError("jobs:tick", error));
-    void recover()
-      .then(() => sync())
-      .then(() => {
-        timers.start = setTimeout(() => {
-          run();
-          timers.tick = setInterval(run, options.tickMs ?? 15_000);
-          timers.tick.unref();
-        }, options.startDelayMs ?? 60_000);
-        timers.start.unref();
-      })
-      .catch((error) => logError("jobs:start", error));
+    if (status.started) return;
+    status.started = true;
+    const run = () => void beat().catch((error) => logError("jobs:tick", error));
+    void prepare().catch((error) => logError("jobs:start", error));
+    timers.start = setTimeout(() => {
+      run();
+      timers.tick = setInterval(run, options.tickMs ?? 15_000);
+      timers.tick.unref();
+    }, options.startDelayMs ?? 60_000);
+    timers.start.unref();
   }
 
   function stop(): void {
     clearTimeout(timers.start);
     clearInterval(timers.tick);
     timers = {};
+    status.started = false;
   }
 
-  return { sync, recover, tick, runNow, reschedule, start, stop, isRunning: (jobId: string) => inFlight.has(jobId) };
+  return {
+    sync,
+    recover,
+    tick,
+    beat,
+    prepare,
+    runNow,
+    reschedule,
+    start,
+    stop,
+    status: (): RunnerStatus => ({ ...status }),
+    isRunning: (jobId: string) => inFlight.has(jobId),
+  };
 }
 
 export type JobRunner = ReturnType<typeof createJobRunner>;

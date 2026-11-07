@@ -4,7 +4,6 @@ import { z } from "zod";
 import { isHexColor } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/constants";
 import { formObject } from "@/lib/forms";
-import { logError } from "@/lib/log-safe";
 import { isValidTime } from "@/lib/opening-hours";
 import { checkUpload } from "@/lib/upload-sniff";
 import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
@@ -86,8 +85,9 @@ const saveWorkshopOperation = defineOperation({
     };
     await tx.workshop.upsert({ where: { id: "default" }, update: data, create: { id: "default", ...data } });
     // erst nach dem Speichern, nie bei einem abgebrochenen Vorgang; die Termine der Cron-Jobs gelten danach in der neuen Zeitzone
-    afterCommit(() => {
-      if (applyTimezone(d.timezone)) void jobRunner().reschedule().catch((error) => logError("settings:reschedule", error));
+    // (Der Aktions-Rahmen wartet auf afterCommit-Aufgaben und protokolliert Fehler darin.)
+    afterCommit(async () => {
+      if (applyTimezone(d.timezone)) await jobRunner().reschedule();
     });
     audit({ target: d.name });
     return { saved: true };

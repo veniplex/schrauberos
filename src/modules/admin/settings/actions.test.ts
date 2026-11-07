@@ -83,7 +83,6 @@ describe("saveWorkshop: Zeitzonenwechsel stellt die Termine der Cron-Jobs um", (
 
     const state = await actions.saveWorkshop({}, workshopForm({ timezone: "America/New_York" }));
     assert.equal(state.ok, true);
-    await new Promise((r) => setTimeout(r, 100)); // das Umstellen läuft im Hintergrund nach dem Speichern
     const ny = await nextOf();
     assert.equal(new Intl.DateTimeFormat("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ny), "03:00");
     assert.notEqual(ny.getTime(), berlin.getTime());

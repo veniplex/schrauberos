@@ -12,6 +12,8 @@ export type JobStatusRow = {
   lastMessage: string | null;
   failures: number;
   running: boolean;
+  /** Ende der Sperre (liegt sie in der Vergangenheit, hängt der Lauf) */
+  lockedUntil: Date | null;
 };
 
 export type JobRunRow = { id: string; jobId: string; startedAt: Date; durationMs: number | null; status: string; message: string | null; attempt: number };
@@ -31,6 +33,7 @@ export async function jobStatusRows(): Promise<JobStatusRow[]> {
       lastMessage: s?.lastMessage ?? null,
       failures: s?.failures ?? 0,
       running: !!s?.lockedUntil,
+      lockedUntil: s?.lockedUntil ?? null,
     };
   });
 }

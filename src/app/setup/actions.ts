@@ -8,6 +8,8 @@ import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem 
 import { audit } from "@/server/audit";
 import { seedAllDemo } from "@/server/seed/demo";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
+import { jobRunner } from "@/server/jobs";
+import { logError } from "@/lib/log-safe";
 import { checkSetupToken, removeSetupToken } from "@/server/setup-token";
 import { getI18n } from "@/i18n/server";
 import type { RecoveryActionState } from "@/lib/recovery-code";
@@ -61,6 +63,8 @@ export async function completeSetup(_prev: RecoveryActionState, formData: FormDa
   if (!created) redirect("/login");
   // Erst jetzt, nach dem erfolgreichen Anlegen: Zeitzone anwenden, Token verbrauchen
   applyTimezone(d.timezone);
+  // Die Termine der Cron-Jobs wurden beim Start in der Zeitzone des Prozesses berechnet (vor der Einrichtung UTC): jetzt in der gewählten neu berechnen
+  await jobRunner().reschedule().catch((error) => logError("setup:reschedule", error));
   removeSetupToken();
 
   if (formData.get("demo") === "on" && (await db.customer.count()) === 0) await seedAllDemo(db);
