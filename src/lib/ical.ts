@@ -9,6 +9,8 @@
  *  - **UID stabil** (aus der Kennung der Sache), `DTSTAMP`/`LAST-MODIFIED` aus dem Änderungszeitpunkt (nicht „jetzt“): dieselben Daten ergeben dieselbe Datei.
  */
 
+import { addDaysToKey } from "./zone";
+
 const CRLF = "\r\n";
 const encoder = new TextEncoder();
 
@@ -81,12 +83,8 @@ export type IcalEvent = IcalTimed | IcalAllDay;
 
 const UID_SHAPE = /^[A-Za-z0-9._-]{1,120}$/;
 
-/** `JJJJ-MM-TT` + n Tage (reiner Kalender, ohne Zone). */
-export function addDayToKey(day: string, n: number): string {
-  const [y, m, d] = day.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d + n));
-  return `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
-}
+/** `JJJJ-MM-TT` + n Tage (reiner Kalender, ohne Zone) – dieselbe Rechnung wie überall (`lib/zone.ts`). */
+export const addDayToKey = addDaysToKey;
 
 function eventLines(event: IcalEvent, domain: string): string[] | null {
   if (!UID_SHAPE.test(event.uid)) return null;
