@@ -4,7 +4,7 @@ import { getSession } from "@/server/auth/session";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { vehicleTextWhere } from "@/modules/workshop/vehicles/queries";
 
-const ALLOWED = ["appointments.create", "appointments.edit", "tires.create", "tires.edit", "vehicles.view"] as const;
+const ALLOWED = ["appointments.create", "appointments.edit", "tires.create", "tires.edit", "vehicles.view", "billing.edit"] as const;
 
 /**
  * Fahrzeugsuche für die Auswahlfelder (Kennzeichen, Kundenname, Hersteller/Modell). Kunden erscheinen nur als Anzeigename

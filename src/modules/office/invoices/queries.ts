@@ -14,30 +14,42 @@ export function invoiceTextWhere(term: string, options: { category?: boolean } =
 }
 
 /**
+ * Die **Ausgangsliste**: Buchungsbelege (Rechnung, Abschlag, Schlussrechnung, Gegenbeleg) – ohne Angebote und Auftragsbestätigungen (keine Buchungsbelege) und ohne **Entwürfe** der Rechnungserstellung
+ * (noch ohne Nummer, nicht festgeschrieben). Von Hand erfasste Rechnungen (`source = "manual"`) gehören immer dazu. Jede Liste, Summe, Suche, jeder Export und die API stützen sich auf diese Bedingung.
+ */
+export const ledgerWhere = {
+  docType: { in: ["invoice", "partial", "final", "credit"] },
+  NOT: { source: "billing", finalizedAt: null },
+} as const satisfies Prisma.InvoiceWhereInput;
+
+/**
  * Summen über alle Rechnungen, die `where` trifft – von der Datenbank gerechnet (`aggregate`), nicht über eine geladene Seite: Die Kacheln über der Liste
  * stimmen so unabhängig von Seite, Sortierung und Seitengröße. Gleiche Regeln wie `paymentState`: stornierte zählen nicht, offen mit Fälligkeit vor heute = überfällig.
  */
 export async function invoiceSums(where: Prisma.InvoiceWhereInput = {}, now = new Date()): Promise<InvoiceTotals> {
   const today = startOfDay(now);
-  const sum = (extra: Prisma.InvoiceWhereInput) => db.invoice.aggregate({ where: { AND: [where, extra] }, _sum: { grossCents: true }, _count: { _all: true } });
+  const sum = (extra: Prisma.InvoiceWhereInput) => db.invoice.aggregate({ where: { AND: [ledgerWhere, where, extra] }, _sum: { grossCents: true, deductedCents: true, paidCents: true }, _count: { _all: true } });
   const [open, overdue, paid] = await Promise.all([
     sum({ status: "open", OR: [{ dueDate: null }, { dueDate: { gte: today } }] }),
     sum({ status: "open", dueDate: { lt: today } }),
     sum({ status: "paid" }),
   ]);
-  const cents = (r: { _sum: { grossCents: number | null } }) => r._sum.grossCents ?? 0;
+  // offen = noch zu zahlen (nach angerechneten Abschlägen und Teilzahlungen); bezahlt = Brutto nach Abschlägen
+  type Sum = { _sum: { grossCents: number | null; deductedCents: number | null; paidCents: number | null } };
+  const outstanding = (r: Sum) => Math.max(0, (r._sum.grossCents ?? 0) - (r._sum.deductedCents ?? 0) - (r._sum.paidCents ?? 0));
+  const settled = (r: Sum) => (r._sum.grossCents ?? 0) - (r._sum.deductedCents ?? 0);
   return {
-    openCents: cents(open) + cents(overdue),
+    openCents: outstanding(open) + outstanding(overdue),
     openCount: open._count._all + overdue._count._all,
-    overdueCents: cents(overdue),
+    overdueCents: outstanding(overdue),
     overdueCount: overdue._count._all,
-    paidCents: cents(paid),
+    paidCents: settled(paid),
   };
 }
 
 /** Die Jahre, für die es Rechnungen gibt (von der Datenbank: kleinstes und größtes Datum), absteigend; das laufende Jahr ist immer dabei. */
 export async function invoiceYears(currentYear: number): Promise<number[]> {
-  const { _min, _max } = await db.invoice.aggregate({ _min: { issueDate: true }, _max: { issueDate: true } });
+  const { _min, _max } = await db.invoice.aggregate({ where: ledgerWhere, _min: { issueDate: true }, _max: { issueDate: true } });
   const first = Math.min((_min.issueDate ? wallOf(_min.issueDate).year : currentYear), currentYear);
   const last = Math.max((_max.issueDate ? wallOf(_max.issueDate).year : currentYear), currentYear);
   return Array.from({ length: last - first + 1 }, (_, i) => last - i);

@@ -36,7 +36,7 @@ const MAPS: Array<[string, Record<string, string>, readonly string[]]> = [
   ["Reifensatz", TIRE_SET_STATUS_TONE, TIRE_SET_STATUSES],
   ["Saison", SEASON_TONE, TIRE_SEASONS],
   ["Reifenzustand", HEALTH_TONE, ["ok", "warn", "replace", "unknown"]],
-  ["Zahlung", PAYMENT_TONE, ["open", "overdue", "paid", "cancelled"]],
+  ["Zahlung", PAYMENT_TONE, ["open", "partial", "overdue", "paid", "cancelled"]],
   ["Fuhrpark", FLEET_STATUS_TONE, FLEET_STATUSES],
   ["Abwesenheit", ABSENCE_TONE, [...ABSENCE_TYPES, "masked"]],
   ["Gerätestatus", DEVICE_STATUS_TONE, DEVICE_STATUSES],

@@ -10,7 +10,8 @@ import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { todayInput } from "@/lib/dates";
 import { versionOf } from "@/lib/concurrency";
-import { cancelBlock, finalizeBlock, isFinalized, paymentState } from "@/modules/office/invoices/domain";
+import { cancelBlock, DOC_TYPES_LEDGER, finalizeBlock, isFinalized, outstandingCents, paymentState } from "@/modules/office/invoices/domain";
+import { PageSections } from "@/modules/page-sections";
 import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { formatCents } from "@/lib/money";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
@@ -41,13 +42,17 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       cancelledBy: { select: { id: true, number: true } },
     },
   });
-  if (!inv) notFound();
+  // Entwürfe, Angebote und Auftragsbestätigungen der Rechnungserstellung gehören nicht in die Ausgangsliste
+  if (!inv || !(DOC_TYPES_LEDGER as readonly string[]).includes(inv.docType) || (inv.source === "billing" && !inv.finalizedAt)) notFound();
 
   const state = paymentState(inv);
-  const canEdit = session.can("invoices.edit");
+  // Belege der Rechnungserstellung (Positionen, Schnappschuss, Zahlungen) werden dort bearbeitet: hier nur ansehen und stornieren
+  const fromBilling = inv.source === "billing";
+  const canEdit = session.can("invoices.edit") && !fromBilling;
   const finalized = isFinalized(inv);
   const canFinalize = session.can("invoices.finalize") && finalizeBlock(inv) === null;
-  const canCancel = canEdit && cancelBlock({ ...inv, hasCounterDocument: inv.cancelledBy !== null }) === null;
+  const deductedInFinal = (await db.invoiceDeduction.count({ where: { partialId: inv.id, finalKey: { not: null } } })) > 0;
+  const canCancel = session.can("invoices.edit") && cancelBlock({ ...inv, hasCounterDocument: inv.cancelledBy !== null, deductedInFinal }) === null;
   const outgoing = inv.direction === "outgoing";
   const isImage = inv.file?.mime.startsWith("image/");
 
@@ -58,6 +63,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         title={
           <span className="flex flex-wrap items-center gap-3">
             <span className="font-mono">{inv.number}</span>
+            {inv.docType !== "invoice" ? <Badge tone="neutral">{t(`invoices.docTypes.${inv.docType as "partial" | "final" | "credit"}`)}</Badge> : null}
             <PaymentBadge state={state} t={t} />
             {finalized ? (
               <Badge tone="neutral">
@@ -139,6 +145,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         <div className="min-w-0 flex flex-col gap-5">
           <Card title={t("invoices.sections.amounts")}>
             <p className="text-3xl font-semibold tabular">{eur(inv.grossCents)}</p>
+            {inv.deductedCents !== 0 || inv.paidCents !== 0 ? (
+              <p className="mt-1 text-sm text-ink-muted tabular">{t("invoices.fields.outstanding")}: {eur(outstandingCents(inv))}</p>
+            ) : null}
             <p className="mt-1 text-sm text-ink-muted tabular">
               {inv.netCents != null ? `${t("invoices.fields.net")} ${eur(inv.netCents)}` : ""}
               {inv.netCents != null && inv.vatCents != null ? " · " : ""}
@@ -195,9 +204,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               <form action={cancelInvoice} className="flex flex-col gap-3">
                 <input type="hidden" name="id" value={inv.id} />
                 <input type="hidden" name="version" value={versionOf(inv)} />
-                <Field label={t("invoices.cancel.number")} htmlFor="cancelNumber" name="number" required>
-                  <Input id="cancelNumber" name="number" maxLength={60} required autoComplete="off" className="font-mono" />
-                </Field>
+                {fromBilling ? (
+                  <p className="text-sm text-ink-muted">{t("invoices.cancel.numberAuto")}</p>
+                ) : (
+                  <Field label={t("invoices.cancel.number")} htmlFor="cancelNumber" name="number" required>
+                    <Input id="cancelNumber" name="number" maxLength={60} required autoComplete="off" className="font-mono" />
+                  </Field>
+                )}
                 <Field label={t("invoices.cancel.issueDate")} htmlFor="cancelDate" name="issueDate" hint={t("invoices.cancel.issueDateHint")}>
                   <Input id="cancelDate" name="issueDate" type="date" />
                 </Field>
@@ -210,6 +223,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               </form>
             </Card>
           ) : null}
+
+          <PageSections session={session} host="invoices/detail" entityId={inv.id} />
 
           {session.can("invoices.delete") && !finalized ? (
             <DangerZone title={t("common.dangerZone")}>

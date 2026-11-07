@@ -7,9 +7,10 @@
  *  - `createOrderInTx`: dasselbe **in der Transaktion des Aufrufers** (Angebot annehmen und Auftrag anlegen nur gemeinsam; Recht `orders.create`, Audit und Hooks laufen mit),
  *  - `orderLines`: Positionen ohne Preise für Abschnitte auf der Auftragsseite,
  *  - `orderRef`/`orderLabels`/`stampableOrders`: Nummer, Status und Kennzeichen für Funktionen, die sich an einen Auftrag hängen (Zeiterfassung, Dokumente, Checklisten),
- *  - `appendOrderItems`: Positionen in der Transaktion des Aufrufers anhängen (Zeiten als Positionen übernehmen).
+ *  - `appendOrderItems`: Positionen in der Transaktion des Aufrufers anhängen (Zeiten als Positionen übernehmen, Positionen eines Angebots),
+ *  - `orderForBilling`: der Auftrag mit Preisen für „Rechnung aus Auftrag“ (F3; der Aufrufer prüft `orders.prices`).
  */
 export { ORDER_STATUSES, type OrderStatus } from "./constants";
 export { isOpen as isOrderOpen } from "./domain";
 export { appendOrderItems, createOrderInTx, createOrderOperation, type AppendedLine, type OrderChange } from "./operations";
-export { orderLabels, orderLines, orderRef, stampableOrders } from "./queries";
+export { orderForBilling, orderLabels, orderLines, orderRef, stampableOrders } from "./queries";

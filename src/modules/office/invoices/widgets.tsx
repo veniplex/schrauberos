@@ -4,7 +4,8 @@ import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { startOfDay } from "@/lib/zone";
 import type { InvoiceTotals } from "@/modules/office/invoices/domain";
-import { invoiceSums } from "@/modules/office/invoices/queries";
+import { outstandingCents } from "@/modules/office/invoices/domain";
+import { invoiceSums, ledgerWhere } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";
 import { db } from "@/server/db";
 import type { WidgetDef } from "@/modules/types";
@@ -19,8 +20,8 @@ export async function InvoicesWidget() {
     invoiceSums({ direction: "incoming" }),
     invoiceSums({ direction: "outgoing" }),
     db.invoice.findMany({
-      where: { status: "open", dueDate: { lt: startOfDay(new Date()) } },
-      select: { id: true, number: true, partyName: true, dueDate: true, grossCents: true },
+      where: { AND: [ledgerWhere, { status: "open", dueDate: { lt: startOfDay(new Date()) } }] },
+      select: { id: true, number: true, partyName: true, dueDate: true, grossCents: true, deductedCents: true, paidCents: true },
       orderBy: { dueDate: "asc" },
       take: 5,
     }),
@@ -55,7 +56,7 @@ export async function InvoicesWidget() {
                   <span className="font-mono text-xs text-ink-muted">{i.number}</span>
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-0.5">
-                  <span className="tabular font-medium">{eur(i.grossCents)}</span>
+                  <span className="tabular font-medium">{eur(outstandingCents(i))}</span>
                   <StatusBadge tone="danger">{t("invoices.widgets.dueSince", { date: date(i.dueDate!) })}</StatusBadge>
                 </span>
               </Link>

@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { Viewer } from "@/modules/types";
 import { db } from "@/server/db";
 import { contains, keyContains, phoneContains, type SearchField } from "@/server/search";
+import { customerDisplayName } from "./domain";
 
 /**
  * Lesezugriffe der Funktion „Kunden“. Richtlinie (D7): Der **Anzeigename** eines Kunden ist in Termin-, Fahrzeug-, Reifen- und Rechnungskontext sichtbar, Kontaktdaten
@@ -59,6 +60,18 @@ export const customerSearchFields: ReadonlyArray<SearchField<Prisma.CustomerWher
 ];
 
 export type CustomerContact = { phone: string | null; city: string | null };
+
+/**
+ * Name und Anschrift eines Kunden **für einen neuen Beleg** (Angebot, Rechnung): Der Beleg trägt Anschrift und E-Mail des Empfängers, sie gehören zum Beleg und nicht zu den Kontaktdaten der Kundenseite
+ * (die nur mit `customers.view` erscheinen). Der Aufrufer prüft sein eigenes Recht (`billing.edit`). Nur Kunden, die man neu verknüpfen darf (nicht archiviert, nicht eingeschränkt – `searchableCustomerWhere`).
+ */
+export async function customerForDocument(id: string) {
+  const c = await db.customer.findFirst({
+    where: { id, ...searchableCustomerWhere },
+    select: { id: true, firstName: true, lastName: true, company: true, email: true, street: true, zip: true, city: true, customerNumber: true },
+  });
+  return c ? { id: c.id, name: customerDisplayName(c), street: c.street, zip: c.zip, city: c.city, email: c.email, customerNumber: c.customerNumber } : null;
+}
 
 /**
  * Kontaktdaten (Telefon, Ort) zu Kunden-Ids für Seiten anderer Funktionen: **leer ohne `customers.view`** – dann werden sie gar nicht gelesen. Der Anzeigename kommt aus

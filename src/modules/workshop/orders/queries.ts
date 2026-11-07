@@ -199,6 +199,32 @@ export async function stampableOrders(limit = 40): Promise<Array<{ id: string; n
   return rows.map((o) => ({ id: o.id, number: o.number, status: o.status, plate: o.vehicle.plate }));
 }
 
+/**
+ * Der Auftrag mit **Preisen** für die Rechnungserstellung (F3, „Rechnung aus Auftrag“): Kunde, Fahrzeug, Zeitpunkte und alle Positionen mit Menge, Netto-Einzelpreis, Steuersatz und Rabatt (Zeiten der Zeiterfassung
+ * sind bereits Positionen). Die Preise stehen hier nur, weil die Rechnungserstellung sie braucht – **der Aufrufer prüft `orders.prices`** (und das Recht an seiner eigenen Funktion). `client` darf die Transaktion
+ * einer Operation sein. `restricted`: der Kunde wird eingeschränkt verarbeitet (Art. 18 DSGVO) – dann gibt es keine neue Verknüpfung.
+ */
+export async function orderForBilling(orderId: string, client: Pick<Prisma.TransactionClient, "order"> = db) {
+  const order = await client.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      customerId: true,
+      mileageKm: true,
+      acceptedAt: true,
+      closedAt: true,
+      vehicle: { select: { id: true, plate: true, make: true, model: true } },
+      customer: { select: { processingRestrictedAt: true, archivedAt: true } },
+      items: { orderBy: { position: "asc" }, select: { id: true, kind: true, description: true, unit: true, quantityMilli: true, unitCents: true, taxBp: true, discountBp: true, refType: true, refId: true } },
+    },
+  });
+  if (!order) return null;
+  const { customer, ...rest } = order;
+  return { ...rest, restricted: Boolean(customer?.processingRestrictedAt), open: isOpen(order.status) };
+}
+
 /** Aufträge zu den Kennungen (Anzeige von Zeiten und Dateien): Nummer und Kennzeichen. */
 export async function orderLabels(ids: readonly string[]): Promise<Map<string, { number: string; plate: string }>> {
   if (ids.length === 0) return new Map();

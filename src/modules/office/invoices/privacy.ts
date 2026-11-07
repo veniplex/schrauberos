@@ -2,9 +2,10 @@ import "server-only";
 import { dayField, field } from "@/lib/privacy";
 import type { PrivacyProviderDef } from "@/modules/types";
 import { db } from "@/server/db";
+import { ledgerWhere } from "./queries";
 
 /**
- * Auskunft: die mit dem Kunden verknüpften Rechnungen (Partei, Beträge, Daten, Notizen) – und die Belege, deren **Aufbewahrungsfrist** die Anonymisierung sperrt
+ * Auskunft: die mit dem Kunden verknüpften, von Hand erfassten Rechnungen (Partei, Beträge, Daten, Notizen; Belege der Rechnungserstellung nennt deren eigener Beitrag) – und die Belege, deren **Aufbewahrungsfrist** die Anonymisierung sperrt
  * (festgeschriebene zählen zu den Büchern, die übrigen zu den Buchungsbelegen; siehe `src/lib/privacy.ts`).
  */
 export const privacyProviders: PrivacyProviderDef[] = [
@@ -13,7 +14,7 @@ export const privacyProviders: PrivacyProviderDef[] = [
     feature: "office.invoices",
     order: 50,
     async collect({ id }) {
-      const rows = await db.invoice.findMany({ where: { customerId: id }, orderBy: [{ issueDate: "asc" }, { number: "asc" }], include: { cancels: { select: { number: true } } } });
+      const rows = await db.invoice.findMany({ where: { customerId: id, source: "manual" }, orderBy: [{ issueDate: "asc" }, { number: "asc" }], include: { cancels: { select: { number: true } } } });
       const euros = (cents: number | null) => (cents == null ? null : (cents / 100).toFixed(2));
       return [
         {
@@ -39,7 +40,8 @@ export const privacyProviders: PrivacyProviderDef[] = [
       ];
     },
     async retention({ id }) {
-      const rows = await db.invoice.findMany({ where: { customerId: id }, select: { issueDate: true, finalizedAt: true } });
+      // alle Buchungsbelege des Kunden (auch die der Rechnungserstellung); Entwürfe und Angebote haben keine Aufbewahrungsfrist dieser Art
+      const rows = await db.invoice.findMany({ where: { AND: [ledgerWhere, { customerId: id }] }, select: { issueDate: true, finalizedAt: true } });
       return rows.map((r) => ({ date: r.issueDate, kind: r.finalizedAt ? ("finalizedInvoice" as const) : ("invoice" as const) }));
     },
   },

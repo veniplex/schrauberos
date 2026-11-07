@@ -25,6 +25,9 @@ export const INVOICE_COLUMNS: readonly ColumnDef[] = [
 export const EXPORT_ONLY_COLUMNS: readonly ColumnDef[] = [
   { key: "finalizedAt", labelKey: "invoices.exchange.cols.finalizedAt" },
   { key: "cancelsNumber", labelKey: "invoices.exchange.cols.cancelsNumber" },
+  { key: "docType", labelKey: "invoices.exchange.cols.docType" },
+  { key: "deducted", labelKey: "invoices.exchange.cols.deducted" },
+  { key: "paid", labelKey: "invoices.exchange.cols.paid" },
 ];
 
 /** Spalten des Steuerberater-Exports (nur Export). */
@@ -40,4 +43,7 @@ export const ACCOUNTANT_COLUMNS = [
   { labelKey: "invoices.exchange.accountant.cols.paidAt" },
   { labelKey: "invoices.exchange.accountant.cols.finalizedAt" },
   { labelKey: "invoices.exchange.accountant.cols.cancelsNumber" },
+  { labelKey: "invoices.exchange.accountant.cols.docType" },
+  { labelKey: "invoices.exchange.accountant.cols.deducted" },
+  { labelKey: "invoices.exchange.accountant.cols.paid" },
 ] as const;

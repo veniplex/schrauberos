@@ -5,7 +5,7 @@ import { contains, keyContains } from "@/server/search";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { searchableCustomerWhere } from "@/modules/workshop/customers/queries";
 
-const ALLOWED = ["customers.view", "customers.edit", "invoices.edit"] as const;
+const ALLOWED = ["customers.view", "customers.edit", "invoices.edit", "billing.edit"] as const;
 
 /**
  * Kundensuche für Auswahlfelder (Name, Firma, Kundennummer). Der Anzeigename ist in jedem Auswahl-Kontext sichtbar (Richtlinie D7);

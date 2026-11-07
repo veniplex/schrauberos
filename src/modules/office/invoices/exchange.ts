@@ -11,8 +11,9 @@ import type { ExportDef } from "@/server/csv/types";
 import { moneyCell } from "@/server/csv/writer";
 import { db } from "@/server/db";
 import { ACCOUNTANT_COLUMNS, EXPORT_ONLY_COLUMNS, INVOICE_COLUMNS } from "./exchange-columns";
-import { INVOICE_DIRECTIONS, INVOICE_STATUSES, outgoingKeyOf, paymentState } from "./domain";
+import { DOC_TYPES_LEDGER, INVOICE_DIRECTIONS, INVOICE_STATUSES, outgoingKeyOf, paymentState } from "./domain";
 import { invoiceImportInput, invoiceRecord, type InvoiceImportFields } from "./operations";
+import { ledgerWhere } from "./queries";
 
 /** Der Kunde einer Ausgangsrechnung steht nur mit dem Recht, Kunden zu sehen, in der Datei (Richtlinie D7). */
 const mayUseCustomer = (session: AppSession) => session.features.has("workshop.customers") && session.can("customers.view");
@@ -38,7 +39,9 @@ export const invoicesExport: ExportDef = {
     const from = query.get("from");
     const to = query.get("to");
     if ((from && !isDay(from)) || (to && !isDay(to)) || (from && to && from > to)) return { error: "invoices.exchange.periodInvalid" };
+    // nur die Ausgangsliste: keine Angebote, Auftragsbestätigungen und Entwürfe der Rechnungserstellung
     const where = {
+      ...ledgerWhere,
       ...(direction === "incoming" || direction === "outgoing" ? { direction } : {}),
       ...(from || to ? { issueDate: { ...(from ? { gte: startOf(from) } : {}), ...(to ? { lte: endOf(to) } : {}) } } : {}),
     };
@@ -66,6 +69,9 @@ export const invoicesExport: ExportDef = {
           ...(withCustomer ? [i.customer?.customerNumber ?? null] : []),
           i.finalizedAt ? formatDay(i.finalizedAt) : null,
           i.cancels?.number ?? null,
+          t(`invoices.docTypes.${i.docType as (typeof DOC_TYPES_LEDGER)[number]}`),
+          moneyCell(i.deductedCents, format),
+          moneyCell(i.paidCents, format),
         ];
       }
     }
@@ -90,6 +96,7 @@ export const accountantExport: ExportDef = {
     const to = query.get("to");
     if (!isDay(from) || !isDay(to) || from > to) return { error: "invoices.exchange.periodInvalid" };
     const where = {
+      ...ledgerWhere,
       ...(direction === "incoming" || direction === "outgoing" ? { direction } : {}),
       issueDate: { gte: startOf(from), lte: endOf(to) },
     };
@@ -109,6 +116,9 @@ export const accountantExport: ExportDef = {
           i.paidAt ? formatDay(i.paidAt) : null,
           i.finalizedAt ? formatDay(i.finalizedAt) : null,
           i.cancels?.number ?? null,
+          t(`invoices.docTypes.${i.docType as (typeof DOC_TYPES_LEDGER)[number]}`),
+          moneyCell(i.deductedCents, format),
+          moneyCell(i.paidCents, format),
         ];
       }
     }

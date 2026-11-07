@@ -14,7 +14,7 @@ import { INTL_LOCALE } from "@/i18n/config";
 import { currentYear, startOfDayIn, todayInput } from "@/lib/dates";
 import { clampPage, listHref, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { INVOICE_DIRECTIONS, paymentState, type InvoiceDirection } from "@/modules/office/invoices/domain";
-import { invoiceSums, invoiceTextWhere, invoiceYears } from "@/modules/office/invoices/queries";
+import { invoiceSums, invoiceTextWhere, invoiceYears, ledgerWhere } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -50,7 +50,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
 
   const yearRange = year ? { issueDate: { gte: startOfDayIn(`${year}-01-01`), lt: startOfDayIn(`${year + 1}-01-01`) } } : {};
   const text = searchWhere<Prisma.InvoiceWhereInput>(q, session.can, [{ where: (term) => ({ OR: invoiceTextWhere(term) }) }]);
-  const where: Prisma.InvoiceWhereInput = {
+  // nur die Ausgangsliste: keine Angebote, Auftragsbestätigungen und Entwürfe der Rechnungserstellung
+  const filters: Prisma.InvoiceWhereInput = {
     direction,
     ...yearRange,
     ...(text ?? {}),
@@ -58,6 +59,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     ...(state === "overdue" ? { status: "open", dueDate: { lt: today } } : {}),
     ...(state === "open" ? { status: "open", AND: [{ OR: [{ dueDate: null }, { dueDate: { gte: today } }] }] } : {}),
   };
+  const where: Prisma.InvoiceWhereInput = { AND: [ledgerWhere, filters] };
 
   const orderBy =
     list.sort === "number"
@@ -150,6 +152,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             sort: "number",
             cell: (inv) => (
               <span className="font-mono text-[13px]">
+                {inv.docType !== "invoice" ? <span className="mr-1.5 font-sans text-xs text-ink-muted">{t(`invoices.docTypes.${inv.docType as "partial" | "final" | "credit"}`)}</span> : null}
                 {inv.number}
                 {inv.file ? <Paperclip className="ml-1.5 inline size-3.5 text-ink-muted" aria-label={t("invoices.hasFile")} /> : null}
                 {inv.finalizedAt ? <Lock className="ml-1.5 inline size-3.5 text-ink-muted" aria-label={t("invoices.finalize.badge")} /> : null}

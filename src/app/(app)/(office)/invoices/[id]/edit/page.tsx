@@ -25,7 +25,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
     db.invoice.findUnique({ where: { id }, include: { customer: { select: customerNameSelect }, file: { select: { name: true, size: true } } } }),
     db.invoice.findMany({ where: { category: { not: null } }, select: { category: true }, distinct: ["category"], take: 100 }),
   ]);
-  if (!inv) notFound();
+  // Belege der Rechnungserstellung (Positionen, Schnappschuss) bearbeitet nur diese – das Archiv-Formular kennt sie nicht
+  if (!inv || inv.source === "billing") notFound();
   // Ort des Kunden nur mit `customers.view` (D7); sonst wird er gar nicht gelesen
   const customerCity = (await customerContacts(session, inv.customerId ? [inv.customerId] : [])).get(inv.customerId ?? "")?.city;
   const direction = inv.direction === "outgoing" ? "outgoing" : "incoming";

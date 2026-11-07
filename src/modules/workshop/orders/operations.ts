@@ -413,7 +413,7 @@ export const approveOperation = defineOperation({
 /* ───────────── Positionen anhängen (andere Funktionen) ───────────── */
 
 /** Eine Position, die eine andere Funktion an einen offenen Auftrag hängt (Menge in Tausendsteln, Preis netto in Cent). */
-export type AppendedLine = { kind: "labor" | "part" | "other"; description: string; unit: string; quantityMilli: number; unitCents: number; taxBp: number; refType: string; refId: string };
+export type AppendedLine = { kind: "labor" | "part" | "other"; description: string; unit: string; quantityMilli: number; unitCents: number; taxBp: number; refType: string; refId: string; /** Rabatt in Basispunkten (Standard 0) */ discountBp?: number };
 
 const MAX_ITEMS = 200;
 
@@ -428,12 +428,12 @@ export async function appendOrderItems(tx: Tx, orderId: string, lines: readonly 
   if (!isOpen(order.status)) fail("invalid", "orders.errors.closed");
   const existing = await tx.orderItem.findMany({ where: { orderId }, orderBy: { position: "asc" }, select: { position: true, quantityMilli: true, unitCents: true, taxBp: true, discountBp: true } });
   if (existing.length + lines.length > MAX_ITEMS) fail("invalid", "validation.tooLong");
-  const totals = computeTotals([...existing, ...lines.map((l) => ({ quantityMilli: l.quantityMilli, unitCents: l.unitCents, taxBp: l.taxBp, discountBp: 0 }))], { exempt: false });
+  const totals = computeTotals([...existing, ...lines.map((l) => ({ quantityMilli: l.quantityMilli, unitCents: l.unitCents, taxBp: l.taxBp, discountBp: l.discountBp ?? 0 }))], { exempt: false });
   if (totals.exceedsLimit) fail("invalid", "validation.tooLarge");
   let position = existing.reduce((max, item) => Math.max(max, item.position), -1) + 1;
   const ids: string[] = [];
   for (const line of lines) {
-    const row = await tx.orderItem.create({ data: { orderId, position: position++, kind: line.kind, description: line.description, unit: line.unit, quantityMilli: line.quantityMilli, unitCents: line.unitCents, taxBp: line.taxBp, discountBp: 0, refType: line.refType, refId: line.refId }, select: { id: true } });
+    const row = await tx.orderItem.create({ data: { orderId, position: position++, kind: line.kind, description: line.description, unit: line.unit, quantityMilli: line.quantityMilli, unitCents: line.unitCents, taxBp: line.taxBp, discountBp: line.discountBp ?? 0, refType: line.refType, refId: line.refId }, select: { id: true } });
     ids.push(row.id);
   }
   await tx.order.update({ where: { id: orderId }, data: { updatedAt: new Date() } });

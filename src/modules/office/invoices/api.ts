@@ -5,8 +5,8 @@ import { endOfDayIn, startOfDayIn } from "@/lib/dates";
 import { centsText, dateOnly, day, dayOrNull, iso, nullableString, oneOf } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
-import { invoiceTextWhere } from "./queries";
-import { INVOICE_DIRECTIONS, INVOICE_STATUSES } from "./domain";
+import { invoiceTextWhere, ledgerWhere } from "./queries";
+import { DOC_TYPES_LEDGER, INVOICE_DIRECTIONS, INVOICE_STATUSES } from "./domain";
 import { cancelInvoiceOperation, deleteInvoiceOperation, finalizeInvoiceOperation, markInvoicePaidOperation, reopenInvoiceOperation, saveInvoiceOperation } from "./operations";
 
 /**
@@ -53,6 +53,11 @@ const item = z.object({
   category: nullableString,
   reference: nullableString,
   notes: nullableString,
+  /** Belegart: invoice, partial (Abschlag), final (Schlussrechnung) oder credit (Stornorechnung/Gutschrift) – Angebote und Entwürfe stehen hier nie (siehe /billing-documents) */
+  docType: z.enum(DOC_TYPES_LEDGER),
+  /** Summe der angerechneten Abschläge (Schlussrechnung) und der bisherigen Zahlungen, in Cent */
+  deductedCents: z.number().int(),
+  paidCents: z.number().int(),
   /** Ob ein Beleg (PDF/Bild) abgelegt ist */
   hasFile: z.boolean(),
   /** Festgeschrieben: Inhalt, Beträge und Beleg sind unveränderlich, die Rechnung ist nicht löschbar (nur Ausgangsrechnungen); `null` = nicht festgeschrieben */
@@ -83,6 +88,8 @@ export const endpoints = defineResource({
   read: "invoices.view",
   model: db.invoice as unknown as Delegate<Row>,
   include: { file: true, cancelledBy: { select: { id: true } } },
+  // nur die Ausgangsliste: keine Angebote, Auftragsbestätigungen und Entwürfe der Rechnungserstellung
+  scope: ledgerWhere,
   item,
   version: versionOf,
   toItem: (i): z.input<typeof item> => ({
@@ -102,6 +109,9 @@ export const endpoints = defineResource({
     category: i.category,
     reference: i.reference,
     notes: i.notes,
+    docType: oneOf(DOC_TYPES_LEDGER, i.docType, "invoice"),
+    deductedCents: i.deductedCents,
+    paidCents: i.paidCents,
     hasFile: !!i.file,
     finalizedAt: i.finalizedAt ? iso(i.finalizedAt) : null,
     cancelsInvoiceId: i.cancelsInvoiceId,
@@ -179,11 +189,11 @@ export const endpoints = defineResource({
     },
     {
       name: "cancel",
-      summary: "Cancel a finalized outgoing invoice with a cancellation document (credit note): creates a new finalized invoice with the given number, negated amounts and a reference to the original",
+      summary: "Cancel a finalized outgoing invoice with a cancellation document (credit note): creates a new finalized invoice with negated amounts and a reference to the original. Documents created in invoicing get the next number in sequence automatically; manually recorded invoices need the number in the body",
       permission: "invoices.edit",
       operation: cancelInvoiceOperation,
       ifMatch: true,
-      body: z.strictObject({ number: z.string().trim().min(1).max(60), issueDate: dateOnly.nullable().optional(), reason: z.string().max(500).nullable().optional() }),
+      body: z.strictObject({ number: z.string().trim().min(1).max(60).optional(), issueDate: dateOnly.nullable().optional(), reason: z.string().max(500).nullable().optional() }),
       toInput: (id, b, { version }) => ({ id, version, number: b.number, issueDate: b.issueDate, reason: b.reason }),
     },
   ],
