@@ -595,7 +595,7 @@ Toleranz, Vergleich in konstanter Zeit über alle Kandidaten. Tabellen `TwoFacto
   nicht der Wiederherstellungs-Code des Notzugangs** (anderes Format, ersetzen nur den zweiten Faktor, nie das Passwort).
 * **Zeitschritt nicht wiederverwendbar:** `TwoFactor.lastStep`; das Setzen ist ein bedingtes Update (`lastStep < step`) – zwei gleichzeitige Eingaben desselben Codes: genau eine gewinnt.
 * **Anmeldung in zwei Schritten** (`login` → `verifySecondFactor`, `src/server/auth/session.ts`): Nach dem richtigen Passwort entsteht **keine Sitzung und kein Sitzungs-Cookie**; der
-  Zwischenzustand liegt **nur im Speicher des Servers** (`src/server/auth/pending.ts`, 5 Minuten, höchstens 5 falsche Codes, begrenzte Größe) und der Browser bekommt nur eine zufällige Kennung
+  Zwischenzustand liegt **nur im Speicher des Servers** (`src/server/auth/pending.ts`, 5 Minuten, höchstens 5 falsche Codes, begrenzte Größe, höchstens 5 je Konto), **an das Passwort gebunden** (`credentialVersion`: ändert sich der Passwort-Hash zwischen den Schritten, ist er ungültig; `revokeAccess` löscht alle Zustände des Kontos; ZP5-7) und der Browser bekommt nur eine zufällige Kennung
   (`so_2fa`, unter HTTPS `__Host-so_2fa`, HttpOnly). Es gibt kein Benutzerorakel: Den zweiten Schritt erreicht nur, wer das richtige Passwort kannte (unbekannter Name, falsches
   Passwort und Konto mit/ohne zweiten Faktor antworten vorher gleich). Hier – und nur hier – entsteht die Sitzung (`completeLogin`). `/login/verify` ist eine öffentliche Seite
   (Proxy `OPEN_PAGES`, Routen-Inventur), ohne Zwischenzustand zeigt sie einen Hinweis.

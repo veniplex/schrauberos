@@ -279,6 +279,55 @@ describe("Anmeldung in zwei Schritten", () => {
     assert.equal(pendingCookie(), undefined, "das Cookie wird geräumt");
   });
 
+  it("ZP5-7: ändert sich das Passwort zwischen den Schritten (Wechsel, Zurücksetzen, Notzugang), ist der Zwischenzustand ungültig – auch mit richtigem Code", async () => {
+    const anna = await person();
+    const tf = await enableDirect(anna);
+    await passwordStep("anna");
+    assert.equal(await session.hasPendingLogin(), true);
+    // das Passwort wird anderswo geändert (hier direkt: neuer Hash)
+    await env.db.user.update({ where: { id: anna.id }, data: { passwordHash: "scrypt$anderes-passwort" } });
+    assert.deepEqual(await session.verifySecondFactor(tf.code()), { ok: false, reason: "expired" });
+    assert.equal(pendingMod.pendingLogins.size, 0);
+    assert.equal(pendingCookie(), undefined, "das Cookie wird geräumt");
+    assert.equal(await env.db.session.count(), 0, "keine Sitzung");
+  });
+
+  it("ZP5-7: ‚überall abmelden‘ / Zugang widerrufen (revokeAccess) verwirft auch einen offenen Zwischenzustand des Kontos – andere Konten bleiben unberührt", async () => {
+    const anna = await person();
+    const bob = await person("bob");
+    const tf = await enableDirect(anna);
+    const tfBob = await enableDirect(bob);
+    await passwordStep("anna");
+    const annaCookie = pendingCookie()!;
+    browser.cookies.delete("so_2fa");
+    await passwordStep("bob");
+    const bobCookie = pendingCookie()!;
+    assert.equal(pendingMod.pendingLogins.size, 2);
+
+    // Annas Zugang wird widerrufen (zweiter Browser, angemeldet)
+    browser.reset();
+    await env.signIn(anna);
+    await redirectOf(() => sec.logoutEverywhere(form({})));
+    assert.equal(pendingMod.pendingLogins.size, 1, "nur Annas Zustand ist weg");
+
+    browser.reset();
+    browser.cookies.set("so_2fa", annaCookie);
+    assert.deepEqual(await session.verifySecondFactor(tf.code()), { ok: false, reason: "expired" });
+    browser.reset();
+    browser.cookies.set("so_2fa", bobCookie);
+    assert.equal((await session.verifySecondFactor(tfBob.code())).ok, true);
+  });
+
+  it("ZP5-7: Konten verdrängen mit eigenen Anmeldungen nicht die laufenden Schritte anderer (höchstens 5 je Konto)", () => {
+    const base = { username: "x", credentialVersion: "v", remember: false };
+    const bobToken = pendingMod.pendingLogins.create({ userId: "bob", ...base });
+    const annaTokens = Array.from({ length: 2600 }, () => pendingMod.pendingLogins.create({ userId: "anna", ...base }));
+    assert.equal(pendingMod.pendingLogins.size, 1 + pendingMod.MAX_PER_USER);
+    assert.ok(pendingMod.pendingLogins.get(bobToken), "Bobs laufender Schritt besteht noch");
+    assert.equal(pendingMod.pendingLogins.get(annaTokens[0]), undefined, "Annas ältester ist verdrängt");
+    assert.ok(pendingMod.pendingLogins.get(annaTokens.at(-1)!));
+  });
+
   it("der Zwischenzustand läuft nach 5 Minuten ab", async () => {
     const anna = await person();
     const tf = await enableDirect(anna);

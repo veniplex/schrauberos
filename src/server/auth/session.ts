@@ -11,7 +11,7 @@ import { authRuntime } from "./runtime";
 import { loginThrottle, normalizeUsername } from "./throttle";
 import { findKnownDevice, forgetCurrentDevice, readDeviceToken, recordDeviceFailure, recordDeviceSuccess, rememberDeviceSafely, type PresentedDevice } from "./devices";
 import { currentClientIp } from "./network";
-import { pendingLogins, PENDING_TTL_MS } from "./pending";
+import { credentialVersion, pendingLogins, PENDING_TTL_MS } from "./pending";
 import { authPolicy } from "./policy";
 import { checkSecondFactor, recordSecondFactorFailure, secondFactorRequired, secondFactorWaitMs } from "./second-factor";
 import { isLocale, LOCALE_COOKIE, THEME_COOKIE, type Locale } from "@/i18n/config";
@@ -198,7 +198,7 @@ export async function login(username: string, password: string, context: LoginCo
   // Zweiter Faktor: noch keine Sitzung. Das Gerät (bekannt oder nicht) ändert daran nichts.
   if (await secondFactorRequired(user.id)) {
     await recordPasswordOk(user.id, !device);
-    const token = pendingLogins.create({ userId: user.id, username: key, remember: context.rememberDevice === true });
+    const token = pendingLogins.create({ userId: user.id, username: key, credentialVersion: credentialVersion(user.passwordHash), remember: context.rememberDevice === true });
     await setPendingCookie(token);
     return { ok: false, reason: "secondFactor", account: account! };
   }
@@ -270,6 +270,12 @@ export async function verifySecondFactor(code: string, context: { ip?: string | 
 
   const user = await db.user.findUnique({ where: { id: pending.userId } });
   if (!user || !user.active) {
+    pendingLogins.delete(token);
+    await clearPendingCookie();
+    return { ok: false, reason: "expired" };
+  }
+  // Das Passwort hat sich seit dem ersten Schritt geändert (Wechsel, Zurücksetzen, Notzugang): der Zwischenzustand gilt nicht mehr, das Passwort ist neu einzugeben
+  if (credentialVersion(user.passwordHash) !== pending.credentialVersion) {
     pendingLogins.delete(token);
     await clearPendingCookie();
     return { ok: false, reason: "expired" };
