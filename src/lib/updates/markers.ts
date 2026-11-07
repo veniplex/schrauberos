@@ -4,7 +4,8 @@
  *
  *   verify-failed   Starter → Launcher der eingebauten Version: Die Integritätsprüfung einer installierten Version hat sie abgelehnt (Befund: Code 10–16, 18).
  *                   `<Version>\n<Code>\n<Pfad, höchstens 200 Zeichen>\n`
- *   inconclusive    Starter → Launcher: Die Prüfung blieb unklar (Signal, Zeitüberschreitung, Ein-/Ausgabefehler). `<Version>\n<Grund: signal|timeout|io|fork|other>\n`
+ *   inconclusive    Starter → Launcher: Die Prüfung blieb unklar (Signal, Zeitüberschreitung, Ein-/Ausgabefehler) oder fand gar nicht statt (`quiesce`: der Ruhezustand ließ sich nicht herstellen).
+ *                   `<Version>\n<Grund: signal|timeout|io|fork|other|quiesce>\n`; nur `signal` und `io` zählen als Fehlversuch (`state.ts`, `countsAsAttempt`)
  *   verify-ok       Starter → App: letzte erfolgreiche Prüfung (nur Anzeige „zuletzt geprüft“). `<Version>\n<Dateien>\n<Bytes>\n<ms>\n<Unix-Sekunden>\n`
  *   incompatible    Launcher → Betreiber: Rückfall-Version zu alt für die Datenbank, die App wurde nicht gestartet. `<Version>\n<Anzahl unbekannter Migrationen>\n`
  *   (veraltet/unverträglich — Version ≤ eingebaute, base/arch passen nicht — hat keinen Marker: der Launcher gleicht den Zustand selbst ab, `chooseStart`.)
@@ -12,7 +13,7 @@
 
 /** Prüfcodes, die einen Integritätsbefund bedeuten (siehe README, Tabelle der Exit-Codes). */
 export const NEGATIVE_CODES = [10, 11, 12, 13, 14, 15, 16, 18] as const;
-export const INCONCLUSIVE_REASONS = ["signal", "timeout", "io", "fork", "other"] as const;
+export const INCONCLUSIVE_REASONS = ["signal", "timeout", "io", "fork", "other", "quiesce"] as const;
 export type InconclusiveReason = (typeof INCONCLUSIVE_REASONS)[number];
 
 const VERSION = /^\d+\.\d+\.\d+$/;
@@ -23,8 +24,11 @@ export function versionFromMarker(raw: string): string | null {
   return VERSION.test(name) ? name : null;
 }
 
-/** Entfernt Steuerzeichen und kürzt (Pfade aus Markern landen in Logs, Audit-Text und Anzeige). */
-export const cleanDetail = (value: string, max = 200): string => value.replace(/[\u0000-\u001f\u007f]/g, "?").slice(0, max);
+/**
+ * Entfernt Steuerzeichen und kürzt (Pfade aus Markern landen in Logs, Audit-Text und Anzeige). Wie `sos_clean` im Starter (docker/verify.c): C0, DEL, C1 (U+0080–U+009F),
+ * Bidi-Steuerzeichen (U+061C, U+200E/F, U+202A–E, U+2066–9) und Zeilentrenner (U+2028/9) werden zu `?`.
+ */
+export const cleanDetail = (value: string, max = 200): string => value.replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069\ufffd]/g, "?").slice(0, max);
 
 export type VerifyFailedMarker = { version: string; code: (typeof NEGATIVE_CODES)[number]; path: string };
 

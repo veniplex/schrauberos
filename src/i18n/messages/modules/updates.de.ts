@@ -70,12 +70,15 @@ export const updatesDe = {
       c18: "Im Datenverzeichnis liegt außerhalb der Version ein Ordner node_modules, der dort nichts verloren hat.",
     },
     unclear: "Die Prüfung der Version {version} konnte nicht abgeschlossen werden ({reason}; {count}. Versuch). Beim nächsten Start wird erneut geprüft; bis dahin läuft die eingebaute Version.",
+    unclearUncounted: "Die Prüfung der Version {version} konnte nicht abgeschlossen werden ({reason}). Das zählt nicht als Fehlversuch: Beim nächsten Start wird erneut geprüft; bis dahin läuft die eingebaute Version.",
+    notStarted: "Update installiert, aber nicht gestartet: Ruhezustand nicht erzwingbar (Version {version}). Die Version wurde deshalb nicht geprüft; bis dahin läuft die eingebaute Version. Beim nächsten Start wird es erneut versucht.",
     unclearReasons: {
       signal: "Prozess abgebrochen",
       timeout: "Zeitüberschreitung",
       io: "Lesefehler",
       fork: "Prozess nicht startbar",
       other: "unbekannte Ursache",
+      quiesce: "Ruhezustand nicht erzwingbar",
     },
   },
   repair: {
@@ -96,7 +99,7 @@ export const updatesDe = {
   tokenMissing: "Für das private Repository wird ein GitHub-Token mit Leserecht benötigt: unter Einstellungen → Updates hinterlegen.",
   errors: {
     badTree: "Die Prüfung des Pakets gegen sein Siegel ist fehlgeschlagen (die Dateien passen nicht zur signierten Dateiliste). Es wird nicht installiert.",
-    sealExpired: "Die Beglaubigung des Signaturschlüssels dieser Version ist abgelaufen. Sie lässt sich nicht installieren, bis ein erneuertes Release erscheint.",
+    sealExpired: "Die Beglaubigung des Signaturschlüssels dieser Version ist abgelaufen. Sie lässt sich nicht installieren, bis ein erneuertes Release erscheint. Bitte auch die Systemuhr des Servers prüfen.",
     network: "GitHub ist nicht erreichbar oder hat unerwartet geantwortet.",
     unauthorized: "Kein Zugriff auf die Releases. Ist unter Einstellungen → Updates ein Token hinterlegt, und hat es Leserecht auf das Repository?",
     noRelease: "Es wurde noch kein Release veröffentlicht.",

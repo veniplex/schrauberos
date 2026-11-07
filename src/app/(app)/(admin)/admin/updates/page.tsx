@@ -8,8 +8,9 @@ import { getI18n } from "@/i18n/server";
 import type { MessageKey } from "@/i18n/translate";
 import { splitBytes } from "@/lib/bytes";
 import { endorsementWarning } from "@/lib/updates/expiry";
-import { integrityCodeOf, parseVerifyOk } from "@/lib/updates/markers";
+import { INCONCLUSIVE_REASONS, integrityCodeOf, parseVerifyOk } from "@/lib/updates/markers";
 import { compareVersions } from "@/lib/updates/semver";
+import { countsAsAttempt } from "@/lib/updates/state";
 import { readSmallFile, readState, verifyOkFile } from "@/lib/updates/store";
 import { requirePermission } from "@/server/auth/session";
 import { checkForUpdates } from "@/modules/admin/updates/actions";
@@ -19,8 +20,6 @@ import { needsNewImage } from "@/modules/admin/updates/manifest";
 import { checkLatestRelease, fetchReleaseNotes } from "@/modules/admin/updates/releases";
 import { FieldLabel } from "@/components/ui/form";
 
-/** Gründe, die der Starter für eine unklare Prüfung nennt (lib/updates/markers.ts) */
-const UNCLEAR_REASONS = ["signal", "timeout", "io", "fork", "other"] as const;
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -100,11 +99,13 @@ export default async function UpdatesPage() {
           {unclear ? (
             <div className="mt-4">
               <Alert tone="warning">
-                {t("updates.integrity.unclear", {
-                  version: unclear.version,
-                  count: unclear.count,
-                  reason: t(`updates.integrity.unclearReasons.${(UNCLEAR_REASONS as readonly string[]).includes(unclear.reason) ? unclear.reason : "other"}` as MessageKey),
-                })}
+                {unclear.reason === "quiesce"
+                  ? t("updates.integrity.notStarted", { version: unclear.version })
+                  : t(countsAsAttempt(unclear.reason) ? "updates.integrity.unclear" : "updates.integrity.unclearUncounted", {
+                      version: unclear.version,
+                      count: unclear.count,
+                      reason: t(`updates.integrity.unclearReasons.${(INCONCLUSIVE_REASONS as readonly string[]).includes(unclear.reason) ? unclear.reason : "other"}` as MessageKey),
+                    })}
               </Alert>
             </div>
           ) : null}

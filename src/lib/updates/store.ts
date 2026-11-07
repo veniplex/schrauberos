@@ -1,4 +1,4 @@
-import { constants as fsConstants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { constants as fsConstants, closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { removeTreeSync } from "./fs-tree";
 import { parseEndorsements, type Endorsement } from "./keychain";
@@ -44,6 +44,24 @@ export function readSmallFile(file: string, max = 4096): string | null {
   }
 }
 
+/**
+ * Entfernt einen Marker, egal was dort liegt (Datei, Link, FIFO oder ein – auch nicht leeres – Verzeichnis, das die App vor dem Neustart angelegt hat), und wirft nie: ein Hindernis
+ * unter einem Markernamen darf den Start der eingebauten App nicht verhindern. Gibt zurück, ob danach nichts mehr dort liegt.
+ */
+export function removeMarker(file: string): boolean {
+  try {
+    rmSync(file, { recursive: true, force: true });
+  } catch {
+    /* geprüft wird unten */
+  }
+  try {
+    lstatSync(file);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 /** version.json eines App-Verzeichnisses; null, wenn nicht vorhanden oder ungültig. */
 export function readMeta(dir: string): VersionMeta | null {
   try {
@@ -65,13 +83,29 @@ export function readState(data = dataDir()): UpdateState {
   }
 }
 
-/** Atomar schreiben (temporäre Datei + Umbenennen), damit ein Absturz nie eine halbe Datei hinterlässt. */
+/**
+ * Atomar schreiben (temporäre Datei + Umbenennen), damit ein Absturz nie eine halbe Datei hinterlässt. Liegt ein Verzeichnis unter dem Namen von `state.json` oder `active`
+ * (die App darf dort schreiben), wird es entfernt und die Datei neu angelegt – sonst bliebe der Zustand für immer unschreibbar.
+ */
 export function writeState(state: UpdateState, data = dataDir()): void {
   mkdirSync(updatesDir(data), { recursive: true });
   const write = (file: string, content: string) => {
     const tmp = `${file}.${process.pid}.tmp`;
+    removeMarker(tmp);
     writeFileSync(tmp, content);
-    renameSync(tmp, file);
+    try {
+      renameSync(tmp, file);
+    } catch (error) {
+      let isDirectory = false;
+      try {
+        isDirectory = lstatSync(file).isDirectory();
+      } catch {
+        /* nicht vorhanden: der Fehler war ein anderer */
+      }
+      if (!isDirectory) throw error;
+      rmSync(file, { recursive: true, force: true });
+      renameSync(tmp, file);
+    }
   };
   // Erst der Zustand, dann der Zeiger: Der Starter folgt immer dem Zeiger, der zum gespeicherten Zustand passt
   write(stateFile(data), JSON.stringify(state, null, 2));

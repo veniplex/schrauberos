@@ -5,7 +5,7 @@ import path from "node:path";
 import { after, afterEach, beforeEach, describe, it } from "node:test";
 import { applyPendingRestore, pendingDbFile, readApplied, readRestoreResult, restoreDir, writePending } from "../lib/updates/restore";
 import { RESTART_EXIT_CODE, emptyState } from "../lib/updates/state";
-import { incompatibleFile, inconclusiveFile, launcherCrashFile, readActive, readState, verifyFailedFile, versionDir, writeState } from "../lib/updates/store";
+import { activeFile, incompatibleFile, inconclusiveFile, launcherCrashFile, readActive, readState, updatesDir, verifyFailedFile, versionDir, writeState } from "../lib/updates/store";
 import { createLauncher, DEFAULT_HEALTH_MAX_MS, INCOMPATIBLE_EXIT_CODE, type AppProcess, type LauncherConfig, type LauncherDeps, type SpawnSpec } from "./launcher";
 
 /**
@@ -479,10 +479,10 @@ describe("Marker des Starters (nur die eingebaute Version wertet sie aus)", () =
     assert.ok(detail.length <= 200);
   });
 
-  it("unklare Prüfung: die Version bleibt eingetragen und ungesperrt, für diesen Start läuft die eingebaute App; nach dreimal in Folge gilt sie als fehlgeschlagen", async () => {
+  it("unklare Prüfung: die Version bleibt eingetragen und ungesperrt, für diesen Start läuft die eingebaute App; nach dreimal (Signal, Lesefehler) gilt sie als fehlgeschlagen", async () => {
     install("1.1.0", { pending: false });
     for (const count of [1, 2]) {
-      unclearMarker("1.1.0", "timeout");
+      unclearMarker("1.1.0", "signal");
       rig.spawned.length = 0;
       assert.equal(await launcherFor(builtin).run(), 0);
       assert.equal(rig.spawned.length, 1, "die eingebaute App läuft");
@@ -500,6 +500,30 @@ describe("Marker des Starters (nur die eingebaute Version wertet sie aus)", () =
     assert.deepEqual(state.failed, ["1.1.0"]);
     assert.equal(state.last?.reason, "integrity:17");
     assert.equal(state.inconclusive, null);
+  });
+
+  it("Zeitüberschreitung, nicht herstellbarer Ruhezustand und Unbekanntes brennen eine Version nie ein, auch nicht nach zehn Mal", async () => {
+    install("1.1.0", { pending: false });
+    for (const reason of ["timeout", "quiesce", "other", "fork"]) {
+      for (let i = 0; i < 10; i++) {
+        unclearMarker("1.1.0", reason);
+        rig.spawned.length = 0;
+        assert.equal(await launcherFor(builtin).run(), 0, reason);
+        assert.equal(rig.spawned.length, 1, "die eingebaute App läuft");
+      }
+      const state = readState(data);
+      assert.equal(state.current, "1.1.0", `${reason}: bleibt aktuell`);
+      assert.deepEqual(state.failed, [], `${reason}: nie gesperrt`);
+      assert.equal(state.inconclusive?.count, 0);
+      assert.equal(state.inconclusive?.reason, reason);
+    }
+  });
+
+  it("quiesce: die Meldung sagt, dass die Version installiert, aber nicht gestartet wurde", async () => {
+    install("1.1.0", { pending: false });
+    unclearMarker("1.1.0", "quiesce");
+    await launcherFor(builtin).run();
+    assert.ok(rig.logs.some((l) => l.includes("installiert, wurde aber nicht gestartet") && l.includes("Ruhezustand")), rig.logs.join("\n"));
   });
 
   it("die installierte Version setzt den Zähler unklarer Prüfungen zurück, sobald der Starter sie wieder startet", async () => {
@@ -535,6 +559,80 @@ describe("Marker des Starters (nur die eingebaute Version wertet sie aus)", () =
     assert.equal(readState(data).current, "1.1.0");
     assert.equal(existsSync(volume("1.1.0")), true);
     assert.ok(rig.logs.some((l) => l.includes("der Zustand bleibt unverändert")));
+  });
+});
+
+describe("Hindernisse unter Markern und Zustandsdateien (die App darf <DATA_DIR>/app beschreiben)", () => {
+  const install = (version: string, over: Partial<ReturnType<typeof emptyState>> = {}) => {
+    meta(volume(version), version);
+    writeState({ ...emptyState(), current: version, ...over }, data);
+  };
+  /** ein nicht leeres Verzeichnis unter dem Namen einer Datei */
+  const obstruct = (file: string) => {
+    rmSync(file, { recursive: true, force: true });
+    mkdirSync(file, { recursive: true });
+    writeFileSync(path.join(file, "x"), "x");
+  };
+
+  for (const [label, file] of [
+    ["verify-failed", () => verifyFailedFile(data)],
+    ["inconclusive", () => inconclusiveFile(data)],
+    ["launcher-crash", () => launcherCrashFile(data)],
+    ["incompatible", () => incompatibleFile(data)],
+  ] as const) {
+    it(`${label} als nicht leeres Verzeichnis: die eingebaute App startet trotzdem, das Hindernis wird entfernt`, async () => {
+      install("1.1.0", { pending: false });
+      obstruct(file());
+      assert.equal(await launcherFor(builtin).run(), 0);
+      assert.equal(rig.spawned.length, 1, "die App läuft");
+      assert.equal(existsSync(file()), false, "das Hindernis wurde entfernt");
+    });
+  }
+
+  it("state.json als Verzeichnis: gilt als leerer Zustand, die App startet; ein späteres Schreiben legt die Datei neu an", async () => {
+    mkdirSync(updatesDir(data), { recursive: true });
+    obstruct(path.join(updatesDir(data), "state.json"));
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+    // ein Befund erzwingt das Schreiben des Zustands über dem Hindernis
+    meta(volume("1.1.0"), "1.1.0");
+    obstruct(path.join(updatesDir(data), "state.json"));
+    writeFileSync(verifyFailedFile(data), `1.1.0
+15
+x
+`);
+    rig.spawned.length = 0;
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+    assert.equal(readState(data).last?.version, "1.1.0", "Zustand wurde über dem Verzeichnis neu geschrieben");
+    assert.equal(readState(data).last?.reason, "integrity:15");
+  });
+
+  it("active (der Zeiger) als Verzeichnis: die App startet, der Zeiger wird als Datei neu geschrieben", async () => {
+    install("1.1.0", { pending: false });
+    obstruct(activeFile(data));
+    writeFileSync(verifyFailedFile(data), `1.1.0
+16
+server.js
+`);
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
+    assert.equal(readActive(data), null, "leerer Zeiger = eingebaute Version, wieder eine Datei");
+    assert.equal(readState(data).current, null);
+  });
+
+  it("ein nicht schreibbarer Zustand (hier: <DATA_DIR>/app ist eine Datei) ist nur eine Logzeile", async () => {
+    rmSync(updatesDir(data), { recursive: true, force: true });
+    writeFileSync(updatesDir(data), "kein Verzeichnis");
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1, "die App startet trotz allem");
+  });
+
+  it("<DATA_DIR>/app/versions als Datei: das Aufräumen scheitert leise, die App startet", async () => {
+    mkdirSync(updatesDir(data), { recursive: true });
+    writeFileSync(path.join(updatesDir(data), "versions"), "keine Versionen");
+    assert.equal(await launcherFor(builtin).run(), 0);
+    assert.equal(rig.spawned.length, 1);
   });
 });
 

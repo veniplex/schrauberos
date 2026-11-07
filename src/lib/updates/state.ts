@@ -40,14 +40,22 @@ export type UpdateState = {
    */
   last: { at: string; version: string; status: "ok" | "rolled-back"; reason?: string; detail?: string } | null;
   /**
-   * Die Prüfung dieser Version durch den Starter ist unklar geblieben (Signal, Zeitüberschreitung, Ein-/Ausgabefehler): kein Befund über den Inhalt. Die Version bleibt
-   * `current`; der nächste Start prüft erneut. Nach `INCONCLUSIVE_LIMIT` unklaren Läufen in Folge wird sie wie ein negativer Befund behandelt.
+   * Die Prüfung dieser Version durch den Starter ist unklar geblieben (Signal, Zeitüberschreitung, Ein-/Ausgabefehler) oder hat gar nicht stattgefunden (`quiesce`): kein Befund über
+   * den Inhalt. Die Version bleibt `current`; der nächste Start prüft erneut. Nur `signal` und `io` zählen als Fehlversuch (`count`); nach `INCONCLUSIVE_LIMIT` davon wird die Version
+   * wie ein negativer Befund behandelt. `count` kann 0 sein (nur nicht zählende Läufe: Zeitüberschreitung, Ruhezustand, …).
    */
   inconclusive: { version: string; count: number; at: string; reason: string } | null;
 };
 
-/** So viele unklare Prüfungen derselben Version in Folge, bis sie wie ein negativer Befund behandelt wird. */
+/** So viele zählende unklare Prüfungen derselben Version, bis sie wie ein negativer Befund behandelt wird. */
 export const INCONCLUSIVE_LIMIT = 3;
+
+/**
+ * Welche unklaren Prüfungen zählen? Nur solche, die auf einen Defekt des Datenträgers oder des Prüfprozesses hindeuten (Signal, Ein-/Ausgabefehler). Eine Zeitüberschreitung (großes
+ * Paket auf langsamem Datenträger), ein nicht herstellbarer Ruhezustand oder ein nicht startbarer Prüfprozess sagen nichts über die Version – sie brennen sie nie ein, die eingebaute
+ * Version läuft einfach weiter.
+ */
+export const countsAsAttempt = (reason: string): boolean => reason === "signal" || reason === "io";
 
 export const emptyState = (): UpdateState => ({ schema: STATE_SCHEMA, current: null, previous: null, pending: false, failed: [], last: null, inconclusive: null });
 
@@ -70,7 +78,7 @@ export function parseState(raw: unknown): UpdateState {
         ? { at: last.at, version: last.version, status: last.status, ...(typeof last.reason === "string" ? { reason: last.reason } : {}), ...(typeof last.detail === "string" ? { detail: last.detail.slice(0, 200) } : {}) }
         : null,
     inconclusive:
-      unclear && typeof unclear === "object" && typeof unclear.version === "string" && typeof unclear.at === "string" && typeof unclear.reason === "string" && Number.isInteger(unclear.count) && (unclear.count as number) > 0
+      unclear && typeof unclear === "object" && typeof unclear.version === "string" && typeof unclear.at === "string" && typeof unclear.reason === "string" && Number.isInteger(unclear.count) && (unclear.count as number) >= 0
         ? { version: unclear.version, count: unclear.count as number, at: unclear.at, reason: unclear.reason.slice(0, 40) }
         : null,
   };
@@ -115,9 +123,10 @@ export function afterIntegrityFailure(state: UpdateState, version: string, reaso
   return { ...state, previous: state.previous === version ? null : state.previous, failed, last, pending: false, inconclusive: state.inconclusive?.version === version ? null : state.inconclusive };
 }
 
-/** Eine unklare Prüfung von `version`: mitzählen (die Version bleibt eingetragen). */
+/** Eine unklare Prüfung von `version`: festhalten (die Version bleibt eingetragen); nur zählende Gründe erhöhen den Zähler. */
 export function afterInconclusive(state: UpdateState, version: string, reason: string, now: string): UpdateState {
-  const count = state.inconclusive?.version === version ? state.inconclusive.count + 1 : 1;
+  const previous = state.inconclusive?.version === version ? state.inconclusive.count : 0;
+  const count = countsAsAttempt(reason) ? previous + 1 : previous;
   return { ...state, inconclusive: { version, count, at: now, reason: reason.slice(0, 40) } };
 }
 

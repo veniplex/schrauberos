@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import { cleanDetail, integrityCodeOf, integrityReason, parseInconclusive, parseVerifyFailed, parseVerifyOk, versionFromMarker } from "./markers";
-import { afterFailure, afterInconclusive, afterIntegrityFailure, emptyState, INCONCLUSIVE_LIMIT, parseState } from "./state";
+import { cleanDetail, INCONCLUSIVE_REASONS, integrityCodeOf, integrityReason, parseInconclusive, parseVerifyFailed, parseVerifyOk, versionFromMarker } from "./markers";
+import { afterFailure, afterInconclusive, afterIntegrityFailure, countsAsAttempt, emptyState, INCONCLUSIVE_LIMIT, parseState, type UpdateState } from "./state";
 import { readSmallFile } from "./store";
 
 const work = mkdtempSync(path.join(tmpdir(), "so-markers-"));
@@ -22,6 +22,8 @@ describe("Marker des Starters", () => {
   it("inconclusive: unbekannte Gründe werden zu 'other'", () => {
     assert.deepEqual(parseInconclusive("1.2.3\ntimeout\n"), { version: "1.2.3", reason: "timeout" });
     assert.deepEqual(parseInconclusive("/x/1.2.3\nirgendwas\n"), { version: "1.2.3", reason: "other" });
+    assert.deepEqual(parseInconclusive("1.2.3\nquiesce\n"), { version: "1.2.3", reason: "quiesce" }, "Ruhezustand nicht herstellbar: eigener Grund");
+    assert.ok((INCONCLUSIVE_REASONS as readonly string[]).includes("quiesce"));
     assert.equal(parseInconclusive("nope\nio\n"), null);
   });
 
@@ -35,6 +37,10 @@ describe("Marker des Starters", () => {
     assert.equal(versionFromMarker("..\\..\\0.3.0"), "0.3.0");
     assert.equal(versionFromMarker("/data/app/versions/.."), null);
     assert.equal(cleanDetail("a\nb\tc"), "a?b?c");
+    // C1, Bidi-Steuerzeichen und Zeilentrenner (Log-/Anzeige-Injektion) wie sos_clean im Starter
+    assert.equal(cleanDetail("x\u009b31;1mEVIL\u202eTXT\u2028y\u2029z\u2066a\u2069b\u200ec\u200fd\u061ce\u0085f\u009fg\u007fh"), "x?31;1mEVIL?TXT?y?z?a?b?c?d?e?f?g?h");
+    assert.equal(cleanDetail("Zähler äöü € 日本 😀 \u00a0 \u00a0"), "Zähler äöü € 日本 😀 \u00a0 \u00a0", "gewöhnliche Zeichen (auch NBSP, Emoji) bleiben");
+    assert.equal(cleanDetail("a".repeat(300)).length, 200);
     assert.equal(integrityReason(15), "integrity:15");
     assert.equal(integrityCodeOf("integrity:15"), 15);
     assert.equal(integrityCodeOf("antwortet nicht gesund"), null);
@@ -56,13 +62,29 @@ describe("Zustand bei Integritätsbefunden", () => {
     assert.deepEqual([s.current, s.previous, s.failed], ["1.2.0", null, ["1.1.0"]]);
   });
 
-  it("zählt unklare Prüfungen je Version; ein Wechsel der Version beginnt neu", () => {
+  it("zählt unklare Prüfungen je Version, aber nur Signal und Ein-/Ausgabefehler; ein Wechsel der Version beginnt neu", () => {
     let s = afterInconclusive(base, "1.2.0", "signal", "t1");
-    s = afterInconclusive(s, "1.2.0", "timeout", "t2");
+    s = afterInconclusive(s, "1.2.0", "io", "t2");
     assert.equal(s.inconclusive?.count, 2);
-    assert.equal(s.inconclusive?.reason, "timeout");
+    assert.equal(s.inconclusive?.reason, "io");
     assert.equal(afterInconclusive(s, "1.1.0", "io", "t3").inconclusive?.count, 1);
     assert.equal(INCONCLUSIVE_LIMIT, 3);
+  });
+
+  it("Zeitüberschreitung, Ruhezustand, Prozessstart und Unbekanntes zählen nie (große Pakete auf langsamen Platten dürfen eine Version nicht einbrennen)", () => {
+    for (const reason of ["timeout", "quiesce", "fork", "other", "irgendwas"]) {
+      assert.equal(countsAsAttempt(reason), false, reason);
+      let s: UpdateState = base;
+      for (let i = 0; i < 10; i++) s = afterInconclusive(s, "1.2.0", reason, `t${i}`);
+      assert.equal(s.inconclusive?.count, 0, `${reason}: zehnmal, kein Zählerstand`);
+      assert.equal(s.inconclusive?.reason, reason);
+    }
+    assert.equal(countsAsAttempt("signal"), true);
+    assert.equal(countsAsAttempt("io"), true);
+    // ein zählender Lauf dazwischen bleibt erhalten, nicht zählende Läufe löschen ihn nicht
+    let s = afterInconclusive(base, "1.2.0", "signal", "t");
+    s = afterInconclusive(s, "1.2.0", "timeout", "t");
+    assert.equal(s.inconclusive?.count, 1);
   });
 
   it("der Rückfall nach einem Befund räumt den Zähler der gesperrten Version", () => {
@@ -75,7 +97,9 @@ describe("Zustand bei Integritätsbefunden", () => {
     const s = parseState({ schema: 1, current: null, last: { at: "a", version: "1.0.0", status: "rolled-back", reason: "integrity:15", detail: "x".repeat(500) }, inconclusive: { version: "1.2.0", count: 2, at: "t", reason: "signal" } });
     assert.equal(s.last?.detail?.length, 200);
     assert.deepEqual(s.inconclusive, { version: "1.2.0", count: 2, at: "t", reason: "signal" });
-    assert.equal(parseState({ schema: 1, inconclusive: { version: "1.2.0", count: 0, at: "t", reason: "x" } }).inconclusive, null);
+    assert.equal(parseState({ schema: 1, inconclusive: { version: "1.2.0", count: -1, at: "t", reason: "x" } }).inconclusive, null);
+    assert.equal(parseState({ schema: 1, inconclusive: { version: "1.2.0", count: 1.5, at: "t", reason: "x" } }).inconclusive, null);
+    assert.equal(parseState({ schema: 1, inconclusive: { version: "1.2.0", count: 0, at: "t", reason: "quiesce" } }).inconclusive?.count, 0, "0 = nur nicht zählende Läufe");
     assert.equal(parseState({ schema: 1, inconclusive: "x" }).inconclusive, null);
   });
 });

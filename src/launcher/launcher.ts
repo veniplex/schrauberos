@@ -15,7 +15,7 @@
  *  - Ist die eingebaute Version neuer als die installierte oder unverträglich, verwirft die installierte Version sich selbst.
  * Migrationen und Basisdaten erledigt die App selbst (instrumentation.ts).
  */
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { databaseFile } from "../server/db-client-path";
 import { blockedMigrations, knownMigrations } from "../lib/updates/compat";
@@ -29,6 +29,7 @@ import {
   afterInconclusive,
   afterIntegrityFailure,
   chooseStart,
+  countsAsAttempt,
   INCONCLUSIVE_LIMIT,
   isCompatible,
   RESTART_EXIT_CODE,
@@ -36,7 +37,7 @@ import {
   type UpdateState,
   type VersionMeta,
 } from "../lib/updates/state";
-import { incompatibleFile, inconclusiveFile, launcherCrashFile, pruneVersions, readMeta, readSmallFile, readState, verifyFailedFile, versionDir, writeState } from "../lib/updates/store";
+import { incompatibleFile, inconclusiveFile, launcherCrashFile, pruneVersions, readMeta, readSmallFile, readState, removeMarker, verifyFailedFile, versionDir, writeState as writeStateFile } from "../lib/updates/store";
 
 /** Exit-Code des Launchers, wenn er die App absichtlich nicht startet (Rückfall-Version zu alt für die Datenbank): der Starter beendet dann den Container. */
 export const INCOMPATIBLE_EXIT_CODE = 78;
@@ -138,6 +139,23 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
     return false;
   }
 
+  /**
+   * Zustand (`state.json` und Zeiger) schreiben. Ein Fehler dabei (die App darf `<DATA_DIR>/app` beschreiben und kann ein Hindernis hinlegen) verhindert den Start der Anwendung
+   * nie: er steht im Log, der Lauf geht weiter (der Starter wählt dann nach dem alten Zustand, der Zeiger bleibt, wie er war).
+   */
+  function writeState(state: UpdateState): void {
+    try {
+      writeStateFile(state);
+    } catch (error) {
+      log(`Hinweis: Der Zustand der Updates lässt sich nicht speichern (${(error as NodeJS.ErrnoException).code ?? "Fehler"}) – der Start geht trotzdem weiter.`);
+    }
+  }
+
+  /** Marker verbrauchen; bleibt ein Hindernis liegen, steht es im Log (der Start geht weiter). */
+  function consume(file: string): void {
+    if (!removeMarker(file)) log(`Hinweis: ${path.basename(file)} lässt sich nicht entfernen – der Start geht trotzdem weiter.`);
+  }
+
   function rollbackUpdate(reason: string) {
     const state = readState();
     log(`Version ${state.current} wird verworfen (${reason}), zurück auf ${state.previous ?? "die eingebaute Version"}.`);
@@ -173,7 +191,7 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
     const marker = launcherCrashFile();
     if (!existsSync(marker)) return null;
     const version = versionFromMarker(readSmallFile(marker) ?? "") ?? "";
-    rmSync(marker, { force: true });
+    consume(marker);
     if (!version) return null;
     const state = readState();
     if (state.current === version) {
@@ -214,8 +232,8 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
   function handleStarterMarkers(): { exit: number | null; handled: boolean } {
     const failedText = readSmallFile(verifyFailedFile());
     const unclearText = readSmallFile(inconclusiveFile());
-    rmSync(verifyFailedFile(), { force: true });
-    rmSync(inconclusiveFile(), { force: true });
+    consume(verifyFailedFile());
+    consume(inconclusiveFile());
 
     const failed = failedText === null ? null : parseVerifyFailed(failedText);
     if (failedText !== null && !failed) log("Der Marker „verify-failed“ ist ungültig und wird ignoriert.");
@@ -226,12 +244,16 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
       const state = readState();
       const next = afterInconclusive(state, unclear.version, unclear.reason, nowIso());
       if (next.inconclusive && next.inconclusive.count >= INCONCLUSIVE_LIMIT) {
-        // Wiederholt unklar (etwa eine Platte, die nie fertig wird) ist kein Zufall mehr: wie ein Befund behandeln
+        // Wiederholt unklar mit zählendem Grund (Signal, Lesefehler des Datenträgers) ist kein Zufall mehr: wie ein Befund behandeln. Zeitüberschreitung, nicht herstellbarer Ruhezustand u. ä. zählen nie.
         log(`Die Prüfung der Version ${unclear.version} blieb ${next.inconclusive.count}× unklar (${unclear.reason}) – sie gilt als fehlgeschlagen.`);
         return { exit: applyIntegrityFailure(state, unclear.version, integrityReason(17), `unklar: ${unclear.reason}`), handled: true };
       }
       writeState(next);
-      log(`Die Prüfung der Version ${unclear.version} blieb unklar (${unclear.reason}, ${next.inconclusive?.count}. Mal) – für diesen Start läuft die eingebaute Version, der nächste Start prüft erneut.`);
+      log(
+        unclear.reason === "quiesce"
+          ? `Version ${unclear.version} ist installiert, wurde aber nicht gestartet: Der Ruhezustand (keine fremden Prozesse mehr) ließ sich nicht herstellen – für diesen Start läuft die eingebaute Version, der nächste Start versucht es erneut.`
+          : `Die Prüfung der Version ${unclear.version} blieb unklar (${unclear.reason}${next.inconclusive && countsAsAttempt(unclear.reason) ? `, ${next.inconclusive.count}. Mal` : ", zählt nicht als Fehlversuch"}) – für diesen Start läuft die eingebaute Version, der nächste Start prüft erneut.`,
+      );
       return { exit: null, handled: true };
     }
     return { exit: null, handled: false };
@@ -280,7 +302,7 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
         const stop = reconcile();
         if (stop !== null) return stop;
       }
-      rmSync(incompatibleFile(), { force: true }); // wir kommen an der Schranke vorbei: der Hinweis ist erledigt
+      consume(incompatibleFile()); // wir kommen an der Schranke vorbei: der Hinweis ist erledigt
     } else {
       // Eine installierte Version gilt nur, wenn sie neuer als die eingebaute und mit ihr verträglich ist und der Zustand auf sie zeigt
       const builtin = readMeta(BUILTIN);
@@ -293,7 +315,11 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
       // Der Starter hat diese Version geprüft und gestartet: eine frühere unklare Prüfung hat sich erledigt
       if (state.inconclusive?.version === own.version) writeState({ ...state, inconclusive: null });
     }
-    pruneVersions(versionsToKeep(readState()));
+    try {
+      pruneVersions(versionsToKeep(readState()));
+    } catch (error) {
+      log(`Hinweis: Alte Versionen lassen sich nicht aufräumen (${(error as NodeJS.ErrnoException).code ?? "Fehler"}) – der Start geht trotzdem weiter.`);
+    }
 
     // 1) Vorgemerkte Wiederherstellung einspielen (oder eine noch unbestätigte aus einem abgebrochenen Start wieder aufnehmen)
     const swapped = applyPendingRestore(dbFile);

@@ -72,12 +72,15 @@ export const updatesEn: typeof updatesDe = {
       c18: "The data directory contains a node_modules folder outside the version, which has no business being there.",
     },
     unclear: "Checking version {version} could not be completed ({reason}; attempt {count}). It is checked again at the next start; until then the built-in version runs.",
+    unclearUncounted: "Checking version {version} could not be completed ({reason}). This does not count as a failed attempt: it is checked again at the next start; until then the built-in version runs.",
+    notStarted: "Update installed, but not started: quiet state cannot be enforced (version {version}). The version was therefore not checked; until then the built-in version runs. It is tried again at the next start.",
     unclearReasons: {
       signal: "process aborted",
       timeout: "timeout",
       io: "read error",
       fork: "process could not be started",
       other: "unknown cause",
+      quiesce: "quiet state cannot be enforced",
     },
   },
   repair: {
@@ -98,7 +101,7 @@ export const updatesEn: typeof updatesDe = {
   tokenMissing: "The private repository needs a GitHub token with read access: store it under Settings → Updates.",
   errors: {
     badTree: "Checking the package against its seal failed (the files do not match the signed file list). It is not installed.",
-    sealExpired: "The endorsement of this version's signing key has expired. It cannot be installed until a renewed release is published.",
+    sealExpired: "The endorsement of this version's signing key has expired. It cannot be installed until a renewed release is published. Please also check the server's system clock.",
     network: "GitHub is unreachable or answered unexpectedly.",
     unauthorized: "No access to the releases. Is a token stored under Settings → Updates, and does it have read access to the repository?",
     noRelease: "No release has been published yet.",
