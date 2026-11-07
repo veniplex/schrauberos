@@ -103,6 +103,79 @@ describe("WebDAV-Ziel", () => {
   });
 });
 
+describe("Multistatus-Parser: linear, auch bei feindlichen Antworten (ZP5-3)", () => {
+  const MIB = 1024 * 1024;
+  /** Zeit, die der Parser braucht – jede Eingabe hier ist 16 MiB groß (die frühere Obergrenze); der quadratische Parser brauchte dafür Stunden. */
+  const timed = (xml: string) => {
+    const start = performance.now();
+    const entries = parseMultistatus(xml);
+    return { entries, ms: performance.now() - start };
+  };
+  const LIMIT_MS = 2500;
+  const big = (unit: string, bytes = 16 * MIB) => unit.repeat(Math.ceil(bytes / unit.length));
+
+  const cases: Array<[string, string]> = [
+    ["Millionen offene response-Tags ohne Ende (der Fall des quadratischen Regulärausdrucks)", big("<D:response>")],
+    ["Millionen offene response-Tags mit href, ohne Ende", big("<D:response><D:href>/a</D:href>")],
+    ["nur '<' ohne '>'", big("<")],
+    ["Tag ohne Ende, immer wieder", big("<a ")],
+    ["tief verschachtelte Tags", big("<a>")],
+    ["ein href ohne Ende (Text ohne schließenden Tag)", `<response><href>${"x".repeat(16 * MIB)}`],
+    ["unterbrochener CDATA-Abschnitt", `<response><href><![CDATA[${"x".repeat(16 * MIB)}`],
+    ["unterbrochener Kommentar", `<!--${"-".repeat(16 * MIB)}`],
+    ["viele ineinander geschachtelte Entitäten und Kaufmannsund", `<response><href>${"&amp;".repeat(3 * MIB)}</href></response>`],
+    ["Millionen leerer resourcetype/collection-Tags", `<response><href>/x</href>${big("<resourcetype><collection/>", 15 * MIB)}</response>`],
+    ["Millionen schließende Tags", big("</response>")],
+    ["Millionen Verarbeitungsanweisungen und DOCTYPE", big("<?x?><!DOCTYPE a>")],
+  ];
+  for (const [name, xml] of cases) {
+    it(name, () => {
+      const { entries, ms } = timed(xml);
+      assert.ok(ms < LIMIT_MS, `${Math.round(ms)} ms für ${xml.length} Zeichen`);
+      assert.ok(entries.length <= 5000, "die Zahl der Einträge ist begrenzt");
+    });
+  }
+
+  it("Einträge sind auf 5000 begrenzt, die Auswertung hört dann auf", () => {
+    const xml = `<multistatus>${big("<response><href>/a/b.sobk</href><propstat><prop><getcontentlength>1</getcontentlength></prop></propstat></response>", 8 * MIB)}</multistatus>`;
+    const { entries, ms } = timed(xml);
+    assert.equal(entries.length, 5000);
+    assert.ok(ms < LIMIT_MS);
+  });
+
+  it("wertet Kommentare, CDATA, selbstschließende Tags, Zeichenverweise und Namensräume richtig aus", () => {
+    const xml = `<?xml version="1.0"?><!DOCTYPE multistatus [<!ENTITY x "bösartig">]><d:multistatus xmlns:d="DAV:"><!-- <d:response><d:href>/falsch</d:href></d:response> -->
+      <d:response><d:href>/dav/a%26b&amp;c&#x2e;sobk</d:href><d:propstat><d:prop><d:getcontentlength> 42 </d:getcontentlength><d:getlastmodified>Wed, 01 Jan 2026 02:00:00 GMT</d:getlastmodified><d:resourcetype/></d:prop></d:propstat></d:response>
+      <d:response><d:href>/dav/ordner/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:getcontentlength>x</d:getcontentlength></d:prop></d:propstat></d:response>
+      <d:response/></d:multistatus>`;
+    const entries = parseMultistatus(xml);
+    assert.deepEqual(entries.map((e) => ({ href: e.href, size: e.size, collection: e.collection })), [
+      { href: "/dav/a&b&c.sobk", size: 42, collection: false },
+      { href: "/dav/ordner/", size: 0, collection: true },
+    ]);
+    assert.equal(entries[0].modifiedAt?.toISOString(), "2026-01-01T02:00:00.000Z");
+  });
+
+  it("eigene Entitäten aus einem DOCTYPE werden nicht aufgelöst", () => {
+    const xml = '<!DOCTYPE a [<!ENTITY big "AAAAAAAAAA"><!ENTITY bigger "&big;&big;&big;">]><response><href>/x&bigger;</href></response>';
+    assert.equal(parseMultistatus(xml)[0].href, "/x&bigger;");
+  });
+
+  it("eine zu große Antwort wird vom Transport abgewiesen, ohne sie auszuwerten", async () => {
+    const t = new WebdavTransport(
+      "https://dav.example/ordner",
+      { username: "u", password: "p" },
+      {
+        fetchImpl: (async (_url: string, init?: { method?: string }) =>
+          init?.method === "PROPFIND" && (init as { headers?: Record<string, string> }).headers?.Depth === "1"
+            ? new Response(new ReadableStream({ pull: (c) => c.enqueue(new Uint8Array(1024 * 1024).fill(32)) }), { status: 207 })
+            : new Response(null, { status: 207 })) as unknown as typeof fetch,
+      },
+    );
+    assert.equal(await codeOf(t.list()), "server");
+  });
+});
+
 describe("Ziel-Prüfung (SSRF-Bedacht)", () => {
   it("WebDAV nur über HTTPS; Klartext nur für den eigenen Rechner", () => {
     assert.deepEqual(normalizeWebdavUrl("https://cloud.example.org/remote.php/dav/files/x/backups/"), { ok: true, url: "https://cloud.example.org/remote.php/dav/files/x/backups" });

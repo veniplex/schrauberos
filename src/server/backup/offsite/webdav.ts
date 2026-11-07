@@ -15,7 +15,10 @@ export type WebdavOptions = {
   idleMs?: number;
 };
 
-const MULTISTATUS_MAX = 16 * 1024 * 1024;
+/** Obergrenze einer Multistatus-Antwort und der ausgewerteten Einträge (ein eigener Ordner enthält nur die Backups; mehr ist ein feindliches oder falsches Ziel). */
+const MULTISTATUS_MAX = 2 * 1024 * 1024;
+const MULTISTATUS_MAX_ENTRIES = 5000;
+const TEXT_MAX = 4096;
 
 const decode = (value: string) => {
   try {
@@ -25,22 +28,95 @@ const decode = (value: string) => {
   }
 };
 
-/** Einträge einer Multistatus-Antwort (PROPFIND). Ohne XML-Bibliothek: nur die drei gebrauchten Eigenschaften, namensraumunabhängig; es werden keine Entitäten oder DTDs ausgewertet. */
-export function parseMultistatus(xml: string): Array<{ href: string; collection: boolean; size: number; modifiedAt: Date | null }> {
-  const entries: Array<{ href: string; collection: boolean; size: number; modifiedAt: Date | null }> = [];
-  for (const block of xml.matchAll(/<(?:\w+:)?response\b[^>]*>([\s\S]*?)<\/(?:\w+:)?response>/gi)) {
-    const body = block[1];
-    const href = /<(?:\w+:)?href\b[^>]*>([\s\S]*?)<\/(?:\w+:)?href>/i.exec(body)?.[1]?.trim();
-    if (!href) continue;
-    const length = /<(?:\w+:)?getcontentlength\b[^>]*>\s*(\d+)\s*</i.exec(body)?.[1];
-    const modified = /<(?:\w+:)?getlastmodified\b[^>]*>([\s\S]*?)</i.exec(body)?.[1]?.trim();
-    const date = modified ? new Date(modified) : null;
-    entries.push({
-      href: decode(href.replace(/&amp;/g, "&")),
-      collection: /<(?:\w+:)?resourcetype\b[^>]*>[\s\S]*?<(?:\w+:)?collection\b/i.test(body),
-      size: length ? Number(length) : 0,
-      modifiedAt: date && !Number.isNaN(date.getTime()) ? date : null,
-    });
+/** Die fünf vordefinierten Entitäten und Zeichenverweise; **keine** eigenen Entitäten oder DTDs (kein Aufblähen möglich). */
+const unescapeXml = (value: string) =>
+  value.replace(/&(#x[0-9a-f]{1,6}|#\d{1,7}|amp|lt|gt|quot|apos);/gi, (match, name: string) => {
+    const lower = name.toLowerCase();
+    if (lower === "amp") return "&";
+    if (lower === "lt") return "<";
+    if (lower === "gt") return ">";
+    if (lower === "quot") return '"';
+    if (lower === "apos") return "'";
+    const code = lower.startsWith("#x") ? Number.parseInt(lower.slice(2), 16) : Number.parseInt(lower.slice(1), 10);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+  });
+
+type MultistatusEntry = { href: string; collection: boolean; size: number; modifiedAt: Date | null };
+
+/**
+ * Einträge einer Multistatus-Antwort (PROPFIND). Ohne XML-Bibliothek: nur die drei gebrauchten Eigenschaften, namensraumunabhängig; es werden keine Entitäten oder DTDs ausgewertet.
+ *
+ * **Linear in der Länge der Antwort** (ZP5-3): ein einziger Durchlauf von Tag zu Tag mit `indexOf`, ohne Rückverfolgung und ohne Regulärausdrücke über den ganzen Text – ein
+ * feindliches Ziel kann die Anwendung mit einer 16-MiB-Antwort nicht einfrieren. Kommentare, CDATA, Verarbeitungsanweisungen und DOCTYPE werden übersprungen; die Zahl der Einträge
+ * und die Länge der gelesenen Texte sind begrenzt.
+ */
+export function parseMultistatus(xml: string): MultistatusEntry[] {
+  const entries: MultistatusEntry[] = [];
+  let current: { href?: string; length?: string; modified?: string; collection: boolean } | null = null;
+  let inResourceType = false;
+  let target: "href" | "length" | "modified" | null = null;
+  let textFrom = 0;
+  const n = xml.length;
+  let i = 0;
+  while (i < n && entries.length < MULTISTATUS_MAX_ENTRIES) {
+    const lt = xml.indexOf("<", i);
+    if (lt < 0) break;
+    // Text bis zu diesem Tag gehört zur offenen Eigenschaft
+    if (target && current) {
+      const text = unescapeXml(xml.slice(textFrom, Math.min(lt, textFrom + TEXT_MAX)));
+      if (target === "href") current.href = text.trim();
+      else if (target === "length") current.length = text.trim();
+      else current.modified = text.trim();
+    }
+    target = null;
+    if (xml.startsWith("<!--", lt)) {
+      const end = xml.indexOf("-->", lt + 4);
+      i = end < 0 ? n : end + 3;
+      continue;
+    }
+    if (xml.startsWith("<![CDATA[", lt)) {
+      const end = xml.indexOf("]]>", lt + 9);
+      i = end < 0 ? n : end + 3;
+      continue;
+    }
+    const gt = xml.indexOf(">", lt + 1);
+    if (gt < 0) break;
+    i = gt + 1;
+    if (xml.charCodeAt(lt + 1) === 63 /* ? */ || xml.charCodeAt(lt + 1) === 33 /* ! */) continue;
+    const closing = xml.charCodeAt(lt + 1) === 47; /* / */
+    const selfClosing = xml.charCodeAt(gt - 1) === 47;
+    const head = xml.slice(lt + (closing ? 2 : 1), Math.min(gt, lt + 1 + 256));
+    const space = head.search(/[\s/]/);
+    const qualified = space < 0 ? head : head.slice(0, space);
+    const name = qualified.slice(qualified.indexOf(":") + 1).toLowerCase();
+
+    if (closing) {
+      if (name === "response" && current) {
+        if (current.href) {
+          const modified = current.modified ? new Date(current.modified) : null;
+          entries.push({
+            href: decode(current.href),
+            collection: current.collection,
+            size: current.length && /^\d{1,15}$/.test(current.length) ? Number(current.length) : 0,
+            modifiedAt: modified && !Number.isNaN(modified.getTime()) ? modified : null,
+          });
+        }
+        current = null;
+        inResourceType = false;
+      } else if (name === "resourcetype") inResourceType = false;
+      continue;
+    }
+    if (name === "response") {
+      if (!selfClosing) current = { collection: false };
+      continue;
+    }
+    if (!current) continue;
+    if (name === "resourcetype") inResourceType = !selfClosing;
+    else if (name === "collection" && inResourceType) current.collection = true;
+    else if (!selfClosing && (name === "href" || name === "getcontentlength" || name === "getlastmodified")) {
+      target = name === "href" ? "href" : name === "getcontentlength" ? "length" : "modified";
+      textFrom = i;
+    }
   }
   return entries;
 }
