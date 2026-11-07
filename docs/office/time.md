@@ -72,7 +72,7 @@ Auf der Auftragsseite zeigt der Abschnitt **Zeiten** die Summe der Zeiten auf di
   Werkstattprofil stehen.
 * **Nur einmal:** Jede Zeit wird als übernommen markiert und nie ein zweites Mal übernommen, auch nicht bei gleichzeitigem Klicken. Laufende Einträge bleiben unberührt. Löschen Sie eine solche Position im Positionen-Editor des Auftrags wieder, wird die Zeit **wieder übernehmbar** (und korrigierbar); Positionen mit Verweis auf eine Zeit lassen sich nicht frei erfinden.
 * **Vor dem Abschließen:** Laufen auf dem Auftrag noch Zeiten oder sind Zeiten nicht übernommen, weist ein Hinweis im Statusbereich der Auftragsseite darauf hin – der Abschluss bleibt trotzdem möglich. Nach dem Abschluss lassen sich Zeiten nur noch über *Wieder öffnen* übernehmen.
-* Die Positionen nennen Tätigkeit und Tag, nie den Namen des Mitarbeiters.
+* Die Positionen nennen Tätigkeit und Tag, nie den Namen des Mitarbeiters. Der **Freitext der Tätigkeit** steht danach in der Position – und damit im Auftrag und auf der Rechnung: bitte keine Namen oder Privates hineinschreiben.
 
 ## Handy und Tablet
 

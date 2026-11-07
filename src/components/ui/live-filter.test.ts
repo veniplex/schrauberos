@@ -102,6 +102,7 @@ describe("ResetFilterButton", () => {
       createElement("input", { name: "due", type: "checkbox", defaultChecked: true }),
       createElement("select", { name: "status", defaultValue: "open" }, createElement("option", { value: "" }, "Alle"), createElement("option", { value: "open" }, "Offen")),
       createElement("input", { name: "sort", type: "hidden", defaultValue: "name" }),
+      // eslint-disable-next-line react/no-children-prop -- die Props verlangen children; createElement(Komponente, props, children) passt nicht zu dieser Signatur
       createElement(ResetFilterButton, { href: "/customers", children: "Zurücksetzen" }),
     );
     view = await mount(await withRouter(form, { pushed }));

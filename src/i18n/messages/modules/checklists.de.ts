@@ -64,7 +64,7 @@ export const checklistsDe = {
   },
   complete: {
     title: "Abschließen",
-    intro: "Nach dem Abschluss lässt sich die Checkliste nicht mehr ändern. Wiederöffnen kann nur die Leitung, mit Begründung.",
+    intro: "Nach dem Abschluss lässt sich die Checkliste nicht mehr ändern. Wiederöffnen kann nur, wer dafür das eigene Recht hat, mit Begründung.",
     customerName: "Name des Kunden",
     customerNameHint: "Der Name zur Unterschrift. Beim Namensweg muss der getippte Name hiermit übereinstimmen.",
     signature: "Unterschrift des Kunden",

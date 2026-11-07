@@ -66,7 +66,7 @@ export const checklistsEn: typeof checklistsDe = {
   },
   complete: {
     title: "Complete",
-    intro: "After completion the checklist can no longer be changed. Only management can reopen it, with a reason.",
+    intro: "After completion the checklist can no longer be changed. Only someone with the dedicated right can reopen it, with a reason.",
     customerName: "Customer's name",
     customerNameHint: "The name for the signature. With the typed-name way, the typed name must match this.",
     signature: "Customer's signature",
