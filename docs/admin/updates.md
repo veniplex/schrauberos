@@ -3,7 +3,8 @@
 Unter **Updates** aktualisieren Administratoren die Anwendung – **ohne Zugriff auf den Server**.
 
 1. Die Seite zeigt die installierte Version und prüft, ob eine neuere veröffentlicht ist; „Jetzt prüfen“ fragt sofort nach.
-2. Gibt es eine neue Version, stehen die Änderungen dabei. **„Auf Version x aktualisieren“** startet das Update.
+2. Gibt es eine neue Version, stehen die Änderungen dabei (aus den Notizen des Releases). Darunter zeigt **„Was ist neu“** die Änderungen der **installierten** Version. Die Notizen stammen von GitHub und
+   werden beim ersten Abruf als Kopie im Datenverzeichnis gespeichert – danach stehen sie auch ohne Netzverbindung da. **„Auf Version x aktualisieren“** startet das Update.
 3. Die Anwendung legt zuerst ein **Backup** an, lädt das Paket herunter und prüft **Signatur und Prüfsumme** – nichts Ungeprüftes
    wird installiert. Dann startet sie kurz neu; die Seite lädt sich danach selbst neu.
 

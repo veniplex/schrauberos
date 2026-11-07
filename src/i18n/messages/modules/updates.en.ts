@@ -40,6 +40,15 @@ export const updatesEn: typeof updatesDe = {
     notes: "Changes",
     checkedAt: "Last checked: {date}",
   },
+  changelog: {
+    title: "What's new",
+    installed: "Changes in the installed version {version}",
+    published: "published on {date}",
+    none: "There are no change notes for the installed version (no release found or GitHub not reachable). Once they have been loaded, they are also available offline.",
+    fromCopy: "Saved copy (GitHub was not reachable).",
+    dev: "This is a development build – there are no change notes.",
+    newer: "The changes of the new version are shown above under “Check for updates”.",
+  },
   install: {
     button: "Update to version {version}",
     confirm: "Update to version {version}? A backup is created automatically first. The application is briefly unavailable while restarting.",

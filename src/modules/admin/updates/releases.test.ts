@@ -114,3 +114,58 @@ describe("Kleine Assets: Größe wird auch beim Lesen begrenzt (ZP3 Kleinigkeit)
     assert.equal("error" in check ? check.error : "ok", "badRelease");
   });
 });
+
+describe("Änderungsprotokoll („Was ist neu“)", () => {
+  const withNotes = (handler: (url: string) => Response | Promise<Response>) => {
+    releases.clearNotesCacheForTest();
+    globalThis.fetch = (async (input: string | URL | Request) => handler(String(input))) as typeof fetch;
+  };
+
+  it("liefert die Notizen des Releases der Version (Tag v<version>) samt Veröffentlichungsdatum", async () => {
+    const urls: string[] = [];
+    withNotes((url) => {
+      urls.push(url);
+      return Response.json({ tag_name: "v1.2.3", body: "## Neu - etwas", published_at: "2026-05-01T10:00:00Z", assets: [] });
+    });
+    assert.deepEqual(await releases.fetchReleaseNotes("1.2.3"), { version: "1.2.3", notes: "## Neu - etwas", publishedAt: "2026-05-01T10:00:00Z" });
+    assert.match(urls[0], /\/releases\/tags\/v1\.2\.3$/);
+    // zweiter Aufruf kommt aus dem Zwischenspeicher
+    await releases.fetchReleaseNotes("1.2.3");
+    assert.equal(urls.length, 1);
+  });
+
+  it("ohne Release, ohne Text, offline oder bei Entwicklungsständen: null (die Seite bleibt benutzbar), kein Wurf", async () => {
+    withNotes(() => new Response("nicht gefunden", { status: 404 }));
+    assert.equal(await releases.fetchReleaseNotes("7.7.7"), null);
+    withNotes(() => Response.json({ body: "   " }));
+    assert.equal(await releases.fetchReleaseNotes("7.7.7"), null);
+    withNotes(() => {
+      throw new TypeError("fetch failed");
+    });
+    assert.equal(await releases.fetchReleaseNotes("7.7.7"), null);
+    let called = false;
+    withNotes(() => {
+      called = true;
+      return Response.json({ body: "x" });
+    });
+    for (const dev of ["0.1.0-dev", "0.0.0-dev", "0.1.0-dev.abc1234", "../etc", ""]) assert.equal(await releases.fetchReleaseNotes(dev), null, dev);
+    assert.equal(called, false, "für Entwicklungsstände wird gar nicht erst angefragt");
+  });
+
+  it("offline: die einmal geholten Notizen stehen als Kopie im Datenverzeichnis und werden gezeigt, wenn GitHub nicht antwortet", async () => {
+    withNotes(() => Response.json({ body: "Neu in 4.5.6", published_at: "2026-06-02T00:00:00Z" }));
+    assert.equal((await releases.fetchReleaseNotes("4.5.6"))!.notes, "Neu in 4.5.6");
+    assert.equal(store.readNotesCopy("4.5.6"), "Neu in 4.5.6");
+    withNotes(() => {
+      throw new TypeError("fetch failed");
+    });
+    assert.deepEqual(await releases.fetchReleaseNotes("4.5.6"), { version: "4.5.6", notes: "Neu in 4.5.6", publishedAt: null, fromCopy: true });
+    assert.equal(await releases.fetchReleaseNotes("4.5.7"), null, "ohne Kopie und ohne Netz gibt es nichts");
+    assert.equal(store.readNotesCopy("../../x"), null, "nur gültige Versionsnummern werden als Dateiname benutzt");
+  });
+
+  it("sehr lange Notizen werden gekürzt", async () => {
+    withNotes(() => Response.json({ body: "x".repeat(releases.NOTES_MAX_CHARS + 5000) }));
+    assert.equal((await releases.fetchReleaseNotes("1.2.3"))!.notes.length, releases.NOTES_MAX_CHARS);
+  });
+});

@@ -179,7 +179,9 @@ jobs:
           context: .
           load: true
           push: false
-          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
           tags: |
             ${{ steps.meta.outputs.tags }}
             schrauberos:smoke
@@ -199,7 +201,9 @@ jobs:
           target: bundle
           # Als tar exportieren: bewahrt Symlinks (.next/node_modules) unverändert
           outputs: type=tar,dest=bundle.tar
-          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
           cache-from: type=gha
       - name: Paket mit dem getesteten Image vergleichen und verpacken
         if: startsWith(github.ref, 'refs/tags/v')

@@ -16,6 +16,9 @@ export type JobHealthInput = {
   lockedUntil: Date | null;
 };
 
+/** Platz auf dem Datenträger des Datenverzeichnisses (`null`: das Dateisystem meldet ihn nicht – dann gibt es nichts zu bewerten). */
+export type DiskHealthInput = { freeBytes: number; totalBytes: number };
+
 export type RunnerHealthInput = { started: boolean; prepared: boolean; lastTickAt: Date | null; lastError: string | null };
 
 export type SystemProblem =
@@ -33,14 +36,35 @@ export type SystemProblem =
   | { code: "runnerDown" }
   | { code: "runnerStale"; lastTickAt: Date }
   /** Vorbereitung/Takt des Zeitgebers scheitert (Datenbank?) */
-  | { code: "runnerError" };
+  | { code: "runnerError" }
+  /** Weniger als 10 % des Datenträgers frei (Hinweis) – siehe `DISK_WARN_FRACTION` */
+  | { code: "diskLow"; freeBytes: number; totalBytes: number }
+  /** Weniger als 5 % oder weniger als der Mindestplatz frei: Sicherungen, Uploads und Updates werden abgewiesen */
+  | { code: "diskCritical"; freeBytes: number; totalBytes: number }
+  /** Das neueste Backup ist älter als `BACKUP_MAX_AGE_DAYS` Tage (`ageDays`) oder es gibt keines (`null`) */
+  | { code: "backupOld"; ageDays: number | null };
 
 /** So lange darf ein fälliger Job auf seinen Lauf warten, bevor er als überfällig gilt (der Zeitgeber tickt alle 15 s). */
 export const OVERDUE_MS = 5 * 60_000;
 /** So lange darf der Zeitgeber ohne Takt bleiben (Takt alle 15 s). */
 export const RUNNER_STALE_MS = 3 * 60_000;
+/** Warnschwellen für den Plattenplatz: unter 10 % frei = Hinweis, unter 5 % oder unter dem Mindestplatz (`DISK_RESERVE_BYTES`, 512 MiB) = Fehler. */
+export const DISK_WARN_FRACTION = 0.1;
+export const DISK_CRITICAL_FRACTION = 0.05;
+export const DISK_MIN_FREE_BYTES = 512 * 1024 * 1024;
+/** So alt darf das neueste Backup werden, bevor der Systemstatus es meldet. */
+export const BACKUP_MAX_AGE_DAYS = 7;
 
-export function evaluateSystem(input: { now: Date; jobs: readonly JobHealthInput[]; outboxFailed: number; runner: RunnerHealthInput }): SystemProblem[] {
+export function evaluateSystem(input: {
+  now: Date;
+  jobs: readonly JobHealthInput[];
+  outboxFailed: number;
+  runner: RunnerHealthInput;
+  /** Platz des Datenverzeichnisses; weglassen/`null` = nicht bewerten */
+  disk?: DiskHealthInput | null;
+  /** Zeitpunkt des neuesten Backups (`null` = es gibt keines); weglassen = nicht bewerten */
+  newestBackupAt?: Date | null;
+}): SystemProblem[] {
   const now = input.now.getTime();
   const problems: SystemProblem[] = [];
   // Vor dem ersten Takt (Startverzögerung) sind nach einer langen Pause alle Jobs „überfällig“ – das ist noch kein Fehler
@@ -58,9 +82,35 @@ export function evaluateSystem(input: { now: Date; jobs: readonly JobHealthInput
   if (!runner.started) problems.push({ code: "runnerDown" });
   else if (runner.lastTickAt && now - runner.lastTickAt.getTime() > RUNNER_STALE_MS) problems.push({ code: "runnerStale", lastTickAt: runner.lastTickAt });
   if (runner.lastError) problems.push({ code: "runnerError" });
+  const { disk } = input;
+  if (disk && disk.totalBytes > 0) {
+    const fraction = disk.freeBytes / disk.totalBytes;
+    if (fraction < DISK_CRITICAL_FRACTION || disk.freeBytes < DISK_MIN_FREE_BYTES) problems.push({ code: "diskCritical", freeBytes: disk.freeBytes, totalBytes: disk.totalBytes });
+    else if (fraction < DISK_WARN_FRACTION) problems.push({ code: "diskLow", freeBytes: disk.freeBytes, totalBytes: disk.totalBytes });
+  }
+  if (input.newestBackupAt !== undefined) {
+    if (input.newestBackupAt === null) problems.push({ code: "backupOld", ageDays: null });
+    else {
+      const ageDays = Math.floor((now - input.newestBackupAt.getTime()) / 86_400_000);
+      if (ageDays >= BACKUP_MAX_AGE_DAYS) problems.push({ code: "backupOld", ageDays });
+    }
+  }
   return problems;
 }
 
-/** Schwere: `danger`, sobald etwas wirklich nicht läuft; `warning` für Übergangszustände. */
+/** Hinweise, die den Betrieb noch nicht stören: ein Übergangszustand (Neustart) oder wenig Platz. Alles andere ist ein Fehler. */
+const WARNING_ONLY = new Set<SystemProblem["code"]>(["interrupted", "diskLow", "backupOld"]);
+
+/** Schwere: `danger`, sobald etwas wirklich nicht läuft; `warning`, wenn es nur Hinweise sind (`WARNING_ONLY`). */
 export const problemTone = (problems: readonly SystemProblem[]): "success" | "warning" | "danger" =>
-  problems.length === 0 ? "success" : problems.every((p) => p.code === "interrupted") ? "warning" : "danger";
+  problems.length === 0 ? "success" : problems.every((p) => WARNING_ONLY.has(p.code)) ? "warning" : "danger";
+
+/**
+ * Hinweise zur Verbindung (reine Information, **keine** Störung – im Werkstattnetz ist HTTP üblich): unverschlüsselt geöffnet, und – wenn „Hinter Reverse-Proxy“ an ist – dass der Proxy dann
+ * `X-Forwarded-Proto: https` mitgeben muss. Eigene Liste, damit „Alles in Ordnung“ davon unberührt bleibt.
+ */
+export type SystemNotice = { code: "insecure" } | { code: "proxyMismatch" };
+export function connectionNotices(input: { secure: boolean; behindProxy: boolean }): SystemNotice[] {
+  if (input.secure) return [];
+  return input.behindProxy ? [{ code: "insecure" }, { code: "proxyMismatch" }] : [{ code: "insecure" }];
+}

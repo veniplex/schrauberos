@@ -23,7 +23,7 @@ export function readMeta(dir: string): VersionMeta | null {
   try {
     const raw = JSON.parse(readFileSync(path.join(dir, "version.json"), "utf8")) as Partial<VersionMeta>;
     if (typeof raw.version === "string" && typeof raw.base === "number") {
-      return { version: raw.version, base: raw.base, ...(typeof raw.node === "string" ? { node: raw.node } : {}), ...(typeof raw.arch === "string" ? { arch: raw.arch } : {}) };
+      return { version: raw.version, base: raw.base, ...(typeof raw.node === "string" ? { node: raw.node } : {}), ...(typeof raw.arch === "string" ? { arch: raw.arch } : {}), ...(typeof raw.commit === "string" && /^[0-9a-f]{7,40}$/i.test(raw.commit) ? { commit: raw.commit.toLowerCase() } : {}) };
     }
   } catch {
     /* fällt auf null zurück */
@@ -85,4 +85,32 @@ export function writeEndorsements(endorsements: readonly Endorsement[], data = d
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify({ keys: endorsements }, null, 2));
   renameSync(tmp, file);
+}
+
+// ───────── Kopien der Release-Notizen („Was ist neu“, offline lesbar) ─────────
+
+const notesDir = (data = dataDir()) => path.join(updatesDir(data), "notes");
+const NOTES_VERSION = /^\d+\.\d+\.\d+$/;
+
+/** Kopie der Notizen einer Version aus dem Datenverzeichnis; `null`, wenn es keine gibt (oder die Version kein gültiger Name ist). */
+export function readNotesCopy(version: string, data = dataDir()): string | null {
+  if (!NOTES_VERSION.test(version)) return null;
+  try {
+    return readFileSync(path.join(notesDir(data), `${version}.md`), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/** Legt die Notizen einer Version als Kopie ab (Fehler dabei sind unwichtig: die Kopie ist nur eine Erleichterung für den Betrieb ohne Netz). */
+export function writeNotesCopy(version: string, value: { notes: string }, data = dataDir()): void {
+  if (!NOTES_VERSION.test(version)) return;
+  try {
+    mkdirSync(notesDir(data), { recursive: true });
+    const target = path.join(notesDir(data), `${version}.md`);
+    writeFileSync(`${target}.tmp`, value.notes);
+    renameSync(`${target}.tmp`, target);
+  } catch {
+    /* nur eine Erleichterung */
+  }
 }

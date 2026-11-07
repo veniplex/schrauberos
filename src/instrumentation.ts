@@ -5,6 +5,9 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  // Ringpuffer der letzten Warn-/Fehlerzeilen für den Systemstatus (lib/log-buffer.ts): console.warn/error bleiben unverändert, die Zeile wird zusätzlich aufgenommen
+  const { installLogCapture } = await import("@/lib/log-buffer");
+  installLogCapture();
   const { launchStartup } = await import("@/server/startup-launch");
   launchStartup();
 }

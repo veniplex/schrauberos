@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-import { Alert, Card, EmptyState, StatusBadge } from "@/components/ui/layout";
+import { Alert, Card, DefinitionList, EmptyState, StatusBadge } from "@/components/ui/layout";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import type { Schedule } from "@/lib/jobs/schedule";
+import { splitBytes } from "@/lib/bytes";
+import { recentLogs } from "@/lib/log-buffer";
 import { requirePermission } from "@/server/auth/session";
+import { isBehindProxy } from "@/server/auth/network";
+import { connectionIsSecure } from "@/server/auth/connection";
+import { systemInfo } from "@/server/system-info";
 import { db } from "@/server/db";
-import { evaluateSystem, problemTone, type SystemProblem } from "@/server/jobs/health";
+import { connectionNotices, evaluateSystem, problemTone, type SystemNotice, type SystemProblem } from "@/server/jobs/health";
 import { jobRunner } from "@/server/jobs";
 import { activeFeatureSet } from "@/server/jobs/runner";
 import { jobStatusRows, recentJobRuns } from "@/server/jobs/status";
@@ -21,14 +26,17 @@ const toneOf = (status: string | null) => JOB_STATUS_TONE[status as JobStatus] ?
 
 export default async function SystemPage() {
   await requirePermission("system.view");
-  const { t, tp, td, date } = await getI18n();
-  const [jobs, runs, active, pending, failed, lastFailed] = await Promise.all([
+  const { t, tp, td, date, number } = await getI18n();
+  const [jobs, runs, active, pending, failed, lastFailed, info, secure, behindProxy] = await Promise.all([
     jobStatusRows(),
     recentJobRuns(30),
     activeFeatureSet(),
     db.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
     db.outboxEvent.count({ where: { failedAt: { not: null } } }),
     db.outboxEvent.findFirst({ where: { failedAt: { not: null } }, orderBy: { failedAt: "desc" }, select: { lastError: true } }),
+    systemInfo(),
+    connectionIsSecure(),
+    isBehindProxy(),
   ]);
   const when = (d: Date | string) => date(d, { dateStyle: "short", timeStyle: "medium" });
   const nameOf = (id: string) => td(`system.names.${id}`, id);
@@ -38,7 +46,16 @@ export default async function SystemPage() {
     jobs: jobs.map((j) => ({ id: j.id, active: !j.feature || active.has(j.feature), failures: j.failures, lastStatus: j.lastStatus, nextRunAt: j.nextRunAt, lockedUntil: j.lockedUntil })),
     outboxFailed: failed,
     runner,
+    disk: info.disk,
+    newestBackupAt: info.newestBackup?.createdAt ?? null,
   });
+  const notices = connectionNotices({ secure, behindProxy });
+  const size = (bytes: number) => {
+    const { value, unit } = splitBytes(bytes);
+    return `${number(value, { maximumFractionDigits: unit === "B" || value >= 100 ? 0 : 1 })} ${unit}`;
+  };
+  const percent = (part: number, whole: number) => `${number(Math.round((part / whole) * 100))} %`;
+  const logs = recentLogs(50).map((entry, id) => ({ ...entry, id }));
   const problemText = (p: SystemProblem) => {
     switch (p.code) {
       case "failing":
@@ -57,8 +74,15 @@ export default async function SystemPage() {
         return t("system.problem.runnerDown");
       case "runnerError":
         return t("system.problem.runnerError");
+      case "diskLow":
+        return t("system.problem.diskLow", { free: size(p.freeBytes), total: size(p.totalBytes), percent: percent(p.freeBytes, p.totalBytes) });
+      case "diskCritical":
+        return t("system.problem.diskCritical", { free: size(p.freeBytes), total: size(p.totalBytes), percent: percent(p.freeBytes, p.totalBytes) });
+      case "backupOld":
+        return p.ageDays === null ? t("system.problem.backupNone") : t("system.problem.backupOld", { days: p.ageDays });
     }
   };
+  const noticeText = (n: SystemNotice) => t(`system.notice.${n.code}`);
 
   const scheduleText = (schedule: Schedule) => {
     if ("cron" in schedule) return t("system.schedule.cron", { cron: schedule.cron });
@@ -84,7 +108,60 @@ export default async function SystemPage() {
             </ul>
           </Alert>
         )}
+        {notices.map((n) => (
+          <Alert key={n.code} tone="info">
+            {noticeText(n)}
+          </Alert>
+        ))}
         <p className="text-xs text-ink-muted">{runner.lastTickAt ? t("system.runner.lastActive", { date: when(runner.lastTickAt) }) : t("system.runner.notYet")}</p>
+
+        <Card title={t("system.server.title")}>
+          <DefinitionList
+            items={[
+              {
+                label: t("system.server.version"),
+                value: (
+                  <span className="tabular">
+                    {info.build.version}
+                    {info.build.commit ? <span className="text-ink-muted"> · {t("system.server.commit", { commit: info.build.commit })}</span> : null}
+                  </span>
+                ),
+              },
+              { label: t("system.server.runtime"), value: <span className="tabular">{t("system.server.runtimeValue", { node: info.build.node, arch: info.build.arch })}</span> },
+              {
+                label: t("system.server.disk"),
+                value: info.disk ? (
+                  <span className="inline-flex flex-wrap items-center gap-2 tabular">
+                    {t("system.server.diskValue", { free: size(info.disk.freeBytes), total: size(info.disk.totalBytes), percent: percent(info.disk.freeBytes, info.disk.totalBytes) })}
+                    {problems.some((p) => p.code === "diskCritical") ? <StatusBadge tone="danger">{t("system.server.diskCritical")}</StatusBadge> : problems.some((p) => p.code === "diskLow") ? <StatusBadge tone="warning">{t("system.server.diskLow")}</StatusBadge> : null}
+                  </span>
+                ) : (
+                  <span className="text-ink-muted">{t("system.server.unknown")}</span>
+                ),
+              },
+              {
+                label: t("system.server.database"),
+                value: info.database ? (
+                  <span className="tabular">
+                    {size(info.database.totalBytes)} <span className="text-ink-muted">({t("system.server.databaseParts", { file: size(info.database.fileBytes), wal: size(info.database.walBytes) })})</span>
+                  </span>
+                ) : (
+                  <span className="text-ink-muted">{t("system.server.unknown")}</span>
+                ),
+              },
+              {
+                label: t("system.server.backup"),
+                value: info.newestBackup ? (
+                  <span className="tabular">
+                    {when(info.newestBackup.createdAt)} <span className="text-ink-muted">({td(`backup.kinds.${info.newestBackup.kind}`, info.newestBackup.kind)})</span>
+                  </span>
+                ) : (
+                  <span className="text-ink-muted">{t("system.server.backupNone")}</span>
+                ),
+              },
+            ]}
+          />
+        </Card>
 
         <section aria-labelledby="jobs-title">
           <h2 id="jobs-title" className="mb-2 text-sm font-semibold">
@@ -156,6 +233,25 @@ export default async function SystemPage() {
               { id: "status", header: t("system.runs.cols.status"), cell: (r) => <StatusBadge tone={toneOf(r.status)}>{td(`system.status.${r.status}`, r.status)}</StatusBadge> },
               { id: "duration", header: t("system.runs.cols.duration"), cell: (r) => <span className="tabular text-ink-muted">{duration(r.durationMs)}</span> },
               { id: "message", header: t("system.runs.cols.message"), cell: (r) => <span className="break-words text-ink-muted">{r.message ?? "–"}</span> },
+            ]}
+          />
+        </section>
+
+        <section aria-labelledby="logs-title">
+          <h2 id="logs-title" className="mb-1 text-sm font-semibold">
+            {t("system.logs.title")}
+          </h2>
+          <p className="mb-2 text-xs text-ink-muted">{t("system.logs.hint")}</p>
+          <DataTable
+            caption={t("system.logs.title")}
+            rows={logs}
+            rowKey={(entry) => String(entry.id)}
+            minWidth="40rem"
+            empty={<EmptyState title={t("system.logs.empty")} />}
+            columns={[
+              { id: "time", header: t("system.logs.cols.time"), priority: "primary", cell: (entry) => <span className="tabular whitespace-nowrap">{when(new Date(entry.at))}</span> },
+              { id: "level", header: t("system.logs.cols.level"), cell: (entry) => <StatusBadge tone={entry.level === "error" ? "danger" : "warning"}>{t(`system.logs.levels.${entry.level}`)}</StatusBadge> },
+              { id: "message", header: t("system.logs.cols.message"), cell: (entry) => <span className="break-words font-mono text-xs text-ink-muted">{entry.message}</span> },
             ]}
           />
         </section>

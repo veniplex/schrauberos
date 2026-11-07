@@ -38,6 +38,15 @@ export const updatesDe = {
     notes: "Änderungen",
     checkedAt: "Zuletzt geprüft: {date}",
   },
+  changelog: {
+    title: "Was ist neu",
+    installed: "Änderungen in der installierten Version {version}",
+    published: "veröffentlicht am {date}",
+    none: "Für die installierte Version liegen keine Änderungsnotizen vor (kein Release gefunden oder GitHub nicht erreichbar). Sobald sie einmal geladen wurden, stehen sie auch ohne Netz zur Verfügung.",
+    fromCopy: "Gespeicherte Kopie (GitHub war nicht erreichbar).",
+    dev: "Dies ist ein Entwicklungsstand – es gibt keine Änderungsnotizen.",
+    newer: "Die Änderungen der neuen Version stehen oben bei „Nach Updates suchen“.",
+  },
   install: {
     button: "Auf Version {version} aktualisieren",
     confirm: "Auf Version {version} aktualisieren? Vorher wird automatisch ein Backup angelegt. Die Anwendung ist beim Neustart kurz nicht erreichbar.",

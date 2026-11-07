@@ -20,6 +20,8 @@ export type VersionMeta = {
   node?: string;
   /** CPU-Architektur, für die das Paket gebaut wurde (process.arch) */
   arch?: string;
+  /** Git-Commit, aus dem das Paket gebaut wurde (Kurzform, nur zur Anzeige im Systemstatus; fehlt bei lokalen Builds) */
+  commit?: string;
 };
 
 export type UpdateState = {

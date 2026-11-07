@@ -12,7 +12,7 @@ import { checkForUpdates } from "@/modules/admin/updates/actions";
 import { runningMeta, runsFromVolume, updateConfig, updaterEnabled } from "@/modules/admin/updates/config";
 import { InstallForm, UpdateWatcher } from "@/modules/admin/updates/install-panel";
 import { needsNewImage } from "@/modules/admin/updates/manifest";
-import { checkLatestRelease } from "@/modules/admin/updates/releases";
+import { checkLatestRelease, fetchReleaseNotes } from "@/modules/admin/updates/releases";
 import { FieldLabel } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -26,7 +26,7 @@ export default async function UpdatesPage() {
   const running = runningMeta();
   const enabled = updaterEnabled();
   const state = enabled ? readState() : null;
-  const check = await checkLatestRelease();
+  const [check, installedNotes] = await Promise.all([checkLatestRelease(), fetchReleaseNotes(running.version)]);
   const hasToken = !!(await updateConfig()).token;
 
   const release = "release" in check ? check.release : null;
@@ -119,6 +119,26 @@ export default async function UpdatesPage() {
             </div>
           )}
           {"at" in check ? <p className="mt-4 text-xs text-ink-muted">{t("updates.check.checkedAt", { date: date(check.at, { dateStyle: "short", timeStyle: "medium" }) })}</p> : null}
+        </Card>
+
+        <Card title={t("updates.changelog.title")}>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold">{t("updates.changelog.installed", { version: running.version })}</h3>
+              {installedNotes?.publishedAt ? <span className="text-sm text-ink-muted">{t("updates.changelog.published", { date: date(installedNotes.publishedAt, { dateStyle: "medium" }) })}</span> : null}
+            </div>
+            {installedNotes ? (
+              <>
+                <div className="max-h-96 overflow-y-auto rounded-md border border-line p-4">
+                  <Markdown source={installedNotes.notes} />
+                </div>
+                {installedNotes.fromCopy ? <p className="text-xs text-ink-muted">{t("updates.changelog.fromCopy")}</p> : null}
+              </>
+            ) : (
+              <p className="text-sm text-ink-muted">{running.version.includes("-") ? t("updates.changelog.dev") : t("updates.changelog.none")}</p>
+            )}
+            {newer ? <p className="text-xs text-ink-muted">{t("updates.changelog.newer")}</p> : null}
+          </div>
         </Card>
       </div>
     </>

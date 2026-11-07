@@ -17,6 +17,10 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error(`Ungült
 const base = Number(readFileSync(resolve(root, "docker/BASE_VERSION"), "utf8").trim());
 if (!Number.isInteger(base) || base < 1) throw new Error("docker/BASE_VERSION muss eine ganze Zahl >= 1 enthalten.");
 
+// Commit nur zur Anzeige (Systemstatus): --commit, sonst APP_COMMIT aus dem Build, sonst nichts (lokaler Build)
+const rawCommit = arg("--commit") || process.env.APP_COMMIT || "";
+const commit = /^[0-9a-f]{7,40}$/i.test(rawCommit) ? rawCommit.slice(0, 7).toLowerCase() : undefined;
+
 const out = resolve(root, arg("--out") ?? ".");
-writeFileSync(resolve(out, "version.json"), JSON.stringify({ version, base, node: process.version, arch: process.arch }, null, 2) + "\n");
-console.log(`version.json: ${version} (base ${base}, node ${process.version})`);
+writeFileSync(resolve(out, "version.json"), JSON.stringify({ version, base, node: process.version, arch: process.arch, ...(commit ? { commit } : {}) }, null, 2) + "\n");
+console.log(`version.json: ${version} (base ${base}, node ${process.version}${commit ? `, commit ${commit}` : ""})`);

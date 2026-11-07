@@ -2,6 +2,13 @@
 
 Der **Systemstatus** zeigt, was die Anwendung im Hintergrund erledigt – ohne dass jemand etwas anstoßen muss. Die Seite ist nur für Administratoren.
 
+* **Server:** Version der Anwendung (bei Paketen mit dem Stand, aus dem sie gebaut wurde), Node-Version, **Speicherplatz** des Datenverzeichnisses (frei von gesamt, in Prozent), **Größe der Datenbank**
+  (Datei und Protokoll) und das **letzte Backup** (Zeitpunkt und Art). **Warnschwellen:** Unter **10 %** freiem Platz erscheint ein Hinweis (gelb), unter **5 %** oder unter 512 MB ein Fehler (rot) – dann werden
+  Backups, Uploads und Updates abgewiesen. Ein Backup, das älter als **7 Tage** ist (oder gar keines), wird ebenfalls gemeldet.
+* **Letzte Warnungen und Fehler:** Die Seite zeigt die letzten (höchstens 50) Warn- und Fehlermeldungen des Servers seit dem Start – damit man sie nicht am Server im Container-Log suchen muss. Es steht nur die **Art**
+  des Fehlers darin (zum Beispiel der Fehlercode einer Datenbankabweisung), **keine** Nutzdaten und keine Zugangsdaten; die Liste liegt nur im Speicher und ist nach einem Neustart leer.
+* **Verbindung:** Wurde die Seite unverschlüsselt (HTTP) geöffnet, steht ein **Hinweis** (blau, kein Fehler): im Werkstattnetz in Ordnung, für den Zugriff von außen bitte HTTPS über einen Reverse-Proxy. Ist „Hinter Reverse-Proxy“
+  eingeschaltet und die Anfrage kommt trotzdem als HTTP an, weist der Hinweis auf den Header `X-Forwarded-Proto` hin (siehe Einstellungen → Sicherheit).
 * **Geplante Aufgaben:** das automatische Backup, das Aufräumen alter Backups, des Audit-Logs und der API-Daten sowie die Zustellung von Ereignissen
   (zum Beispiel für E-Mail oder Schnittstellen). Zu jeder Aufgabe steht, **wann sie zuletzt lief, ob es geklappt hat** (OK, Fehler, Unterbrochen), **was dabei herauskam**,
   **wann sie wieder dran ist** und wie viele Fehlversuche in Folge es gab. Zeitpläne mit Uhrzeit gelten in der **Zeitzone der Werkstatt**

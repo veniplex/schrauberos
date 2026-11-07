@@ -34,6 +34,17 @@ describe("Update-Zustand auf der Platte", () => {
     assert.equal(readMeta(path.join(data, "gibtsnicht")), null);
   });
 
+  it("liest den Commit (nur zur Anzeige) und ignoriert Unsinn darin", () => {
+    const dir = path.join(data, "bundle-commit");
+    mkdirSync(dir, { recursive: true });
+    const meta = (commit: unknown) => {
+      writeFileSync(path.join(dir, "version.json"), JSON.stringify({ version: "1.2.3", base: 3, commit }));
+      return readMeta(dir);
+    };
+    assert.deepEqual(meta("ABCDEF1"), { version: "1.2.3", base: 3, commit: "abcdef1" });
+    for (const bad of ["<script>", "xyz1234", "abc", 12, null]) assert.deepEqual(meta(bad), { version: "1.2.3", base: 3 }, String(bad));
+  });
+
   it("räumt nicht mehr gebrauchte Versionen und Zwischenordner auf", () => {
     for (const v of ["1.0.0", "1.1.0", ".partial-1.3.0"]) mkdirSync(path.join(versionsDir(data), v), { recursive: true });
     pruneVersions(["1.1.0"], data);

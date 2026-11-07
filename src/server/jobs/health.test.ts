@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { evaluateSystem, OVERDUE_MS, problemTone, RUNNER_STALE_MS, type JobHealthInput, type RunnerHealthInput } from "./health";
+import { BACKUP_MAX_AGE_DAYS, connectionNotices, evaluateSystem, OVERDUE_MS, problemTone, RUNNER_STALE_MS, type JobHealthInput, type RunnerHealthInput } from "./health";
 
 const now = new Date("2026-06-01T12:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -36,5 +36,48 @@ describe("Bewertung des Systemstatus", () => {
     assert.deepEqual(evaluate([], { runner: runner({ lastTickAt: ago(RUNNER_STALE_MS + 1) }) }), [{ code: "runnerStale", lastTickAt: ago(RUNNER_STALE_MS + 1) }]);
     assert.deepEqual(evaluate([], { runner: runner({ lastError: "Vorbereitung: x" }) }), [{ code: "runnerError" }]);
     assert.deepEqual(evaluate([job({ nextRunAt: ago(3 * 3600_000) })], { runner: runner({ lastTickAt: null }) }), [], "Container war stundenlang aus; der erste Takt kommt noch");
+  });
+});
+
+describe("Systemstatus: Plattenplatz, Backup und Verbindung", () => {
+  const GiB = 1024 ** 3;
+  const withDisk = (freeBytes: number, totalBytes: number) => evaluateSystem({ now, jobs: [], outboxFailed: 0, runner: runner(), disk: { freeBytes, totalBytes } });
+
+  it("Platz: ab 10 % frei in Ordnung, darunter ein Hinweis, unter 5 % oder unter 512 MiB ein Fehler", () => {
+    assert.deepEqual(withDisk(10 * GiB, 100 * GiB), [], "genau 10 %");
+    assert.deepEqual(withDisk(9.9 * GiB, 100 * GiB), [{ code: "diskLow", freeBytes: 9.9 * GiB, totalBytes: 100 * GiB }]);
+    assert.deepEqual(withDisk(5 * GiB, 100 * GiB), [{ code: "diskLow", freeBytes: 5 * GiB, totalBytes: 100 * GiB }], "genau 5 % ist noch ein Hinweis");
+    assert.deepEqual(withDisk(4.9 * GiB, 100 * GiB), [{ code: "diskCritical", freeBytes: 4.9 * GiB, totalBytes: 100 * GiB }]);
+    // kleine Platte: 8 % von 4 GiB wären 330 MiB – unter dem Mindestplatz, den Sicherungen und Uploads brauchen
+    assert.equal(withDisk(0.4 * GiB, 4 * GiB)[0].code, "diskCritical");
+    assert.equal(withDisk(0.4 * GiB, 4 * GiB).length, 1);
+  });
+
+  it("meldet das Dateisystem keinen Platz (null) oder gar keinen Wert, wird nichts bewertet", () => {
+    assert.deepEqual(evaluateSystem({ now, jobs: [], outboxFailed: 0, runner: runner(), disk: null }), []);
+    assert.deepEqual(evaluateSystem({ now, jobs: [], outboxFailed: 0, runner: runner() }), []);
+    assert.deepEqual(withDisk(0, 0), []);
+  });
+
+  it("Platzmangel allein ist ein Hinweis (gelb), kritisch ein Fehler (rot)", () => {
+    assert.equal(problemTone(withDisk(8 * GiB, 100 * GiB)), "warning");
+    assert.equal(problemTone(withDisk(1 * GiB, 100 * GiB)), "danger");
+  });
+
+  it("Backup: älter als die Frist oder gar keines ist ein Hinweis; ein frisches nicht; ohne Angabe wird nicht bewertet", () => {
+    const check = (newestBackupAt?: Date | null) => evaluateSystem({ now, jobs: [], outboxFailed: 0, runner: runner(), newestBackupAt });
+    assert.deepEqual(check(ago(86_400_000)), []);
+    assert.deepEqual(check(ago((BACKUP_MAX_AGE_DAYS * 86_400_000) - 1000)), []);
+    assert.deepEqual(check(ago(BACKUP_MAX_AGE_DAYS * 86_400_000)), [{ code: "backupOld", ageDays: BACKUP_MAX_AGE_DAYS }]);
+    assert.deepEqual(check(null), [{ code: "backupOld", ageDays: null }]);
+    assert.deepEqual(check(undefined), []);
+    assert.equal(problemTone(check(null)), "warning");
+  });
+
+  it("Verbindung: nur unverschlüsselt gibt es einen Hinweis (kein Fehler); mit Reverse-Proxy-Einstellung zusätzlich der Hinweis auf X-Forwarded-Proto", () => {
+    assert.deepEqual(connectionNotices({ secure: true, behindProxy: false }), []);
+    assert.deepEqual(connectionNotices({ secure: true, behindProxy: true }), []);
+    assert.deepEqual(connectionNotices({ secure: false, behindProxy: false }), [{ code: "insecure" }]);
+    assert.deepEqual(connectionNotices({ secure: false, behindProxy: true }), [{ code: "insecure" }, { code: "proxyMismatch" }]);
   });
 });

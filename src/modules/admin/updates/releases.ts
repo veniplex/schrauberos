@@ -2,7 +2,7 @@ import "server-only";
 import { FetchPolicyError, fetchWithPolicy } from "@/lib/updates/safe-fetch";
 import { fetchPolicy, updateConfig } from "./config";
 import { parseEndorsements, trustedReleaseKeys, validEndorsements } from "@/lib/updates/keychain";
-import { readEndorsements, writeEndorsements } from "@/lib/updates/store";
+import { readEndorsements, readNotesCopy, writeEndorsements, writeNotesCopy } from "@/lib/updates/store";
 import { UpdateError, verifyManifest, type Manifest } from "./manifest";
 
 type GithubAsset = { name: string; url: string; size: number };
@@ -125,3 +125,44 @@ export async function checkLatestRelease(force = false): Promise<ReleaseCheck> {
   }
   return cached;
 }
+
+/** Änderungsprotokoll („Was ist neu“) einer Version: die Notizen des GitHub-Releases (nicht signiert – nur zur Anzeige, nie Grundlage einer Entscheidung). */
+export type ReleaseNotes = { version: string; notes: string; publishedAt: string | null; /** aus der Kopie im Datenverzeichnis (GitHub nicht erreichbar) */ fromCopy?: boolean };
+
+/** Mehr zeigt die Seite nicht (ein Release mit Fremdtext in Megabyte-Größe soll weder Speicher noch Seite sprengen). */
+export const NOTES_MAX_CHARS = 20_000;
+
+const notesCache = new Map<string, { at: number; value: ReleaseNotes | null }>();
+
+/**
+ * Notizen des Releases einer bestimmten Version (`/releases/tags/v<version>`). Wirft nie. Mit Zwischenspeicher (eine Stunde), damit das Öffnen der Update-Seite nicht jedes Mal bei
+ * GitHub anfragt. **Offline-tauglich:** Jede erfolgreich geholte Notiz wird als Kopie im Datenverzeichnis abgelegt (`<Daten>/app/notes/<version>.md`, siehe `lib/updates/store.ts`);
+ * ist GitHub nicht erreichbar, zeigt die Seite diese Kopie – so steht „Was ist neu“ der **installierten** Version auch ohne Netz da, sobald sie einmal geladen wurde (das Paket selbst
+ * bringt keine Notizen mit: Sie entstehen erst mit dem Release, nach dem Bau des Pakets). `null`, wenn es weder ein Release noch eine Kopie gibt.
+ */
+export async function fetchReleaseNotes(version: string, force = false): Promise<ReleaseNotes | null> {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return null; // lokale Entwicklungsstände (0.1.0-dev …) haben kein Release
+  const hit = notesCache.get(version);
+  if (!force && hit && Date.now() - hit.at < TTL_MS) return hit.value;
+  let value: ReleaseNotes | null = null;
+  try {
+    const { repo, apiUrl } = await updateConfig();
+    const res = await request(`${apiUrl}/repos/${repo}/releases/tags/v${version}`, "application/vnd.github+json");
+    if (res.ok) {
+      const release = (await res.json()) as Partial<GithubRelease>;
+      if (typeof release.body === "string" && release.body.trim()) value = { version, notes: release.body.slice(0, NOTES_MAX_CHARS), publishedAt: typeof release.published_at === "string" ? release.published_at : null };
+    }
+  } catch {
+    value = null;
+  }
+  if (value) writeNotesCopy(version, value);
+  else {
+    const copy = readNotesCopy(version);
+    if (copy) value = { version, notes: copy.slice(0, NOTES_MAX_CHARS), publishedAt: null, fromCopy: true };
+  }
+  notesCache.set(version, { at: Date.now(), value });
+  return value;
+}
+
+/** Nur für Tests: Zwischenspeicher der Notizen leeren. */
+export const clearNotesCacheForTest = () => notesCache.clear();

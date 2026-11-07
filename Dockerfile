@@ -33,6 +33,8 @@ FROM deps AS builder
 COPY . .
 # Version dieses Builds (CI setzt sie aus dem Tag bzw. als "<x.y.z>-dev.<sha>"); landet in version.json
 ARG APP_VERSION
+# Git-Commit des Builds (nur zur Anzeige im Systemstatus, steht in version.json)
+ARG APP_COMMIT
 RUN npx prisma generate \
  && node scripts/write-version.mjs --out . \
  && npm run build \
