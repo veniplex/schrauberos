@@ -554,7 +554,7 @@
 {"path":"app/versions/0.3.0/version.json","type":"f","mode":420,"b64":"eyJ2ZXJzaW9uIjoiMC4zLjAiLCJiYXNlIjo0LCJhcmNoIjoieDY0In0K"},
 {"path":"app/versions/0.3.0/Ünïcode-Datei äöü.txt","type":"f","mode":420,"b64":"dXRmLTggbmFtZXMgYXJlIGZpbmUK"}
 ]},
-{"name":"extra-file-long-name","description":"Zusätzliche Datei mit sehr langem Namen.","args":{"version":"0.3.0","image":{"base":4,"arch":"x64"},"floor":"0.2.0-dev.abc1234"},"expect":{"code":15,"class":"negative","reason":"extra"},"entries":[
+{"name":"extra-file-long-name","description":"Zusätzliche Datei mit sehr langem Namen (250 Zeichen, nahe an NAME_MAX).","args":{"version":"0.3.0","image":{"base":4,"arch":"x64"},"floor":"0.2.0-dev.abc1234"},"expect":{"code":15,"class":"negative","reason":"extra"},"entries":[
 {"path":"app","type":"d","mode":493},
 {"path":"app/versions","type":"d","mode":493},
 {"path":"app/versions/0.3.0","type":"d","mode":493},
@@ -591,7 +591,7 @@
 {"path":"app/versions/0.3.0/server.js","type":"f","mode":420,"b64":"Ly8gc2VydmVyCg=="},
 {"path":"app/versions/0.3.0/tmp-leer","type":"d","mode":493},
 {"path":"app/versions/0.3.0/version.json","type":"f","mode":420,"b64":"eyJ2ZXJzaW9uIjoiMC4zLjAiLCJiYXNlIjo0LCJhcmNoIjoieDY0In0K"},
-{"path":"app/versions/0.3.0/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","type":"f","mode":420,"b64":"bGFuZw=="},
+{"path":"app/versions/0.3.0/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","type":"f","mode":420,"b64":"bGFuZw=="},
 {"path":"app/versions/0.3.0/Ünïcode-Datei äöü.txt","type":"f","mode":420,"b64":"dXRmLTggbmFtZXMgYXJlIGZpbmUK"}
 ]},
 {"name":"missing-file","description":"Datei fehlt.","args":{"version":"0.3.0","image":{"base":4,"arch":"x64"},"floor":"0.2.0-dev.abc1234"},"expect":{"code":14,"class":"negative","reason":"missing","path":"server.js"},"entries":[

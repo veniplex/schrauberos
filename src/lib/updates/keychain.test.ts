@@ -124,6 +124,15 @@ describe("Beglaubigung (Format 2)", () => {
     assert.equal(isCalendarDate("2029-13-01"), false);
     assert.equal(isCalendarDate("2029-1-1"), false);
     assert.equal(isCalendarDate(20290101), false);
+    // Schaltjahre nach dem gregorianischen Kalender, auch Jahre unter 100 (der C-Prüfer rechnet genauso)
+    assert.equal(isCalendarDate("2000-02-29"), true);
+    assert.equal(isCalendarDate("2100-02-29"), false);
+    assert.equal(isCalendarDate("0000-02-29"), true);
+    assert.equal(isCalendarDate("0050-02-29"), false);
+    assert.equal(isCalendarDate("0096-02-29"), true);
+    assert.equal(isCalendarDate("2026-04-31"), false);
+    assert.equal(isCalendarDate("2026-00-10"), false);
+    assert.equal(isCalendarDate("2026-12-00"), false);
   });
 
   it("der eingebaute Release-Schlüssel bleibt vertraut, auch wenn ein anderer beglaubigt wird (Rotation ersetzt kein Widerrufen)", () => {

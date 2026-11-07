@@ -71,9 +71,11 @@ export function rawKeyToPem(raw: Buffer): string {
 /** Ist das ein echtes Kalenderdatum `JJJJ-MM-TT`? (`Date.parse` nähme auch den 30. Februar.) */
 export function isCalendarDate(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  // Von Hand gerechnet (proleptischer gregorianischer Kalender, Jahre 0000–9999): `Date.UTC` bildet Jahre unter 100 auf 19xx ab, und der C-Prüfer im Starter rechnet genauso wie hier
   const [y, m, d] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return m >= 1 && m <= 12 && d >= 1 && d <= days[m - 1];
 }
 
 /** Ende des Gültigkeitstages (UTC, 23:59:59). */

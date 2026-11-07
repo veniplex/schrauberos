@@ -182,8 +182,8 @@ export async function buildCorpus(): Promise<Corpus> {
   }
   {
     const fs = await fresh();
-    fs.file("x".repeat(300), "lang");
-    add("extra-file-long-name", "Zusätzliche Datei mit sehr langem Namen.", fs, neg(15, "extra"));
+    fs.file("x".repeat(250), "lang"); // NAME_MAX ist 255: längere Namen lassen sich unter Linux nicht anlegen
+    add("extra-file-long-name", "Zusätzliche Datei mit sehr langem Namen (250 Zeichen, nahe an NAME_MAX).", fs, neg(15, "extra"));
   }
   {
     const fs = await fresh();

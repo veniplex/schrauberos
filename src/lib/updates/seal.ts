@@ -20,7 +20,7 @@
  */
 import { createPublicKey, sign, verify } from "node:crypto";
 import { ENDORSEMENT_STATEMENT_BYTES, endorsementStatement, pemToRawKey, rawKeyToObject, verifyEndorsementBytes, type Endorsement } from "./keychain.ts";
-import { compareVersions, exceedsFloor, floorOf, parseSemver } from "./semver.ts";
+import { compareVersions, exceedsFloor, floorOf } from "./semver.ts";
 import { parseTree, sha512Hex, treeStats, TREE_FILE, TREE_LIMITS, SEAL_FILE, verifyTreeAgainstFs, TreeError, type FsLike, type TreeFailure } from "./tree.ts";
 
 export const SEAL_CONTEXT = "schrauberos-seal-v1\n";
@@ -246,9 +246,11 @@ export async function verifyVersion(options: VerifyOptions): Promise<VerifySucce
     if (found) return fail(VERIFY_EXIT.outside, "node_modules-in-ancestor", found);
 
     const floor = options.floor ? floorOf(options.floor) : null;
-    const folder = parseSemver(options.expectVersion);
+    // Ordnername bzw. --expect-version: streng `x.y.z` wie die Version im Siegel (keine führenden Nullen, höchstens 9 Ziffern je Zahl, keine Vorabversion) – der C-Prüfer rechnet damit in Zahlen
+    const folderMatch = VERSION_PATTERN.exec(options.expectVersion);
+    const folder = folderMatch ? { major: Number(folderMatch[1]), minor: Number(folderMatch[2]), patch: Number(folderMatch[3]) } : null;
     const enforce = options.enforceFloor !== false;
-    if (!folder || folder.pre.length > 0) return fail(VERIFY_EXIT.version, "folder-name");
+    if (!folder) return fail(VERIFY_EXIT.version, "folder-name");
     if (floor && enforce && !exceedsFloor(folder, floor)) return fail(VERIFY_EXIT.outdated, "floor");
 
     const sealStat = await options.fs.lstat(SEAL_FILE);

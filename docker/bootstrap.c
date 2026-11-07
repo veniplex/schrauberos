@@ -1,85 +1,400 @@
 /*
- * SchrauberOS – Starter (PID 1 im Container). Das Einzige im Image, das nicht per Web-Update erneuert wird.
+ * SchrauberOS – Starter (PID 1 im Container). Das Einzige im Image, das nicht per Web-Update erneuert wird – und der Vertrauensanker:
+ * Eine installierte Version (unter <DATA_DIR>/app/versions/, für die App beschreibbar und deshalb NICHT vertraut) wird nur gestartet, wenn sie genau dem entspricht,
+ * was der Release-Schlüssel signiert hat (Siegel + Dateiliste, Mengengleichheit). Die eingebaute Version unter /app ist root-eigen und die Vertrauensbasis.
+ * Spezifikation: README „Starter-Vertrauensanker“; der Prüfer steht in verify.c (derselbe Code läuft als `--verify`), die Schlüssel in trust-keys.h (generiert).
  *
- * Bewusst winzig, statisch gelinkt, ohne Netzwerk und ohne Parser für fremde Eingaben:
- *   1. Wählt das App-Verzeichnis: den Eintrag in <DATA_DIR>/app/active (eine installierte Version) oder die im Image
- *      eingebaute Version /app.
- *   2. Startet dessen Launcher mit der mitgelieferten Laufzeit (Lader + Bibliotheken + Node liegen im Paket):
+ * Bewusst klein und statisch gelinkt, ohne Netzwerk (außer dem lokalen Healthcheck) und ohne Umgebungsauswertung außer DATA_DIR und PORT:
+ *   1. Wählt das App-Verzeichnis: den strengen Zeiger <DATA_DIR>/app/active (eine installierte Version) oder die eingebaute Version /app.
+ *   2. Prüft eine installierte Version in einem Kindprozess (ein Speicherfehler im Prüfer darf den Start der eingebauten Version nie verhindern), nachdem alle Nachfahren
+ *      des vorigen Laufs beendet sind (Ruhezustand: geprüft wird nur, wenn keine fremde Prozessgruppe der App mehr läuft).
+ *   3. Startet den Launcher des gewählten Verzeichnisses mit der mitgelieferten Laufzeit:
  *        <dir>/runtime/<loader> --library-path <dir>/runtime/lib <dir>/runtime/node <dir>/launcher.mjs
- *   3. Exit-Code des Launchers: 0 = sauber beendet, 42 = neu auswählen (Update/Rückfall), sonst Absturz. Stürzt der Launcher
- *      einer installierten Version zweimal kurz hintereinander ab, nimmt der Starter für diesen Lauf die eingebaute Version und
- *      hinterlässt <DATA_DIR>/app/launcher-crash (die eingebaute Version markiert die fehlerhafte dann als unbrauchbar).
+ *   4. Exit-Code des Launchers: 0 = sauber beendet, 42 = neu prüfen und auswählen (jeder Neustart der App geht über den Starter), sonst Absturz. Stürzt der Launcher einer
+ *      installierten Version zweimal kurz nach dem Start ab, nimmt der Starter die eingebaute Version und hinterlässt <DATA_DIR>/app/launcher-crash.
  *
- * Kommandozeile: `/bootstrap --healthcheck` fragt http://127.0.0.1:$PORT/api/health ab (Exit 0 = gesund) – für Docker HEALTHCHECK,
- * weil das Image weder Shell noch Node auf dem Suchpfad hat.
+ * Prüfergebnisse: ok · negativ (Integritätsbefund 10–16, 18: Marker verify-failed) · veraltet (19: nur ein Logeintrag) · unklar (Signal, Zeitüberschreitung, Ein-/Ausgabe:
+ * Marker inconclusive, kein Befund über den Inhalt). In allen Fällen außer ok läuft für diesen Durchlauf die eingebaute Version; der Starter selbst ist zustandslos (der Zeiger
+ * bleibt, die Vorversion-Logik liegt im Launcher der eingebauten Version).
  *
- * Übersetzen: gcc -static -Os -s -Wall -o bootstrap bootstrap.c
+ * Kommandozeile:
+ *   /bootstrap --healthcheck                 fragt http://127.0.0.1:$PORT/api/health ab (Exit 0 = gesund) – für Docker HEALTHCHECK
+ *   /bootstrap --print-keys                  "root <16 Hex>" / "release <16 Hex>": Fingerabdrücke der einkompilierten Schlüssel (Echtprobe)
+ *   /bootstrap --verify DIR [--expect-version V] [--no-floor] [--check-expiry JJJJ-MM-TT]
+ *                                            prüft ein Versionsverzeichnis wie der Starter (Installer, Echtprobe); eine JSON-Zeile auf stdout, Exit-Code = Befund
+ *
+ * Übersetzen (Produktion, Dockerfile): gcc -O2 -static-pie -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wl,-z,relro,-z,now -Wall -Wextra -Wformat=2 -Wconversion -Wshadow -Werror
+ *                                      -DSOS_PRODUCTION=1 -Ivendor/monocypher -o bootstrap bootstrap.c verify.c vendor/monocypher/monocypher.c vendor/monocypher/monocypher-ed25519.c
  */
 #define _GNU_SOURCE
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
+#include "trust-keys.h"
+#include "verify.h"
+
 #define RESTART_CODE 42
-#define BUILTIN_DIR "/app"
+#define POINTER_MAX 4096
+
+/* Konstanten; die Tests (docker/test) überschreiben sie mit -D, ein Produktions-Build (-DSOS_PRODUCTION) nie */
+#if defined(SOS_PRODUCTION) && (defined(SOS_BUILTIN_DIR) || defined(SOS_VERIFY_TIMEOUT_SECONDS) || defined(SOS_QUIESCE_MILLIS) || defined(SOS_CRASH_WINDOW_SECONDS))
+#error "Testkonstanten in einem Produktions-Build"
+#endif
+#ifndef SOS_BUILTIN_DIR
+#define SOS_BUILTIN_DIR "/app"
+#endif
+#ifndef SOS_VERIFY_TIMEOUT_SECONDS
+#define SOS_VERIFY_TIMEOUT_SECONDS 300u /* harte Grenze für eine Prüfung (alarm) */
+#endif
+#ifndef SOS_QUIESCE_MILLIS
+#define SOS_QUIESCE_MILLIS 10000u /* so lange wartet der Starter darauf, dass alle Nachfahren weg sind */
+#endif
+#ifndef SOS_CRASH_WINDOW_SECONDS
+#define SOS_CRASH_WINDOW_SECONDS 30 /* ein Launcher, der kürzer lebt, zählt als „sofort abgestürzt“ */
+#endif
+#define BUILTIN_DIR SOS_BUILTIN_DIR
+#define VERIFY_TIMEOUT_SECONDS SOS_VERIFY_TIMEOUT_SECONDS
+#define QUIESCE_MILLIS SOS_QUIESCE_MILLIS
+#define CRASH_WINDOW_SECONDS SOS_CRASH_WINDOW_SECONDS
 
 static volatile pid_t child = 0;
 static volatile sig_atomic_t terminating = 0;
 
 static void forward_signal(int sig) {
   terminating = 1;
-  if (child > 0) kill(child, sig);
+  pid_t c = child;
+  if (c > 0) kill(c, sig);
 }
 
-/* Erste Zeile einer kleinen Textdatei ohne Zeilenende; 0, wenn nicht lesbar oder leer. */
-static int read_line(const char *path, char *buf, size_t size) {
-  FILE *f = fopen(path, "r");
-  if (!f) return 0;
-  if (!fgets(buf, (int)size, f)) {
-    fclose(f);
+static const int HANDLED_SIGNALS[] = {SIGTERM, SIGINT, SIGHUP, SIGQUIT};
+
+static void block_signals(sigset_t *old) {
+  sigset_t set;
+  sigemptyset(&set);
+  for (size_t i = 0; i < sizeof HANDLED_SIGNALS / sizeof HANDLED_SIGNALS[0]; i++) sigaddset(&set, HANDLED_SIGNALS[i]);
+  sigprocmask(SIG_BLOCK, &set, old);
+}
+
+/* Im Kindprozess: Standardverhalten der Signale zurück und Signalmaske leeren (der Launcher und das Prüfkind erben sonst die Handler/die Sperre des Starters) */
+static void child_reset_signals(void) {
+  struct sigaction sa;
+  memset(&sa, 0, sizeof sa);
+  sa.sa_handler = SIG_DFL;
+  sigemptyset(&sa.sa_mask);
+  for (size_t i = 0; i < sizeof HANDLED_SIGNALS / sizeof HANDLED_SIGNALS[0]; i++) sigaction(HANDLED_SIGNALS[i], &sa, NULL);
+  sigaction(SIGALRM, &sa, NULL);
+  sigset_t empty;
+  sigemptyset(&empty);
+  sigprocmask(SIG_SETMASK, &empty, NULL);
+}
+
+static uint64_t monotonic_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (uint64_t)ts.tv_sec * 1000u + (uint64_t)ts.tv_nsec / 1000000u;
+}
+
+/* Datenverzeichnis ohne Schrägstrich am Ende (DATA_DIR oder /data) */
+static const char *data_dir(void) {
+  static char dir[PATH_MAX - 128];
+  if (dir[0]) return dir;
+  const char *d = getenv("DATA_DIR");
+  if (!d || !*d || strlen(d) >= sizeof dir) d = "/data";
+  snprintf(dir, sizeof dir, "%s", d);
+  size_t n = strlen(dir);
+  while (n > 1 && dir[n - 1] == '/') dir[--n] = 0;
+  return dir;
+}
+
+static void anchor_init(sos_anchor *a) {
+  memset(a, 0, sizeof *a);
+  a->root_key = SOS_ROOT_KEY;
+  a->release_key = SOS_RELEASE_KEY;
+  a->base = SOS_BASE;
+  a->arch = SOS_ARCH;
+  a->has_floor = 1;
+  a->floor_major = SOS_FLOOR_MAJOR;
+  a->floor_minor = SOS_FLOOR_MINOR;
+  a->floor_patch = SOS_FLOOR_PATCH;
+  a->floor_prerelease = SOS_FLOOR_PRERELEASE;
+}
+
+/* ───────── Marker (Daten für den Launcher der eingebauten Version; nie blockierend, nie einem Link folgend) ───────── */
+
+static void write_marker(const char *name, const char *content) {
+  char path[PATH_MAX];
+  snprintf(path, sizeof path, "%s/app/%s", data_dir(), name);
+  unlink(path); /* auch ein untergeschobener Link oder eine FIFO unter diesem Namen verschwindet */
+  int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0644);
+  if (fd < 0) return;
+  size_t len = strlen(content), done = 0;
+  while (done < len) {
+    ssize_t n = write(fd, content + done, len - done);
+    if (n < 0) {
+      if (errno == EINTR) continue;
+      break;
+    }
+    done += (size_t)n;
+  }
+  close(fd);
+}
+
+/* ───────── Zeiger ───────── */
+
+/*
+ * <DATA_DIR>/app/active: exakt "<DATA_DIR>/app/versions/<x.y.z>", eine Zeile (ein einzelnes Zeilenende am Ende ist erlaubt). Alles andere – auch eine leere Datei –
+ * bedeutet „eingebaute Version“, ohne Marker (Ungültigkeit ist kein Angriffsziel). Öffnen ohne zu blockieren (kein mkfifo-Aussperren), ohne Link, nur reguläre Datei, kleine Datei.
+ */
+static int read_pointer(char *version, size_t version_cap, char *dir, size_t dir_cap) {
+  char path[PATH_MAX];
+  snprintf(path, sizeof path, "%s/app/active", data_dir());
+  int fd = open(path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+  if (fd < 0) return 0;
+  struct stat st;
+  char buf[POINTER_MAX + 1];
+  ssize_t got = -1;
+  if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0 && st.st_size <= POINTER_MAX) {
+    size_t total = 0;
+    for (;;) {
+      ssize_t n = read(fd, buf + total, sizeof buf - 1 - total);
+      if (n < 0 && errno == EINTR) continue;
+      if (n <= 0) break;
+      total += (size_t)n;
+      if (total >= sizeof buf - 1) break;
+    }
+    got = (ssize_t)total;
+  }
+  close(fd);
+  if (got <= 0 || got > POINTER_MAX) return 0;
+  size_t len = (size_t)got;
+  if (buf[len - 1] == '\n') len--;
+  buf[len] = 0;
+  if (strlen(buf) != len) return 0; /* NUL im Inhalt */
+  for (size_t i = 0; i < len; i++)
+    if ((unsigned char)buf[i] < 0x20 || buf[i] == 0x7f) return 0; /* nur eine Zeile, keine Steuerzeichen */
+  char prefix[PATH_MAX];
+  int pl = snprintf(prefix, sizeof prefix, "%s/app/versions/", data_dir());
+  if (pl < 0 || (size_t)pl >= sizeof prefix || len <= (size_t)pl || strncmp(buf, prefix, (size_t)pl) != 0) return 0;
+  uint32_t parts[3];
+  if (!sos_version_parse(buf + pl, parts)) return 0;
+  if (strlen(buf + pl) >= version_cap || len >= dir_cap) return 0;
+  snprintf(version, version_cap, "%s", buf + pl);
+  snprintf(dir, dir_cap, "%s", buf);
+  return 1;
+}
+
+/* ───────── Ruhezustand ───────── */
+
+/*
+ * Geprüft wird nur, wenn kein anderer Code der App läuft. Der Starter ist Subreaper (oder PID 1): Alles, was vom vorigen Lauf übrig ist, hängt als Kind an ihm. Er tötet diese
+ * Prozesse (nur Nachfahren: gesucht wird über /proc nach ppid == getpid(), nie kill(-1) – das träfe `docker exec` und den Healthcheck) und sammelt sie ein.
+ * 1 = ruhig · 0 = es blieb etwas übrig · -1 = nicht erzwingbar (kein /proc und nicht erkennbar, ob Kinder bleiben).
+ */
+static int children_of_us(int kill_them, int *unreadable) {
+  DIR *proc = opendir("/proc");
+  *unreadable = 0;
+  if (!proc) {
+    *unreadable = 1;
     return 0;
   }
-  fclose(f);
-  buf[strcspn(buf, "\r\n")] = 0;
-  return buf[0] != 0;
-}
-
-static const char *data_dir(void) {
-  const char *d = getenv("DATA_DIR");
-  return (d && *d) ? d : "/data";
-}
-
-/* Nur Verzeichnisse unterhalb von <DATA_DIR>/app/versions/ mit vorhandenem Launcher sind gültig. */
-static int valid_version_dir(const char *dir) {
-  char prefix[PATH_MAX], probe[PATH_MAX];
-  snprintf(prefix, sizeof prefix, "%s/app/versions/", data_dir());
-  if (strncmp(dir, prefix, strlen(prefix)) != 0 || strstr(dir, "..") != NULL) return 0;
-  snprintf(probe, sizeof probe, "%s/launcher.mjs", dir);
-  return access(probe, R_OK) == 0;
-}
-
-static void pick_dir(char *out, size_t size, int force_builtin) {
-  char active_file[PATH_MAX], dir[PATH_MAX];
-  snprintf(active_file, sizeof active_file, "%s/app/active", data_dir());
-  if (!force_builtin && read_line(active_file, dir, sizeof dir) && valid_version_dir(dir)) {
-    snprintf(out, size, "%s", dir);
-    return;
+  int found = 0;
+  pid_t me = getpid();
+  struct dirent *d;
+  while ((d = readdir(proc)) != NULL) {
+    char *end;
+    if (d->d_name[0] < '1' || d->d_name[0] > '9') continue;
+    long pid = strtol(d->d_name, &end, 10);
+    if (*end || pid <= 0 || pid == me) continue;
+    char path[64], buf[512];
+    snprintf(path, sizeof path, "/proc/%ld/stat", pid);
+    int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0) continue;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) continue;
+    buf[n] = 0;
+    char *paren = strrchr(buf, ')'); /* der Prozessname steht in Klammern und darf beliebige Zeichen enthalten */
+    if (!paren) continue;
+    char state;
+    long ppid;
+    if (sscanf(paren + 1, " %c %ld", &state, &ppid) != 2) continue;
+    if (ppid == (long)me) {
+      found++;
+      if (kill_them) kill((pid_t)pid, SIGKILL);
+    }
   }
-  snprintf(out, size, "%s", BUILTIN_DIR);
+  closedir(proc);
+  return found;
 }
+
+static int quiesce(void) {
+  uint64_t deadline = monotonic_ms() + QUIESCE_MILLIS;
+  for (;;) {
+    int reaped = 0, status;
+    pid_t w;
+    while ((w = waitpid(-1, &status, WNOHANG)) > 0) reaped++;
+    int no_children = (w < 0 && errno == ECHILD);
+    int unreadable;
+    int found = children_of_us(1, &unreadable);
+    if (no_children && (found == 0 || unreadable)) return 1;
+    if (unreadable && !no_children) return -1;
+    if (terminating) return 0;
+    if (monotonic_ms() >= deadline) return 0;
+    (void)reaped;
+    struct timespec nap = {0, 10 * 1000 * 1000};
+    nanosleep(&nap, NULL);
+  }
+}
+
+/* ───────── Prüfung im Kindprozess ───────── */
+
+typedef struct {
+  int32_t code;
+  int32_t floor;
+  uint64_t files, bytes, ms;
+  char reason[28];
+  char path[SOS_REPORT_PATH + 1];
+} report_t;
+
+typedef struct {
+  const char *version;
+  uint64_t started;
+} progress_ctx;
+
+static void print_progress(void *ctx, uint64_t done, uint64_t total, uint32_t files_done, uint32_t files_total) {
+  const progress_ctx *p = ctx;
+  fprintf(stderr, "[bootstrap] Prüfe Version %s … %llu MiB / %llu MiB (%u / %u Dateien)\n", p->version, (unsigned long long)(done >> 20), (unsigned long long)(total >> 20), files_done,
+          files_total);
+}
+
+typedef enum { VERIFY_OK, VERIFY_NEGATIVE, VERIFY_OUTDATED, VERIFY_INCONCLUSIVE } verify_class;
+
+/* Ergebnis der Prüfung einer installierten Version: Klasse, Grund bei „unklar“, Bericht (nur Anzeige) */
+static verify_class verify_in_child(const char *version, const char *dir, report_t *rep, const char **why) {
+  memset(rep, 0, sizeof *rep);
+  *why = "other";
+  int fds[2];
+  if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) != 0) {
+    *why = "io";
+    return VERIFY_INCONCLUSIVE;
+  }
+  sigset_t old;
+  block_signals(&old);
+  pid_t parent = getpid();
+  pid_t pid = fork();
+  if (pid < 0) {
+    sigprocmask(SIG_SETMASK, &old, NULL);
+    close(fds[0]);
+    close(fds[1]);
+    *why = "fork";
+    return VERIFY_INCONCLUSIVE;
+  }
+  if (pid == 0) {
+    /* Prüfkind: zuerst Signale und Maske, dann alarm – ein Speicherfehler im Prüfer darf nichts außer diesem Kind treffen */
+    child_reset_signals();
+    alarm(VERIFY_TIMEOUT_SECONDS);
+    prctl(PR_SET_PDEATHSIG, SIGKILL);
+    if (getppid() != parent) _exit(1);
+    prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    struct rlimit nocore = {0, 0};
+    setrlimit(RLIMIT_CORE, &nocore);
+    close(fds[0]);
+    sos_anchor anchor;
+    anchor_init(&anchor);
+    sos_options opt;
+    memset(&opt, 0, sizeof opt);
+    opt.enforce_floor = 1;
+    opt.expect_version = version;
+    progress_ctx pc = {version, monotonic_ms()};
+    opt.progress = print_progress;
+    opt.progress_ctx = &pc;
+    sos_result r;
+    int code = sos_verify_path(dir, data_dir(), &anchor, &opt, &r);
+    report_t out;
+    memset(&out, 0, sizeof out);
+    out.code = code;
+    out.floor = r.floor;
+    out.files = r.files;
+    out.bytes = r.bytes;
+    out.ms = r.ms;
+    snprintf(out.reason, sizeof out.reason, "%s", r.reason);
+    sos_clean(r.path, strlen(r.path), out.path, sizeof out.path);
+    ssize_t ignored = write(fds[1], &out, sizeof out);
+    (void)ignored;
+    _exit(code & 0xff);
+  }
+  child = pid;
+  sigprocmask(SIG_SETMASK, &old, NULL); /* ein inzwischen eingetroffenes Signal wird jetzt zugestellt und erreicht das Kind */
+  close(fds[1]);
+  int status = 0;
+  for (;;) {
+    pid_t w = waitpid(pid, &status, 0);
+    if (w == pid) break;
+    if (w < 0 && errno != EINTR) {
+      status = -1;
+      break;
+    }
+  }
+  child = 0;
+  report_t got;
+  ssize_t n = read(fds[0], &got, sizeof got);
+  close(fds[0]);
+  if (status == -1) {
+    *why = "other";
+    return VERIFY_INCONCLUSIVE;
+  }
+  if (WIFSIGNALED(status)) {
+    *why = WTERMSIG(status) == SIGALRM ? "timeout" : "signal";
+    return VERIFY_INCONCLUSIVE;
+  }
+  int code = WEXITSTATUS(status);
+  if (n == (ssize_t)sizeof got && got.code == code) {
+    *rep = got;
+    rep->reason[sizeof rep->reason - 1] = 0;
+    rep->path[sizeof rep->path - 1] = 0;
+  } else {
+    rep->code = code;
+  }
+  if (code == 0) return VERIFY_OK;
+  if ((code >= SOS_E_SEAL && code <= SOS_E_DIFFERS) || code == SOS_E_OUTSIDE) return VERIFY_NEGATIVE;
+  if (code == SOS_E_OUTDATED) return VERIFY_OUTDATED;
+  *why = code == SOS_E_IO ? "io" : "other";
+  return VERIFY_INCONCLUSIVE;
+}
+
+/* ───────── Launcher ───────── */
 
 static pid_t spawn_launcher(const char *dir) {
+  sigset_t old;
+  block_signals(&old);
   pid_t pid = fork();
-  if (pid != 0) return pid;
+  if (pid < 0) {
+    sigprocmask(SIG_SETMASK, &old, NULL);
+    return pid;
+  }
+  if (pid != 0) {
+    child = pid;
+    sigprocmask(SIG_SETMASK, &old, NULL);
+    return pid;
+  }
+  child_reset_signals();
 
   char loader_file[PATH_MAX], loader_rel[256], loader[PATH_MAX], libs[PATH_MAX], node[PATH_MAX], launcher[PATH_MAX];
   snprintf(loader_file, sizeof loader_file, "%s/runtime/loader", dir);
@@ -87,7 +402,16 @@ static pid_t spawn_launcher(const char *dir) {
   snprintf(node, sizeof node, "%s/runtime/node", dir);
   snprintf(launcher, sizeof launcher, "%s/launcher.mjs", dir);
   if (chdir(dir) != 0) _exit(126);
-  if (read_line(loader_file, loader_rel, sizeof loader_rel)) {
+  FILE *f = fopen(loader_file, "r");
+  int have_loader = 0;
+  if (f) {
+    if (fgets(loader_rel, (int)sizeof loader_rel, f)) {
+      loader_rel[strcspn(loader_rel, "\r\n")] = 0;
+      have_loader = loader_rel[0] != 0;
+    }
+    fclose(f);
+  }
+  if (have_loader) {
     snprintf(loader, sizeof loader, "%s/runtime/%s", dir, loader_rel);
     char *args[] = {loader, "--library-path", libs, node, launcher, NULL};
     execv(loader, args);
@@ -99,23 +423,14 @@ static pid_t spawn_launcher(const char *dir) {
   _exit(127);
 }
 
-static void record_launcher_crash(const char *dir) {
-  char path[PATH_MAX];
-  snprintf(path, sizeof path, "%s/app/launcher-crash", data_dir());
-  FILE *f = fopen(path, "w");
-  if (f) {
-    fputs(dir, f);
-    fclose(f);
-  }
-}
-
 static int healthcheck(void) {
   const char *p = getenv("PORT");
-  int port = (p && atoi(p) > 0) ? atoi(p) : 3000;
+  int port = (p && atoi(p) > 0 && atoi(p) < 65536) ? atoi(p) : 3000;
   alarm(4);
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) return 1;
-  struct sockaddr_in addr = {0};
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof addr);
   addr.sin_family = AF_INET;
   addr.sin_port = htons((unsigned short)port);
   inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
@@ -128,31 +443,152 @@ static int healthcheck(void) {
   return (n > 12 && strncmp(buf, "HTTP/1.", 7) == 0 && strncmp(buf + 8, " 200", 4) == 0) ? 0 : 1;
 }
 
+/* ───────── Kommandozeilen-Modi ───────── */
+
+static int print_keys(void) {
+  printf("root %s\nrelease %s\n", SOS_ROOT_FINGERPRINT, SOS_RELEASE_FINGERPRINT);
+  return 0;
+}
+
+static int usage_error(const char *what) {
+  fprintf(stderr, "[bootstrap] Aufruf: --verify DIR [--expect-version V] [--no-floor] [--check-expiry JJJJ-MM-TT] (%s)\n", what);
+  printf("{\"ok\":false,\"code\":2,\"reason\":\"usage\",\"path\":\"\",\"ms\":0}\n");
+  return SOS_E_USAGE;
+}
+
+static int verify_command(int argc, char **argv) {
+  const char *dir = NULL;
+  sos_options opt;
+  memset(&opt, 0, sizeof opt);
+  opt.enforce_floor = 1;
+  for (int i = 2; i < argc; i++) {
+    if (strcmp(argv[i], "--expect-version") == 0 && i + 1 < argc && !opt.expect_version) {
+      opt.expect_version = argv[++i];
+    } else if (strcmp(argv[i], "--check-expiry") == 0 && i + 1 < argc && !opt.check_expiry) {
+      opt.check_expiry = argv[++i];
+      if (!sos_calendar_date(opt.check_expiry)) return usage_error("Datum");
+    } else if (strcmp(argv[i], "--no-floor") == 0 && opt.enforce_floor) {
+      opt.enforce_floor = 0;
+    } else if (!dir && argv[i][0] != '-') {
+      dir = argv[i];
+    } else {
+      return usage_error("Argument");
+    }
+  }
+  if (!dir) return usage_error("Verzeichnis fehlt");
+  struct rlimit nocore = {0, 0};
+  setrlimit(RLIMIT_CORE, &nocore);
+  sos_anchor anchor;
+  anchor_init(&anchor);
+  sos_result r;
+  int code = sos_verify_path(dir, data_dir(), &anchor, &opt, &r);
+  char json[2048];
+  sos_result_json(&r, json, sizeof json);
+  printf("%s\n", json);
+  fflush(stdout);
+  if (code == 0) {
+    fprintf(stderr, "[bootstrap] Version %s geprüft: %llu Einträge, %llu Bytes, %llu ms.\n", r.version, (unsigned long long)r.files, (unsigned long long)r.bytes, (unsigned long long)r.ms);
+  } else {
+    char clean[SOS_REPORT_PATH + 1];
+    sos_clean(r.path, strlen(r.path), clean, sizeof clean);
+    fprintf(stderr, "[bootstrap] Prüfung fehlgeschlagen (Code %d, %s%s%s).\n", code, r.reason, clean[0] ? ", " : "", clean);
+  }
+  return code;
+}
+
+/* ───────── Hauptschleife ───────── */
+
 int main(int argc, char **argv) {
   if (argc > 1 && strcmp(argv[1], "--healthcheck") == 0) return healthcheck();
+  if (argc > 1 && strcmp(argv[1], "--print-keys") == 0) return print_keys();
+  if (argc > 1 && strcmp(argv[1], "--verify") == 0) return verify_command(argc, argv);
+  if (argc > 1) {
+    fprintf(stderr, "[bootstrap] Unbekanntes Argument.\n");
+    return SOS_E_USAGE;
+  }
+
+  /* PID 1 darf nicht über /proc/1/mem oder ptrace von der App (gleiche uid) verändert werden; keine Speicherabzüge mit Geheimnissen */
+  prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+  struct rlimit nocore = {0, 0};
+  setrlimit(RLIMIT_CORE, &nocore);
+  int subreaper = prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) == 0;
+  int can_quiesce = subreaper || getpid() == 1;
+  if (!can_quiesce) fprintf(stderr, "[bootstrap] Warnung: Ruhezustand nicht erzwingbar (weder PID 1 noch Subreaper) – installierte Versionen werden nicht gestartet.\n");
 
   struct sigaction sa;
   memset(&sa, 0, sizeof sa);
   sa.sa_handler = forward_signal;
-  sigaction(SIGTERM, &sa, NULL);
-  sigaction(SIGINT, &sa, NULL);
-  sigaction(SIGHUP, &sa, NULL);
-  sigaction(SIGQUIT, &sa, NULL);
+  sigemptyset(&sa.sa_mask);
+  for (size_t i = 0; i < sizeof HANDLED_SIGNALS / sizeof HANDLED_SIGNALS[0]; i++) sigaction(HANDLED_SIGNALS[i], &sa, NULL);
 
   int force_builtin = 0, crashes = 0;
   char last_dir[PATH_MAX] = "";
-  time_t last_crash = 0;
 
   for (;;) {
-    char dir[PATH_MAX];
-    pick_dir(dir, sizeof dir, force_builtin);
+    if (terminating) return 0;
+
+    char dir[PATH_MAX] = BUILTIN_DIR, version[32] = "";
+    int installed = 0;
+    if (!force_builtin) {
+      char target[PATH_MAX];
+      struct stat st;
+      if (read_pointer(version, sizeof version, target, sizeof target) && lstat(target, &st) == 0) {
+        installed = 1;
+        snprintf(dir, sizeof dir, "%s", target);
+      }
+    }
+
+    if (installed) {
+      int quiet = can_quiesce ? quiesce() : -1;
+      if (terminating) return 0;
+      if (quiet < 0) {
+        fprintf(stderr, "[bootstrap] Warnung: Ruhezustand nicht erzwingbar – Version %s wird nicht geprüft, es läuft die eingebaute Version.\n", version);
+        installed = 0;
+      } else if (quiet == 0) {
+        fprintf(stderr, "[bootstrap] Nach dem Beenden der App laufen noch Prozesse – Version %s wird nicht geprüft, es läuft die eingebaute Version.\n", version);
+        char marker[64];
+        snprintf(marker, sizeof marker, "%s\nother\n", version);
+        write_marker("inconclusive", marker);
+        installed = 0;
+      } else {
+        fprintf(stderr, "[bootstrap] Prüfe Version %s …\n", version);
+        report_t rep;
+        const char *why;
+        verify_class cls = verify_in_child(version, dir, &rep, &why);
+        if (terminating) return 0; /* nach einem Stoppsignal gibt es keinen Befund und keinen Marker */
+        if (cls == VERIFY_OK) {
+          unsigned long long secs = rep.ms / 1000u, tenths = (rep.ms % 1000u) / 100u;
+          fprintf(stderr, "[bootstrap] Version %s geprüft (%llu Einträge, %llu MiB, %llu,%llu s).\n", version, (unsigned long long)rep.files, (unsigned long long)(rep.bytes >> 20), secs, tenths);
+          char marker[160];
+          snprintf(marker, sizeof marker, "%s\n%llu\n%llu\n%llu\n%lld\n", version, (unsigned long long)rep.files, (unsigned long long)rep.bytes, (unsigned long long)rep.ms, (long long)time(NULL));
+          write_marker("verify-ok", marker);
+        } else {
+          installed = 0;
+          if (cls == VERIFY_NEGATIVE) {
+            fprintf(stderr, "[bootstrap] Version %s abgelehnt (Code %d, %s%s%s) – es läuft die eingebaute Version.\n", version, rep.code, rep.reason, rep.path[0] ? ": " : "", rep.path);
+            char marker[SOS_REPORT_PATH + 96];
+            snprintf(marker, sizeof marker, "%s\n%d\n%s\n", version, rep.code, rep.path);
+            write_marker("verify-failed", marker);
+          } else if (cls == VERIFY_OUTDATED) {
+            fprintf(stderr, "[bootstrap] Version %s ist veraltet oder passt nicht zu diesem Image (%s) – es läuft die eingebaute Version.\n", version, rep.reason);
+          } else {
+            fprintf(stderr, "[bootstrap] Die Prüfung der Version %s blieb unklar (%s) – es läuft die eingebaute Version, der nächste Start prüft erneut.\n", version, why);
+            char marker[64];
+            snprintf(marker, sizeof marker, "%s\n%s\n", version, why);
+            write_marker("inconclusive", marker);
+          }
+        }
+      }
+      if (!installed) snprintf(dir, sizeof dir, "%s", BUILTIN_DIR);
+    }
+
     fprintf(stderr, "[bootstrap] Starte Launcher aus %s\n", dir);
+    uint64_t spawned = monotonic_ms();
     pid_t pid = spawn_launcher(dir);
     if (pid < 0) {
       perror("[bootstrap] fork");
       return 1;
     }
-    child = pid;
 
     int status = 0;
     for (;;) { /* auch verwaiste Prozesse einsammeln, bis der Launcher selbst endet */
@@ -166,17 +602,18 @@ int main(int argc, char **argv) {
     if (terminating || code == 0) return code;
     if (code == RESTART_CODE) {
       crashes = 0;
+      if (strcmp(dir, BUILTIN_DIR) == 0) force_builtin = 0; /* die eingebaute Version hat den Zustand abgeglichen: der Zeiger entscheidet wieder */
       continue;
     }
 
     if (strcmp(dir, BUILTIN_DIR) != 0) {
-      time_t now = time(NULL);
-      crashes = (strcmp(dir, last_dir) == 0 && now - last_crash < 30) ? crashes + 1 : 1;
+      /* Absturzfenster an der Laufzeit des Launchers, nicht an der Prüfzeit */
+      int quick = monotonic_ms() - spawned < CRASH_WINDOW_SECONDS * 1000u;
+      crashes = (strcmp(dir, last_dir) == 0 && quick) ? crashes + 1 : 1;
       snprintf(last_dir, sizeof last_dir, "%s", dir);
-      last_crash = now;
       if (crashes >= 2) {
         fprintf(stderr, "[bootstrap] Launcher aus %s stürzt wiederholt ab (Code %d) – nehme die eingebaute Version.\n", dir, code);
-        record_launcher_crash(dir);
+        write_marker("launcher-crash", dir);
         force_builtin = 1;
         crashes = 0;
       }
