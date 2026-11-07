@@ -7,7 +7,7 @@ import { Sidebar, type SidebarGroup, type SidebarItem } from "@/components/shell
 import { UserMenu } from "@/components/shell/user-menu";
 import { logoutAction } from "@/app/login/actions";
 import { MODULES } from "@/modules/catalog";
-import { navFor, quickActionsFor } from "@/modules/registry";
+import { navFor, quickActionsFor, searchProvidersFor } from "@/modules/registry";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { NAV_COOKIE, parseCollapsed } from "@/lib/nav-state";
 import type { AppSession } from "@/server/auth/session";
@@ -57,7 +57,8 @@ export async function AppShell({ session, children }: { session: AppSession; chi
       groups={groups}
       trailing={trailing}
       collapsed={parseCollapsed(jar.get(NAV_COOKIE)?.value)}
-      search={<QuickSearch />}
+      // ohne ein einziges durchsuchbares Recht gibt es kein Suchfeld (die Route antwortete 403)
+      search={searchProvidersFor(session).length > 0 ? <QuickSearch /> : null}
       quickNew={<NewMenu label={t("nav.new")} actions={actions} />}
       account={<UserMenu {...user} />}
       accountCompact={<UserMenu {...user} compact />}

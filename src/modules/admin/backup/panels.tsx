@@ -10,6 +10,9 @@ import { createManualBackup, restoreBackup, runAutoBackupNow } from "./actions";
 import { FileInput, Form, FormMessage } from "@/components/ui/form";
 import { useI18n } from "@/i18n/client";
 
+/** Größte angenommene Sicherungsdatei – wie `BACKUP_UPLOAD_MAX_BYTES` der Upload-Route (kein Server-Action-Limit, die Datei wird gestreamt); die Prüfung der Größe macht der Server. */
+const BACKUP_UPLOAD_MAX_BYTES = 100 * 1024 ** 3;
+
 export function CreateBackupForm({ label }: { label: string }) {
   return (
     <Form action={createManualBackup} className="flex flex-col gap-3">
@@ -124,7 +127,7 @@ export function UploadForm({ labels }: { labels: { button: string; hint: string;
       <p className="text-sm text-ink-muted">{labels.hint}</p>
       {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
       <div>
-        <FileInput ref={input} accept=".tar,.gz,.tgz,.db,.sqlite" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+        <FileInput ref={input} accept=".tar,.gz,.tgz,.db,.sqlite" maxBytes={BACKUP_UPLOAD_MAX_BYTES} hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
         <Button disabled={busy} onClick={() => input.current?.click()}>
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Upload className="size-4" aria-hidden />}
           {busy ? labels.uploading : labels.button}
