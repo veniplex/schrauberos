@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, afterEach, before, describe, it } from "node:test";
 import { createElement } from "react";
 import { act, installDom, type MountedView, type TestDom } from "@/test/dom";
-import { mountI18n, plain } from "@/test/ui";
+import { mountI18n, plain, rerenderI18n } from "@/test/ui";
 
 /** Stempel-Knopf: groß, gegen Doppeltippen gesichert, Wiederholung mit demselben Idempotenzschlüssel. */
 let dom: TestDom;
@@ -22,7 +22,7 @@ const flush = () => act(() => new Promise<void>((resolve) => setTimeout(resolve,
 
 async function mountStamp(onStamp: (key: string) => Promise<void>, props: Record<string, unknown> = {}) {
   const { StampButton } = await import("./stamp-button");
-  view = await mountI18n(createElement(StampButton, { onStamp, cooldownMs: 40, ...props, children: "Kommen" } as never));
+  view = await mountI18n(createElement(StampButton, { onStamp, actionId: "clock-in", cooldownMs: 40, ...props, children: "Kommen" } as never));
   return { button: view.container.querySelector("button") as HTMLButtonElement, status: () => plain(view!.container.querySelector("[role='status']")?.textContent) };
 }
 
@@ -83,6 +83,29 @@ describe("StampButton", () => {
     await act(() => button.click());
     await flush();
     assert.notEqual(keys[2], keys[1], "nach Erfolg beginnt eine neue Buchung");
+  });
+
+  it("der Schlüssel gehört zur Aktion: nach einem Fehler und gewechselter Aktion (Kommen → Gehen) wird ein neuer Schlüssel verwendet, nicht der alte", async () => {
+    const { StampButton } = await import("./stamp-button");
+    const keys: string[] = [];
+    const onStamp = async (key: string) => {
+      keys.push(key);
+      if (keys.length === 1) throw new Error("kein Netz");
+    };
+    const render = (actionId: string, label: string) => createElement(StampButton, { onStamp, actionId, cooldownMs: 40, children: label } as never);
+    view = await mountI18n(render("clock-in", "Kommen"));
+    const button = () => view!.container.querySelector("button") as HTMLButtonElement;
+    await act(() => button().click());
+    await flush();
+    assert.equal(keys.length, 1);
+    assert.match(keys[0], /^clock-in:/);
+    // dieselbe Komponente zeigt jetzt „Gehen“
+    await rerenderI18n(view, render("clock-out", "Gehen"));
+    await act(() => button().click());
+    await flush();
+    assert.equal(keys.length, 2);
+    assert.match(keys[1], /^clock-out:/);
+    assert.notEqual(keys[0].split(":")[1], keys[1].split(":")[1]);
   });
 
   it("gesperrt (disabled) bucht nichts; der Knopf ist groß (mindestens 64 px) und bleibt fokussierbar", async () => {

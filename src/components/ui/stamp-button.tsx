@@ -19,12 +19,15 @@ export function newIdempotencyKey(): string {
  * Stempel-Knopf (Zeiterfassung: Kommen/Gehen/Auftrag starten/beenden): groß (mindestens 64 px hoch, volle Breite am Handy), **gegen Doppeltippen gesichert** und **wiederholbar ohne doppelte Buchung**.
  *
  *  - Solange die Buchung läuft, ist der Knopf gesperrt; direkt nach Erfolg ignoriert er Antippen noch `cooldownMs` (Standard 1,5 s) – ein zweiter Finger oder ein Wackler bucht nicht noch einmal.
+ *  - `actionId` benennt, **was** gebucht wird (z. B. `clock-in`, `order-start:<Auftrag>`). Der Schlüssel gehört zu genau dieser Aktion: Wechselt `actionId` (derselbe Knopf zeigt nach `router.refresh()` plötzlich „Gehen“
+ *    statt „Kommen“), wird der Schlüssel verworfen – sonst lieferte der Server die gespeicherte Antwort der ersten Aktion und buchte die zweite nicht. Der Schlüssel trägt `actionId` als Präfix.
  *  - `onStamp(idempotencyKey)` bekommt einen Schlüssel für diese Buchung. Scheitert sie (kein Netz), bleibt der Schlüssel **erhalten**: Ein erneutes Antippen sendet denselben Schlüssel, der Server
  *    erkennt die Wiederholung (`Idempotency-Key`, README „Programmierschnittstelle“) und bucht nicht doppelt – auch wenn die erste Anfrage doch angekommen war. Nach Erfolg gibt es einen neuen Schlüssel.
  *  - Der Zustand (Meldung, Fehler) steht in einer Live-Region.
  */
 export function StampButton({
   children,
+  actionId,
   onStamp,
   cooldownMs = 1500,
   tone = "primary",
@@ -32,6 +35,8 @@ export function StampButton({
   className,
 }: {
   children: ReactNode;
+  /** was gebucht wird (Aktionsname und ggf. Ziel); bindet den Idempotenzschlüssel an die Aktion */
+  actionId: string;
   onStamp: (idempotencyKey: string) => Promise<void>;
   cooldownMs?: number;
   tone?: "primary" | "neutral";
@@ -41,17 +46,19 @@ export function StampButton({
   const { t } = useI18n();
   const [phase, setPhase] = useState<"idle" | "working" | "done" | "failed">("idle");
   const busy = useRef(false);
-  const key = useRef<string | null>(null);
+  const key = useRef<{ action: string; value: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
 
   async function press() {
     if (busy.current || disabled) return; // synchron gesperrt: zwei Taps im selben Augenblick lösen nur einen Aufruf aus
     busy.current = true;
-    key.current ??= newIdempotencyKey();
+    // ein Schlüssel einer anderen Aktion wird nie wiederverwendet
+    if (key.current?.action !== actionId) key.current = { action: actionId, value: `${actionId}:${newIdempotencyKey()}` };
+    const current = key.current;
     setPhase("working");
     try {
-      await onStamp(key.current);
+      await onStamp(current.value);
       key.current = null;
       setPhase("done");
       timer.current = setTimeout(() => {
