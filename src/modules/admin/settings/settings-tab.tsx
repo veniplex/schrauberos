@@ -2,7 +2,9 @@ import { getWorkshop } from "@/server/workshop";
 import type { SettingsTabDef } from "@/modules/types";
 import { getAuditRetentionDays } from "@/server/audit-retention";
 import { isBehindProxy } from "@/server/auth/network";
-import { SecurityForm } from "./security-form";
+import { cspMode } from "@/lib/csp-mode";
+import { connectionIsSecure } from "@/server/auth/connection";
+import { CspModeForm, HttpsNotice, SecurityForm } from "./security-form";
 import { WorkshopForm } from "./workshop-form";
 
 async function WorkshopSettingsTab() {
@@ -31,7 +33,14 @@ async function WorkshopSettingsTab() {
 }
 
 async function SecuritySettingsTab() {
-  return <SecurityForm behindProxy={await isBehindProxy()} auditRetentionDays={await getAuditRetentionDays()} />;
+  const [behindProxy, secure, auditRetentionDays] = await Promise.all([isBehindProxy(), connectionIsSecure(), getAuditRetentionDays()]);
+  return (
+    <div className="flex flex-col gap-5">
+      <HttpsNotice secure={secure} behindProxy={behindProxy} />
+      <SecurityForm behindProxy={behindProxy} auditRetentionDays={auditRetentionDays} />
+      <CspModeForm reportOnly={cspMode() === "report-only"} />
+    </div>
+  );
 }
 
 export const settingsTabs: SettingsTabDef[] = [

@@ -5,6 +5,7 @@ import { Badge, Card, DefinitionList, TextLink, DangerZone } from "@/components/
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
+import { PdfPreview } from "@/components/ui/pdf-preview";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { todayInput } from "@/lib/dates";
@@ -101,10 +102,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 {isImage ? (
                   // eslint-disable-next-line @next/next/no-img-element -- geschützte Datei aus der Datenbank
                   <img src={`/api/invoices/${inv.id}/file`} alt={inv.file.name} className="max-h-[70vh] w-full object-contain p-4" />
+                ) : inv.file.mime === "application/pdf" ? (
+                  <PdfPreview src={`/api/invoices/${inv.id}/file`} title={inv.file.name} labels={{ show: t("invoices.showPreview"), hide: t("invoices.hidePreview"), mobile: t("invoices.previewDesktopOnly") }} />
                 ) : (
-                  <object data={`/api/invoices/${inv.id}/file`} type="application/pdf" className="h-[70vh] w-full" aria-label={inv.file.name}>
-                    <p className="p-5 text-sm text-ink-muted">{t("invoices.noPreview")}</p>
-                  </object>
+                  <p className="p-5 text-sm text-ink-muted">{t("invoices.noPreview")}</p>
                 )}
               </>
             ) : (

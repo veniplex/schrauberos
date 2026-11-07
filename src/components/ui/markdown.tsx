@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { isInternalHref, isLocalImageSrc } from "@/lib/markdown-url";
 import { slugify } from "@/lib/slug";
 
 function textOf(node: ReactNode): string {
@@ -12,7 +13,8 @@ function textOf(node: ReactNode): string {
 
 /**
  * Rendert Markdown (GitHub-Variante: Tabellen, Aufgabenlisten, durchgestrichen).
- * Sicherheit: react-markdown gibt kein rohes HTML aus und entschärft gefährliche URLs (javascript: usw.).
+ * Sicherheit: react-markdown gibt kein rohes HTML aus und entschärft gefährliche URLs (javascript: usw.). Interne Links sind nur Pfade der eigenen Herkunft (`//host` ist extern),
+ * externe Bilder werden nicht geladen (`lib/markdown-url.ts`).
  * Funktioniert in Server- und Client-Komponenten (Vorschau im Editor). `taskLabels`: Namen für die Kästchen von Aufgabenlisten („erledigt“/„offen“).
  */
 export function Markdown({ source, taskLabels }: { source: string; taskLabels?: { done: string; open: string } }) {
@@ -24,7 +26,7 @@ export function Markdown({ source, taskLabels }: { source: string; taskLabels?: 
           h2: ({ children }) => <h2 id={slugify(textOf(children))}>{children}</h2>,
           h3: ({ children }) => <h3 id={slugify(textOf(children))}>{children}</h3>,
           a: ({ href, children }: ComponentPropsWithoutRef<"a">) =>
-            href?.startsWith("/") || href?.startsWith("#") ? (
+            isInternalHref(href) ? (
               <a href={href}>{children}</a>
             ) : (
               <a href={href} target="_blank" rel="noopener noreferrer nofollow">
@@ -40,8 +42,10 @@ export function Markdown({ source, taskLabels }: { source: string; taskLabels?: 
           // Kästchen einer Aufgabenliste (nur Anzeige): ohne Name wären sie ein unbeschriftetes Formularfeld; der Zustand wird angesagt, der Text der Aufgabe folgt direkt dahinter
           input: ({ type, checked }: ComponentPropsWithoutRef<"input">) =>
             type === "checkbox" ? <input type="checkbox" checked={Boolean(checked)} disabled readOnly aria-label={taskLabels ? (checked ? taskLabels.done : taskLabels.open) : undefined} /> : null,
+          // Bilder nur von der eigenen Herkunft (Doku-Bilder unter /api/docs/images): ein fremdes Bild würde beim Lesen eine Anfrage an einen fremden Server auslösen, die
+          // Content-Security-Policy blockiert es ohnehin. Statt des Bildes steht dessen Beschreibung.
           // eslint-disable-next-line @next/next/no-img-element -- Bilder kommen aus der geschützten Datenbank
-          img: ({ src, alt }) => (typeof src === "string" ? <img src={src} alt={alt ?? ""} loading="lazy" /> : null),
+          img: ({ src, alt }) => (typeof src === "string" && isLocalImageSrc(src) ? <img src={src} alt={alt ?? ""} loading="lazy" /> : alt ? <span className="text-ink-muted">[{alt}]</span> : null),
         }}
       >
         {source}

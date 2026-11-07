@@ -115,4 +115,39 @@ test.describe("Erkennung von Fehlerseiten in der Browser-CI (Selbsttest)", () =>
     const asset = await page.evaluate(() => Array.from(document.scripts).map((s) => s.src).find((src) => src.includes("/_next/static/")));
     if (asset) expect(header((await request.get(asset)).headers(), "content-security-policy") ?? "").toContain("default-src 'self'");
   });
+  test("CSP mit Nonce (P1b-1): je Anfrage ein neuer Nonce, jedes Skript und jedes Stilelement der Seite trägt ihn – auch Anmeldung, Startseite und „Nicht gefunden“", async ({ request }) => {
+    const nonceOf = (csp: string) => /'nonce-([^']+)'/.exec(csp)?.[1];
+    const fetchPage = async (url: string) => {
+      const res = await request.get(url, { headers: { accept: "text/html" } });
+      return { csp: res.headers()["content-security-policy"] ?? "", html: await res.text(), status: res.status() };
+    };
+    const first = await fetchPage("/login");
+    const second = await fetchPage("/login");
+    expect(nonceOf(first.csp), "Nonce in der Richtlinie").toBeTruthy();
+    expect(nonceOf(first.csp), "bei jeder Anfrage neu").not.toBe(nonceOf(second.csp));
+    expect(first.csp).toContain("'strict-dynamic'");
+    expect(first.csp, "kein 'unsafe-inline' für Skripte und Stilelemente").not.toMatch(/(script-src|style-src) [^;]*'unsafe-inline'/);
+    for (const url of ["/login", "/", "/gibt-es-nicht"]) {
+      const { csp, html } = await fetchPage(url);
+      const nonce = nonceOf(csp);
+      expect(nonce, `${url}: Nonce`).toBeTruthy();
+      const tags = [...html.matchAll(/<(script|style)[^>]*>/g)].map((m) => m[0]).filter((tag) => !/nomodule/i.test(tag)); // das Skript für alte Browser (noModule) läuft in keinem Browser mit CSP-Unterstützung
+      expect(tags.length, `${url}: Skripte vorhanden`).toBeGreaterThan(0);
+      for (const tag of tags) expect(tag, `${url}: ${tag.slice(0, 80)}`).toContain(`nonce="${nonce}"`);
+    }
+  });
+
+  test("CSP je Antwortart (P1b-1, ZP3-S-F9): Programmschnittstelle default-src 'none', Statik die Rückfall-Richtlinie, nie zwei Köpfe, Permissions-Policy mit Kamera für die eigene Herkunft", async ({ request, page }) => {
+    const api = await request.get("/api/v1/customers");
+    expect(api.headers()["content-security-policy"]).toBe("default-src 'none'; frame-ancestors 'none'");
+    const health = await request.get("/api/health");
+    expect(health.headers()["content-security-policy"] ?? "").not.toMatch(/nonce/);
+    for (const res of [api, health, (await page.goto("/login"))!]) {
+      expect(res.headers()["content-security-policy-report-only"], "erzwungen, nicht nur gemeldet").toBeUndefined();
+      expect(res.headers()["permissions-policy"] ?? "").toContain("camera=(self)");
+      expect(res.headers()["x-content-type-options"]).toBe("nosniff");
+      // Next führt mehrere Köpfe gleichen Namens mit Komma zusammen: genau eine Richtlinie hat genau ein script-src bzw. default-src
+      expect((res.headers()["content-security-policy"] ?? "").match(/default-src/g)?.length ?? 0).toBe(1);
+    }
+  });
 });

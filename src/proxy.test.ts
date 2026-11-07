@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 import { NextRequest } from "next/server";
 import { config, proxy } from "./proxy";
+import { setCspModeInProcess } from "./lib/csp-mode";
 import { startupState } from "./server/startup-state";
 
 // Frisch gestartet ist der Zustand „starting“ (der Proxy sperrt dann alles) – die Tests unten prüfen den Normalbetrieb, die Sperre hat einen eigenen Abschnitt
@@ -181,5 +182,85 @@ describe("Proxy: Start läuft noch (Migrationen)", () => {
 
   it("die Gesamtprüfung: nach dem Start (ready) läuft wieder alles durch", async () => {
     assert.ok(passes(proxy(request("/appointments", "so_session=abc"))));
+  });
+});
+
+describe("Proxy: Content-Security-Policy und Sicherheits-Köpfe", () => {
+  const csp = (res: Response) => res.headers.get("content-security-policy");
+  const nonceOf = (value: string | null) => /'nonce-([^']+)'/.exec(value ?? "")?.[1];
+  /** Was Next als Kopf der Anfrage an die Seite weitergibt (`NextResponse.next({ request })` kodiert es als `x-middleware-request-*`). */
+  const forwarded = (res: Response, name: string) => res.headers.get(`x-middleware-request-${name}`);
+
+  it("Seiten: erzwungene Richtlinie mit frischem Nonce je Anfrage; derselbe Wert geht als Kopf der Anfrage an Next (daraus liest Next den Nonce)", () => {
+    const first = proxy(request("/appointments", "so_session=abc"));
+    const second = proxy(request("/appointments", "so_session=abc"));
+    const nonce = nonceOf(csp(first));
+    assert.ok(nonce, "Nonce in der Richtlinie");
+    assert.notEqual(nonce, nonceOf(csp(second)), "bei jeder Anfrage ein neuer Nonce");
+    assert.equal(forwarded(first, "x-nonce"), nonce);
+    assert.equal(forwarded(first, "content-security-policy"), csp(first));
+    assert.match(csp(first)!, /script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+    assert.equal(first.headers.get("content-security-policy-report-only"), null);
+  });
+
+  it("ein von außen mitgeschickter CSP-/Nonce-Kopf der Anfrage wird überschrieben, nicht übernommen", () => {
+    const res = proxy(request("/appointments", "so_session=abc", { "content-security-policy": "script-src 'nonce-fremd'", "content-security-policy-report-only": "script-src 'nonce-fremd2'", "x-nonce": "fremd" }));
+    assert.notEqual(forwarded(res, "x-nonce"), "fremd");
+    assert.doesNotMatch(forwarded(res, "content-security-policy") ?? "", /fremd/);
+    assert.equal(forwarded(res, "content-security-policy-report-only"), null);
+    assert.equal((res.headers.get("x-middleware-override-headers") ?? "").split(",").includes("content-security-policy-report-only"), false);
+  });
+
+  it("Notschalter „nur melden“: derselbe Inhalt unter dem Namen Report-Only (Antwort und Anfrage), nichts wird erzwungen", () => {
+    setCspModeInProcess("report-only");
+    try {
+      const res = proxy(request("/appointments", "so_session=abc"));
+      assert.equal(csp(res), null);
+      const value = res.headers.get("content-security-policy-report-only");
+      assert.match(value ?? "", /script-src 'self' 'nonce-/);
+      assert.equal(forwarded(res, "content-security-policy-report-only"), value);
+      assert.equal(forwarded(res, "content-security-policy"), null);
+      assert.equal(nonceOf(value), forwarded(res, "x-nonce"));
+    } finally {
+      setCspModeInProcess("enforce");
+    }
+    assert.ok(csp(proxy(request("/appointments", "so_session=abc"))), "danach wieder erzwungen");
+  });
+
+  it("Programmierschnittstelle (/api/v1): default-src 'none'; Dateirouten: der Proxy setzt nichts (die Route hat ihre eigene Richtlinie)", () => {
+    assert.equal(csp(proxy(request("/api/v1/customers"))), "default-src 'none'; frame-ancestors 'none'");
+    assert.equal(csp(proxy(request("/api/v1"))), "default-src 'none'; frame-ancestors 'none'");
+    for (const path of ["/api/invoices/abc/file", "/api/docs/images/abc"]) {
+      const res = proxy(request(path, "so_session=abc"));
+      assert.ok(passes(res), path);
+      assert.equal(csp(res), null, path);
+      assert.equal(res.headers.get("content-security-policy-report-only"), null, path);
+    }
+  });
+
+  it("auch Weiterleitung, 401 und die 503-Seiten tragen die Richtlinie; die 503-Seite kennzeichnet ihr Stilelement mit dem Nonce", async () => {
+    assert.ok(csp(proxy(request("/appointments"))), "Weiterleitung auf /login");
+    assert.ok(csp(proxy(request("/api/customers/search"))), "401");
+    const state = startupState();
+    for (const status of ["starting", "reinstall"] as const) {
+      state.status = status;
+      try {
+        const res = proxy(request("/", undefined, { accept: "text/html" }));
+        const nonce = nonceOf(csp(res));
+        assert.ok(nonce, status);
+        assert.ok((await res.text()).includes(`<style nonce="${nonce}">`), status);
+      } finally {
+        state.status = "ready";
+      }
+    }
+  });
+
+  it("HSTS nur bei erkanntem HTTPS", () => {
+    const hsts = (res: Response) => res.headers.get("strict-transport-security");
+    assert.equal(hsts(proxy(request("/appointments", "so_session=abc"))), null);
+    assert.equal(hsts(proxy(request("/login", undefined, { "x-forwarded-proto": "http" }))), null);
+    assert.match(hsts(proxy(request("/appointments", "__Host-so_session=abc", HTTPS))) ?? "", /^max-age=\d+$/);
+    assert.match(hsts(proxy(request("/api/v1/customers", undefined, HTTPS))) ?? "", /^max-age=\d+$/);
+    assert.ok(hsts(proxy(request("/appointments", undefined, HTTPS))), "auch die Weiterleitung");
   });
 });

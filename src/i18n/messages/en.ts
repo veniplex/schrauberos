@@ -368,6 +368,19 @@ export const en: Messages = {
       auditRetention: "Keep audit log (days)",
       auditRetentionHint: "Older audit log entries are deleted daily (data minimisation). Default: 730 days (2 years); at least 30 days; 0 = keep forever.",
       behindProxyHint: "Turn this on only if a reverse proxy really sits in front that appends the client address as the last X-Forwarded-For entry (nginx: proxy_add_x_forwarded_for). Sign-in then additionally limits failed attempts per address. Without a real proxy anyone can forge the address in the header and get other people's addresses blocked. Even with a proxy: if many devices share one address (office network behind NAT), the limit hits all of them together – administrators included, except on devices they have signed in from before. When in doubt, leave it off.",
+      csp: {
+        title: "Content security policy (CSP)",
+        reportOnly: "Emergency mode: only report the policy, do not enforce it",
+        hint: "The application only lets the browser run scripts and load content that it serves itself. If a page shows nothing any more because of this policy (for example after a change behind a proxy), you can temporarily switch it to “report only” here: the browser then blocks nothing and only writes violations to its console. The change applies immediately, for everyone, and is recorded in the audit log. Please use it only for troubleshooting and enforce the policy again afterwards.",
+        stateEnforced: "The policy is enforced.",
+        stateReportOnly: "Emergency mode: the policy is only reported, not enforced.",
+      },
+      https: {
+        title: "Encrypted connection (HTTPS)",
+        insecure: "This page was opened over an unencrypted connection (HTTP). That works on the local network, but passwords and data then travel unencrypted. For access from outside or over Wi-Fi away from the workshop, please set up HTTPS through a reverse proxy (see the installation guide).",
+        proxyMismatch: "“Behind a reverse proxy” is switched on, but the request arrived as HTTP. Does the proxy forward the header X-Forwarded-Proto: https?",
+        secure: "This connection is encrypted (HTTPS). The browser is told to open this address only over an encrypted connection from now on (HSTS).",
+      },
     },
     errors: {
       hoursInvalid: "Please enter valid times (end after start).",

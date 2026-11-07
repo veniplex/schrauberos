@@ -91,6 +91,7 @@ export const auditDe = {
       appointments: "Termin-Einstellungen geändert",
       tires: "Reifen-Einstellungen geändert",
       security: "Sicherheits-Einstellungen geändert",
+      csp: "Inhaltssicherheitsrichtlinie (CSP) umgestellt",
       backupPlan: "Backup-Plan geändert",
       updateToken: "Update-Token geändert",
     },

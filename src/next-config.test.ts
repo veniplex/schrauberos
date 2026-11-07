@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { pathToRegexp } from "next/dist/compiled/path-to-regexp";
 import { Readable } from "node:stream";
 import { getCloneableBody } from "next/dist/server/body-streams";
-import nextConfig, { PROXY_BODY_LIMIT, SECURITY_HEADERS, SERVER_ACTION_BODY_LIMIT } from "../next.config";
+import nextConfig, { CSP_FALLBACK_HEADERS, PROXY_BODY_LIMIT, SECURITY_HEADERS, SERVER_ACTION_BODY_LIMIT } from "../next.config";
 
 /**
  * Die Basis-Header aus `next.config.ts`. Geprüft wird nicht nur der Inhalt der Konfiguration, sondern mit dem Mustervergleich, den auch
@@ -15,30 +15,44 @@ import nextConfig, { PROXY_BODY_LIMIT, SECURITY_HEADERS, SERVER_ACTION_BODY_LIMI
 const PATHS = ["/", "/login", "/login/recover", "/setup", "/appointments", "/appointments/abc123/edit", "/admin/users", "/api/health", "/api/v1/customers", "/api/ical/abc.ics", "/api/files/invoice/xyz", "/_next/static/chunks/a.js", "/_next/image", "/sw.js", "/manifest.webmanifest", "/favicon.ico", "/icons/192.png"];
 
 describe("next.config: Basis-Header", () => {
-  it("setzt nosniff, Referrer-Policy, X-Frame-Options SAMEORIGIN und eine erzwungene Content-Security-Policy", () => {
-    const header = (key: string) => SECURITY_HEADERS.find((h) => h.key === key)?.value;
+  const header = (key: string) => SECURITY_HEADERS.find((h) => h.key === key)?.value;
+
+  it("setzt nosniff, Referrer-Policy, X-Frame-Options SAMEORIGIN und eine Permissions-Policy mit Kamera für die eigene Herkunft", () => {
     assert.equal(header("X-Content-Type-Options"), "nosniff");
     assert.equal(header("Referrer-Policy"), "strict-origin-when-cross-origin");
     assert.equal(header("X-Frame-Options"), "SAMEORIGIN");
-    assert.match(header("Content-Security-Policy") ?? "", /default-src 'self'.*frame-ancestors 'self'/);
-    assert.equal(SECURITY_HEADERS.some((h) => h.key.toLowerCase().includes("report-only")), false, "die Richtlinie wird erzwungen, nicht nur gemeldet");
+    assert.match(header("Permissions-Policy") ?? "", /camera=\(self\)/);
+    assert.doesNotMatch(header("Permissions-Policy") ?? "", /camera=\(\)/);
   });
 
-  it("die Regel gilt für alle Pfade (Seiten, API, Statik, Dateien), und keine andere Regel überschreibt die Header", async () => {
+  it("die Content-Security-Policy steckt nicht in den Basis-Headern (sie kommt vom Proxy mit Nonce), und es gibt nie Report-Only", () => {
+    assert.equal(SECURITY_HEADERS.some((h) => h.key.toLowerCase().includes("content-security-policy")), false);
+    assert.equal(CSP_FALLBACK_HEADERS.some((h) => h.key.toLowerCase().includes("report-only")), false, "die Richtlinie wird erzwungen, nicht nur gemeldet");
+  });
+
+  it("die Basis-Header gelten für alle Pfade (Seiten, API, Statik, Dateien)", async () => {
     const rules = await nextConfig.headers!();
-    const matching = (path: string) => rules.filter((rule) => pathToRegexp(rule.source).test(path));
     for (const path of PATHS) {
-      const rulesForPath = matching(path);
-      assert.equal(rulesForPath.length, 1, `${path}: genau eine Regel erwartet, waren ${rulesForPath.length}`);
-      for (const expected of SECURITY_HEADERS) {
-        assert.equal(rulesForPath[0].headers.find((h) => h.key === expected.key)?.value, expected.value, `${path}: ${expected.key}`);
-      }
-      assert.ok(!rulesForPath[0].has && !rulesForPath[0].missing, `${path}: die Regel hat keine Bedingung`);
+      const base = rules.filter((rule) => pathToRegexp(rule.source).test(path) && rule.headers.some((h) => h.key === "X-Content-Type-Options"));
+      assert.equal(base.length, 1, `${path}: genau eine Basis-Regel erwartet, waren ${base.length}`);
+      for (const expected of SECURITY_HEADERS) assert.equal(base[0].headers.find((h) => h.key === expected.key)?.value, expected.value, `${path}: ${expected.key}`);
+      assert.ok(!base[0].has && !base[0].missing, `${path}: die Regel hat keine Bedingung`);
+    }
+  });
+
+  it("die Rückfall-CSP gilt genau für die Pfade außerhalb des Proxys – und für keinen Pfad, den der Proxy bedient", async () => {
+    const rules = await nextConfig.headers!();
+    const withCsp = (path: string) => rules.filter((rule) => pathToRegexp(rule.source).test(path) && rule.headers.some((h) => h.key === "Content-Security-Policy"));
+    for (const path of ["/_next/static/chunks/a.js", "/_next/image", "/sw.js", "/manifest.webmanifest", "/favicon.ico", "/icons/192.png", "/icon.png", "/apple-icon.png", "/api/health", "/api/backups/upload"]) {
+      assert.equal(withCsp(path).length, 1, `${path}: genau eine Rückfall-Regel erwartet`);
+    }
+    for (const path of ["/", "/login", "/appointments", "/api/v1/customers", "/api/ical/abc.ics", "/api/invoices/xyz/file", "/api/docs/images/abc", "/api/backups/status", "/api/healthz", "/icons-secret"]) {
+      assert.equal(withCsp(path).length, 0, `${path}: der Proxy (oder die Route) setzt die CSP, nicht die Konfiguration`);
     }
   });
 
   it("verbietet das Einbetten von außen und die Typerkennung, ohne die PDF-Vorschau derselben Herkunft zu sperren", () => {
-    const csp = SECURITY_HEADERS.find((h) => h.key === "Content-Security-Policy")!.value;
+    const csp = CSP_FALLBACK_HEADERS[0].value;
     assert.match(csp, /frame-ancestors 'self'/);
     assert.doesNotMatch(csp, /frame-ancestors 'none'/);
   });

@@ -3,13 +3,18 @@
  * wir sie gespeichert haben.
  *
  *  - `X-Content-Type-Options: nosniff` immer – der Browser nimmt den gelieferten Typ, rät nicht.
- *  - **PDF**: inline möglich; mehr als `nosniff` verträgt der eingebaute PDF-Betrachter nicht (eine `sandbox`-Richtlinie verhindert die Anzeige).
+ *  - **PDF**: inline möglich; der eingebaute PDF-Betrachter verträgt weder `sandbox` noch `object-src 'none'`. Deshalb nur `Content-Security-Policy: frame-ancestors 'self'`
+ *    (Einbetten im `<iframe>` der Beleg-Vorschau, sonst nirgends).
  *  - **Bilder** und alles andere: `Content-Security-Policy: sandbox; default-src 'none'` – selbst wenn jemand die Adresse direkt öffnet, läuft nichts
  *    (kein Skript, kein Formular, kein Zugriff auf die Herkunft der Anwendung).
+ *  - Diese Köpfe sind die **einzige** CSP dieser Antworten: Der Proxy und `next.config` fassen die Dateirouten nicht an (`ROUTE_OWNED_PATHS` in `lib/csp.ts`) – Next hängt die
+ *    Kopfzeile einer Route nur an, wenn der Server den Namen nicht schon gesetzt hat.
  *  - **XML** (XRechnung) wird nie angezeigt, sondern immer als Download (`attachment`) geliefert.
  *  - Unbekannte Typen gelten als `application/octet-stream` und werden ebenfalls nur als Download geliefert.
  * Der Dateiname im `Content-Disposition` ist ASCII (kein Einschleusen von Zeilen oder Anführungszeichen) und zusätzlich UTF-8-kodiert (RFC 5987/6266).
  */
+
+import { PDF_CONTENT_SECURITY_POLICY, SANDBOX_CONTENT_SECURITY_POLICY } from "@/lib/csp";
 
 const INLINE_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"]);
 const KNOWN_TYPES = new Set([...INLINE_TYPES, "application/xml"]);
@@ -62,7 +67,7 @@ export function deliveryHeaders(options: DeliveryOptions): Record<string, string
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": options.cacheControl ?? "private, no-store",
   };
-  if (mime !== "application/pdf") headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
+  headers["Content-Security-Policy"] = mime === "application/pdf" ? PDF_CONTENT_SECURITY_POLICY : SANDBOX_CONTENT_SECURITY_POLICY;
   if (options.size !== undefined) headers["Content-Length"] = String(options.size);
   return headers;
 }

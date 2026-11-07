@@ -118,3 +118,43 @@ describe("saveSecurity (Hinter Reverse-Proxy)", () => {
     assert.equal(await network.isBehindProxy(), false);
   });
 });
+
+describe("saveCspMode (Notschalter der Content-Security-Policy)", () => {
+  it("speichert den Zustand, setzt ihn sofort im Prozess (der Proxy liest ihn von dort) und protokolliert die Änderung", async () => {
+    const mode = await import("@/lib/csp-mode");
+    const setting = await import("@/server/csp-setting");
+    mode.setCspModeInProcess("enforce");
+    assert.equal((await actions.saveCspMode({}, form({ reportOnly: true }))).ok, true);
+    assert.equal(mode.cspMode(), "report-only");
+    assert.equal((await env.db.appSetting.findUniqueOrThrow({ where: { key: mode.CSP_MODE_KEY } })).value, "report-only");
+
+    // Neustart: der gespeicherte Wert wird beim Start wieder in den Prozess geladen
+    mode.setCspModeInProcess("enforce");
+    await setting.loadCspMode();
+    assert.equal(mode.cspMode(), "report-only");
+
+    assert.equal((await actions.saveCspMode({}, form({}))).ok, true);
+    assert.equal(mode.cspMode(), "enforce");
+    const audits = await env.db.auditLog.findMany({ where: { action: "settings.csp" }, orderBy: { createdAt: "asc" } });
+    assert.equal(audits.length, 2);
+    assert.match(audits[0].target ?? "", /enforce → report-only/);
+    assert.match(audits[1].target ?? "", /report-only → enforce/);
+  });
+
+  it("ohne gespeicherten oder mit unbekanntem Wert gilt „erzwungen“", async () => {
+    const mode = await import("@/lib/csp-mode");
+    assert.equal(mode.parseCspMode(null), "enforce");
+    assert.equal(mode.parseCspMode("irgendwas"), "enforce");
+    assert.equal(mode.parseCspMode("report-only"), "report-only");
+  });
+
+  it("verlangt das Recht settings.manage: ohne es bleibt die Richtlinie erzwungen", async () => {
+    const mode = await import("@/lib/csp-mode");
+    mode.setCspModeInProcess("enforce");
+    const plain = await env.user({ username: "ohne-recht-csp", roles: [await env.role({ permissions: ["appointments.view"] })] });
+    await env.signIn(plain);
+    assert.equal(await redirectOf(() => actions.saveCspMode({}, form({ reportOnly: true }))), "/forbidden");
+    assert.equal(mode.cspMode(), "enforce");
+    assert.equal(await env.db.appSetting.count({ where: { key: mode.CSP_MODE_KEY } }), 0);
+  });
+});

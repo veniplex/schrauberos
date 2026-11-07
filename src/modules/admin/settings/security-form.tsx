@@ -1,9 +1,9 @@
 "use client";
 
 import { Checkbox, Field, Form, FormActions, Input } from "@/components/ui/form";
-import { Card } from "@/components/ui/layout";
+import { Alert, Card } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
-import { saveSecurity } from "./actions";
+import { saveCspMode, saveSecurity } from "./actions";
 
 export function SecurityForm({ behindProxy, auditRetentionDays }: { behindProxy: boolean; auditRetentionDays: number }) {
   const { t } = useI18n();
@@ -19,5 +19,34 @@ export function SecurityForm({ behindProxy, auditRetentionDays }: { behindProxy:
       </Card>
       <FormActions />
     </Form>
+  );
+}
+
+/** Notschalter der Content-Security-Policy (siehe `saveCspMode`): „nur melden“ statt erzwingen. */
+export function CspModeForm({ reportOnly }: { reportOnly: boolean }) {
+  const { t } = useI18n();
+  return (
+    <Form action={saveCspMode} className="flex max-w-3xl flex-col gap-5">
+      <Card title={t("settings.security.csp.title")}>
+        <div className="flex flex-col gap-3">
+          <Alert tone={reportOnly ? "warning" : "success"}>{reportOnly ? t("settings.security.csp.stateReportOnly") : t("settings.security.csp.stateEnforced")}</Alert>
+          <Checkbox name="reportOnly" defaultChecked={reportOnly} label={t("settings.security.csp.reportOnly")} hint={t("settings.security.csp.hint")} />
+        </div>
+      </Card>
+      <FormActions />
+    </Form>
+  );
+}
+
+/** Hinweis zur Verbindung: HTTPS erkannt (HSTS) oder unverschlüsselt (HTTP). Nur Information – im LAN ist HTTP üblich. */
+export function HttpsNotice({ secure, behindProxy }: { secure: boolean; behindProxy: boolean }) {
+  const { t } = useI18n();
+  return (
+    <Card title={t("settings.security.https.title")}>
+      <div className="flex flex-col gap-3">
+        <Alert tone={secure ? "success" : "info"}>{secure ? t("settings.security.https.secure") : t("settings.security.https.insecure")}</Alert>
+        {!secure && behindProxy ? <Alert tone="warning">{t("settings.security.https.proxyMismatch")}</Alert> : null}
+      </div>
+    </Card>
   );
 }

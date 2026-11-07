@@ -16,13 +16,13 @@ export const REINSTALL_TEXT = {
 
 const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** Eigenständige Seite (ohne die Anwendung, ohne Datenbank) für die 503-Antwort. */
-export function reinstallHtml(): string {
+/** Eigenständige Seite (ohne die Anwendung, ohne Datenbank) für die 503-Antwort; `nonce`: der Nonce der Anfrage für das Stilelement (die Richtlinie erlaubt keine ungekennzeichneten Stile). */
+export function reinstallHtml(nonce?: string): string {
   const paragraphs = [...REINSTALL_TEXT.de, ...REINSTALL_TEXT.en].map((p) => `<p>${escapeHtml(p)}</p>`).join("");
   return (
     `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<meta name="robots" content="noindex"><title>SchrauberOS</title>` +
-    `<style>:root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:2rem 1rem}main{max-width:40rem;margin:0 auto}</style></head>` +
+    `<style${nonce ? ` nonce="${nonce}"` : ""}>:root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:2rem 1rem}main{max-width:40rem;margin:0 auto}</style></head>` +
     `<body><main data-status="reinstall"><h1>${escapeHtml(REINSTALL_TEXT.title)}</h1>${paragraphs}</main></body></html>`
   );
 }

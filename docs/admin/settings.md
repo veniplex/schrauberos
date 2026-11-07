@@ -13,6 +13,12 @@ ihre eigenen Einstellungen mit.
   **Hochladen** (Backups, Bilder in der Dokumentation) außerdem der Header `X-Forwarded-Host`: Schreibt der Proxy den `Host` um, muss er den öffentlichen
   Namen dort mitgeben (nginx: `proxy_set_header X-Forwarded-Host $host;`), sonst werden Uploads mit „Verboten“ abgewiesen. Außerdem: **Audit-Log aufbewahren (Tage)** –
   ältere Einträge werden täglich gelöscht, Standard 730 Tage, mindestens 30; `0` = unbegrenzt (siehe Hilfe „Audit-Log“).
+  Dazu zeigt der Reiter, ob die Seite **verschlüsselt (HTTPS)** geöffnet wurde: Bei HTTP erscheint ein Hinweis (im Werkstattnetz in Ordnung, für den Zugriff von außen nicht); bei HTTPS
+  weist die Anwendung den Browser an, die Adresse künftig nur noch verschlüsselt aufzurufen. Steht „Hinter Reverse-Proxy“ an, die Anfrage kommt aber als HTTP an, sagt der Hinweis, dass der Proxy
+  `X-Forwarded-Proto: https` weitergeben muss.
+  **Inhaltssicherheitsrichtlinie (CSP):** Die Anwendung erlaubt dem Browser nur Skripte und Inhalte, die sie selbst ausliefert. Zeigt eine Seite deswegen einmal nichts mehr an, kann ein
+  Administrator die Richtlinie hier vorübergehend auf **„nur melden“** stellen: Der Browser blockiert dann nichts mehr und schreibt Verstöße nur in seine Konsole (Notbetrieb, gilt sofort für alle,
+  steht im Audit-Log). Danach bitte wieder erzwingen lassen.
 * **Backups:** Zeitplan der automatischen Backups und die Aufbewahrung je Art von Backup (siehe Hilfe „Backups“).
 * **Updates:** Zugang für die Update-Prüfung (siehe Hilfe „Updates“).
 * **Termine** und **Reifenlager:** Kalender-Raster, Arbeitsplätze, Terminarten bzw. Ampel-Grenzwerte und Winterfenster – beschrieben in der Hilfe

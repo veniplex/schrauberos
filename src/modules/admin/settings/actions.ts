@@ -8,6 +8,7 @@ import { formObject } from "@/lib/forms";
 import { isValidTime } from "@/lib/opening-hours";
 import { checkUpload } from "@/lib/upload-sniff";
 import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
+import { CSP_MODE_KEY, parseCspMode, setCspModeInProcess } from "@/lib/csp-mode";
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
 import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, failField } from "@/server/operations";
@@ -140,6 +141,31 @@ const saveSecurityOperation = defineOperation({
 
 export const saveSecurity = defineAction(saveSecurityOperation, {
   form: (fd) => ({ ...formObject(fd), behindProxy: fd.get("behindProxy") === "on" }),
+  revalidate: ["/settings"],
+  message: "common.saved",
+});
+
+/**
+ * Notschalter der Content-Security-Policy: „nur melden“ statt erzwingen. Der Proxy liest den Zustand aus dem Prozess (`lib/csp-mode.ts`), nicht aus der Datenbank –
+ * deshalb wird er nach dem Speichern (nach dem Commit, nie bei einem Fehlschlag) im Prozess gesetzt; beim nächsten Start liest `startApp` ihn aus der Datenbank.
+ */
+const saveCspModeOperation = defineOperation({
+  name: "admin.settings.saveCspMode",
+  permission: "settings.manage",
+  input: z.object({ reportOnly: z.boolean() }),
+  audit: "settings.csp",
+  run: async ({ input, tx, audit, afterCommit }) => {
+    const before = parseCspMode((await tx.appSetting.findUnique({ where: { key: CSP_MODE_KEY } }))?.value);
+    const after = input.reportOnly ? "report-only" : "enforce";
+    await setSetting(CSP_MODE_KEY, after, tx);
+    audit({ target: `${before} → ${after}` });
+    afterCommit(() => setCspModeInProcess(after));
+    return { mode: after };
+  },
+});
+
+export const saveCspMode = defineAction(saveCspModeOperation, {
+  form: (fd) => ({ reportOnly: fd.get("reportOnly") === "on" }),
   revalidate: ["/settings"],
   message: "common.saved",
 });

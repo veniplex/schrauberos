@@ -2,6 +2,7 @@ import "server-only";
 import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
 import { writeAudit } from "@/server/audit";
+import { loadCspMode } from "@/server/csp-setting";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
 import { startJobRunner } from "@/server/jobs";
@@ -67,6 +68,8 @@ export async function startApp(): Promise<void> {
     await db.$executeRawUnsafe("PRAGMA synchronous = FULL");
 
     await ensureBaseData(db);
+    // Notschalter der Content-Security-Policy: der Proxy liest den Zustand aus dem Prozess, nicht aus der Datenbank
+    await loadCspMode();
     const revoked = await revokeApiTokensAfterRestore();
     if (revoked > 0) console.log(`[start] Nach der Wiederherstellung: ${revoked} API-Token(s) widerrufen.`);
     const workshop = await db.workshop.findUnique({ where: { id: "default" }, select: { timezone: true } });

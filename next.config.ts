@@ -1,17 +1,24 @@
 import type { NextConfig } from "next";
-import { contentSecurityPolicy } from "./src/lib/csp";
+import { PERMISSIONS_POLICY, contentSecurityPolicy } from "./src/lib/csp";
 
 /**
- * Basis-Header für alle Antworten – auch für Statik und den Service Worker (die Nonce-Logik des Proxys betrifft sie nicht). Die
- * Content-Security-Policy ist die strikte Grundlage aus `src/lib/csp.ts` und wird erzwungen (nicht nur gemeldet); `X-Frame-Options` ist die
- * Entsprechung von `frame-ancestors` für ältere Browser. Der Nonce für Skripte folgt mit P1b-1.
+ * Basis-Header für alle Antworten – auch für Statik und den Service Worker. `X-Frame-Options` ist die Entsprechung von `frame-ancestors` für ältere Browser.
+ * Die Content-Security-Policy steckt **nicht** darin (siehe `CSP_FALLBACK_HEADERS` und `src/lib/csp.ts`).
  */
 export const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "Content-Security-Policy", value: contentSecurityPolicy({ dev: process.env.NODE_ENV !== "production" }) },
+  { key: "Permissions-Policy", value: PERMISSIONS_POLICY },
 ];
+
+/**
+ * Pfade außerhalb des Proxys (`matcher` in `src/proxy.ts`): Statik, Icons, Manifest, Service Worker, Health, Upload von Sicherungen. Dort setzt `next.config` die
+ * Content-Security-Policy ohne Nonce (`script-src 'self'`); alles, was durch den Proxy läuft, bekommt sie vom Proxy mit Nonce – **nie beides**, denn Next hängt die Kopfzeile
+ * einer Route nur an, wenn der Name noch fehlt, und zwei CSP-Köpfe verschärfen sich im Browser gegenseitig. `src/lib/csp.test.ts` prüft, dass sich beide Seiten ergänzen.
+ */
+export const PROXY_FREE_PATHS = ["/_next/static/:path*", "/_next/image", "/favicon.ico", "/manifest.webmanifest", "/sw.js", "/icon.:ext", "/apple-icon.:ext", "/icons/:path*", "/api/health", "/api/backups/upload"];
+export const CSP_FALLBACK_HEADERS = [{ key: "Content-Security-Policy", value: contentSecurityPolicy({ dev: process.env.NODE_ENV !== "production" }) }];
 
 /** Grenzen für Anfrage-Bodies in Byte-Schreibweise von Next; der Proxy-Puffer muss größer sein als das Limit der Server Actions. */
 export const SERVER_ACTION_BODY_LIMIT = "12mb";
@@ -31,7 +38,10 @@ const nextConfig: NextConfig = {
     proxyClientMaxBodySize: PROXY_BODY_LIMIT,
   },
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      ...PROXY_FREE_PATHS.map((source) => ({ source, headers: CSP_FALLBACK_HEADERS })),
+    ];
   },
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-better-sqlite3", "better-sqlite3"],
   // better-sqlite3 lädt seine native Datei dynamisch (bindings) – die Ablaufverfolgung findet sie nicht von selbst

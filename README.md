@@ -970,17 +970,33 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
   Sicherheit** „Hinter Reverse-Proxy“ einschalten, damit die Anmeldung die Client-Adresse auswertet (Proxy muss sie als letzten `X-Forwarded-For`-Eintrag anhängen). Erscheint beim Speichern „Invalid Server Actions
   request“, leitet der Proxy den öffentlichen Host nicht per `x-forwarded-host` weiter – dann die Domain in `next.config.ts` unter
   `experimental.serverActions.allowedOrigins` eintragen.
-* **Sicherheits-Header und Content-Security-Policy:** `next.config.ts` setzt auf **allen** Antworten (Seiten, Programmschnittstelle, Statik, später auch `sw.js`) `X-Content-Type-Options: nosniff`,
-  `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` und die **erzwungene** CSP aus `src/lib/csp.ts` (kein Report-Only): `default-src`, Skripte, Verbindungen, Frames, Worker, Manifest
-  nur `'self'`; Bilder zusätzlich `data:`/`blob:`; `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'self'` (die PDF-Vorschau derselben Herkunft bleibt möglich);
-  kein `upgrade-insecure-requests` (die App läuft im LAN auch über HTTP). In `next dev` kommen `'unsafe-eval'` (React) und `ws:` (Entwicklungsserver) hinzu. Die Header kommen aus
-  `next.config`, nicht aus dem Proxy – Statik und Service Worker brauchen keine Nonce-Logik. Tests: `src/lib/csp.test.ts`, `src/next-config.test.ts`; die Browser-CI wertet jeden
-  `securitypolicyviolation` der Inventur als Fehler und prüft die Header an echten Antworten (`states.spec.ts`).
-  **Noch offen (P1b-1):** `script-src` enthält `'unsafe-inline'` (Next.js bettet Start-Skripte inline ein) – Ziel ist ein Nonce je Anfrage im Proxy (`'nonce-…' 'strict-dynamic'`, `x-nonce`,
-  alle Routen dynamisch gerendert, Fehler-/Nicht-gefunden-/Verboten-Seiten eingeschlossen) und `style-src` mit Nonce plus `style-src-attr 'unsafe-inline'`; `Permissions-Policy`
-  (ohne pauschales `camera=()`), HSTS nur bei erkanntem HTTPS samt Hinweis ohne HTTPS, `default-src 'none'` für die JSON-Antworten unter `/api/v1`, eigene Header der PDF-Routen,
-  Markdown ohne `//host`-Links und externe Bilder, der Not-Schalter „nur melden“ in der Oberfläche (für den Proxy lesbar) und der Lauf der Browser-CI über alle Rollen, Dialoge,
-  Druckansichten und den Service Worker.
+* **Sicherheits-Header und Content-Security-Policy (P1b-1):** `next.config.ts` setzt auf **allen** Antworten `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` und
+  `Permissions-Policy` (`camera=(self)` für „Foto aufnehmen“, sonst Mikrofon, Standort, Zahlung, USB … gesperrt – kein pauschales `camera=()`). Die **CSP wird erzwungen** (kein Meldeendpunkt, kleinere
+  Angriffsfläche; die Absicherung ist die Browser-CI) und kommt aus `src/lib/csp.ts` – **von genau einer Stelle je Antwort**:
+  * **Seiten, Server Actions, JSON-Routen** (alles hinter `src/proxy.ts`): der **Proxy**, mit einem frischen **Nonce je Anfrage** (`createNonce`, 128 Bit). Er schreibt Richtlinie und `x-nonce` auch als Kopf der
+    *Anfrage* (`NextResponse.next({ request })`) – **Next liest den Nonce aus dem Kopf der Anfrage** (`getScriptNonceFromHeaders`) und trägt ihn beim Rendern in alle eigenen Skripte und Stile ein; ein
+    von außen mitgeschickter CSP-Kopf wird vorher entfernt. Skripte: `'self' 'nonce-…' 'strict-dynamic'` (`'self'` nur als Rückfall alter Browser), kein `'unsafe-inline'`, im Betrieb kein `'unsafe-eval'`.
+    Stile: `style-src 'self' 'nonce-…'`; **`style-src-attr 'unsafe-inline'` ist bewusst erlaubt** (React schreibt `style="…"` ins HTML: Kalender, `--workshop-accent`; das ergibt keine Skriptausführung). Dazu `default-src 'self'`,
+    `img-src 'self' data: blob:`, `connect-src`/`frame-src`/`worker-src`/`manifest-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'self'`; kein `upgrade-insecure-requests`
+    (die App läuft im LAN auch über HTTP). In `next dev` kommen `'unsafe-eval'` und `ws:` hinzu. **Dynamisches Rendering:** Der Nonce gehört zur Anfrage, also rendert **jede** Seite je Anfrage – auch „Nicht gefunden“, „Kein Zugriff“ und
+    Fehlerseiten (alle im Root-Layout, das `connection()` abwartet; die App liest ohnehin Cookies und Datenbank). `cacheComponents` bleibt aus (mit Nonce unverträglich). Eigene Inline-Skripte gibt es nicht (Theme und Sprache setzt der Server);
+    käme eines hinzu, bekommt es `nonce` aus `(await headers()).get("x-nonce")`. Die 503-Seiten des Proxys (Start, Neuinstallation) tragen den Nonce an ihrem `<style>`.
+  * **JSON-/Feed-Antworten** (`/api/v1`, `/api/ical`): `default-src 'none'; frame-ancestors 'none'` (nur dort, **nicht** für Dateirouten).
+  * **Dateirouten** (Rechnungsbeleg, Doku-Bilder; `ROUTE_OWNED_PATHS`): die **Route selbst** (`lib/file-delivery.ts`) – Bilder und alles andere `sandbox; default-src 'none'`, **PDF nur `frame-ancestors 'self'`** (weder `sandbox` noch
+    `object-src 'none'`: der PDF-Betrachter des Browsers würde nichts anzeigen). Der Proxy fasst diese Pfade nicht an. **Hintergrund (ZP3-S-F9, im Quelltext geprüft):** Next hängt die Kopfzeilen einer Route nur an, wenn der Server den Namen noch nicht
+    gesetzt hat (`sendResponse`); eine globale CSP aus `next.config` oder dem Proxy hätte die `sandbox`-Richtlinie der Route still verdrängt (und zwei Köpfe verschärfen sich im Browser gegenseitig). Der Proxy überschreibt dagegen den Kopf aus
+    `next.config` (Reihenfolge im Router: Konfigurations-Header, dann Proxy) – trotzdem setzt `next.config` die CSP nur für **Pfade außerhalb des Proxys** (`PROXY_FREE_PATHS`: Statik, Icons, Manifest, `sw.js`, Health, Backup-Upload; Richtlinie ohne Nonce, `script-src 'self'`).
+    `src/lib/csp.test.ts` prüft, dass jeder Pfad genau eine Quelle hat (Proxy, Konfiguration **oder** Route), und dass jede Route mit `deliveryHeaders(` in `ROUTE_OWNED_PATHS` steht.
+  * **PDF-Vorschau:** `components/ui/pdf-preview.tsx` – `<iframe>` (`frame-src 'self'`, kein `<object>`/`<embed>`), **nur ab `lg`** und erst **nach Klick** auf „Vorschau anzeigen“ (der Rahmen wird dann erst eingehängt, nicht per `hidden`). Eine Option „PDF nur als Download“ gibt es nicht (nicht nötig, solange der Betrachter unter `frame-ancestors`-only anzeigt; **Block 13: im Chrome prüfen**).
+  * **Notschalter (Einstellungen → Sicherheit, Recht `settings.manage`, Audit `settings.csp`):** „nur melden“ – derselbe Inhalt unter `Content-Security-Policy-Report-Only` (Antwort und Anfrage; Next liest den Nonce auch daraus), nichts wird blockiert, Verstöße
+    stehen nur in der Browser-Konsole. Der Proxy liest den Zustand **ohne Datenbankzugriff** aus dem Prozess (`lib/csp-mode.ts`, `globalThis.__cspMode` wie der Startzustand – Proxy und App sind getrennte Bundles im selben Node-Prozess, ein Modul-Singleton würde nicht
+    geteilt, `globalThis` schon). `startApp` lädt den gespeicherten Wert (`security.cspMode`), die Aktion schreibt Datenbank **und** (nach dem Commit) Prozess. Ohne Wert gilt `enforce`. `X-Frame-Options` bleibt auch im Notbetrieb. Ein Prozess, eine Datenbank: kein Abgleich nötig.
+  * **HSTS** (`max-age=15552000`, keine Unterdomänen, kein Preload) nur bei erkanntem HTTPS (`x-forwarded-proto` bzw. `SESSION_COOKIE_SECURE`, siehe `session-cookie.ts`). Ohne HTTPS zeigen Einstellungen → Sicherheit und der Systemstatus einen Hinweis (Information, kein Fehler: im LAN ist HTTP üblich), mit
+    einem Zusatz, wenn „Hinter Reverse-Proxy“ an ist, die Anfrage aber als HTTP ankommt.
+  * **Markdown:** Interne Links nur Pfade der eigenen Herkunft (`//host` ist extern, `lib/markdown-url.ts`); externe Bilder werden nicht geladen (statt des Bildes steht die Beschreibung).
+  * **Tests:** `csp.test.ts`, `next-config.test.ts`, `proxy.test.ts` (Nonce je Anfrage, Notschalter, Header-Überschreiben, HSTS, 503-Seiten), `markdown-url.test.ts`, `file-delivery.test.ts`. Browser-CI: jeder `securitypolicyviolation` der Inventur ist ein Fehler; `states.spec.ts` prüft
+    Nonce je Anfrage an allen `<script>`/`<style>` (Anmeldung, Startseite, 404), die Köpfe je Antwortart und die Selbsterkennung. **Offen für Block 13 (nur im Browser prüfbar):** Lauf der Inventur über alle Rollen/Dialoge/Druckansichten unter der CSP in Chromium und WebKit, axe unter CSP,
+    Chrome-PDF-Viewer mit `frame-ancestors`-only, ob `strict-dynamic` auf allen Zielbrowsern greift, Notschalter im Betrieb.
 * **Zeitzone:** Einstellungen → Werkstatt; wird bei jedem Start angewendet.
 * **Image neu ziehen** ist nur nötig, wenn ein Release den Vertrag des Starters ändert (die Update-Seite sagt es) oder bei einem
   Schlüsselwechsel: `docker compose pull && docker compose up -d` (die Daten bleiben).
@@ -992,8 +1008,7 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 * Dateien wachsen mit dem Archiv; Backups verweisen per Hardlink darauf (kaum Zusatzplatz), schützen aber nicht vor dem Ausfall des
   Datenträgers – Kopien außerhalb des Servers über „Herunterladen“.
 * Backups sind unverschlüsselt.
-* **Für die Browser-CI / Block 13 vorgemerkt (CSP und Dateirouten, ZP3-S-F9):** Die globale CSP aus `next.config` und die route-eigene `Content-Security-Policy` der Dateirouten (`sandbox; default-src 'none'`) zusammen im Browser prüfen; **Chrome-PDF-Viewer unter `object-src 'none'`**
-  (zeigt er das PDF inline? sonst Option „PDF nur als Download“); Bilder mit `sandbox` inline; Doku-Bild-Upload mit `Content-Length` über die gebaute App und einen üblichen Reverse-Proxy (nginx/Traefik; fehlt die Länge, antwortet die Route 411).
+* **Für die Browser-CI / Block 13 vorgemerkt (CSP und Dateirouten, ZP3-S-F9):** Zusammenspiel im Browser prüfen: PDF-Beleg im `<iframe>` unter `frame-ancestors 'self'` (Chrome-Betrachter, WebKit), Bilder der Dateirouten mit `sandbox` inline; Doku-Bild-Upload mit `Content-Length` über die gebaute App und einen üblichen Reverse-Proxy (nginx/Traefik; fehlt die Länge, antwortet die Route 411).
 * Der Job-Runner setzt genau einen Prozess voraus (ein Container, eine SQLite-Datei): Nach einem Neustart gelten laufende Läufe als unterbrochen. Jobs sind deshalb wiederholbar auszulegen.
 * **Tests mit Symlinks** (`archive.test.ts`: Prüfung auf dem Dateisystem, Verzeichnis-Symlink) laufen nur unter Linux/macOS (unter Windows ohne Entwicklermodus fehlt das Recht, sie werden übersprungen) – die Linux-Pipeline muss sie ausführen; `safe-fetch.test.ts` bindet `127.0.0.2` (sonst Ausweichen auf `127.0.0.1`).
 * API: noch ohne Oberfläche zur Token-Verwaltung, ohne Webhooks, ohne Datei-Upload (Rechnungsbelege) und ohne Doku-Seite der Ressourcen (F11); Tokens entstehen bis dahin nur über die Server-Funktion `createApiTokenOperation`. Rate-Limit und Drosselung liegen im Speicher des Prozesses (ein Prozess, eine Datenbank).

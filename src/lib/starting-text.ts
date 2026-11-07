@@ -13,12 +13,12 @@ export const STARTING_RETRY_SECONDS = 5;
 
 const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** Eigenständige Seite (ohne die Anwendung, ohne Datenbank) für die 503-Antwort. */
-export function startingHtml(): string {
+/** Eigenständige Seite (ohne die Anwendung, ohne Datenbank) für die 503-Antwort; `nonce`: der Nonce der Anfrage für das Stilelement (die Richtlinie erlaubt keine ungekennzeichneten Stile). */
+export function startingHtml(nonce?: string): string {
   return (
     `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<meta name="robots" content="noindex"><meta http-equiv="refresh" content="${STARTING_RETRY_SECONDS}"><title>SchrauberOS</title>` +
-    `<style>:root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:2rem 1rem}main{max-width:40rem;margin:0 auto}</style></head>` +
+    `<style${nonce ? ` nonce="${nonce}"` : ""}>:root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:2rem 1rem}main{max-width:40rem;margin:0 auto}</style></head>` +
     `<body><main data-status="starting"><h1>${escapeHtml(STARTING_TEXT.title)}</h1><p>${escapeHtml(STARTING_TEXT.de)}</p><p>${escapeHtml(STARTING_TEXT.en)}</p></main></body></html>`
   );
 }

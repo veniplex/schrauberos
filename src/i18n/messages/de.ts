@@ -368,6 +368,19 @@ export const de = {
       auditRetention: "Audit-Log aufbewahren (Tage)",
       auditRetentionHint: "Ältere Einträge des Audit-Logs werden täglich gelöscht (Datensparsamkeit). Standard: 730 Tage (2 Jahre); mindestens 30 Tage; 0 = unbegrenzt aufbewahren.",
       behindProxyHint: "Nur einschalten, wenn wirklich ein Reverse-Proxy davorsteht, der die Adresse des Clients als letzten Eintrag von X-Forwarded-For anhängt (nginx: proxy_add_x_forwarded_for). Dann begrenzt die Anmeldung Fehlversuche zusätzlich je Adresse. Ohne echten Proxy kann jeder die Adresse im Header vortäuschen und damit fremde Adressen sperren lassen. Auch mit Proxy gilt: Teilen sich viele Geräte eine Adresse (Büro-Netz hinter NAT), trifft die Begrenzung alle gemeinsam – auch Administratoren, außer auf Geräten, mit denen sie sich schon einmal angemeldet haben. Im Zweifel ausgeschaltet lassen.",
+      csp: {
+        title: "Inhaltssicherheitsrichtlinie (CSP)",
+        reportOnly: "Notbetrieb: Richtlinie nur melden, nicht erzwingen",
+        hint: "Die Anwendung erlaubt dem Browser nur Skripte und Inhalte, die sie selbst ausliefert. Zeigt eine Seite wegen dieser Richtlinie nichts mehr an (zum Beispiel nach einer Änderung hinter einem Proxy), kann man sie hier vorübergehend auf „nur melden“ stellen: Der Browser blockiert dann nichts mehr und schreibt Verstöße nur in seine Konsole. Die Umstellung gilt sofort, für alle, und steht im Audit-Log. Bitte nur zur Fehlersuche und danach wieder erzwingen.",
+        stateEnforced: "Die Richtlinie wird erzwungen.",
+        stateReportOnly: "Notbetrieb: Die Richtlinie wird nur gemeldet, nicht erzwungen.",
+      },
+      https: {
+        title: "Verschlüsselte Verbindung (HTTPS)",
+        insecure: "Diese Seite wurde über eine unverschlüsselte Verbindung (HTTP) geöffnet. Im lokalen Netz geht das; Passwörter und Daten laufen dann aber unverschlüsselt durchs Netz. Für den Zugriff von außen oder über WLAN außerhalb der Werkstatt bitte HTTPS über einen Reverse-Proxy einrichten (siehe Installationsanleitung).",
+        proxyMismatch: "„Hinter Reverse-Proxy“ ist eingeschaltet, die Anfrage kam aber als HTTP an. Leitet der Proxy den Header X-Forwarded-Proto: https weiter?",
+        secure: "Diese Verbindung ist verschlüsselt (HTTPS). Der Browser wird angewiesen, diese Adresse künftig nur noch verschlüsselt aufzurufen (HSTS).",
+      },
     },
     errors: {
       hoursInvalid: "Bitte gültige Zeiten angeben (Ende nach Beginn).",

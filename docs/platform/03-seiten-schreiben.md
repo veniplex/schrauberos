@@ -14,7 +14,7 @@ Auszeichnung. Der Editor hat eine Werkzeugleiste und eine **Vorschau**.
 | Zitat | `> Hinweis` |
 | Code | `` `Code` `` oder ein Block zwischen drei Gravis-Zeichen |
 
-Rohes HTML wird nicht ausgegeben (aus Sicherheitsgründen).
+Rohes HTML wird nicht ausgegeben (aus Sicherheitsgründen). **Bilder von fremden Adressen** (`![…](https://…)`) werden nicht geladen – an ihrer Stelle steht nur die Beschreibung; Bilder gehören über „Bild einfügen“ hochgeladen. Links auf andere Seiten der Anwendung beginnen mit `/`; Adressen mit `//` und alles mit `https://` öffnen sich als fremde Seite in einem neuen Tab.
 
 ## Bilder
 

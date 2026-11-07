@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import type { CSSProperties, ReactNode } from "react";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
@@ -26,6 +27,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Der Nonce der Content-Security-Policy gehört zur einzelnen Anfrage (der Proxy erzeugt ihn, Next trägt ihn beim Rendern in alle Skripte ein): Jede Seite – auch
+  // „Nicht gefunden“, „Kein Zugriff“ und die Fehlerseiten, die alle in diesem Layout rendern – muss je Anfrage gerendert werden, nie beim Build. Die App ist ohnehin dynamisch
+  // (Cookies, Datenbank); diese Zeile hält es auch dann fest, wenn einmal nichts davon mehr gelesen würde.
+  await connection();
   // Fremde Datenbank (Volume einer nicht verträglichen Version): keine Seite fasst sie an, nur der Hinweis wird gezeigt
   if (startupState().status === "reinstall") {
     return (

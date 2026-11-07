@@ -5,12 +5,13 @@ import { asciiFileName, contentDisposition, deliveryHeaders, truncateName } from
 describe("Auslieferungs-Kopfzeilen je Dateityp", () => {
   const h = (mime: string, extra: Partial<Parameters<typeof deliveryHeaders>[0]> = {}) => deliveryHeaders({ mime, name: "Datei.bin", ...extra });
 
-  it("PDF: inline, nosniff, ohne sandbox (der PDF-Betrachter verträgt sie nicht)", () => {
+  it("PDF: inline, nosniff, CSP nur frame-ancestors 'self' – weder sandbox noch object-src 'none' (der PDF-Betrachter verträgt sie nicht)", () => {
     const headers = h("application/pdf");
     assert.equal(headers["Content-Type"], "application/pdf");
     assert.equal(headers["X-Content-Type-Options"], "nosniff");
     assert.match(headers["Content-Disposition"], /^inline;/);
-    assert.equal("Content-Security-Policy" in headers, false);
+    assert.equal(headers["Content-Security-Policy"], "frame-ancestors 'self'");
+    assert.doesNotMatch(headers["Content-Security-Policy"], /sandbox|object-src|default-src/);
   });
 
   it("Bilder: inline mit sandbox und default-src 'none'", () => {

@@ -25,6 +25,7 @@ export const AUDIT_ACTIONS = [
   "settings.appointments",
   "settings.tires",
   "settings.security",
+  "settings.csp",
   "settings.backupPlan",
   "settings.updateToken",
   "appointment.create",

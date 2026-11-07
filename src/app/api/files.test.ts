@@ -191,12 +191,12 @@ describe("Rechnungsbeleg ausliefern", () => {
     assert.equal(await res.text(), "%PDF-1.4 beleg");
   });
 
-  it("Kopfzeilen je Dateityp (SEC-12): PDF nur nosniff, Bilder mit sandbox, XML und Unbekanntes immer als Download", async () => {
+  it("Kopfzeilen je Dateityp (SEC-12): PDF nur frame-ancestors, Bilder mit sandbox, XML und Unbekanntes immer als Download", async () => {
     await signInWith(["invoices.view"]);
     const file = await env.db.invoiceFile.findUniqueOrThrow({ where: { invoiceId } });
     const SANDBOX = "sandbox; default-src 'none'";
     const cases: Array<{ mime: string; type: string; disposition: RegExp; csp: string | null }> = [
-      { mime: "application/pdf", type: "application/pdf", disposition: /^inline;/, csp: null },
+      { mime: "application/pdf", type: "application/pdf", disposition: /^inline;/, csp: "frame-ancestors 'self'" },
       { mime: "image/png", type: "image/png", disposition: /^inline;/, csp: SANDBOX },
       { mime: "application/xml", type: "application/xml", disposition: /^attachment;/, csp: SANDBOX },
       // manipulierter Datenbankeintrag: nie als Seite ausliefern
