@@ -26,7 +26,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  * Kundenfunktion mit eigenem Recht), Arbeitsplatz, Zuständigen, Reifensatz und die Notizen im Volltext. Mit dem Recht zum Bearbeiten führt „Bearbeiten“ ins Formular.
  * Gibt es den Termin nicht mehr, erscheint nichts (die Seite bleibt benutzbar).
  */
-export async function AppointmentDetail({ id, view, date, canEdit }: { id: string; view: CalendarView; date: Date; canEdit: boolean }) {
+export async function AppointmentDetail({ id, view, date, canEdit, sections }: { id: string; view: CalendarView; date: Date; canEdit: boolean; /** Beiträge anderer Funktionen (Erweiterungspunkt `appointments/detail`, z. B. „Auftrag aus Termin“) */ sections?: ReactNode }) {
   const [i18n, a] = await Promise.all([getI18n(), db.appointment.findUnique({ where: { id }, include: appointmentInclude })]);
   if (!a) return null;
   const { t, td } = i18n;
@@ -66,6 +66,7 @@ export async function AppointmentDetail({ id, view, date, canEdit }: { id: strin
       </dl>
       <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
         {!canEdit ? <p className="mr-auto text-xs text-ink-muted">{t("appointments.detail.editHint")}</p> : null}
+        {sections}
         <LinkButton href={closeHref}>{t("common.close")}</LinkButton>
         {canEdit ? (
           <LinkButton variant="primary" href={calendarHref(view, date, { edit: a.id })}>

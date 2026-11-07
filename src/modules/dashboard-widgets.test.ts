@@ -42,8 +42,8 @@ describe("Bausteine der Funktionen", () => {
       for (const hidden of picked.more) assert.ok(hidden.priority >= worstShown, `${role.key}: ${hidden.id} ist weniger wichtig als alles Offene`);
     }
     const ids = (role: string) => pickWidgets(registry.widgetsFor(sessionOf(new Set(DEFAULT_ROLES.find((r) => r.key === role)!.permissions)))).shown.map((x) => x.id);
-    assert.deepEqual(ids("mechanic"), ["today-appointments", "inspection-due", "tire-attention", "tire-swap"], "Mechaniker: Termine, Prüfungen und Reifen");
-    assert.deepEqual(ids("office"), ["today-appointments", "invoices-open", "employees-overview", "fleet-dues"], "Büro: Termine, Rechnungen, Mitarbeiter, Fuhrpark");
+    assert.deepEqual(ids("mechanic"), ["today-appointments", "orders-open", "inspection-due", "tire-swap"], "Mechaniker: Termine, offene Aufträge, Prüfungen und Reifen");
+    assert.deepEqual(ids("office"), ["today-appointments", "orders-open", "invoices-open", "employees-overview"], "Büro: Termine, offene Aufträge, Rechnungen, Mitarbeiter");
   });
 
   it("Bausteine ausgeschalteter Funktionen fehlen, auch wenn das Recht in der Rolle steht (ausgeschaltet = keine Rechte)", () => {

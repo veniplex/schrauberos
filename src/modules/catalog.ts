@@ -5,6 +5,8 @@ import { handbookModule } from "./handbook/module";
 import { adminModule } from "./admin/module";
 import { appointmentsFeature } from "./workshop/appointments/feature";
 import { tiresFeature } from "./workshop/tires/feature";
+import { ordersFeature } from "./workshop/orders/feature";
+import { partsFeature } from "./workshop/parts/feature";
 import { customersFeature } from "./workshop/customers/feature";
 import { vehiclesFeature } from "./workshop/vehicles/feature";
 import { invoicesFeature } from "./office/invoices/feature";
@@ -34,6 +36,8 @@ export const MODULES = [workshopModule, officeModule, itModule, handbookModule, 
 
 export const FEATURES = [
   appointmentsFeature,
+  ordersFeature,
+  partsFeature,
   tiresFeature,
   customersFeature,
   vehiclesFeature,

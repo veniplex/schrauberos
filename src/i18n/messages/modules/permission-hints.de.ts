@@ -7,6 +7,20 @@ export const permissionHintsDe = {
     delete: "Termine endgültig löschen.",
     configure: "Arbeitsplätze, Terminarten und das Zeitraster des Kalenders festlegen.",
   },
+  orders: {
+    view: "Werkstattaufträge mit Positionen (ohne Preise), Befunden und Verlauf ansehen.",
+    create: "Aufträge annehmen, auch aus einem Termin.",
+    edit: "Status setzen, Befunde und Positionen erfassen, Kundenfreigaben protokollieren.",
+    close: "Aufträge abschließen („abgeholt“); dabei buchen andere Funktionen ab, z. B. das Lager.",
+    reopen: "Einen abgeschlossenen Auftrag wieder öffnen: bucht zurück und steht im Audit-Log. Wird nie automatisch vergeben.",
+    prices: "Preise, Steuersätze, Rabatte und Summen der Aufträge sehen und erfassen. Ohne dieses Recht bleiben sie verborgen (Standard für Mechaniker).",
+  },
+  parts: {
+    view: "Artikel, Lagerbestand und Bewegungen ansehen (ohne Preise).",
+    edit: "Artikel anlegen, ändern und archivieren.",
+    stock: "Wareneingang erfassen und Inventur buchen.",
+    prices: "Einkaufs- und Verkaufspreise der Artikel sehen und ändern. Ohne dieses Recht werden sie nicht gelesen (Standard für Mechaniker).",
+  },
   tires: {
     view: "Reifensätze und ihren Lagerort ansehen.",
     create: "Neue Reifensätze einlagern.",

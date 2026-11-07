@@ -20,7 +20,7 @@ export type PresetDef = {
 export const PRESETS: readonly PresetDef[] = [
   { id: "basic", nameKey: "setup.presets.basic.name", descriptionKey: "setup.presets.basic.description", enable: [] },
   // Block 12 trägt hier die Funktionen für Aufträge und Rechnungen ein (F2/F3); bis dahin ist es vom Standard nicht zu unterscheiden und die Einrichtung blendet es aus
-  { id: "orders", nameKey: "setup.presets.orders.name", descriptionKey: "setup.presets.orders.description", enable: [] },
+  { id: "orders", nameKey: "setup.presets.orders.name", descriptionKey: "setup.presets.orders.description", enable: ["workshop.orders", "workshop.parts"] },
 ];
 
 export type SkippedReason = "unknown" | "required" | "alreadyOn";

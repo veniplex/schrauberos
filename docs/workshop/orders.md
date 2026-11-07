@@ -1,0 +1,39 @@
+# Aufträge
+
+Ein Auftrag (Arbeitskarte) begleitet ein Fahrzeug von der Annahme bis zur Abholung. Die Funktion ist standardmäßig ausgeschaltet; ein Administrator schaltet sie unter
+**Verwaltung → Module & Funktionen** ein. Sie braucht die Funktion **Fahrzeuge**; Termine und Kunden werden verknüpft, wenn sie aktiv sind.
+
+## Ablauf
+
+**Angenommen → In Arbeit → Fertig (abholbereit) → Abgeholt.** Dazu gibt es **Storniert**. Der Stand steht oben auf der Auftragsseite, jeder Wechsel mit Zeit und Person im **Verlauf**.
+
+* **Auftrag annehmen:** Unter **Aufträge → Neuer Auftrag** das Fahrzeug wählen, Kundenwunsch und **Kilometerstand bei Annahme** eintragen. Schneller geht es aus einem Termin:
+  Im Termin (Kalender, Termin anklicken) erscheint **Auftrag aus Termin**; Fahrzeug und Anliegen werden übernommen. Zu einem Termin kann es einen (nicht stornierten) Auftrag geben.
+  Jeder Auftrag bekommt eine fortlaufende Nummer der Form `A-2026-0001` ohne Lücken.
+* **Kunde:** Er ergibt sich aus dem Halter des Fahrzeugs. Ein Fahrzeug ohne Halter ergibt einen Auftrag ohne Kunden. Archivierte Fahrzeuge lassen sich nicht annehmen; bei Kunden mit
+  eingeschränkter Verarbeitung (Datenschutz) ist kein neuer Auftrag möglich.
+* **Kilometerstand:** Ist der Stand bei Annahme **höher** als der im Fahrzeug gespeicherte (oder dort noch leer), übernimmt ihn das Fahrzeug. Ist er niedriger, bleibt der Stand im Fahrzeug
+  unverändert – die Anwendung weist darauf hin, es ist kein Fehler (der Tacho kann getauscht worden sein).
+* **Status:** Auf der Auftragsseite unter **Weiter im Ablauf**: *Arbeit beginnen*, *Fertig melden*, zurück, *Stornieren* und *Wieder aufnehmen*. Ein Termin zum Auftrag folgt automatisch:
+  Beginnt die Arbeit, steht er auf *In Arbeit*; wird der Auftrag abgeschlossen, auf *Erledigt*. Ein stornierter Auftrag sagt den Termin nicht ab. Aufträge werden nie gelöscht.
+* **Abschließen (abgeholt):** Mit dem Recht **Aufträge abschließen**. Beim Abschließen buchen andere Funktionen ab, zum Beispiel **Teile & Lager** die verbrauchten Teile –
+  entweder gelingt alles, oder der Auftrag bleibt offen und nichts ist gebucht. Ein abgeschlossener Auftrag lässt sich nicht mehr ändern.
+* **Wieder öffnen:** Nur mit dem eigenen Recht **Abgeschlossene Aufträge wieder öffnen** (in keiner mitgelieferten Rolle enthalten, ein Administrator vergibt es bewusst). Der Auftrag steht danach
+  auf *Fertig*, die Abbuchungen werden zurückgebucht, der Vorgang steht im Audit-Log. Erst dann lässt er sich ändern.
+
+## Positionen, Befunde, Freigaben
+
+* **Positionen:** Arbeit, Teil oder Sonstiges, mit Beschreibung, Menge, Einheit, Netto-Einzelpreis, Steuersatz und Rabatt; unten stehen Netto, Steuer je Satz und Brutto.
+  Am Handy erscheint jede Position als Karte und die Summe klebt am unteren Rand. Preise und Summen sehen und erfassen nur Personen mit dem Recht **Preise und Summen der Aufträge**;
+  **Mechaniker haben es standardmäßig nicht** und sehen die Positionen ohne Preise. Ist im Werkstattprofil der Kleinunternehmer (§ 19 UStG) eingestellt, werden keine Steuern ausgewiesen.
+  Ist **Teile & Lager** aktiv, lassen sich Artikel einfügen (Bezeichnung, Preis und Steuersatz werden vorbelegt und bleiben änderbar).
+* **Befunde:** Freitext, beliebig viele. Jeder Befund trägt Verfasser und Zeit.
+* **Kundenfreigabe bei Mehrarbeit:** Wird mehr Arbeit nötig als vereinbart, holt die Werkstatt die Freigabe ein und protokolliert sie: **Mehrbetrag (brutto)**, **Begründung**, die **freigebende Person**
+  und die Art – **Unterschrift am Gerät** (auf dem Tablet zeichnen; wer nicht zeichnen kann, tippt den Namen und bestätigt) oder **telefonisch**. Zeitpunkt und erfassende Person werden festgehalten.
+  Einträge im Protokoll lassen sich **nicht ändern oder löschen**; sie stehen auch im Audit-Log.
+
+## Hinweise
+
+* Die Liste zeigt standardmäßig die **offenen** Aufträge; die Suche findet Nummer, Kennzeichen, Fahrzeug, Halter und Kundenwunsch. Die Übersicht zeigt offene und abholbereite Aufträge.
+* Mehrere Personen können denselben Auftrag öffnen: Hat jemand ihn inzwischen geändert, meldet die Anwendung einen Konflikt, statt etwas zu überschreiben.
+* Eine Rechnung zum Auftrag entsteht erst mit der Funktion für Angebote und Rechnungen. Das Annahmeprotokoll (Zustand des Fahrzeugs bei Annahme) gehört zu den Checklisten.

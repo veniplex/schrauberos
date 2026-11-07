@@ -4,6 +4,8 @@ import type { HelpTopicDef } from "./types";
 
 import { help as appointments } from "./workshop/appointments/help";
 import { help as tires } from "./workshop/tires/help";
+import { help as orders } from "./workshop/orders/help";
+import { help as parts } from "./workshop/parts/help";
 import { help as customers } from "./workshop/customers/help";
 import { help as vehicles } from "./workshop/vehicles/help";
 import { help as invoices } from "./office/invoices/help";
@@ -28,6 +30,8 @@ import { help as system } from "./admin/system/help";
  */
 export const ALL_HELP_TOPICS: readonly HelpTopicDef[] = [
   ...appointments,
+  ...orders,
+  ...parts,
   ...tires,
   ...customers,
   ...vehicles,

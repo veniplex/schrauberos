@@ -7,6 +7,9 @@
  * Anzeigeeinstellungen). Beides sind nie API-Ressourcen.
  */
 export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
+  "parts.count": "Inventur: eine Zählung vor Ort mit Soll-/Ist-Abgleich in der Oberfläche; die API bucht Bestand nur über den Wareneingang (POST /stock-movements).",
+  "orders.reopen": "Wieder öffnen hebt einen Abschluss samt den Rückbuchungen anderer Funktionen auf (eigenes, gekennzeichnetes Recht orders.reopen): eine bewusste Handlung in der Oberfläche, kein Weg für Integrationen.",
+  "orders.removeFinding": "Befunde sind Aufzeichnungen der Werkstatt; die API legt sie nur an. Entfernen ist eine Korrektur in der Oberfläche.",
   "customers.restrict": "Datenschutzvorgang (Art. 18 DSGVO) mit Sonderrecht customers.privacy: nur in der Oberfläche; eingeschränkte Kunden gibt es für die API nicht (404).",
   "customers.unrestrict": "Datenschutzvorgang (Art. 18 DSGVO) mit Sonderrecht customers.privacy: nur in der Oberfläche; eingeschränkte Kunden gibt es für die API nicht (404).",
   "customers.anonymize": "Unumkehrbarer Datenschutzvorgang (Art. 17 DSGVO) mit Sonderrecht customers.privacy und Rückfrage: nur in der Oberfläche.",

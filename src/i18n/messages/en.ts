@@ -6,6 +6,8 @@ import { employeesEn } from "./modules/employees.en";
 import { vehiclesEn } from "./modules/vehicles.en";
 import { appointmentsEn } from "./modules/appointments.en";
 import { tiresEn } from "./modules/tires.en";
+import { ordersEn } from "./modules/orders.en";
+import { partsEn } from "./modules/parts.en";
 import { customersEn } from "./modules/customers.en";
 import { exchangeEn } from "./modules/exchange.en";
 import { usersEn } from "./modules/users.en";
@@ -159,6 +161,8 @@ export const en: Messages = {
     administration: "Administration",
     dashboard: "Overview",
     appointments: "Appointments",
+    orders: "Orders",
+    parts: "Parts & stock",
     tires: "Tyre storage",
     customers: "Customers",
     users: "Users",
@@ -211,7 +215,7 @@ export const en: Messages = {
     presetHint: "What the workshop starts with. Everything can be switched on and off later under “Modules & features”.",
     presets: {
       basic: { name: "Basic", description: "Appointments, tire storage, customers, vehicles, invoice archive, employees, fleet, handbook and IT documentation." },
-      orders: { name: "With orders and invoices", description: "Additionally orders and invoice creation for the daily workshop routine." },
+      orders: { name: "With orders and stock", description: "Additionally workshop orders (job cards) and parts & stock for the daily workshop routine." },
     },
     demo: "Start with sample data",
     demoHint: "Creates sample customers, vehicles, appointments etc. for trying things out (only sensible for a test).",
@@ -304,6 +308,8 @@ export const en: Messages = {
   vehicles: vehiclesEn,
   appointments: appointmentsEn,
   tires: tiresEn,
+  orders: ordersEn,
+  parts: partsEn,
   customers: customersEn,
   exchange: exchangeEn,
   users: usersEn,
@@ -312,6 +318,8 @@ export const en: Messages = {
   roles: rolesEn,
   permissionGroups: {
     appointments: "Appointments",
+    orders: "Orders",
+    parts: "Parts & stock",
     tires: "Tyre storage",
     customers: "Customers",
     vehicles: "Vehicles",
@@ -339,6 +347,20 @@ export const en: Messages = {
       edit: "Edit appointments",
       delete: "Delete appointments",
       configure: "Set up bays, appointment types and calendar",
+    },
+    orders: {
+      view: "View orders",
+      create: "Accept orders",
+      edit: "Edit orders (status, positions, findings, approvals)",
+      close: "Close orders (picked up)",
+      reopen: "Reopen closed orders",
+      prices: "See and enter prices and totals of orders",
+    },
+    parts: {
+      view: "View parts and stock",
+      edit: "Create and edit articles",
+      stock: "Book goods receipts and stocktaking",
+      prices: "See and change purchase and sales prices of articles",
     },
     tires: {
       view: "View tyre storage",

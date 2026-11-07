@@ -8,6 +8,20 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     delete: "Delete appointments permanently.",
     configure: "Define workstations, appointment types and the calendar grid.",
   },
+  orders: {
+    view: "View workshop orders with positions (without prices), findings and history.",
+    create: "Accept orders, also from an appointment.",
+    edit: "Set the status, enter findings and positions, record customer approvals.",
+    close: "Close orders (“picked up”); other functions book out as a result, e.g. stock.",
+    reopen: "Reopen a closed order: reverses bookings and is recorded in the audit log. Never granted automatically.",
+    prices: "See and enter prices, tax rates, discounts and totals of orders. Without it they stay hidden (default for mechanics).",
+  },
+  parts: {
+    view: "View articles, stock levels and movements (without prices).",
+    edit: "Create, change and archive articles.",
+    stock: "Record goods receipts and book stocktaking.",
+    prices: "See and change purchase and sales prices of articles. Without it they are not read (default for mechanics).",
+  },
   tires: {
     view: "View tire sets and their storage location.",
     create: "Store new tire sets.",

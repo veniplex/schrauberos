@@ -116,8 +116,8 @@ describe("Schnellaktionen der Übersicht", () => {
   const ids = (key: string) => registry.shortcutsFor(roleSession(key)).map((a) => a.id);
 
   it("zwei bis drei je Rolle: erst Anlegen, dann Ansichten als Auffüllung", () => {
-    assert.deepEqual(ids("admin"), ["appointments.new", "tires.new", "customers.new"]);
-    assert.deepEqual(ids("advisor"), ["appointments.new", "tires.new", "customers.new"]);
+    assert.deepEqual(ids("admin"), ["appointments.new", "orders.new", "tires.new"]);
+    assert.deepEqual(ids("advisor"), ["appointments.new", "orders.new", "tires.new"]);
     assert.deepEqual(ids("mechanic"), ["appointments.today", "tires.stock", "vehicles.list"], "ohne Anlegen-Rechte: Kalender, Ein-/Ausbuchen, Fahrzeuge");
     assert.deepEqual(ids("office"), ["invoices.new", "fleet.new", "handbook.new"]);
     assert.deepEqual(ids("it_admin"), ["network.newDevice", "docsIt.new"]);

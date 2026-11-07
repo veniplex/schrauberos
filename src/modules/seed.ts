@@ -2,6 +2,8 @@ import type { SeedDef } from "./types";
 
 import { seeds as appointments } from "./workshop/appointments/seed";
 import { seeds as tires } from "./workshop/tires/seed";
+import { seeds as orders } from "./workshop/orders/seed";
+import { seeds as parts } from "./workshop/parts/seed";
 import { seeds as customers } from "./workshop/customers/seed";
 import { seeds as vehicles } from "./workshop/vehicles/seed";
 import { seeds as invoices } from "./office/invoices/seed";
@@ -18,6 +20,8 @@ import { seeds as manual } from "./handbook/manual/seed";
 export const ALL_SEEDS: readonly SeedDef[] = [
   ...appointments,
   ...tires,
+  ...orders,
+  ...parts,
   ...customers,
   ...vehicles,
   ...invoices,

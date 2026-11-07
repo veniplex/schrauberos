@@ -8,6 +8,14 @@ GET /appointments/{id} appointments.get appointments.view
 PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId,vehicleId,customerId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
 DELETE /appointments/{id} appointments.delete appointments.delete
 POST /appointments/{id}/status appointments.status appointments.edit body=status
+GET /article-prices article-prices.list parts.prices sort=number
+GET /article-prices/{id} article-prices.get parts.prices
+GET /articles articles.list parts.view query=number,archived,belowMinimum sort=number,name,stockMilli,updatedAt
+POST /articles articles.create parts.edit body=number,name,unit,supplier,taxBp,minStockMilli,notes,purchaseCents,saleCents
+GET /articles/{id} articles.get parts.view
+PATCH /articles/{id} articles.update parts.edit body=number,name,unit,supplier,taxBp,minStockMilli,notes,purchaseCents,saleCents
+POST /articles/{id}/archive articles.archive parts.edit
+POST /articles/{id}/unarchive articles.unarchive parts.edit
 GET /customers customers.list customers.view query=q,city,archived sort=lastName,customerNumber,city,createdAt,updatedAt
 POST /customers customers.create customers.edit body=customerNumber,firstName,lastName,company,email,phone,street,zip,city,notes,allowDuplicate
 GET /customers/{id} customers.get customers.view
@@ -85,6 +93,22 @@ POST /network-vlans network-vlans.create network.edit body=number,name,descripti
 GET /network-vlans/{id} network-vlans.get network.view
 PATCH /network-vlans/{id} network-vlans.update network.edit body=number,name,description
 DELETE /network-vlans/{id} network-vlans.delete network.delete
+GET /order-approvals order-approvals.list orders.prices query=orderId sort=createdAt
+POST /order-approvals order-approvals.create orders.prices body=orderId,amountCents,reason,method,approverName
+GET /order-approvals/{id} order-approvals.get orders.prices
+GET /order-items order-items.list orders.prices query=orderId sort=position
+GET /order-items/{id} order-items.get orders.prices
+GET /orders orders.list orders.view query=status,vehicleId,customerId,appointmentId,number sort=acceptedAt,number,updatedAt
+POST /orders orders.create orders.create body=vehicleId,customerId,appointmentId,request,mileageKm
+GET /orders/{id} orders.get orders.view
+PATCH /orders/{id} orders.update orders.edit body=request,mileageKm
+POST /orders/{id}/close orders.close orders.close
+POST /orders/{id}/findings orders.findings orders.edit body=text
+POST /orders/{id}/items orders.items orders.prices body=items
+POST /orders/{id}/status orders.status orders.edit body=status
+GET /stock-movements stock-movements.list parts.view query=articleId,kind,orderId sort=createdAt
+POST /stock-movements stock-movements.create parts.stock body=articleId,quantityMilli,reference,note
+GET /stock-movements/{id} stock-movements.get parts.view
 GET /tire-sets tire-sets.list tires.view query=vehicleId,status,season sort=storedAt,season,createdAt,updatedAt
 POST /tire-sets tire-sets.create tires.create body=vehicleId,season,status,brand,model,width,aspect,rim,loadIndex,speedIndex,rimType,storageLocation,storedAt,notes,spare,tires
 GET /tire-sets/{id} tire-sets.get tires.view

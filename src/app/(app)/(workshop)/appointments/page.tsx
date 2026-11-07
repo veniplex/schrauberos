@@ -8,6 +8,7 @@ import { addDays, startOfWeek } from "@/lib/zone";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { getWorkshop } from "@/server/workshop";
+import { PageSections } from "@/modules/page-sections";
 import { getAppointmentSettings } from "@/modules/workshop/appointments/settings";
 import { AppointmentDetail } from "@/modules/workshop/appointments/appointment-detail";
 import { AppointmentModal } from "@/modules/workshop/appointments/appointment-modal";
@@ -104,7 +105,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
           canDelete={session.can("appointments.delete")}
         />
       ) : null}
-      {showDetail ? <AppointmentDetail key={sp.show} id={sp.show!} view={view} date={date} canEdit={canEdit} /> : null}
+      {showDetail ? <AppointmentDetail key={sp.show} id={sp.show!} view={view} date={date} canEdit={canEdit} sections={<PageSections session={session} host="appointments/detail" entityId={sp.show!} />} /> : null}
     </>
   );
 }

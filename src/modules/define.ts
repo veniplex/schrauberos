@@ -12,6 +12,8 @@ export type IconName =
   | "dashboard"
   | "calendar"
   | "tires"
+  | "orders"
+  | "parts"
   | "customers"
   | "vehicles"
   | "users"

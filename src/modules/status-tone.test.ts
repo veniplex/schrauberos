@@ -15,6 +15,10 @@ import { FLEET_STATUS_TONE } from "@/modules/office/fleet/status-tone";
 import { PAYMENT_TONE } from "@/modules/office/invoices/status-tone";
 import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { STATUS_TONE } from "@/modules/workshop/appointments/status-tone";
+import { ORDER_STATUSES } from "@/modules/workshop/orders/constants";
+import { ORDER_STATUS_TONE } from "@/modules/workshop/orders/status-tone";
+import { MOVEMENT_KINDS } from "@/modules/workshop/parts/constants";
+import { MOVEMENT_TONE, STOCK_TONE } from "@/modules/workshop/parts/status-tone";
 import { TIRE_SEASONS, TIRE_SET_STATUSES } from "@/modules/workshop/tires/constants";
 import { HEALTH_TONE, SEASON_TONE, TIRE_SET_STATUS_TONE } from "@/modules/workshop/tires/status-tone";
 import { MAIL_STATUSES } from "@/lib/mail";
@@ -26,6 +30,9 @@ import { BACKUP_KINDS } from "@/server/backup/kinds";
  */
 const MAPS: Array<[string, Record<string, string>, readonly string[]]> = [
   ["Termin", STATUS_TONE, APPOINTMENT_STATUSES],
+  ["Auftrag", ORDER_STATUS_TONE, ORDER_STATUSES],
+  ["Lagerbewegung", MOVEMENT_TONE, MOVEMENT_KINDS],
+  ["Bestand", STOCK_TONE, ["negative", "low", "ok"]],
   ["Reifensatz", TIRE_SET_STATUS_TONE, TIRE_SET_STATUSES],
   ["Saison", SEASON_TONE, TIRE_SEASONS],
   ["Reifenzustand", HEALTH_TONE, ["ok", "warn", "replace", "unknown"]],

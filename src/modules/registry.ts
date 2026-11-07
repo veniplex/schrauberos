@@ -4,11 +4,15 @@ import { FEATURES, MODULES, fullFeatureId, isPermission, type FeatureId, type Mo
 import { withTimeout } from "@/lib/with-timeout";
 import type { IconName } from "./define";
 import { logError } from "@/lib/log-safe";
-import type { SearchHit, SearchProviderDef, SettingsTabDef, SetupCheckDef, WidgetDef } from "./types";
+import type { SearchHit, SearchProviderDef, SectionDef, SectionHost, SettingsTabDef, SetupCheckDef, WidgetDef } from "./types";
 
 import { widgets as appointmentsWidgets } from "./workshop/appointments/widgets";
 import { settingsTabs as appointmentsSettings } from "./workshop/appointments/settings-tab";
 import { widgets as tiresWidgets } from "./workshop/tires/widgets";
+import { widgets as ordersWidgets } from "./workshop/orders/widgets";
+import { widgets as partsWidgets } from "./workshop/parts/widgets";
+import { sections as partsSections } from "./workshop/parts/sections";
+import { sections as ordersSections } from "./workshop/orders/sections";
 import { widgets as vehiclesWidgets } from "./workshop/vehicles/widgets";
 import { settingsTabs as tiresSettings } from "./workshop/tires/settings-tab";
 import { settingsTabs as employeesSettings } from "./office/employees/settings-tab";
@@ -33,6 +37,8 @@ import { settingsTabs as updatesSettings } from "./admin/updates/settings-tab";
 
 import { searchProviders as appointmentsSearch } from "./workshop/appointments/search";
 import { searchProviders as tiresSearch } from "./workshop/tires/search";
+import { searchProviders as ordersSearch } from "./workshop/orders/search";
+import { searchProviders as partsSearch } from "./workshop/parts/search";
 import { searchProviders as customersSearch } from "./workshop/customers/search";
 import { searchProviders as vehiclesSearch } from "./workshop/vehicles/search";
 import { searchProviders as invoicesSearch } from "./office/invoices/search";
@@ -48,6 +54,8 @@ import { searchProviders as handbookSearch } from "./handbook/manual/search";
  */
 const ALL_WIDGETS: WidgetDef[] = [
   ...appointmentsWidgets,
+  ...ordersWidgets,
+  ...partsWidgets,
   ...tiresWidgets,
   ...vehiclesWidgets,
   ...invoicesWidgets,
@@ -62,6 +70,8 @@ const ALL_WIDGETS: WidgetDef[] = [
 /** Suchanbieter der Funktionen (Schnellsuche). Neue Funktion mit durchsuchbaren Daten: Zeile ergänzen – `src/modules/search.test.ts` verlangt sie für jede fachliche Funktion. */
 export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...appointmentsSearch,
+  ...ordersSearch,
+  ...partsSearch,
   ...tiresSearch,
   ...customersSearch,
   ...vehiclesSearch,
@@ -72,6 +82,12 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...itDocsSearch,
   ...handbookSearch,
 ];
+
+/**
+ * Beiträge von Funktionen zu Seiten anderer Funktionen („Erweiterungspunkte“): Der Gastgeber (Auftragsseite, Termin) fragt `sectionsFor(session, host)` und kennt seine Gäste nicht.
+ * Neue Funktion mit Abschnitten: `sections.tsx` anlegen und hier eintragen.
+ */
+const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections];
 
 const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
 
@@ -124,6 +140,11 @@ export async function setupChecksFor(session: AppSession, secure: boolean): Prom
     }),
   );
   return results.filter((r): r is SetupCheckResult => r !== null);
+}
+
+/** Abschnitte für einen Erweiterungspunkt: nur von aktiven Funktionen (und deren aktiven weichen Abhängigkeiten), für die die Person das Recht hat. */
+export function sectionsFor(session: AppSession, host: SectionHost): SectionDef[] {
+  return ALL_SECTIONS.filter((s) => s.host === host && session.features.has(s.feature) && session.can(s.permission) && (s.uses ?? []).every((f) => session.features.has(f))).sort((a, b) => a.order - b.order);
 }
 
 export function settingsTabsFor(session: AppSession): SettingsTabDef[] {

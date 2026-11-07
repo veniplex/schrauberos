@@ -27,10 +27,13 @@ describe("Presets (ausgeliefert)", () => {
     }
   });
 
-  it("das erste Preset ist der Standard und ändert nichts; heute gibt es keine Wahl in der Einrichtung", () => {
+  it("das erste Preset ist der Standard und ändert nichts; das Preset „orders“ schaltet die Funktionen für Aufträge ein, deshalb gibt es jetzt eine Wahl in der Einrichtung", () => {
     assert.deepEqual(PRESETS[0].enable, []);
     assert.deepEqual(planPreset(PRESETS[0], MODULES, FEATURES), { overrides: {}, skipped: [] });
-    assert.deepEqual(presetChoices(PRESETS, MODULES, FEATURES).map((p) => p.id), ["basic"], "solange kein Preset etwas einschaltet");
+    const orders = PRESETS.find((p) => p.id === "orders")!;
+    assert.ok(orders.enable.includes("workshop.orders"));
+    assert.deepEqual(Object.keys(planPreset(orders, MODULES, FEATURES).overrides).sort(), orders.enable.slice().sort(), "jede Funktion des Presets ist von Haus aus aus und wird eingeschaltet");
+    assert.deepEqual(presetChoices(PRESETS, MODULES, FEATURES).map((p) => p.id), ["basic", "orders"]);
   });
 });
 

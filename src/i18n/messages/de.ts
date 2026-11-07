@@ -5,6 +5,8 @@ import { employeesDe } from "./modules/employees.de";
 import { vehiclesDe } from "./modules/vehicles.de";
 import { appointmentsDe } from "./modules/appointments.de";
 import { tiresDe } from "./modules/tires.de";
+import { ordersDe } from "./modules/orders.de";
+import { partsDe } from "./modules/parts.de";
 import { customersDe } from "./modules/customers.de";
 import { exchangeDe } from "./modules/exchange.de";
 import { usersDe } from "./modules/users.de";
@@ -160,6 +162,8 @@ export const de = {
     administration: "Verwaltung",
     dashboard: "Übersicht",
     appointments: "Termine",
+    orders: "Aufträge",
+    parts: "Teile & Lager",
     tires: "Reifenlager",
     customers: "Kunden",
     users: "Benutzer",
@@ -212,7 +216,7 @@ export const de = {
     presetHint: "Womit die Werkstatt startet. Später lässt sich alles unter „Module & Funktionen“ ein- und ausschalten.",
     presets: {
       basic: { name: "Basis", description: "Termine, Reifenlager, Kunden, Fahrzeuge, Rechnungsarchiv, Mitarbeiter, Fuhrpark, Handbuch und IT-Dokumentation." },
-      orders: { name: "Mit Aufträgen und Rechnungen", description: "Zusätzlich Aufträge und Rechnungserstellung für den Werkstattalltag." },
+      orders: { name: "Mit Aufträgen und Lager", description: "Zusätzlich Werkstattaufträge (Arbeitskarten) und Teile & Lager für den Werkstattalltag." },
     },
     demo: "Mit Beispieldaten starten",
     demoHint: "Legt Beispiel-Kunden, -Fahrzeuge, -Termine usw. zum Ausprobieren an (nur sinnvoll für einen Test).",
@@ -305,6 +309,8 @@ export const de = {
   vehicles: vehiclesDe,
   appointments: appointmentsDe,
   tires: tiresDe,
+  orders: ordersDe,
+  parts: partsDe,
   customers: customersDe,
   exchange: exchangeDe,
   users: usersDe,
@@ -312,6 +318,8 @@ export const de = {
   roles: rolesDe,
   permissionGroups: {
     appointments: "Termine",
+    orders: "Aufträge",
+    parts: "Teile & Lager",
     tires: "Reifenlager",
     customers: "Kunden",
     vehicles: "Fahrzeuge",
@@ -339,6 +347,20 @@ export const de = {
       edit: "Termine bearbeiten",
       delete: "Termine löschen",
       configure: "Arbeitsplätze, Terminarten und Kalender einrichten",
+    },
+    orders: {
+      view: "Aufträge ansehen",
+      create: "Aufträge annehmen",
+      edit: "Aufträge bearbeiten (Status, Positionen, Befunde, Freigaben)",
+      close: "Aufträge abschließen (abgeholt)",
+      reopen: "Abgeschlossene Aufträge wieder öffnen",
+      prices: "Preise und Summen der Aufträge sehen und erfassen",
+    },
+    parts: {
+      view: "Teile und Lagerbestand ansehen",
+      edit: "Artikel anlegen und bearbeiten",
+      stock: "Wareneingang und Inventur buchen",
+      prices: "Einkaufs- und Verkaufspreise der Artikel sehen und ändern",
     },
     tires: {
       view: "Reifenlager ansehen",

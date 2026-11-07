@@ -4,3 +4,4 @@
  */
 export { VehiclePicker, type VehicleOption } from "./vehicle-picker";
 export { toVehicleOption } from "./vehicle-option";
+export { vehicleTextWhere } from "./queries";
