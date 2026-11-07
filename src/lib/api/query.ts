@@ -42,8 +42,12 @@ export function parseSort(raw: string | null, allowed: readonly string[], fallba
 
 export const isParamError = (value: unknown): value is ParamError => typeof value === "object" && value !== null && "field" in value && "code" in value;
 
-/** ETag einer Zeile aus ihrer Version (Millisekunden der letzten Änderung, siehe `versionOf`). */
-export const etagOf = (version: string): string => `"${version}"`;
+/**
+ * ETag einer Zeile aus ihrer Version (Millisekunden der letzten Änderung, siehe `versionOf`). `extra`: Zustand, der die Antwort ändert, aber nicht die Version (z. B. der Bestand eines Artikels,
+ * der sich durch Buchungen ändert, ohne dass die Stammdaten es tun): Er steht als Anhang hinter einem Punkt, damit ein bedingtes Lesen (`If-None-Match`) nie einen veralteten Stand bestätigt.
+ * Für `If-Match` zählt nur die Version (`parseIfMatch`).
+ */
+export const etagOf = (version: string, extra?: string): string => (extra ? `"${version}.${extra}"` : `"${version}"`);
 
 /**
  * `If-None-Match` (nur Lesen): Hat der Client den aktuellen Stand schon? `*` passt auf jedes vorhandene Element; sonst eine Liste von Entity-Tags, schwache (`W/"…"`)
@@ -64,6 +68,6 @@ export function ifNoneMatchHit(header: string | null, etag: string): boolean {
 /** `If-Match` → Version. `*` und Listen werden nicht unterstützt (die Version muss genau benannt werden). */
 export function parseIfMatch(header: string | null): { kind: "none" } | { kind: "invalid" } | { kind: "version"; version: string } {
   if (header === null || header.trim() === "") return { kind: "none" };
-  const match = /^(?:W\/)?"(\d{1,16})"$/.exec(header.trim());
+  const match = /^(?:W\/)?"(\d{1,16})(?:\.[-0-9a-z]{1,24})?"$/.exec(header.trim());
   return match ? { kind: "version", version: match[1] } : { kind: "invalid" };
 }

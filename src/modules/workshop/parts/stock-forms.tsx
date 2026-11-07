@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Field, Form, FormActions, Input } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { SearchCombobox, type SearchOption } from "@/components/ui/search-combobox";
@@ -71,23 +72,27 @@ export function ReceiptForm({ article, cancelHref }: { article: ArticleOption | 
 
 export type CountRow = { id: string; number: string; name: string; unit: string; stock: string };
 
-/** Inventur: je Artikel Soll und Eingabe „gezählt“; nur ausgefüllte Zeilen werden gebucht (die Differenz als Korrektur). */
-export function CountForm({ rows, cancelHref }: { rows: readonly CountRow[]; cancelHref: string }) {
+/**
+ * Inventur: je Artikel Soll und Eingabe „gezählt“; nur ausgefüllte Zeilen werden gebucht (die Differenz als Korrektur). **Mobil** (unter `md`) steht jeder Artikel gestapelt: Name (umbrechend, volle
+ * Zeile) mit Nummer und Soll darunter, die Eingabe darunter in voller Breite; ab `md` sind es drei Spalten (Name | Soll | Eingabe). Der Name wird nie auf eine Spalte von wenigen Zeichen gequetscht.
+ */
+export function CountForm({ rows, cancelHref, draftKey = "count", notice }: { rows: readonly CountRow[]; cancelHref: string; draftKey?: string; notice?: ReactNode }) {
   const { t } = useI18n();
   return (
-    <Form action={bookCount} draftKey="count" className="flex flex-col gap-5">
+    <Form action={bookCount} draftKey={draftKey} className="flex flex-col gap-5">
       <Card title={t("parts.sections.count")}>
         <p className="mb-3 text-sm text-ink-muted">{t("parts.count.intro")}</p>
+        {notice}
         <ul className="flex flex-col divide-y divide-line">
           {rows.map((row) => (
-            <li key={row.id} className="grid grid-cols-[minmax(0,1fr)_7rem_8rem] items-center gap-3 py-2">
+            <li key={row.id} data-count-row="" className="grid grid-cols-1 gap-2 py-3 md:grid-cols-[minmax(0,1fr)_7rem_8rem] md:items-center md:gap-3 md:py-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{row.name}</p>
-                <p className="truncate text-xs text-ink-muted">
+                <p className="break-words text-sm font-medium md:truncate">{row.name}</p>
+                <p className="break-words text-xs text-ink-muted md:truncate">
                   <span className="tabular">{row.number}</span> · {t("parts.count.expected", { stock: row.stock, unit: row.unit })}
                 </p>
               </div>
-              <span className="text-right text-sm text-ink-muted tabular">
+              <span className="hidden text-right text-sm text-ink-muted tabular md:block">
                 {row.stock} {row.unit}
               </span>
               <Field label={t("parts.count.counted")} labelClassName="sr-only" htmlFor={`count-${row.id}`} name={`count.${row.id}`}>

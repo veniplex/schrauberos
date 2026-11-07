@@ -19,16 +19,22 @@ Jede Änderung des Bestands ist eine **Bewegung**, die sich nicht mehr ändern o
 * **Wareneingang** (Recht **Wareneingang und Inventur buchen**): Artikel, Menge, dazu die Nummer des Lieferscheins oder der Eingangsrechnung. Die Nummer tragen Sie von Hand ein;
   ist die Rechnungsfunktion aktiv, führt sie in der Bewegungsliste zu den Rechnungen.
 * **Inventur:** Unter **Inventur** steht je Artikel der Sollbestand; Sie tragen den gezählten Bestand ein. Nur ausgefüllte Zeilen werden gebucht, die **Differenz** als Korrektur.
-  Maßgeblich ist der Stand im Moment des Buchens. Jede Inventur steht im Audit-Log.
+  Maßgeblich ist der Stand im Moment des Buchens. Jede Inventur steht im Audit-Log. Am Handy steht jeder Artikel für sich (Name, darunter Nummer und Soll, darunter die Eingabe), am Tablet und
+  Computer in Spalten. Die Liste zeigt **höchstens 500 Artikel** je Seite (nach Artikelnummer); gibt es mehr, sagt die Seite es und führt über **Weiter mit den nächsten Artikeln** zu den übrigen –
+  jede Seite wird für sich gebucht.
 * **Beim Abschluss eines Auftrags** wird für jede Position mit Artikelverweis (Art *Teil*) die Menge abgebucht – **in derselben Transaktion** wie der Abschluss: Schlägt etwas fehl, bleibt der Auftrag
-  offen und nichts ist gebucht. Positionen ohne Artikelverweis (freier Text) werden nicht gebucht.
-* **Wieder öffnen** eines abgeschlossenen Auftrags bucht zurück, was für ihn noch abgebucht ist (Rückbuchung). Eine **Stornorechnung** bucht den Bestand **nicht** automatisch zurück: Wurden Teile
+  offen und nichts ist gebucht. Positionen ohne Artikelverweis (freier Text) werden nicht gebucht. Eine Position mit **negativer Menge** (Gutschrift) bucht einen Zugang. Derselbe Artikel in mehreren
+  Positionen zählt zusammen.
+* **Wieder öffnen** eines abgeschlossenen Auftrags bucht zurück, was für ihn noch gebucht ist (Rückbuchung, auch eine Gutschrift wird wieder abgezogen): Danach steht der Bestand wie vor dem Abschluss,
+  auch bei mehrfachem Abschließen und Öffnen. Maßgeblich sind die Bewegungen des Auftrags: Bucht ein Abschluss bereits Gebuchtes, wird nur der Unterschied gebucht. Eine **Stornorechnung** bucht den Bestand **nicht** automatisch zurück: Wurden Teile
   tatsächlich zurückgenommen, buchen Sie das als Wareneingang oder Inventur-Korrektur.
 * **Negativer Bestand** ist erlaubt (die Ware war da, die Buchung hinkt hinterher). Er wird nicht verhindert, aber sichtbar: in der Artikelliste (Filter **Negativer Bestand**), auf der Artikelseite, auf
-  der Übersicht und im Auftrag. Reicht der Bestand für die Teile eines offenen Auftrags nicht, steht dort ein Hinweis; abschließen lässt sich der Auftrag trotzdem.
+  der Übersicht und im Auftrag. Reicht der Bestand für die Teile eines offenen Auftrags nicht, steht dort ein Hinweis (gerechnet je Artikel mit der Summe aller Positionen); abschließen lässt sich der Auftrag trotzdem.
+  Eine Buchung ändert die **Stammdaten des Artikels nicht**: Wer gerade den Artikel bearbeitet, bekommt wegen einer Buchung keinen Konflikt.
 
 ## Im Auftrag
 
 Ist die Funktion **Aufträge** aktiv, erscheint im Positionen-Editor **Artikel einfügen**: Auswahl über Nummer oder Bezeichnung, Bezeichnung, Einheit, Verkaufspreis und Steuersatz werden vorbelegt.
 Der Abschnitt **Verbrauchte Teile** auf der Auftragsseite zeigt, was gebucht wird oder schon gebucht ist. Wird die Funktion Teile & Lager ausgeschaltet, buchen Aufträge nichts mehr ab und zurück;
-bereits gebuchte Bewegungen bleiben.
+bereits gebuchte Bewegungen bleiben. Wird sie zwischen Abschluss und Wiederöffnen eines Auftrags aus- und wieder eingeschaltet, bucht der nächste Abschluss nur den noch fehlenden Unterschied
+(nie doppelt); wird ein solcher Auftrag stattdessen storniert, gibt das Stornieren die Buchungen frei.

@@ -15,9 +15,10 @@ export async function bookMovement(
   tx: Tx,
   input: { articleId: string; kind: MovementKind; delta: number; byName: string; orderId?: string; orderNumber?: string; reference?: string | null; note?: string | null },
 ): Promise<{ id: string; stockAfterMilli: number } | null> {
-  const exists = await tx.article.findUnique({ where: { id: input.articleId }, select: { id: true } });
+  const exists = await tx.article.findUnique({ where: { id: input.articleId }, select: { id: true, updatedAt: true } });
   if (!exists) return null;
-  const updated = await tx.article.update({ where: { id: input.articleId }, data: { stockMilli: { increment: input.delta } }, select: { stockMilli: true } });
+  // `updatedAt` bleibt stehen (explizit zurückgeschrieben): Es ist die Version der Stammdaten für das Bearbeiten-Formular – eine Buchung ist kein Konflikt (wie die Anmeldezähler am Konto)
+  const updated = await tx.article.update({ where: { id: input.articleId }, data: { stockMilli: { increment: input.delta }, updatedAt: exists.updatedAt }, select: { stockMilli: true } });
   const movement = await tx.stockMovement.create({
     data: {
       articleId: input.articleId,

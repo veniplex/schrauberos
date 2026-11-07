@@ -337,3 +337,115 @@ describe("Verbrauchte Teile (Abschnitt der Auftragsseite)", () => {
     assert.deepEqual(await queries.consumedParts(id, []), []);
   });
 });
+
+describe("Rückbuchung nach Bilanz (Fix-Runde 12b: M1, N3)", () => {
+  const savePartLines = async (id: string, lines: Array<[string, number]>) =>
+    orderOps.saveItemsOperation.execute(advisor, {
+      id,
+      version: await versionNow(id),
+      items: JSON.stringify(lines.map(([articleId, qty]) => ({ description: "Teil", unit: "Stk", quantityMilli: qty * 1000, unitCents: 1000, taxBp: 1900, discountBp: 0, kind: "part", refType: "article", refId: articleId }))),
+    });
+  /** Wiederöffnen bei ausgeschalteter Funktion Teile & Lager (die Hooks laufen dann nicht) */
+  const reopenWhilePartsOff = async (id: string) => {
+    await env.db.featureSetting.update({ where: { key: "workshop.parts" }, data: { enabled: false } });
+    try {
+      const adminOff = await sessionFor([], { admin: true });
+      assert.ok(!adminOff.features.has("workshop.parts"));
+      assert.ok((await orderOps.reopenOrderOperation.execute(adminOff, { id, version: await versionNow(id) })).ok);
+    } finally {
+      await env.db.featureSetting.update({ where: { key: "workshop.parts" }, data: { enabled: true } });
+    }
+  };
+
+  it("negative Menge (Gutschriftsposition): Abschluss bucht Zugang, Wiederöffnen bucht ihn zurück – der Bestand wächst nicht bei jedem Zyklus", async () => {
+    const a = await article();
+    await receive(a, "10");
+    const id = await orderWith([]);
+    assert.ok((await savePartLines(id, [[a, -2]])).ok);
+    assert.ok((await close(id)).ok);
+    assert.equal(await stock(a), 12_000);
+    assert.ok((await reopen(id)).ok);
+    assert.equal(await stock(a), 10_000, "Wiederöffnen stellt den Zustand vor dem Abschluss her");
+    assert.ok((await close(id)).ok);
+    assert.equal(await stock(a), 12_000, "nicht 14 000: nie doppelt");
+    await reopen(id);
+    await close(id);
+    await reopen(id);
+    assert.equal(await stock(a), 10_000);
+    assert.equal((await env.db.stockMovement.findMany({ where: { orderId: id } })).reduce((sum, m) => sum + m.quantityMilli, 0), 0);
+  });
+
+  it("gemischte Vorzeichen derselben Ware in einem Auftrag: Saldo je Artikel, in beide Richtungen, auch bei geänderten Positionen", async () => {
+    const a = await article();
+    const b = await article();
+    await receive(a, "10");
+    await receive(b, "10");
+    const id = await orderWith([]);
+    assert.ok((await savePartLines(id, [[a, 5], [a, -2], [b, -1], [b, 1]])).ok);
+    assert.ok((await close(id)).ok);
+    assert.deepEqual([await stock(a), await stock(b)], [7000, 10_000], "a: −3, b: Summe 0 → keine Buchung");
+    assert.equal(await env.db.stockMovement.count({ where: { orderId: id, articleId: b } }), 0);
+    await reopen(id);
+    assert.deepEqual([await stock(a), await stock(b)], [10_000, 10_000]);
+    assert.ok((await savePartLines(id, [[a, -4]])).ok);
+    await close(id);
+    assert.equal(await stock(a), 14_000);
+    await reopen(id);
+    await close(id);
+    assert.equal(await stock(a), 14_000);
+    await reopen(id);
+    assert.equal(await stock(a), 10_000);
+  });
+
+  it("Abschluss bucht nur die Differenz zur Bilanz: wurde beim Wiederöffnen nicht zurückgebucht (Funktion aus), gibt es keine Doppelbuchung; geänderte Menge: nur der Unterschied", async () => {
+    const a = await article();
+    await receive(a, "10");
+    const id = await orderWith([[a, 3]]);
+    assert.ok((await close(id)).ok);
+    assert.equal(await stock(a), 7000);
+    await reopenWhilePartsOff(id);
+    assert.equal(await stock(a), 7000, "bei ausgeschalteter Funktion bucht das Wiederöffnen nichts zurück");
+    assert.ok((await close(id)).ok);
+    assert.equal(await stock(a), 7000, "Bilanz −3 000 entspricht schon dem Verbrauch: keine zweite Abbuchung");
+    assert.equal(await env.db.stockMovement.count({ where: { orderId: id } }), 1);
+    await reopenWhilePartsOff(id);
+    assert.ok((await savePartLines(id, [[a, 5]])).ok);
+    assert.ok((await close(id)).ok);
+    assert.equal(await stock(a), 5000, "Differenz −2 000 gebucht");
+    assert.ok((await reopen(id)).ok);
+    assert.equal(await stock(a), 10_000);
+  });
+
+  it("Stornieren eines wieder geöffneten Auftrags mit offenen Buchungen (Funktion war aus) gibt sie frei; danach bucht nichts mehr", async () => {
+    const a = await article();
+    await receive(a, "10");
+    const id = await orderWith([[a, 3]]);
+    await close(id);
+    await reopenWhilePartsOff(id);
+    assert.equal(await stock(a), 7000);
+    assert.ok((await orderOps.setStatusOperation.execute(advisor, { id, version: await versionNow(id), status: "cancelled" })).ok);
+    assert.equal(await stock(a), 10_000);
+    await orderOps.setStatusOperation.execute(advisor, { id, version: await versionNow(id), status: "accepted" });
+    await orderOps.setStatusOperation.execute(advisor, { id, version: await versionNow(id), status: "cancelled" });
+    assert.equal(await stock(a), 10_000);
+  });
+});
+
+describe("Bestandsbewegung und Version des Artikels (N8)", () => {
+  it("eine Buchung ändert die Version der Stammdaten nicht: ein vorher geladenes Bearbeiten-Formular meldet keinen Konflikt", async () => {
+    const a = await article();
+    const before = versionOf(await env.db.article.findUniqueOrThrow({ where: { id: a } }));
+    await receive(a, "5");
+    await ops.countOperation.execute(warehouse, { counts: { [a]: "3" } });
+    const id = await orderWith([[a, 1]]);
+    await close(id);
+    const row = await env.db.article.findUniqueOrThrow({ where: { id: a } });
+    assert.equal(versionOf(row), before, "Version unverändert");
+    assert.equal(row.stockMilli, 2000);
+    const saved = await ops.saveArticleOperation.execute(warehouse, { id: a, version: before, number: row.number, name: "Neuer Name", unit: "Stk" });
+    assert.ok(saved.ok, "kein Konflikt durch Buchungen");
+    assert.equal(await stock(a), 2000, "der Bestand bleibt");
+    const stale = await ops.saveArticleOperation.execute(warehouse, { id: a, version: before, number: row.number, name: "Noch einer", unit: "Stk" });
+    assert.equal(!stale.ok && stale.failure.code, "conflict", "eine echte zweite Bearbeitung mit der alten Version bleibt ein Konflikt");
+  });
+});

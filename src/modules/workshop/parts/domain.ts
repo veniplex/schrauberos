@@ -26,15 +26,46 @@ export function sumByArticle(lines: ReadonlyArray<{ refId: string; quantityMilli
   return sums;
 }
 
-/**
- * Was beim Wiederöffnen zurückzubuchen ist: je Artikel der Saldo der bisherigen Bewegungen zu diesem Auftrag (Abgänge negativ, Rückbuchungen positiv). Ein negativer Saldo wird mit
- * dem Gegenwert zurückgebucht; Saldo 0 (schon zurückgebucht) ergibt nichts – das Wiederöffnen ist so auch bei mehrfachem Abschließen richtig.
- */
-export function reversalsFor(movements: ReadonlyArray<{ articleId: string; quantityMilli: number }>): Map<string, number> {
+/** Bilanz der bisherigen Bewegungen eines Auftrags je Artikel (Abgänge negativ, Rückbuchungen positiv; Bewegungsarten `order` und `reversal`). */
+export function orderBalance(movements: ReadonlyArray<{ articleId: string; quantityMilli: number }>): Map<string, number> {
   const balance = new Map<string, number>();
   for (const m of movements) balance.set(m.articleId, (balance.get(m.articleId) ?? 0) + m.quantityMilli);
+  return balance;
+}
+
+/**
+ * Was beim Wiederöffnen (und beim Stornieren eines wieder geöffneten Auftrags) zu buchen ist: je Artikel das Gegenteil der Bilanz der bisherigen Bewegungen zu diesem Auftrag – in **beide**
+ * Richtungen (ein Abgang wird zurückgebucht, ein Zugang durch eine negative Menge/Gutschriftsposition wieder abgezogen). Bilanz 0 ergibt nichts: Das Wiederöffnen stellt immer genau den
+ * Zustand vor dem Abschluss her und ist bei mehrfachem Abschließen und Öffnen nie doppelt.
+ */
+export function reversalsFor(movements: ReadonlyArray<{ articleId: string; quantityMilli: number }>): Map<string, number> {
   const out = new Map<string, number>();
-  for (const [articleId, saldo] of balance) if (saldo < 0) out.set(articleId, -saldo);
+  for (const [articleId, balance] of orderBalance(movements)) if (balance !== 0) out.set(articleId, -balance);
+  return out;
+}
+
+/**
+ * Was beim Abschluss zu buchen ist: Ziel ist, dass die Bilanz des Auftrags je Artikel genau dem Verbrauch der Positionen (`consumed`, Abgang = −Menge) entspricht – gebucht wird die **Differenz**
+ * zu dem, was schon gebucht ist. Normalfall (nichts gebucht): der Verbrauch. Wurde zwischenzeitlich nicht zurückgebucht (Teile & Lager war beim Wiederöffnen ausgeschaltet) oder haben sich
+ * die Positionen geändert, bucht der Abschluss nur den Unterschied – nie doppelt. Artikel, die nicht mehr in den Positionen stehen, aber noch gebucht sind, werden zurückgebucht.
+ */
+export function closingDeltas(consumed: ReadonlyMap<string, number>, movements: ReadonlyArray<{ articleId: string; quantityMilli: number }>): Map<string, number> {
+  const balance = orderBalance(movements);
+  const out = new Map<string, number>();
+  for (const articleId of new Set([...consumed.keys(), ...balance.keys()])) {
+    const delta = -(consumed.get(articleId) ?? 0) - (balance.get(articleId) ?? 0);
+    if (delta !== 0) out.set(articleId, delta);
+  }
+  return out;
+}
+
+/** Artikel, deren Bestand für die Summe aller Positionen nicht reicht (derselbe Artikel in mehreren Positionen zählt zusammen; Gutschriften mit negativer Menge nie). */
+export function shortages(lines: ReadonlyArray<{ refId: string; quantityMilli: number }>, stock: ReadonlyMap<string, number>): Set<string> {
+  const out = new Set<string>();
+  for (const [articleId, needed] of sumByArticle(lines)) {
+    const have = stock.get(articleId);
+    if (have !== undefined && needed > 0 && have < needed) out.add(articleId);
+  }
   return out;
 }
 

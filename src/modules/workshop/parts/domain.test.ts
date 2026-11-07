@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { bookableLines, normalizeArticleNumber, reversalsFor, stockState, sumByArticle } from "./domain";
+import { bookableLines, closingDeltas, normalizeArticleNumber, reversalsFor, shortages, stockState, sumByArticle } from "./domain";
 
 describe("Artikelnummer", () => {
   it("getrimmt, Großbuchstaben, innere Leerzeichen zusammengefasst", () => {
@@ -38,5 +38,30 @@ describe("Buchung beim Abschluss", () => {
     assert.deepEqual([...reversalsFor([{ articleId: "a", quantityMilli: -3000 }, { articleId: "a", quantityMilli: 3000 }])], []);
     assert.deepEqual([...reversalsFor([{ articleId: "a", quantityMilli: -3000 }, { articleId: "a", quantityMilli: 3000 }, { articleId: "a", quantityMilli: -5000 }])], [["a", 5000]]);
     assert.deepEqual([...reversalsFor([])], []);
+  });
+});
+
+describe("Bilanz und Abschluss (Fix-Runde 12b)", () => {
+  it("Rückbuchung in beide Richtungen: Abgang wird zurückgebucht, Zugang (negative Menge) wieder abgezogen, Bilanz 0 ergibt nichts", () => {
+    assert.deepEqual([...reversalsFor([{ articleId: "a", quantityMilli: 2000 }])], [["a", -2000]]);
+    assert.deepEqual([...reversalsFor([{ articleId: "a", quantityMilli: 2000 }, { articleId: "a", quantityMilli: -2000 }])], []);
+    assert.deepEqual([...reversalsFor([{ articleId: "a", quantityMilli: -3000 }, { articleId: "b", quantityMilli: 1000 }])], [["a", 3000], ["b", -1000]]);
+  });
+
+  it("Abschluss bucht Verbrauch minus Bilanz: normal der Verbrauch, schon gebucht nichts, geändert die Differenz, nicht mehr verbrauchte Artikel werden zurückgebucht", () => {
+    const sums = (entries: Array<[string, number]>) => new Map(entries);
+    assert.deepEqual([...closingDeltas(sums([["a", 3000]]), [])], [["a", -3000]]);
+    assert.deepEqual([...closingDeltas(sums([["a", 3000]]), [{ articleId: "a", quantityMilli: -3000 }])], []);
+    assert.deepEqual([...closingDeltas(sums([["a", 5000]]), [{ articleId: "a", quantityMilli: -3000 }])], [["a", -2000]]);
+    assert.deepEqual([...closingDeltas(sums([["a", 1000]]), [{ articleId: "a", quantityMilli: -3000 }])], [["a", 2000]]);
+    assert.deepEqual([...closingDeltas(sums([]), [{ articleId: "a", quantityMilli: -3000 }])], [["a", 3000]]);
+    assert.deepEqual([...closingDeltas(sums([["a", -2000]]), [])], [["a", 2000]], "Gutschrift: Zugang");
+  });
+
+  it("Bestand reicht nicht: je Artikel gegen die Summe der Positionen (zwei Positionen à 3 bei Bestand 4), Gutschriften zählen nicht", () => {
+    const stock = new Map([["a", 4000], ["b", 1000]]);
+    assert.deepEqual([...shortages([{ refId: "a", quantityMilli: 3000 }, { refId: "a", quantityMilli: 3000 }], stock)], ["a"]);
+    assert.deepEqual([...shortages([{ refId: "a", quantityMilli: 3000 }, { refId: "b", quantityMilli: 1000 }], stock)], []);
+    assert.deepEqual([...shortages([{ refId: "b", quantityMilli: -5000 }, { refId: "unbekannt", quantityMilli: 9000 }], stock)], []);
   });
 });

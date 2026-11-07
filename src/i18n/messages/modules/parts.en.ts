@@ -63,6 +63,8 @@ export const partsEn: typeof partsDe = {
     note: "Note on the stocktaking",
     save: "Book stocktaking",
     empty: "No active articles.",
+    truncated: "Showing {shown} of {total} articles (sorted by article number). Book this stocktaking; count the remaining articles afterwards via \"Continue with the next articles\".",
+    next: "Continue with the next articles",
   },
   picker: { label: "Insert article", placeholder: "Article number or name …", hint: "Inserts a position with the article's name, sale price and tax rate; everything stays editable. Stock is booked when the order is closed." },
   consumed: {

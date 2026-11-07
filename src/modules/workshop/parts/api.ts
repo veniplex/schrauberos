@@ -77,6 +77,8 @@ export const articleEndpoints = defineResource({
   select: { id: true, number: true, name: true, unit: true, supplier: true, taxBp: true, stockMilli: true, minStockMilli: true, notes: true, archivedAt: true, createdAt: true, updatedAt: true },
   item: articleItem,
   version: versionOf,
+  // Buchungen ändern den Bestand, nicht die Version (Stammdaten): der Bestand gehört in den ETag, sonst bestätigte ein bedingtes Lesen einen veralteten Bestand
+  etagExtra: (a) => a.stockMilli.toString(36),
   toItem: (a): z.input<typeof articleItem> => ({
     id: a.id,
     version: versionOf(a),

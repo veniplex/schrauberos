@@ -61,6 +61,8 @@ export const partsDe = {
     note: "Notiz zur Inventur",
     save: "Inventur buchen",
     empty: "Keine aktiven Artikel.",
+    truncated: "Angezeigt werden {shown} von {total} Artikeln (nach Artikelnummer sortiert). Diese Inventur wird für sich gebucht; die übrigen Artikel folgen über „Weiter mit den nächsten Artikeln“.",
+    next: "Weiter mit den nächsten Artikeln",
   },
   picker: { label: "Artikel einfügen", placeholder: "Artikelnummer oder Bezeichnung …", hint: "Fügt eine Position mit Bezeichnung, Verkaufspreis und Steuersatz des Artikels ein; alles bleibt änderbar. Gebucht wird beim Abschluss des Auftrags." },
   consumed: {

@@ -157,14 +157,14 @@ describe("Wareneingang und Inventur", () => {
     root = await render(await ReceiptPage({ searchParams: Promise.resolve({ article: ids.archived }) }));
     assert.ok(root.querySelector("input[role='combobox'], input[aria-autocomplete]") || !root.querySelector("input[name='articleId'][type='hidden'][value='" + ids.archived + "']"), "archivierter Artikel ist nicht vorgewählt");
     await view!.unmount();
-    root = await render(await CountPage());
+    root = await render(await CountPage({ searchParams: Promise.resolve({}) }));
     const text = plain(root.textContent);
     assert.match(text, /Motoröl 5W-30/);
     assert.doesNotMatch(text, /Altteil/);
     assert.ok(root.querySelector(`input[name='count.${ids.oil}']`));
     await login(["parts.view"]);
     await view!.unmount();
-    assert.equal(await redirectOf(() => CountPage()), "/forbidden");
+    assert.equal(await redirectOf(() => CountPage({ searchParams: Promise.resolve({}) })), "/forbidden");
     assert.equal(await redirectOf(() => ReceiptPage({ searchParams: Promise.resolve({}) })), "/forbidden");
   });
 });
@@ -225,6 +225,49 @@ describe("Artikelauswahl im Editor", () => {
       assert.equal(events[0].name, "items");
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("Fix-Runde 12b: Bestandshinweis je Artikel (N10) und Inventur über 500 Artikel (N9)", () => {
+  it("N10: zwei Positionen desselben Artikels (je 3) bei Bestand 4 warnen – die Summe zählt, nicht die einzelne Zeile", async () => {
+    await login(ALL);
+    const article = await env.db.article.create({ data: { number: "SUM-1", name: "Summenteil", searchKey: "sum 1 summenteil", stockMilli: 4000 } });
+    const vehicle = await env.db.vehicle.findFirstOrThrow({ where: { plateNorm: "BSN909" } });
+    const order = await env.db.order.create({ data: { number: "A-2099-9001", status: "in_progress", vehicleId: vehicle.id } });
+    const line = (position: number) => ({ orderId: order.id, position, kind: "part", description: "Summenteil", unit: "Stk", quantityMilli: 3000, unitCents: 100, taxBp: 1900, discountBp: 0, refType: "article", refId: article.id });
+    await env.db.orderItem.createMany({ data: [line(0)] });
+    const { default: OrderPage } = await import("@/app/(app)/(workshop)/orders/[id]/page");
+    let root = await render(await OrderPage({ params: Promise.resolve({ id: order.id }) }));
+    assert.doesNotMatch(plain(root.textContent), /Für 1 Artikel reicht der Bestand nicht/, "eine Zeile à 3 bei Bestand 4 reicht");
+    await view!.unmount();
+    await env.db.orderItem.createMany({ data: [line(1)] });
+    root = await render(await OrderPage({ params: Promise.resolve({ id: order.id }) }));
+    assert.match(plain(root.textContent), /Für 1 Artikel reicht der Bestand nicht/, "zusammen 6 bei Bestand 4");
+  });
+
+  it("N9: die Inventur zeigt höchstens 500 Artikel je Seite, sagt es und führt mit „Weiter“ zu den nächsten", async () => {
+    await login(ALL);
+    await env.db.article.createMany({ data: Array.from({ length: 520 }, (_, i) => ({ number: `Z-${String(i + 1).padStart(4, "0")}`, name: `Massenartikel ${i + 1}`, searchKey: `z ${i + 1} massenartikel` })) });
+    try {
+      const { default: CountPage } = await import("@/app/(app)/(workshop)/parts/count/page");
+      let root = await render(await CountPage({ searchParams: Promise.resolve({}) }));
+      assert.equal(root.querySelectorAll("[data-count-row]").length, 500);
+      const total = await env.db.article.count({ where: { archivedAt: null } });
+      assert.match(plain(root.textContent), new RegExp(`Angezeigt werden 500 von ${total} Artikeln`));
+      const next = root.querySelector("a[href^='/parts/count?from=']") as HTMLAnchorElement;
+      assert.ok(next, "Link zur nächsten Seite");
+      const from = decodeURIComponent(next.getAttribute("href")!.split("from=")[1]);
+      assert.equal(from, (await env.db.article.findMany({ where: { archivedAt: null }, orderBy: { number: "asc" }, take: 500 })).at(-1)!.number);
+      await view!.unmount();
+      root = await render(await CountPage({ searchParams: Promise.resolve({ from }) }));
+      const rest = root.querySelectorAll("[data-count-row]").length;
+      assert.equal(rest, total - 500);
+      assert.ok(rest > 0);
+      assert.doesNotMatch(plain(root.textContent), /Angezeigt werden/, "auf der letzten Seite kein Hinweis");
+      assert.equal(root.querySelector("a[href^='/parts/count?from=']"), null);
+    } finally {
+      await env.db.article.deleteMany({ where: { number: { startsWith: "Z-" } } });
     }
   });
 });

@@ -3,6 +3,7 @@ import { getI18n } from "@/i18n/server";
 import type { SectionDef, SectionProps } from "@/modules/types";
 import { isOrderOpen, orderLines } from "@/modules/workshop/orders/public";
 import { ArticlePicker } from "./article-picker";
+import { shortages } from "./domain";
 import { consumedParts } from "./queries";
 import { STOCK_TONE } from "./status-tone";
 
@@ -16,20 +17,21 @@ async function ConsumedParts({ entityId, session }: SectionProps) {
   const rows = await consumedParts(order.id, order.items);
   if (rows.length === 0) return null;
   const open = isOrderOpen(order.status);
-  const shortage = open ? rows.filter((r) => r.article && r.article.stockMilli < r.line.quantityMilli) : [];
+  // Der Bestand wird je Artikel gegen die Summe aller Positionen mit diesem Artikel geprüft (zwei Positionen à 3 bei Bestand 4 reichen nicht)
+  const short = open ? shortages(rows.map((r) => ({ refId: r.line.refId!, quantityMilli: r.line.quantityMilli })), new Map(rows.filter((r) => r.article).map((r) => [r.article!.id, r.article!.stockMilli]))) : new Set<string>();
   const qty = (milli: number) => number(milli / 1000, { maximumFractionDigits: 3 });
 
   return (
     <Card title={t("parts.consumed.title")}>
-      {shortage.length > 0 ? (
+      {short.size > 0 ? (
         <Alert tone="warning" className="mb-4">
-          {tp("parts.consumed.shortage", shortage.length)}
+          {tp("parts.consumed.shortage", short.size)}
         </Alert>
       ) : null}
       <ul className="flex flex-col divide-y divide-line text-sm">
         {rows.map(({ line, article, bookedMilli }) => {
           const booked = bookedMilli > 0;
-          const state = !article ? "negative" : article.stockMilli < 0 ? "negative" : article.stockMilli < line.quantityMilli && open ? "low" : "ok";
+          const state = !article ? "negative" : article.stockMilli < 0 ? "negative" : open && short.has(article.id) ? "low" : "ok";
           return (
             <li key={line.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5 first:pt-0 last:pb-0">
               <div className="min-w-0">

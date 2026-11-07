@@ -123,3 +123,27 @@ describe("Bewegungen über die API", () => {
     assert.deepEqual(moves.json.data.map((m: Json) => [m.kind, m.quantityMilli, m.orderNumber === order.number]), [["order", -2000, true]]);
   });
 });
+
+describe("ETag und Bestand (Fix-Runde 12b: N8)", () => {
+  const rawGet = (path: string, headers: Record<string, string> = {}) => router.handleApiRequest(apiRequest("GET", path, { token: full, headers }));
+
+  it("der ETag eines Artikels trägt den Bestand: nach einer Buchung bestätigt If-None-Match den alten Stand nicht; If-Match mit dem alten ETag bleibt gültig", async () => {
+    const created = (await call(full, "POST", "/articles", { number: "e1", name: "Etag" })).json.data as Json;
+    const first = await rawGet(`/articles/${created.id}`);
+    const etag = first.headers.get("etag")!;
+    assert.match(etag, /^"\d+\.[-0-9a-z]+"$/);
+    assert.equal((await rawGet(`/articles/${created.id}`, { "if-none-match": etag })).status, 304, "unverändert: 304");
+    // Wareneingang ändert den Bestand, nicht die Version der Stammdaten
+    assert.equal((await call(full, "POST", "/stock-movements", { articleId: created.id, quantityMilli: 4000 })).status, 201);
+    const stale = await rawGet(`/articles/${created.id}`, { "if-none-match": etag });
+    assert.equal(stale.status, 200, "veralteter Bestand wird nie mit 304 bestätigt");
+    assert.equal(((await stale.json()) as Json).data.stockMilli, 4000);
+    assert.notEqual(stale.headers.get("etag"), etag);
+    // Bearbeiten mit dem alten ETag: kein 412, denn die Stammdaten sind unverändert
+    const patched = await call(full, "PATCH", `/articles/${created.id}`, { name: "Etag neu" }, { "if-match": etag });
+    assert.equal(patched.status, 200, JSON.stringify(patched.json));
+    assert.equal((await env.db.article.findUniqueOrThrow({ where: { id: created.id } })).stockMilli, 4000);
+    // nach der echten Änderung ist der alte ETag veraltet
+    assert.equal((await call(full, "PATCH", `/articles/${created.id}`, { name: "Noch einer" }, { "if-match": etag })).status, 412);
+  });
+});
