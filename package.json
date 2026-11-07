@@ -16,7 +16,7 @@
     "db:studio": "prisma studio",
     "setup": "prisma generate && tsx prisma/seed.ts",
     "predev": "prisma generate",
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "tsx --test \"src/**/*.test.ts\" \"e2e/support/*.test.ts\"",
     "db:baseline": "node scripts/db-baseline.mjs",
     "db:check": "node scripts/db-check.mjs",
     "db:freeze": "tsx scripts/db-freeze.ts freeze",

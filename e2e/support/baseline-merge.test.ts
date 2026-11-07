@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { assertGrowthAllowed, budgetFor, mergeBaseline, mergeBudget, type Baseline } from "../e2e/support/baseline-merge";
+import { assertGrowthAllowed, budgetFor, mergeBaseline, mergeBudget, type Baseline } from "./baseline-merge";
 
 /** Die Regel „Baseline-Listen und JS-Budgets dürfen nur schrumpfen“ wird beim Neuschreiben erzwungen (Browser-CI, e2e/global-teardown.ts). */
 const old: Baseline = {

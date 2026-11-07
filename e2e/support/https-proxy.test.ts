@@ -3,7 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, it } from "node:test";
-import { startHttpsProxy, type HttpsProxy } from "../e2e/support/https-proxy";
+import { startHttpsProxy, type HttpsProxy } from "./https-proxy";
 
 /** Der TLS-Proxy der Browser-CI (e2e/tests/https.spec.ts) tut, was ein Reverse Proxy tut: HTTPS nach außen, HTTP nach innen mit Weiterleitungs-Kopfzeilen. */
 let upstream: http.Server;

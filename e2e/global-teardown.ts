@@ -7,7 +7,7 @@ import { BASELINE_DIR, FOUND_DIR, UPDATE_BASELINE } from "./support/env";
 /**
  * Mit E2E_UPDATE_BASELINE=1: schreibt die gefundenen Verstöße und gemessenen JS-Budgets in die Baseline-Listen (sortiert, bei jedem Lauf gleiche
  * Reihenfolge). Nur geprüfte Seiten werden neu geschrieben; Wachstum bricht ab, außer E2E_ALLOW_BASELINE_GROWTH nennt eine Begründung
- * (Logik und Tests: e2e/support/baseline-merge.ts, src/e2e-baseline.test.ts).
+ * (Logik und Tests: e2e/support/baseline-merge.ts und -.test.ts).
  */
 export default function globalTeardown() {
   if (UPDATE_BASELINE) {

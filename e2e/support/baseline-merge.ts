@@ -1,5 +1,5 @@
 /**
- * Reine Logik zum Neuschreiben der Baseline-Listen (`E2E_UPDATE_BASELINE=1`), getestet in `src/e2e-baseline.test.ts`.
+ * Reine Logik zum Neuschreiben der Baseline-Listen (`E2E_UPDATE_BASELINE=1`), getestet in `e2e/support/baseline-merge.test.ts`.
  *
  * Die Regel „Listen bekannter Verstöße und JS-Budgets dürfen nur schrumpfen“ gilt damit nicht nur als Konvention, sondern wird beim Neuschreiben
  * erzwungen: Wächst etwas, bricht das Neuschreiben ab – außer es steht eine Begründung in `E2E_ALLOW_BASELINE_GROWTH` (mindestens 10 Zeichen; sie wird
