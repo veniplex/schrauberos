@@ -29,7 +29,13 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   partialPrefetching: false,
   output: "standalone",
+  // Das Paketverzeichnis ist zur Laufzeit schreibgeschützt (Starter-Vertrauensanker, README „Starter-Vertrauensanker“): Die Bildoptimierung legt ihre
+  // Ergebnisse unter `<distDir>/cache/images` ab, und `/_next/image` ist unauthentifiziert erreichbar – in einer installierten Version würde jede Anfrage
+  // eine zusätzliche Datei erzeugen und die Prüfung beim nächsten Start scheitern lassen. Die App verwendet `next/image` nicht; mit `unoptimized` antwortet
+  // Next vor jedem Schreiben mit 404 (next-server.js). Gleiches gilt für das Zurückschreiben von Cache-Einträgen auf die Platte (`isrFlushToDisk`).
+  images: { unoptimized: true },
   experimental: {
+    isrFlushToDisk: false,
     // Rechnungs-Uploads (bis 10 MB) laufen über Server Actions (Datei + Formularfelder, mit Rand < 12 MB)
     serverActions: { bodySizeLimit: SERVER_ACTION_BODY_LIMIT },
     // Der Proxy läuft vor jeder Anfrage; Next puffert dafür den Body und schneidet ihn bei diesem Limit **stumm** ab (Standard 10 MiB:

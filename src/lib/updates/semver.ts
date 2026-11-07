@@ -46,3 +46,26 @@ export function compareVersions(a: string, b: string): number {
   }
   return comparePre(pa.pre, pb.pre);
 }
+
+/**
+ * Untergrenze des Starters als Tripel plus Vorabflag. Der Starter (C) vergleicht **nicht** mit eigener SemVer-Logik: `scripts/gen-trust-header.mjs` berechnet
+ * hieraus die Konstanten des C-Headers, und der Vergleich in C ist nur `exceedsFloor` in Zahlen. Eine einzige Quelle der Wahrheit (`compareVersions`),
+ * abgesichert durch einen Differentialtest in `semver.test.ts`.
+ */
+export type Floor = { major: number; minor: number; patch: number; prerelease: boolean };
+
+export function floorOf(version: string): Floor | null {
+  const p = parseSemver(version);
+  return p ? { major: p.major, minor: p.minor, patch: p.patch, prerelease: p.pre.length > 0 } : null;
+}
+
+/**
+ * Ist die veröffentlichte Version `x.y.z` (ohne Vorabzusatz) strikt größer als die Untergrenze? Entspricht `compareVersions(version, floor) > 0` für
+ * Veröffentlichungen: gleiche Zahlen gelten als größer, wenn die Untergrenze selbst eine Vorabversion ist (`0.2.0` > `0.2.0-dev.x`).
+ */
+export function exceedsFloor(version: { major: number; minor: number; patch: number }, floor: Floor): boolean {
+  if (version.major !== floor.major) return version.major > floor.major;
+  if (version.minor !== floor.minor) return version.minor > floor.minor;
+  if (version.patch !== floor.patch) return version.patch > floor.patch;
+  return floor.prerelease;
+}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { compareVersions, isReleaseVersion, parseSemver } from "./semver";
+import { compareVersions, exceedsFloor, floorOf, isReleaseVersion, parseSemver } from "./semver";
 
 describe("SemVer", () => {
   it("parst gültige und lehnt ungültige Versionen ab", () => {
@@ -28,5 +28,22 @@ describe("SemVer", () => {
     assert.ok(compareVersions("0.2.0-dev.abc", "0.1.9") > 0);
     assert.ok(compareVersions("1.0.0-alpha.2", "1.0.0-alpha.10") < 0);
     assert.ok(compareVersions("1.0.0-alpha", "1.0.0-alpha.1") < 0);
+  });
+
+  it("Untergrenze als Tripel + Vorabflag (für den Starter) stimmt mit compareVersions überein (Differentialtest)", () => {
+    const releases: string[] = [];
+    for (const major of [0, 1, 2]) for (const minor of [0, 1, 9, 10]) for (const patch of [0, 1, 10]) releases.push(`${major}.${minor}.${patch}`);
+    const floors = [...releases, ...releases.map((v) => `${v}-dev.abc1234`), ...releases.map((v) => `${v}-rc1`)];
+    let checked = 0;
+    for (const floor of floors) {
+      const f = floorOf(floor)!;
+      for (const version of releases) {
+        assert.equal(exceedsFloor(parseSemver(version)!, f), compareVersions(version, floor) > 0, `${version} gegen ${floor}`);
+        checked += 1;
+      }
+    }
+    assert.ok(checked > 1000);
+    assert.equal(floorOf("kein-semver"), null);
+    assert.deepEqual(floorOf("0.2.0-dev.abc1234"), { major: 0, minor: 2, patch: 0, prerelease: true });
   });
 });

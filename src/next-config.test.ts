@@ -88,4 +88,9 @@ describe("next.config: Größe der Anfrage-Bodies (ZP2-A-F1)", () => {
     assert.equal(await read(configured()), total);
     assert.equal(await read(undefined), 10 * 1024 * 1024, "Standard von Next: stilles Kappen bei 10 MiB (genau das verhindert die Konfiguration)");
   });
+
+  it("schreibt zur Laufzeit nicht in das Paketverzeichnis: keine Bildoptimierung (Cache unter .next/cache/images), kein Zurückschreiben von Cache-Einträgen", () => {
+    assert.equal(nextConfig.images?.unoptimized, true, "/_next/image ist unauthentifiziert erreichbar und würde sonst Dateien in den Baum schreiben");
+    assert.equal(nextConfig.experimental?.isrFlushToDisk, false);
+  });
 });
