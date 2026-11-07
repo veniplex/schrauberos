@@ -35,6 +35,7 @@ export const recoveryDe = {
     doneIntro:
       "Das neue Passwort gilt, alle bisherigen Anmeldungen dieses Kontos wurden beendet. Der benutzte Code ist ungültig – hier ist der neue Code. Eine automatische Anmeldung erfolgt nicht.",
     toLogin: "Zur Anmeldung",
+    secondFactorReset: "Die Zwei-Faktor-Anmeldung dieses Kontos wurde zurückgesetzt: Der Notzugang umgeht sie. Nach der Anmeldung unter „Mein Konto“ neu einrichten.",
     errors: {
       invalid: "Der Code ist ungültig oder nicht mehr gültig.",
       throttled: "Zu viele Versuche von dieser Adresse. Bitte in etwa {seconds} Sekunden erneut versuchen.",

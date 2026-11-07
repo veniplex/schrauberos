@@ -151,8 +151,11 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
   });
 
   it("Gegenprobe: mit genau dem erforderlichen Recht wird nicht an der Anmeldung/Berechtigung abgewiesen", async () => {
+    // „Überall abmelden“ gelingt und führt absichtlich zur Anmeldung (die Sitzung ist danach weg) – das ist keine Abweisung
+    const leavesSession = new Set(["account.logoutEverywhere"]);
     for (const action of actions) {
       const { permission, name } = action.operation;
+      if (leavesSession.has(name)) continue;
       await signInAs({ permissions: permission === "authenticated" ? [] : [permission] });
       const out = await outcomeOf(() => action({}, form({})));
       assert.ok(!out.notFound && !["/login", "/account", "/forbidden"].includes(out.redirect ?? ""), `${name}: fälschlich abgewiesen (${JSON.stringify(out)})`);

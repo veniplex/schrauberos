@@ -16,7 +16,7 @@ const searchLimiter = new RateLimiter({ max: 40, windowMs: 10_000 });
  */
 export async function GET(request: NextRequest) {
   const session = await getSession();
-  if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (searchProvidersFor(session).length === 0) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const decision = searchLimiter.take(session.user.id);
   if (!decision.allowed) {

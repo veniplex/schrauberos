@@ -75,4 +75,6 @@ export type RecoveryActionState = {
   recoveryCode?: string;
   /** Ausstellungsdatum (bereits formatiert) für die Druckansicht */
   issuedOn?: string;
+  /** Beim Einlösen wurde ein eingerichteter zweiter Faktor des Kontos zurückgesetzt (die Person richtet ihn nach der Anmeldung neu ein) */
+  secondFactorReset?: boolean;
 };

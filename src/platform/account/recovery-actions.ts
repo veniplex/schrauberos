@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { verifyPassword } from "@/server/auth/password";
+import { accountOwner, verifyPassword } from "@/server/auth/password";
 import { acknowledgeRecoveryNotice, replaceRecoveryCode } from "@/server/auth/recovery";
 import { loginThrottle } from "@/server/auth/throttle";
 import { db } from "@/server/db";
@@ -27,7 +27,7 @@ const createRecoveryCodeOperation = defineOperation({
     const wait = gate.check(user.id);
     if (wait > 0) fail("forbidden", "account.errors.tooManyAttempts", { seconds: Math.ceil(wait / 1000) });
     gate.take(user.id);
-    if (!(await verifyPassword(input.password, user.passwordHash))) failField("password", "account.errors.currentWrong");
+    if (!(await verifyPassword(input.password, user.passwordHash, { owner: accountOwner(principal.user.id) }))) failField("password", "account.errors.currentWrong");
     gate.succeed(user.id);
     return { username: user.username };
   },

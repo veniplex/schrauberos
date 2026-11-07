@@ -3,6 +3,7 @@ import type { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import type { AuditAction } from "@/lib/audit-actions";
 import { logError } from "@/lib/log-safe";
+import { QueueFullError } from "@/lib/semaphore";
 import type { Permission } from "@/modules/catalog";
 import type { AppSession } from "@/server/auth/session";
 import { writeAudit } from "@/server/audit";
@@ -131,7 +132,9 @@ export function listOperations(): ReadonlyMap<string, Operation> {
 
 const TX_OPTIONS = { maxWait: 5_000, timeout: 20_000 };
 
-const failureOf = (error: unknown, operation: string): OperationFailure | null => (error instanceof OperationError ? error.failure : mapPrismaError(error, operation));
+/** Überlast des Eigentümer-Pfads (`QueueFullError`: zu viele gleichzeitige Passwortberechnungen) ist `busy` – „bitte gleich noch einmal“ –, kein Programmfehler. */
+const failureOf = (error: unknown, operation: string): OperationFailure | null =>
+  error instanceof OperationError ? error.failure : error instanceof QueueFullError ? { code: "busy" } : mapPrismaError(error, operation);
 
 export function defineOperation<S extends z.ZodType, R, P = undefined>(def: OperationDef<S, R, P>): Operation<z.output<S>, R> {
   if (!def.permission) throw new Error(`Operation ${def.name}: permission ist Pflicht`);

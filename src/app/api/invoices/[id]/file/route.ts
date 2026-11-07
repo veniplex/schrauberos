@@ -11,7 +11,7 @@ import { fileExists, fileSize, openFile } from "@/server/files";
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || session.user.mustChangePassword) return new Response("Unauthorized", { status: 401 });
+  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return new Response("Unauthorized", { status: 401 });
   if (!session.can("invoices.view")) return new Response("Forbidden", { status: 403 });
 
   const { id } = await params;

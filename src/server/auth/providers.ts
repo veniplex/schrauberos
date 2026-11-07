@@ -14,7 +14,7 @@ import { verifyPassword } from "./password";
 export interface AuthProvider {
   id: string;
   /** `bounded`: bei voller Warteschlange der Passwortprüfung abweisen (`QueueFullError`), statt zu warten */
-  verify(user: User, password: string, options?: { bounded?: boolean }): Promise<boolean>;
+  verify(user: User, password: string, options?: { bounded?: boolean; owner?: string }): Promise<boolean>;
 }
 
 const localProvider: AuthProvider = {

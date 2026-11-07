@@ -10,6 +10,7 @@ import { checkUpload } from "@/lib/upload-sniff";
 import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
 import { CSP_MODE_KEY, parseCspMode, setCspModeInProcess } from "@/lib/csp-mode";
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
+import { IDLE_TIMEOUT_KEY, IDLE_TIMEOUT_MAX_HOURS, parseIdleHours, REQUIRE_2FA_ADMINS_KEY } from "@/server/auth/policy";
 import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
@@ -118,6 +119,10 @@ const securityInput = z.object({
     .max(AUDIT_RETENTION_MAX_DAYS)
     .refine((days) => days === 0 || days >= AUDIT_RETENTION_MIN_DAYS, { message: "settings.errors.auditRetentionMin", params: { min: AUDIT_RETENTION_MIN_DAYS } } as never)
     .optional(),
+  /** Stunden ohne Anfrage bis zur Abmeldung, 0 = aus; ohne Angabe bleibt die Einstellung unverändert */
+  idleTimeoutHours: z.coerce.number().int().min(0).max(IDLE_TIMEOUT_MAX_HOURS).optional(),
+  /** Zwei-Faktor-Anmeldung für Administratoren verpflichtend */
+  requireTwoFactorAdmins: z.boolean(),
 });
 
 /** Sicherheit: Läuft die Anwendung hinter einem Reverse-Proxy? Nur dann wird die Client-Adresse aus X-Forwarded-For ausgewertet. Dazu die Aufbewahrung des Audit-Logs. */
@@ -128,19 +133,30 @@ const saveSecurityOperation = defineOperation({
   audit: "settings.security",
   run: async ({ input, tx, audit }) => {
     // Alter und neuer Wert stehen im Audit-Log (die Frist des Audit-Logs selbst zu verkürzen ist eine Änderung, die man später nachvollziehen können muss)
-    const [oldProxy, oldRetention] = await Promise.all([tx.appSetting.findUnique({ where: { key: BEHIND_PROXY_KEY } }), tx.appSetting.findUnique({ where: { key: AUDIT_RETENTION_KEY } })]);
+    const [oldProxy, oldRetention, oldIdle, oldRequire] = await Promise.all([
+      tx.appSetting.findUnique({ where: { key: BEHIND_PROXY_KEY } }),
+      tx.appSetting.findUnique({ where: { key: AUDIT_RETENTION_KEY } }),
+      tx.appSetting.findUnique({ where: { key: IDLE_TIMEOUT_KEY } }),
+      tx.appSetting.findUnique({ where: { key: REQUIRE_2FA_ADMINS_KEY } }),
+    ]);
+    const idleBefore = parseIdleHours(oldIdle?.value);
+    const idleAfter = input.idleTimeoutHours ?? idleBefore;
+    await setSetting(IDLE_TIMEOUT_KEY, String(idleAfter), tx);
+    await setSetting(REQUIRE_2FA_ADMINS_KEY, input.requireTwoFactorAdmins ? "true" : "false", tx);
     const retentionBefore = parseRetentionDays(oldRetention?.value ?? null);
     const retentionAfter = input.auditRetentionDays ?? retentionBefore;
     await setSetting(BEHIND_PROXY_KEY, input.behindProxy ? "true" : "false", tx);
     if (input.auditRetentionDays !== undefined) await setSetting(AUDIT_RETENTION_KEY, String(input.auditRetentionDays), tx);
     const days = (n: number) => (n === 0 ? "unbegrenzt" : `${n} d`);
-    audit({ target: `Audit-Aufbewahrung ${days(retentionBefore)} → ${days(retentionAfter)}; Reverse-Proxy ${oldProxy?.value === "true" ? "an" : "aus"} → ${input.behindProxy ? "an" : "aus"}` });
+    audit({
+      target: `Audit-Aufbewahrung ${days(retentionBefore)} → ${days(retentionAfter)}; Reverse-Proxy ${oldProxy?.value === "true" ? "an" : "aus"} → ${input.behindProxy ? "an" : "aus"}; Leerlauf-Abmeldung ${idleBefore === 0 ? "aus" : `${idleBefore} h`} → ${idleAfter === 0 ? "aus" : `${idleAfter} h`}; 2FA für Administratoren ${oldRequire?.value === "true" ? "Pflicht" : "freiwillig"} → ${input.requireTwoFactorAdmins ? "Pflicht" : "freiwillig"}`,
+    });
     return { saved: true };
   },
 });
 
 export const saveSecurity = defineAction(saveSecurityOperation, {
-  form: (fd) => ({ ...formObject(fd), behindProxy: fd.get("behindProxy") === "on" }),
+  form: (fd) => ({ ...formObject(fd), behindProxy: fd.get("behindProxy") === "on", requireTwoFactorAdmins: fd.get("requireTwoFactorAdmins") === "on" }),
   revalidate: ["/settings"],
   message: "common.saved",
 });

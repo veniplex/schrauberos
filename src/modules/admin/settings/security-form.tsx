@@ -5,12 +5,20 @@ import { Alert, Card } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
 import { saveCspMode, saveSecurity } from "./actions";
 
-export function SecurityForm({ behindProxy, auditRetentionDays }: { behindProxy: boolean; auditRetentionDays: number }) {
+export function SecurityForm({ behindProxy, auditRetentionDays, idleTimeoutHours, requireTwoFactorAdmins }: { behindProxy: boolean; auditRetentionDays: number; idleTimeoutHours: number; requireTwoFactorAdmins: boolean }) {
   const { t } = useI18n();
   return (
     <Form action={saveSecurity} className="flex max-w-3xl flex-col gap-5">
       <Card title={t("settings.security.title")}>
         <Checkbox name="behindProxy" defaultChecked={behindProxy} label={t("settings.security.behindProxy")} hint={t("settings.security.behindProxyHint")} />
+      </Card>
+      <Card title={t("settings.security.sessionsTitle")}>
+        <div className="flex flex-col gap-4">
+          <Field label={t("settings.security.idleTimeout")} htmlFor="idleTimeoutHours" name="idleTimeoutHours" hint={t("settings.security.idleTimeoutHint")}>
+            <Input id="idleTimeoutHours" name="idleTimeoutHours" type="number" min={0} max={720} defaultValue={idleTimeoutHours} />
+          </Field>
+          <Checkbox name="requireTwoFactorAdmins" defaultChecked={requireTwoFactorAdmins} label={t("settings.security.requireTwoFactor")} hint={t("settings.security.requireTwoFactorHint")} />
+        </div>
       </Card>
       <Card title={t("audit.title")}>
         <Field label={t("settings.security.auditRetention")} htmlFor="auditRetentionDays" name="auditRetentionDays" hint={t("settings.security.auditRetentionHint")}>

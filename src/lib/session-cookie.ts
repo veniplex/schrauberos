@@ -12,12 +12,15 @@
  */
 export const SESSION_COOKIE = "so_session";
 export const DEVICE_COOKIE = "so_device";
+/** Zwischenzustand der Anmeldung mit zweitem Faktor: Passwort stimmt, der Code fehlt noch (kurz gültig, nur eine Kennung – der Zustand liegt im Server) */
+export const PENDING_COOKIE = "so_2fa";
 
 export const hostPrefixed = (name: string) => `__Host-${name}`;
 export const cookieName = (base: string, secure: boolean) => (secure ? hostPrefixed(base) : base);
 
 export const sessionCookieName = (secure: boolean) => cookieName(SESSION_COOKIE, secure);
 export const deviceCookieName = (secure: boolean) => cookieName(DEVICE_COOKIE, secure);
+export const pendingCookieName = (secure: boolean) => cookieName(PENDING_COOKIE, secure);
 
 /**
  * Läuft die Anfrage über HTTPS? Erkannt am Header des Reverse Proxys (`x-forwarded-proto`). Ohne Proxy (reines HTTP im LAN) bleibt
@@ -37,6 +40,11 @@ export function readSessionToken(get: (name: string) => { value: string } | unde
 /** Das Geräte-Token lesen – ebenfalls nur unter dem Namen, der zum Übertragungsweg passt. */
 export function readDeviceToken(get: (name: string) => { value: string } | undefined, secure: boolean): string | undefined {
   return get(deviceCookieName(secure))?.value || undefined;
+}
+
+/** Die Kennung des Anmelde-Zwischenzustands lesen – ebenfalls nur unter dem Namen, der zum Übertragungsweg passt. */
+export function readPendingToken(get: (name: string) => { value: string } | undefined, secure: boolean): string | undefined {
+  return get(pendingCookieName(secure))?.value || undefined;
 }
 
 /** Attribute eines Cookies, das der Browser sicher behält (HttpOnly, SameSite=Lax; unter HTTPS Secure und Pfad „/“ für `__Host-`). */

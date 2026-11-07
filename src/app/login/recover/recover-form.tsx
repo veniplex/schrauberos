@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Field, Form, FormMessage, Input } from "@/components/ui/form";
 import { SubmitButton, LinkButton } from "@/components/ui/buttons";
+import { Alert } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
 import { parseRecoveryCode, type RecoveryActionState } from "@/lib/recovery-code";
 import { RecoveryCodeView } from "@/platform/account/recovery-code-view";
@@ -34,6 +35,7 @@ export function RecoverForm() {
           <div className="flex flex-col gap-4">
             <h2 className="text-base font-semibold">{t("recovery.recover.doneTitle")}</h2>
             <p className="text-sm text-ink-muted print:hidden">{t("recovery.recover.doneIntro")}</p>
+            {state.secondFactorReset ? <Alert tone="warning" className="print:hidden">{t("recovery.recover.secondFactorReset")}</Alert> : null}
             <RecoveryCodeView code={state.recoveryCode} issuedOn={state.issuedOn} continueLabel={t("recovery.recover.toLogin")} onContinue={() => router.push("/login")} />
           </div>
         ) : (

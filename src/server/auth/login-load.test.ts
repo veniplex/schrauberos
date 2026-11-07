@@ -45,7 +45,7 @@ describe("Überlast durch gleichzeitige Anmeldungen", () => {
   });
 
   it("viele verschiedene echte Konten gleichzeitig: höchstens 2 Hashes gleichzeitig, die Warteschlange ist begrenzt (busy statt unbegrenztem Warten)", async () => {
-    const passwordHash = await passwordMod.hashPassword("irgendein-passwort-1");
+    const passwordHash = await passwordMod.hashPassword("irgendein-passwort-1", "test");
     await env.db.user.createMany({ data: Array.from({ length: 60 }, (_, i) => ({ username: `konto-${i}`, name: `Konto ${i}`, passwordHash })) });
     passwordMod.hashStats.computed = 0;
 

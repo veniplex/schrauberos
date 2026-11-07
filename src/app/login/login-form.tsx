@@ -1,7 +1,7 @@
 "use client";
 
 import { loginAction } from "./actions";
-import { Field, Form, FormMessage, Input } from "@/components/ui/form";
+import { Checkbox, Field, Form, FormMessage, Input } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { useI18n } from "@/i18n/client";
 
@@ -16,6 +16,7 @@ export function LoginForm({ next }: { next: string }) {
       <Field label={t("auth.password")} htmlFor="password" name="password" required>
         <Input id="password" name="password" type="password" autoComplete="current-password" maxLength={128} required />
       </Field>
+      <Checkbox name="remember" label={t("auth.rememberDevice")} hint={t("auth.rememberDeviceHint")} />
       <FormMessage />
       <SubmitButton className="w-full">{t("auth.signIn")}</SubmitButton>
     </Form>

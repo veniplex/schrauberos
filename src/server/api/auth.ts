@@ -71,7 +71,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthR
   const u = row.user;
   const principal: AppSession = {
     // Ein API-Principal ist nie Administrator und trägt keine Rollen: nichts, was an Rollen hängt, kann über ein Token ausgelöst werden
-    user: { id: u.id, username: u.username, name: u.name, email: u.email, locale: null, theme: null, authSource: u.authSource, mustChangePassword: false, isAdmin: false, roleNames: [], roleIds: [] },
+    user: { id: u.id, username: u.username, name: u.name, email: u.email, locale: null, theme: null, authSource: u.authSource, mustChangePassword: false, isAdmin: false, roleNames: [], roleIds: [], twoFactor: false, mustSetupTwoFactor: false },
     features,
     permissions,
     can: (permission: Permission) => permissions.has(permission),

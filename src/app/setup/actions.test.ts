@@ -143,7 +143,7 @@ describe("completeSetup", () => {
     // alle sind Weiterleitungen (Erfolg oder „schon eingerichtet“) oder Token-Fehler, nie ein Absturz
     assert.equal(results.filter((r) => r.status === "fulfilled" && r.value.ok).length, 1);
     for (const r of results) {
-      if (r.status === "fulfilled" && !r.value.ok) assert.ok(r.value.fieldErrors?.token);
+      if (r.status === "fulfilled" && !r.value.ok) assert.ok(r.value.fieldErrors?.token || r.value.error, "Token-Fehler oder „bitte gleich noch einmal“ (Eigentümer-Pfad voll)");
       if (r.status === "rejected") assert.match(String(r.reason?.message ?? r.reason), /NEXT_REDIRECT/);
     }
     assert.equal(await env.db.recoveryCode.count(), 1, "genau ein Code");

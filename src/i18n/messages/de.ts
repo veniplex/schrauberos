@@ -8,6 +8,7 @@ import { tiresDe } from "./modules/tires.de";
 import { customersDe } from "./modules/customers.de";
 import { usersDe } from "./modules/users.de";
 import { recoveryDe } from "./modules/recovery.de";
+import { securityDe } from "./modules/security.de";
 import { rolesDe } from "./modules/roles.de";
 import { networkDe } from "./modules/network.de";
 import { modulesDe } from "./modules/admin-modules.de";
@@ -19,6 +20,7 @@ import { systemDe } from "./modules/system.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
+  security: securityDe,
   docs: docsDe,
   invoices: invoicesDe,
   fleet: fleetDe,
@@ -210,6 +212,20 @@ export const de = {
       busy: "Gerade melden sich sehr viele Personen an. Bitte in einem Moment erneut versuchen.",
       inactive: "Dieses Konto ist deaktiviert.",
     },
+    rememberDevice: "Dieses Gerät merken",
+    rememberDeviceHint: "Nur auf dem eigenen Gerät: Dort entfällt die Wartezeit nach Fehlversuchen, die jemand anderes mit diesem Benutzernamen auslösen kann. Das Passwort wird weiterhin verlangt.",
+    sessionEnded: "Die Sitzung ist abgelaufen oder wurde beendet. Bitte erneut anmelden – es geht danach an derselben Stelle weiter.",
+    secondFactor: {
+      title: "Zweiter Faktor",
+      intro: "Das Passwort stimmt. Bitte den Code aus der Authenticator-App eingeben.",
+      code: "Code",
+      codeHint: "6 Ziffern aus der App – oder ein Sicherungscode (der Code gilt dann einmal).",
+      submit: "Bestätigen",
+      cancel: "Abbrechen",
+      invalid: "Der Code ist ungültig oder schon benutzt.",
+      expired: "Dieser Schritt der Anmeldung ist abgelaufen. Bitte mit Benutzername und Passwort neu beginnen.",
+      toLogin: "Zur Anmeldung",
+    },
     forgotPassword: "Passwort vergessen – bitte die Administration fragen.",
     forbiddenTitle: "Kein Zugriff",
     forbiddenText: "Für diese Seite fehlt die Berechtigung. Bitte an die Administration wenden.",
@@ -364,10 +380,15 @@ export const de = {
     tabs: { workshop: "Werkstatt", security: "Sicherheit" },
     security: {
       title: "Anmeldung & Netzwerk",
+      sessionsTitle: "Sitzungen & Zwei-Faktor-Anmeldung",
+      idleTimeout: "Abmelden nach Leerlauf (Stunden)",
+      idleTimeoutHint: "Sitzungen enden, wenn so viele Stunden lang keine Seite aufgerufen wurde (auf etwa eine Minute genau). 0 = aus (Standard); sonst 1 bis 720. Nach der erneuten Anmeldung geht es auf derselben Seite weiter, nicht gespeicherte Eingaben bleiben im Browser erhalten.",
+      requireTwoFactor: "Zwei-Faktor-Anmeldung für Administratoren verpflichtend",
+      requireTwoFactorHint: "Administrator-Konten ohne eingerichteten zweiten Faktor kommen nach der Anmeldung nur noch zu „Mein Konto“, bis sie ihn eingerichtet haben, und können ihn nicht ausschalten. Standard: aus. Vorher sicherstellen, dass jeder Administrator ein Handy mit Authenticator-App hat.",
       behindProxy: "Die Anwendung läuft hinter einem Reverse-Proxy",
       auditRetention: "Audit-Log aufbewahren (Tage)",
       auditRetentionHint: "Ältere Einträge des Audit-Logs werden täglich gelöscht (Datensparsamkeit). Standard: 730 Tage (2 Jahre); mindestens 30 Tage; 0 = unbegrenzt aufbewahren.",
-      behindProxyHint: "Nur einschalten, wenn wirklich ein Reverse-Proxy davorsteht, der die Adresse des Clients als letzten Eintrag von X-Forwarded-For anhängt (nginx: proxy_add_x_forwarded_for). Dann begrenzt die Anmeldung Fehlversuche zusätzlich je Adresse. Ohne echten Proxy kann jeder die Adresse im Header vortäuschen und damit fremde Adressen sperren lassen. Auch mit Proxy gilt: Teilen sich viele Geräte eine Adresse (Büro-Netz hinter NAT), trifft die Begrenzung alle gemeinsam – auch Administratoren, außer auf Geräten, mit denen sie sich schon einmal angemeldet haben. Im Zweifel ausgeschaltet lassen.",
+      behindProxyHint: "Nur einschalten, wenn wirklich ein Reverse-Proxy davorsteht, der die Adresse des Clients als letzten Eintrag von X-Forwarded-For anhängt (nginx: proxy_add_x_forwarded_for). Dann begrenzt die Anmeldung Fehlversuche zusätzlich je Adresse. Ohne echten Proxy kann jeder die Adresse im Header vortäuschen und damit fremde Adressen sperren lassen. Auch mit Proxy gilt: Teilen sich viele Geräte eine Adresse (Büro-Netz hinter NAT), trifft die Begrenzung alle gemeinsam – auch Administratoren, außer auf Geräten, die sie bei der Anmeldung gemerkt haben. Im Zweifel ausgeschaltet lassen.",
       csp: {
         title: "Inhaltssicherheitsrichtlinie (CSP)",
         reportOnly: "Notbetrieb: Richtlinie nur melden, nicht erzwingen",

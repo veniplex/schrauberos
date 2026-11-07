@@ -9,6 +9,7 @@ import { tiresEn } from "./modules/tires.en";
 import { customersEn } from "./modules/customers.en";
 import { usersEn } from "./modules/users.en";
 import { recoveryEn } from "./modules/recovery.en";
+import { securityEn } from "./modules/security.en";
 import { rolesEn } from "./modules/roles.en";
 import { networkEn } from "./modules/network.en";
 import { modulesEn } from "./modules/admin-modules.en";
@@ -210,6 +211,20 @@ export const en: Messages = {
       busy: "Many people are signing in right now. Please try again in a moment.",
       inactive: "This account is disabled.",
     },
+    rememberDevice: "Remember this device",
+    rememberDeviceHint: "Only on your own device: there, the waiting time after failed attempts – which someone else can trigger with your name – does not apply. The password is still required.",
+    sessionEnded: "The session has expired or was ended. Please sign in again – you will return to the same place.",
+    secondFactor: {
+      title: "Second factor",
+      intro: "The password is correct. Please enter the code from the authenticator app.",
+      code: "Code",
+      codeHint: "6 digits from the app – or a backup code (which then works once).",
+      submit: "Confirm",
+      cancel: "Cancel",
+      invalid: "The code is invalid or has already been used.",
+      expired: "This sign-in step has expired. Please start again with username and password.",
+      toLogin: "To sign-in",
+    },
     forgotPassword: "Forgot your password? Please ask your administrator.",
     forbiddenTitle: "No access",
     forbiddenText: "You don't have permission for this page. Please contact your administrator.",
@@ -252,6 +267,7 @@ export const en: Messages = {
   customers: customersEn,
   users: usersEn,
   recovery: recoveryEn,
+  security: securityEn,
   roles: rolesEn,
   permissionGroups: {
     appointments: "Appointments",
@@ -364,10 +380,15 @@ export const en: Messages = {
     tabs: { workshop: "Workshop", security: "Security" },
     security: {
       title: "Sign-in & network",
+      sessionsTitle: "Sessions & two-factor sign-in",
+      idleTimeout: "Sign out after inactivity (hours)",
+      idleTimeoutHint: "Sessions end when no page was opened for this many hours (accurate to about a minute). 0 = off (default); otherwise 1 to 720. After signing in again you return to the same page, and unsaved input stays in the browser.",
+      requireTwoFactor: "Two-factor sign-in mandatory for administrators",
+      requireTwoFactorHint: "Administrator accounts without a second factor can only reach “My account” after signing in until they have set it up, and cannot turn it off. Default: off. First make sure every administrator has a phone with an authenticator app.",
       behindProxy: "The application runs behind a reverse proxy",
       auditRetention: "Keep audit log (days)",
       auditRetentionHint: "Older audit log entries are deleted daily (data minimisation). Default: 730 days (2 years); at least 30 days; 0 = keep forever.",
-      behindProxyHint: "Turn this on only if a reverse proxy really sits in front that appends the client address as the last X-Forwarded-For entry (nginx: proxy_add_x_forwarded_for). Sign-in then additionally limits failed attempts per address. Without a real proxy anyone can forge the address in the header and get other people's addresses blocked. Even with a proxy: if many devices share one address (office network behind NAT), the limit hits all of them together – administrators included, except on devices they have signed in from before. When in doubt, leave it off.",
+      behindProxyHint: "Turn this on only if a reverse proxy really sits in front that appends the client address as the last X-Forwarded-For entry (nginx: proxy_add_x_forwarded_for). Sign-in then additionally limits failed attempts per address. Without a real proxy anyone can forge the address in the header and get other people's addresses blocked. Even with a proxy: if many devices share one address (office network behind NAT), the limit hits all of them together – administrators included, except on devices they chose to remember when signing in. When in doubt, leave it off.",
       csp: {
         title: "Content security policy (CSP)",
         reportOnly: "Emergency mode: only report the policy, do not enforce it",

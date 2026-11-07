@@ -18,13 +18,16 @@ export function UserMenu({
   locale,
   theme,
   logoutAction,
+  hasDevice,
   compact,
 }: {
   name: string;
   roles: string;
   locale: Locale;
   theme: Theme;
-  logoutAction: () => Promise<void>;
+  logoutAction: (formData: FormData) => Promise<void>;
+  /** Dieser Browser trägt ein Geräte-Cookie („Dieses Gerät merken“): dann gibt es „Abmelden und Gerät vergessen“ */
+  hasDevice?: boolean;
   compact?: boolean;
 }) {
   const { t } = useI18n();
@@ -64,6 +67,11 @@ export function UserMenu({
         <MenuSubmit>
           <LogOut className="size-4" aria-hidden /> {t("auth.logout")}
         </MenuSubmit>
+        {hasDevice ? (
+          <MenuSubmit name="forgetDevice" value="on">
+            <LogOut className="size-4" aria-hidden /> {t("security.banner.forgetDevice")}
+          </MenuSubmit>
+        ) : null}
       </form>
     </Menu>
   );

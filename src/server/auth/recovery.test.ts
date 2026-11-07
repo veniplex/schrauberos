@@ -155,15 +155,25 @@ describe("Einlösen", () => {
   });
 
   it("macht die bekannten Geräte des Kontos ungültig", async () => {
-    await session.login("chef", PASSWORD);
+    await session.login("chef", PASSWORD, { rememberDevice: true });
     assert.equal(await env.db.knownDevice.count({ where: { userId: admin.id } }), 1);
     assert.equal((await redeem(await issue())).ok, true);
     assert.equal(await env.db.knownDevice.count({ where: { userId: admin.id } }), 0);
   });
 
-  it("2FA-Erweiterungsstelle ist in der Transaktion verdrahtet (Aufruf beim Einlösen)", async () => {
-    // Solange es keine 2FA gibt, ist die Stelle leer – sie muss existieren und aufrufbar sein
-    await assert.doesNotReject(env.db.$transaction((tx) => recovery.resetSecondFactor(tx, admin.id)));
+  it("setzt einen eingerichteten zweiten Faktor zurück und meldet das – der Notzugang umgeht ihn nicht stillschweigend", async () => {
+    const { encryptSecret } = await import("@/server/secrets");
+    await env.db.twoFactor.create({ data: { userId: admin.id, secret: encryptSecret("JBSWY3DPEHPK3PXP"), enabledAt: new Date(), lastStep: 5 } });
+    await env.db.twoFactorBackupCode.create({ data: { userId: admin.id, codeHash: "a".repeat(64) } });
+    const result = await redeem(await issue());
+    assert.ok(result.ok && result.secondFactorReset === true);
+    const row = await env.db.twoFactor.findUniqueOrThrow({ where: { userId: admin.id } });
+    assert.deepEqual({ secret: row.secret, enabled: row.enabledAt, step: row.lastStep, reason: row.resetReason }, { secret: null, enabled: null, step: 0, reason: "recovery" });
+    assert.equal(await env.db.twoFactorBackupCode.count({ where: { userId: admin.id } }), 0);
+    // ohne eingerichteten zweiten Faktor gibt es nichts zurückzusetzen
+    await env.db.twoFactor.deleteMany();
+    const again = await redeem(await issue());
+    assert.ok(again.ok && again.secondFactorReset === false);
   });
 });
 

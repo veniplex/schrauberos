@@ -1,6 +1,6 @@
 import "server-only";
 import { passwordTooLong } from "@/lib/password-rules";
-import { Semaphore } from "@/lib/semaphore";
+import { FairLane, Semaphore } from "@/lib/semaphore";
 import { authRuntime } from "./runtime";
 import { scryptHash, scryptVerify } from "./scrypt";
 
@@ -13,13 +13,16 @@ export { MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/lib/
 export const hashSemaphore = new Semaphore(2, 32);
 
 /**
- * Eigener Pfad für alles, was **nicht** hinter einer Flut von Anmeldungen warten darf: Passwort setzen (Konto, Benutzerverwaltung,
- * Einrichtung), das Hashen des neuen Passworts beim Einlösen des Wiederherstellungs-Codes, die Passwortabfrage im Konto und die
- * Anmeldung von einem bekannten Gerät. Höchstens 1 Berechnung gleichzeitig (zusammen mit den Anmeldungen bleibt ein Thread des
- * libuv-Pools frei), die Warteschlange ist nicht begrenzt – wer hier ankommt, ist angemeldet, hat einen gültigen Code oder ein
- * bekanntes Gerät, und jeder dieser Wege ist anderweitig begrenzt.
+ * Eigener Pfad (`FairLane`) für alles, was **nicht** hinter einer Flut von Anmeldungen warten darf: Passwort setzen (Konto, Benutzerverwaltung, Einrichtung), das
+ * Hashen des neuen Passworts beim Einlösen des Wiederherstellungs-Codes, die Passwortabfrage im Konto und die Anmeldung von einem bekannten Gerät. Höchstens 1
+ * Berechnung gleichzeitig (zusammen mit den Anmeldungen bleibt ein Thread des libuv-Pools frei). **Begrenzt und gerecht** (R2-SEC-01): je Schlüssel (Konto/Gerät/
+ * Vorgang) höchstens eine laufende und eine wartende Berechnung, insgesamt höchstens 32 Wartende, reihum über die Schlüssel – eine Flut mit einem gestohlenen
+ * Geräte-Cookie oder wiederholten Passwortabfragen belegt nur die eigenen Plätze und wird danach mit `QueueFullError` („bitte gleich noch einmal“) abgewiesen.
  */
-export const ownerSemaphore = new Semaphore(1, Infinity);
+export const ownerLane = new FairLane(1, 32, 2);
+
+/** Platz im Eigentümer-Pfad für ein Konto: alles, was für dieses Konto rechnet (Gerätelogin, Passwort setzen, Passwortabfrage), teilt sich ihn. */
+export const accountOwner = (userId: string): string => `account:${userId}`;
 
 /** Zähler für Tests (Wie oft wurde tatsächlich gehasht?) und die gemessene typische Dauer einer Prüfung in ms (gleitender Mittelwert). */
 export const hashStats = { computed: 0, typicalMs: 250 };
@@ -35,8 +38,9 @@ async function timed<T>(task: () => Promise<T>): Promise<T> {
   }
 }
 
-export function hashPassword(password: string): Promise<string> {
-  return ownerSemaphore.run(() => {
+/** `owner`: wer rechnen lässt (Konto-Id der handelnden Person, "setup", "recovery") – bestimmt den Platz im Eigentümer-Pfad. */
+export function hashPassword(password: string, owner: string): Promise<string> {
+  return ownerLane.run(owner, () => {
     hashStats.computed += 1;
     return scryptHash(password);
   });
@@ -46,22 +50,19 @@ export function hashPassword(password: string): Promise<string> {
  * Prüft ein Passwort. `hash` null/leer (unbekannter Benutzer, Konto ohne lokales Passwort): **es wird nicht gerechnet** – sonst könnte
  * jeder mit erfundenen Namen die Hash-Plätze belegen und alle Anmeldungen blockieren. Stattdessen wartet die Antwort per Timer so
  * lange, wie eine echte Prüfung typischerweise dauert (`hashStats.typicalMs`), und ist immer falsch.
- * `bounded`: Anmeldung (begrenzte Warteschlange, bei Überlast `QueueFullError`); sonst der eigene Pfad ohne Begrenzung.
+ * `bounded`: Anmeldung (begrenzte Warteschlange, bei Überlast `QueueFullError`); sonst der Eigentümer-Pfad (`owner` bestimmt den Platz, auch dort kann `QueueFullError` kommen).
  */
-export async function verifyPassword(password: string, hash: string | null | undefined, options: { bounded?: boolean } = {}): Promise<boolean> {
+export async function verifyPassword(password: string, hash: string | null | undefined, options: { bounded?: boolean; owner?: string } = {}): Promise<boolean> {
   if (passwordTooLong(password)) return false; // zu lange Eingaben werden gar nicht erst gerechnet
   if (!hash) {
     await authRuntime.sleep(authRuntime.between(Math.round(hashStats.typicalMs * 0.9), Math.round(hashStats.typicalMs * 1.2)));
     return false;
   }
-  const lane = options.bounded ? hashSemaphore : ownerSemaphore;
-  return lane.run(
-    () => {
-      hashStats.computed += 1;
-      return timed(() => scryptVerify(password, hash));
-    },
-    { bounded: options.bounded },
-  );
+  const compute = () => {
+    hashStats.computed += 1;
+    return timed(() => scryptVerify(password, hash));
+  };
+  return options.bounded ? hashSemaphore.run(compute, { bounded: true }) : ownerLane.run(options.owner ?? "shared", compute);
 }
 
 export { QueueFullError } from "@/lib/semaphore";

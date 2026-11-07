@@ -1,7 +1,9 @@
 import "server-only";
 import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
+import { logError } from "@/lib/log-safe";
 import { writeAudit } from "@/server/audit";
+import { resetUnreadableSecondFactors } from "@/server/auth/second-factor";
 import { loadCspMode } from "@/server/csp-setting";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
@@ -72,6 +74,9 @@ export async function startApp(): Promise<void> {
     await loadCspMode();
     const revoked = await revokeApiTokensAfterRestore();
     if (revoked > 0) console.log(`[start] Nach der Wiederherstellung: ${revoked} API-Token(s) widerrufen.`);
+    // Backup ohne passenden Schlüssel (secret.key): Die Geheimnisse der Zwei-Faktor-Anmeldung sind unlesbar – für alle Konten zurücksetzen (Hinweis beim ersten Login, Audit)
+    const twoFactorReset = await resetUnreadableSecondFactors().catch((error) => (logError("start:twoFactor", error), 0));
+    if (twoFactorReset > 0) console.log(`[start] Zwei-Faktor-Anmeldung für ${twoFactorReset} Konto/Konten zurückgesetzt (Schlüssel passt nicht zum Backup).`);
     const workshop = await db.workshop.findUnique({ where: { id: "default" }, select: { timezone: true } });
     if (workshop && !applyTimezone(workshop.timezone)) console.error(`[start] Unbekannte Zeitzone ${workshop.timezone}`);
 

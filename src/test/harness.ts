@@ -246,7 +246,7 @@ export async function createTestEnv(): Promise<TestEnv> {
       });
     },
     user: async (input) => {
-      const passwordHash = input.password ? await (await import("@/server/auth/password")).hashPassword(input.password) : null;
+      const passwordHash = input.password ? await (await import("@/server/auth/password")).hashPassword(input.password, "test") : null;
       return db.user.create({
         data: {
           username: input.username,

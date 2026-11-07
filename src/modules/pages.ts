@@ -63,5 +63,6 @@ export const PLATFORM_PAGES: readonly PlatformPageDef[] = [
   { path: "/help/[slug]", kind: "detail", params: { slug: { value: "handbook.manual" } } },
   { path: "/login", kind: "other", public: true, key: true },
   { path: "/login/recover", kind: "other", public: true },
+  { path: "/login/verify", kind: "other", public: true },
   { path: "/forbidden", kind: "other", public: true },
 ];

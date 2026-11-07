@@ -3,15 +3,17 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import { bytesToDataChars, formatRecoveryCode, parseRecoveryCode } from "@/lib/recovery-code";
 import { db } from "@/server/db";
+import { QueueFullError } from "@/lib/semaphore";
 import { hashPassword } from "./password";
 import { revokeAccess } from "./revoke";
+import { resetSecondFactor } from "./second-factor";
 import { authRuntime } from "./runtime";
 import { loginThrottle, normalizeUsername } from "./throttle";
 
 /**
  * Notzugang: Wiederherstellungs-Code für Administrator-Konten. Der Code hat 160 Bit Zufall, gespeichert wird nur sein SHA-256-Hash
- * (bei so viel Zufall genügt ein schneller Hash – Raten ist aussichtslos). Er umgeht Passwort und (später) 2FA und ist deshalb wie
- * ein Passwort aufzubewahren.
+ * (bei so viel Zufall genügt ein schneller Hash – Raten ist aussichtslos). Er umgeht Passwort und Zwei-Faktor-Anmeldung und ist deshalb wie
+ * ein Passwort aufzubewahren; beim Einlösen wird der zweite Faktor des Kontos zurückgesetzt.
  *
  * Das Einlösen läuft über einen **eigenen Pfad** (nicht über die scrypt-Semaphore der Passwortprüfung): SHA-256 und Vergleich in
  * konstanter Zeit über alle gespeicherten Hashes. Gedrosselt wird **ausschließlich global** (Budget, das verlangsamt, nie abweist)
@@ -45,19 +47,9 @@ export async function replaceRecoveryCode(tx: Tx, userId: string): Promise<strin
   return code;
 }
 
-/**
- * Erweiterungsstelle für die Zwei-Faktor-Anmeldung (P1b-5): Beim Einlösen des Codes wird ein eingerichteter zweiter Faktor des
- * Kontos zurückgesetzt. Solange es keine 2FA gibt, ist nichts zu tun – die Stelle ist in der Transaktion des Einlösens bereits
- * verdrahtet und muss dort nur noch gefüllt werden.
- */
-export async function resetSecondFactor(tx: Tx, userId: string): Promise<void> {
-  void tx;
-  void userId;
-}
-
 export type RedeemInput = { code: string; password: string; ip: string | null };
 export type RedeemResult =
-  | { ok: true; newCode: string; account: { id: string; name: string; username: string } }
+  | { ok: true; newCode: string; account: { id: string; name: string; username: string }; secondFactorReset: boolean }
   /** Immer dieselbe Antwort, egal warum: kein Code, falscher Code, Prüfsumme, Konto unbrauchbar, bereits benutzt */
   | { ok: false; reason: "invalid" }
   /** Nur die Client-Adresse (mit Reverse-Proxy-Einstellung) ist gedrosselt – nie ein Konto */
@@ -131,9 +123,13 @@ async function attempt(input: RedeemInput): Promise<RedeemResult> {
   const user = await db.user.findUnique({ where: { id: found.userId }, include: { roles: { include: { role: true } } } });
   if (!user || !user.active || user.authSource !== "local" || !user.roles.some((r) => r.role.isAdmin)) throw new Invalid();
 
-  // Das neue Passwort wird erst jetzt gehasht (nur für einen gültigen Code) – auf dem eigenen Pfad `ownerSemaphore`, nie in der
+  // Das neue Passwort wird erst jetzt gehasht (nur für einen gültigen Code) – auf dem Eigentümer-Pfad (`ownerLane`, Schlüssel "recovery"), nie in der
   // Warteschlange der Anmeldungen; die Antwortdauer ist aufgefüllt
-  const passwordHash = await hashPassword(input.password);
+  // Ist der Eigentümer-Pfad gerade voll (zwei gleichzeitige Einlösungen mit gültigem Code), gilt der Versuch wie jeder andere Fehlschlag: gleiche Antwort, der Code bleibt unverbraucht
+  const passwordHash = await hashPassword(input.password, "recovery").catch((error) => {
+    throw error instanceof QueueFullError ? new Invalid() : error;
+  });
+  let secondFactorReset = false;
   const newCode = await db.$transaction(async (tx) => {
     // Der Code wird verbraucht: nur wer die Zeile tatsächlich löscht, hat ihn eingelöst (zwei gleichzeitige Einlösungen: eine gewinnt)
     const used = await tx.recoveryCode.deleteMany({ where: { id: found.id, codeHash: found.codeHash } });
@@ -141,12 +137,13 @@ async function attempt(input: RedeemInput): Promise<RedeemResult> {
     await tx.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false, failedLogins: 0, lockedUntil: null } });
     // Zugang verloren: alle Sitzungen enden (kein automatisches Anmelden), bekannte Geräte gelten nicht mehr und API-Tokens des Kontos werden widerrufen
     await revokeAccess(tx, user.id);
-    await resetSecondFactor(tx, user.id);
+    // Der Notzugang umgeht Passwort **und** zweiten Faktor – er setzt den zweiten Faktor deshalb zurück (die Person richtet ihn neu ein und sieht einen Hinweis)
+    secondFactorReset = await resetSecondFactor(tx, user.id, "recovery");
     await tx.recoveryNotice.create({ data: { userId: user.id, userName: user.name } });
     return replaceRecoveryCode(tx, user.id);
   });
   loginThrottle.accounts.reset(normalizeUsername(user.username)); // eine laufende Wartezeit des Kontos soll die Anmeldung nicht blockieren
-  return { ok: true, newCode, account: { id: user.id, name: user.name, username: user.username } };
+  return { ok: true, newCode, account: { id: user.id, name: user.name, username: user.username }, secondFactorReset };
 }
 
 /* ───────────── Hinweise („Notzugang wurde verwendet“) ───────────── */

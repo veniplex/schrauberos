@@ -9,7 +9,7 @@ import { startupState } from "@/server/startup-state";
 // Nur eine schnelle, optimistische Prüfung (Cookie vorhanden?). Die echte Prüfung der Sitzung und der Berechtigungen passiert
 // serverseitig in getSession()/requirePermission(). Deshalb leitet der Proxy nie „von /login weg“: Ein totes Cookie führte sonst zu
 // einer Schleife (Seite → /login → /). Ob jemand wirklich angemeldet ist, entscheidet die Anmeldeseite selbst.
-const OPEN_PAGES = new Set(["/login", "/login/recover", "/setup"]);
+const OPEN_PAGES = new Set(["/login", "/login/recover", "/login/verify", "/setup"]);
 
 // Programmierschnittstelle (Bearer-Token) und iCal-Feed (Token in der URL) prüfen sich selbst und brauchen kein Sitzungs-Cookie.
 const SELF_AUTHENTICATED = ["/api/v1", "/api/ical"];
@@ -56,6 +56,8 @@ function secured(response: NextResponse, policy: RequestPolicy, secure: boolean)
 function passThrough(request: NextRequest, policy: RequestPolicy, secure: boolean): NextResponse {
   if (!policy || policy.kind === "api") return secured(NextResponse.next(), policy, secure);
   const headers = new Headers(request.headers);
+  // Pfad der Anfrage für das Rücksprungziel nach einer abgelaufenen Sitzung (`requireSession`); ein vom Absender mitgeschickter Wert wird überschrieben
+  headers.set("x-so-path", request.nextUrl.pathname + request.nextUrl.search);
   headers.delete(CSP_HEADER);
   headers.delete(CSP_REPORT_ONLY_HEADER);
   headers.set("x-nonce", policy.nonce);

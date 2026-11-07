@@ -5,8 +5,10 @@ import type { MessageKey } from "@/i18n/translate";
 import { formObject } from "@/lib/forms";
 import { claimRow } from "@/lib/concurrency";
 import { checkGrantRole, checkManageUser, type Denial } from "@/lib/rbac";
-import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
+import { accountOwner, hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
+import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { revokeAccess } from "@/server/auth/revoke";
+import { resetSecondFactor } from "@/server/auth/second-factor";
 import { loginThrottle, normalizeUsername } from "@/server/auth/throttle";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { loadActor, loadRoles, toRights } from "@/server/rbac/hierarchy";
@@ -53,7 +55,7 @@ const saveUserOperation = defineOperation({
   input: saveInput,
   audit: (input) => (input.id ? "user.update" : "user.create"),
   // aufwendig, deshalb vor der Transaktion
-  prepare: async ({ input }) => ({ passwordHash: input.password ? await hashPassword(input.password) : undefined }),
+  prepare: async ({ input, principal }) => ({ passwordHash: input.password ? await hashPassword(input.password, accountOwner(principal.user.id)) : undefined }),
   run: async ({ input: d, principal, prepared, tx, audit }) => {
     // Prüfen und Schreiben gehören zusammen: Rechte-Hierarchie, Schutz des letzten Administrators und Speichern in einer Transaktion
     const actor = await loadActor(tx, principal.user.id);
@@ -169,4 +171,36 @@ export const deleteUser = defineAction(deleteUserOperation, {
   redirect: "/admin/users",
   message: "common.deleted",
   redirectOnError: "/admin/users",
+});
+
+/**
+ * Zwei-Faktor-Anmeldung eines Kontos zurücksetzen (Telefon verloren, Sicherungscodes weg). Gleiche Rechte-Hierarchie wie beim Ändern des Kontos, die **Passwortabfrage der
+ * handelnden Person** und ein Audit-Eintrag; das Konto sieht danach einen Hinweis. Sitzungen, bekannte Geräte und API-Tokens des Kontos enden (wer das Telefon verloren hat,
+ * soll keine alte Sitzung behalten). Das eigene Konto schaltet man unter „Mein Konto“ aus, nicht hier.
+ */
+const resetTwoFactorOperation = defineOperation({
+  name: "admin.users.resetTwoFactor",
+  permission: "users.manage",
+  input: z.object({ id: z.string().min(1), password: z.string().max(1024) }),
+  audit: "auth.twoFactorReset",
+  prepare: async ({ input, principal }) => {
+    if (input.id === principal.user.id) fail("forbidden", "users.errors.selfResetTwoFactor");
+    return confirmOwnPassword(principal.user.id, input.password);
+  },
+  run: async ({ input, principal, tx, audit }) => {
+    const actor = await loadActor(tx, principal.user.id);
+    const user = await tx.user.findUnique({ where: { id: input.id }, include: withRoles });
+    if (!user) fail("notFound");
+    const denied = checkManageUser(actor, user.roles.map((r) => toRights(r.role)));
+    if (denied) fail("forbidden", deniedKey(denied));
+    if (!(await resetSecondFactor(tx, user.id, "admin"))) fail("conflict", "users.errors.noTwoFactor");
+    await revokeAccess(tx, user.id);
+    audit({ target: user.username, entityId: user.id });
+    return { id: user.id };
+  },
+});
+
+export const resetTwoFactor = defineAction(resetTwoFactorOperation, {
+  revalidate: ["/admin/users"],
+  redirect: ({ id }) => `/admin/users/${id}?twoFactorReset=1`,
 });

@@ -22,7 +22,7 @@ const BODY_OVERHEAD = 64 * 1024;
  */
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!isSameOriginUpload(request, await isBehindProxy())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   if (!Object.values(DOC_PERMISSIONS).some((p) => session.can(p.edit))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const header = request.headers.get("content-length");

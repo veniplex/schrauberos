@@ -31,5 +31,5 @@ export async function recoverAccess(_prev: RecoveryActionState, formData: FormDa
     return { error: result.reason === "throttled" ? t("recovery.recover.errors.throttled", { seconds: result.retryAfterSeconds }) : t("recovery.recover.errors.invalid") };
   }
   await audit("auth.recoveryUsed", { actor: { id: result.account.id, name: result.account.name }, target: result.account.username });
-  return { ok: true, recoveryCode: result.newCode, issuedOn: date(new Date(), { dateStyle: "medium" }) };
+  return { ok: true, recoveryCode: result.newCode, issuedOn: date(new Date(), { dateStyle: "medium" }), secondFactorReset: result.secondFactorReset };
 }

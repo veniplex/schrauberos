@@ -36,6 +36,7 @@ export const recoveryEn: typeof recoveryDe = {
     doneIntro:
       "The new password is active and all existing sign-ins of this account have been ended. The code you used is no longer valid – here is your new code. You are not signed in automatically.",
     toLogin: "To sign-in",
+    secondFactorReset: "Two-factor sign-in for this account has been reset: the emergency access bypasses it. After signing in, set it up again under “My account”.",
     errors: {
       invalid: "The code is invalid or no longer valid.",
       throttled: "Too many attempts from this address. Please try again in about {seconds} seconds.",

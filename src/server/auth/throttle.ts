@@ -23,6 +23,14 @@ function create() {
      * Geräte-Id (nur gültige Geräte kommen hierher), deshalb ist die Tabelle durch Konten × 10 begrenzt.
      */
     devices: new Gate({ free: 5, baseMs: 2_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 2_000, now }),
+    /**
+     * Zweiter Faktor bei der Anmeldung (Schlüssel: Konto-Id): 5 freie Versuche, dann 2 s, 4 s … bis 90 s. Der Code ist billig zu prüfen (kein Hash), die Drosselung
+     * hält das Raten trotzdem aussichtslos (6 Ziffern, 3 gültige Werte). Ein Erfolg gleicht nur den eigenen Versuch aus (`forgive`), er setzt die Zählung nicht zurück.
+     * Dazu zählt `TwoFactor.failedAttempts/lockedUntil` dauerhaft (überlebt einen Neustart).
+     */
+    totp: new Gate({ free: 5, baseMs: 2_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 2_000, now }),
+    /** Code-Eingabe bei der **Einrichtung** des zweiten Faktors im Konto (Schlüssel: Konto-Id): eine gestohlene Sitzung darf dort nicht unbegrenzt raten. */
+    totpSetup: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
     /** Passwortwechsel im Konto: eigenes Limit (die Prüfung des aktuellen Passworts darf kein Rate-Orakel für gestohlene Sitzungen sein). */
     passwordChange: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
     /** Alle Fehlversuche zusammen: ab 30 pro Minute wird jede Anmeldung bis zu 3 s langsamer, aber nie abgewiesen. */
@@ -38,6 +46,8 @@ function create() {
       /** Audit für Fehlversuche: insgesamt höchstens einer alle 10 s und 6 pro Minute */
       audit: new RateWindow({ perKeyMs: 10_000, globalLimit: 6, globalWindowMs: 60_000, maxKeys: 4, now }),
     },
+    /** Audit-Einträge für Fehlversuche beim zweiten Faktor: je Konto höchstens einer pro Minute, insgesamt höchstens 30 pro Minute. */
+    audit2fa: new RateWindow({ perKeyMs: 60_000, globalLimit: 30, globalWindowMs: 60_000, maxKeys: 2_000, now }),
     /** Audit-Einträge für Fehlversuche: je Konto höchstens einer pro Minute, insgesamt höchstens 30 pro Minute. */
     audit: new RateWindow({ perKeyMs: 60_000, globalLimit: 30, globalWindowMs: 60_000, maxKeys: 2_000, now }),
   };

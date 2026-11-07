@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { login } from "@/server/auth/session";
-import { hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
+import { hashPassword, QueueFullError, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
 import { audit } from "@/server/audit";
 import { seedAllDemo } from "@/server/seed/demo";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
@@ -50,7 +50,14 @@ export async function completeSetup(_prev: RecoveryActionState, formData: FormDa
 
   const adminRole = await db.role.findUnique({ where: { key: "admin" } });
   if (!adminRole) return { error: t("setup.errors.notReady") };
-  const passwordHash = await hashPassword(d.password);
+  // Eigentümer-Pfad: gleichzeitige Einrichtungsversuche belegen höchstens zwei Plätze, der Rest bekommt „bitte gleich noch einmal“
+  let passwordHash: string;
+  try {
+    passwordHash = await hashPassword(d.password, "setup");
+  } catch (error) {
+    if (error instanceof QueueFullError) return { error: t("common.errors.busy") };
+    throw error;
+  }
 
   // In einer Transaktion: Zwei gleichzeitige Aufrufe können nicht beide einen Administrator anlegen
   const created = await db.$transaction(async (tx) => {

@@ -13,7 +13,7 @@ const ALLOWED = ["appointments.create", "appointments.edit", "tires.create", "ti
  */
 export async function GET(request: NextRequest) {
   const session = await getSession();
-  if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!session.features.has("workshop.vehicles") || !ALLOWED.some((p) => session.can(p))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 60);

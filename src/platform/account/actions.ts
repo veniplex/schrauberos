@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { formObject } from "@/lib/forms";
-import { hashPassword, MAX_PASSWORD_CHARS, MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from "@/server/auth/password";
+import { accountOwner, hashPassword, MAX_PASSWORD_CHARS, MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from "@/server/auth/password";
 import { revokeAccess } from "@/server/auth/revoke";
 import { loginThrottle } from "@/server/auth/throttle";
 import { db } from "@/server/db";
@@ -63,10 +63,10 @@ const changePasswordOperation = defineOperation({
     const wait = gate.check(user.id);
     if (wait > 0) fail("forbidden", "account.errors.tooManyAttempts", { seconds: Math.ceil(wait / 1000) });
     gate.take(user.id);
-    if (!(await verifyPassword(input.current, user.passwordHash))) failField("current", "account.errors.currentWrong");
+    if (!(await verifyPassword(input.current, user.passwordHash, { owner: accountOwner(principal.user.id) }))) failField("current", "account.errors.currentWrong");
     gate.succeed(user.id);
     if (input.next === input.current) failField("next", "account.errors.sameAsOld");
-    return { passwordHash: await hashPassword(input.next), wasForced: user.mustChangePassword };
+    return { passwordHash: await hashPassword(input.next, accountOwner(principal.user.id)), wasForced: user.mustChangePassword };
   },
   run: async ({ principal, prepared, tx, audit }) => {
     await tx.user.update({ where: { id: principal.user.id }, data: { passwordHash: prepared.passwordHash, mustChangePassword: false } });

@@ -10,7 +10,7 @@ import { canViewDocImage } from "@/capabilities/docs/images";
 /** Liefert ein Doku-Bild aus – nur mit Leserecht auf den Bereich und nur, wenn das Bild auf einer für den Betrachter sichtbaren Seite steht (Bearbeiter: alle). */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || session.user.mustChangePassword) return new Response("Unauthorized", { status: 401 });
+  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return new Response("Unauthorized", { status: 401 });
 
   const { id } = await params;
   const image = await db.docImage.findUnique({ where: { id } });

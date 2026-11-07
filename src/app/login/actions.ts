@@ -28,7 +28,7 @@ async function auditLogin(username: string, result: LoginResult) {
     await audit("auth.login", { actor: result.account });
     return;
   }
-  if (result.reason === "throttled" || result.reason === "busy") return;
+  if (result.reason === "throttled" || result.reason === "busy" || result.reason === "secondFactor") return;
   const known = result.account;
   const actor = known ?? { id: null, name: "–" };
   const target = known ? `${key} · ${result.reason}` : `#${nameFingerprint(key)} · ${result.reason}`;
@@ -44,9 +44,16 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   // Überlange Eingaben werden gar nicht erst geprüft (und verursachen keine Arbeit)
   if (!parsed.success || passwordTooLong(parsed.data.password)) return { error: t("auth.errors.invalid") };
 
-  const result = await login(parsed.data.username, parsed.data.password, { ip: await currentClientIp(), deviceToken: await readDeviceToken() });
+  const result = await login(parsed.data.username, parsed.data.password, {
+    ip: await currentClientIp(),
+    deviceToken: await readDeviceToken(),
+    // „Dieses Gerät merken“ ist ein Opt-in: ohne Häkchen entsteht kein bekanntes Gerät
+    rememberDevice: formData.get("remember") === "on",
+  });
   await auditLogin(parsed.data.username, result);
   if (!result.ok) {
+    // Passwort richtig, zweiter Faktor fehlt noch: zum zweiten Schritt (noch keine Sitzung)
+    if (result.reason === "secondFactor") redirect(verifyUrl(formData.get("next")));
     if (result.reason === "throttled") return { error: t("auth.errors.throttled", { seconds: result.retryAfterSeconds }) };
     return { error: t(`auth.errors.${result.reason}`) };
   }
@@ -54,8 +61,15 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   redirect(result.mustChangePassword ? "/account" : safeNext(formData.get("next")));
 }
 
-export async function logoutAction() {
+/** Adresse des zweiten Schritts; das Rücksprungziel bleibt erhalten (nur interne Pfade). */
+function verifyUrl(next: FormDataEntryValue | null): string {
+  const target = safeNext(next);
+  return target === "/" ? "/login/verify" : `/login/verify?next=${encodeURIComponent(target)}`;
+}
+
+/** Abmelden; mit dem Häkchen „Dieses Gerät vergessen“ wird zusätzlich das bekannte Gerät dieses Browsers vergessen. */
+export async function logoutAction(formData?: FormData) {
   await audit("auth.logout");
-  await logout();
+  await logout({ forgetDevice: formData?.get("forgetDevice") === "on" });
   redirect("/login");
 }

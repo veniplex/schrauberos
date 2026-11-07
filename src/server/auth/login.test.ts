@@ -50,6 +50,8 @@ const makeUser = async (username = "anna", password = "richtiges-passwort-1", ex
   return user;
 };
 const attempt = (name: string, pw = "falsches-passwort", ip: string | null = null) => session.login(name, pw, { ip });
+/** Anmeldung mit dem Häkchen „Dieses Gerät merken“ (ohne das Häkchen entsteht kein bekanntes Gerät) */
+const attemptRemember = (name: string, pw: string, ip: string | null = null) => session.login(name, pw, { ip, rememberDevice: true });
 const reasonOf = (r: { ok: boolean } & Record<string, unknown>) => (r.ok ? "ok" : (r.reason as string));
 const loginForm = (name: string, pw: string, next?: string) => form({ username: name, password: pw, next });
 
@@ -72,9 +74,9 @@ describe("Cookie", () => {
     assert.ok((await session.getSession())?.user.username === "anna");
   });
 
-  it("Abmelden im HTTP-LAN löscht das Klartext-Cookie und die Sitzung", async () => {
+  it("Abmelden im HTTP-LAN löscht das Klartext-Cookie und die Sitzung; das gemerkte Gerät bleibt, wenn man es nicht vergessen lässt", async () => {
     await makeUser();
-    await attempt("anna", "richtiges-passwort-1");
+    await attemptRemember("anna", "richtiges-passwort-1");
     await session.logout();
     assert.equal(browser.cookies.has("so_session"), false);
     assert.equal(browser.cookies.has("so_device"), true, "das Geräte-Cookie bleibt über das Abmelden hinaus bestehen");
@@ -269,7 +271,7 @@ describe("Bekanntes Gerät: Dauerbeschuss sperrt den Besitzer nicht aus", () => 
   const ADMIN_PW = "admin-passwort-1";
   /** Meldet an, merkt sich das Geräte-Cookie und gibt es zurück (so, wie es der Browser des Administrators hätte). */
   const knownDevice = async (name = "admin", pw = ADMIN_PW) => {
-    assert.equal((await attempt(name, pw)).ok, true);
+    assert.equal((await attemptRemember(name, pw)).ok, true);
     const token = browser.cookies.get("so_device");
     assert.ok(token, "nach der Anmeldung gibt es ein Geräte-Cookie");
     browser.reset(); // der Angreifer hat dieses Cookie nicht
@@ -280,7 +282,7 @@ describe("Bekanntes Gerät: Dauerbeschuss sperrt den Besitzer nicht aus", () => 
 
   it("setzt nach der Anmeldung ein langes, zufälliges Cookie (HttpOnly, SameSite=Lax, 180 Tage); in der Datenbank steht nur sein Hash", async () => {
     await makeUser("admin", ADMIN_PW);
-    assert.equal((await attempt("admin", ADMIN_PW)).ok, true);
+    assert.equal((await attemptRemember("admin", ADMIN_PW)).ok, true);
     const w = browser.writes.find((x) => x.name === "so_device")!;
     assert.ok(w.value && w.value.length >= 40);
     assert.deepEqual({ h: w.options.httpOnly, l: w.options.sameSite, p: w.options.path, s: w.options.secure, a: w.options.maxAge }, { h: true, l: "lax", p: "/", s: false, a: 180 * 86_400 });
@@ -296,7 +298,7 @@ describe("Bekanntes Gerät: Dauerbeschuss sperrt den Besitzer nicht aus", () => 
   it("unter HTTPS heißt es __Host-so_device (Secure, Pfad /); ein Klartext-Cookie wird dort nicht gelesen", async () => {
     await makeUser("admin", ADMIN_PW);
     browser.setHeaders({ "x-forwarded-proto": "https" });
-    await attempt("admin", ADMIN_PW);
+    await attemptRemember("admin", ADMIN_PW);
     const w = browser.writes.find((x) => x.name === "__Host-so_device")!;
     assert.deepEqual({ s: w.options.secure, p: w.options.path, h: w.options.httpOnly }, { s: true, p: "/", h: true });
     const devices = await import("./devices");
@@ -390,7 +392,7 @@ describe("Bekanntes Gerät: Dauerbeschuss sperrt den Besitzer nicht aus", () => 
     await devices.revokeDevices(admin.id);
     assert.equal(await env.db.knownDevice.count(), 0);
     // Wechsel im Konto: das eigene Gerät behalten, andere vergessen
-    await attempt("admin", ADMIN_PW);
+    await attemptRemember("admin", ADMIN_PW);
     await env.db.knownDevice.create({ data: { tokenHash: "x".repeat(64), userId: admin.id } });
     await devices.revokeDevices(admin.id, true);
     const left = await env.db.knownDevice.findMany();
@@ -404,7 +406,7 @@ describe("Bekanntes Gerät: Dauerbeschuss sperrt den Besitzer nicht aus", () => 
       browser.reset();
       clock += 1_000;
       throttleMod.resetLoginThrottle();
-      assert.equal((await attempt("admin", ADMIN_PW)).ok, true);
+      assert.equal((await attemptRemember("admin", ADMIN_PW)).ok, true);
     }
     assert.equal(await env.db.knownDevice.count({ where: { userId: admin.id } }), 10);
   });
@@ -441,7 +443,7 @@ describe("Flut von Anmeldungen: Administrator und Notzugang kommen durch", () =>
     const admin = await env.user({ username: "admin", password: ADMIN_PW, roles: [role] });
     passwordMod.hashStats.computed = 0;
     await makeUser("anna");
-    assert.equal((await attempt("admin", ADMIN_PW)).ok, true);
+    assert.equal((await attemptRemember("admin", ADMIN_PW)).ok, true);
     const token = browser.cookies.get("so_device")!;
     browser.reset();
     throttleMod.resetLoginThrottle();
@@ -459,7 +461,7 @@ describe("Flut von Anmeldungen: Administrator und Notzugang kommen durch", () =>
       assert.equal(reasonOf(await attempt("anna", "richtiges-passwort-1")), "busy");
       // ... die vom bekannten Gerät, das Passwort-Setzen und der Notzugang nicht
       assert.equal((await session.login("admin", ADMIN_PW, { deviceToken: token })).ok, true);
-      assert.ok((await passwordMod.hashPassword("neues-passwort-123")).startsWith("scrypt$"));
+      assert.ok((await passwordMod.hashPassword("neues-passwort-123", "test")).startsWith("scrypt$"));
       const result = await recovery.redeemRecoveryCode({ code, password: "notweg-passwort-456", ip: null });
       assert.equal(result.ok, true);
     } finally {

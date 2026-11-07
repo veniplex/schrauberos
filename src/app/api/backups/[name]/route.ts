@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ name: string }> }) {
   const session = await getSession();
-  if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session || session.user.mustChangePassword || session.user.mustSetupTwoFactor) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!session.can("backup.manage")) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const { name } = await params;

@@ -3,9 +3,14 @@ import { Alert, Card } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LocaleSwitch, ThemeSwitch } from "@/components/shell/switches";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
-import { requireSession } from "@/server/auth/session";
+import { listSessions, requireSession } from "@/server/auth/session";
 import { PasswordForm, ProfileForm } from "@/platform/account/forms";
 import { RecoveryCard } from "@/platform/account/recovery-card";
+import { TwoFactorCard } from "@/platform/account/two-factor-card";
+import { DevicesCard, SessionsCard } from "@/platform/account/sessions-card";
+import { listDevices } from "@/server/auth/devices";
+import { authPolicy } from "@/server/auth/policy";
+import { twoFactorStatus } from "@/server/auth/second-factor";
 import { db } from "@/server/db";
 import { FieldHint, FieldLabel } from "@/components/ui/form";
 
@@ -18,8 +23,15 @@ export default async function AccountPage() {
   const session = await requireSession({ allowPasswordChange: true });
   const [{ t, date }, locale, theme] = await Promise.all([getI18n(), getLocale(), getTheme()]);
   const showRecovery = session.user.isAdmin && session.user.authSource === "local" && !session.user.mustChangePassword;
-  const recovery = showRecovery ? await db.recoveryCode.findUnique({ where: { userId: session.user.id } }) : null;
   const forced = session.user.mustChangePassword;
+  const [recovery, twoFactor, sessions, devices, policy] = await Promise.all([
+    showRecovery ? db.recoveryCode.findUnique({ where: { userId: session.user.id } }) : null,
+    twoFactorStatus(session.user.id),
+    forced ? [] : listSessions(session.user.id),
+    forced ? [] : listDevices(session.user.id),
+    authPolicy(),
+  ]);
+  const requireSecond = policy.requireTwoFactorForAdmins && session.user.isAdmin;
 
   return (
     <>
@@ -29,6 +41,10 @@ export default async function AccountPage() {
         {forced ? (
           <div className="mb-5 max-w-2xl">
             <Alert tone="warning">{t("account.mustChange")}</Alert>
+          </div>
+        ) : session.user.mustSetupTwoFactor ? (
+          <div className="mb-5 max-w-2xl">
+            <Alert tone="warning">{t("security.twoFactor.requiredNotice")}</Alert>
           </div>
         ) : null}
       </div>
@@ -64,6 +80,17 @@ export default async function AccountPage() {
             </Card>
           )}
         </div>
+        {!forced ? (
+          <div className="contents">
+            <Card title={t("security.twoFactor.title")}>
+              <TwoFactorCard
+                status={{ enabled: twoFactor.enabled, enabledOn: twoFactor.enabledAt ? date(twoFactor.enabledAt, { dateStyle: "medium" }) : null, codesLeft: twoFactor.backupCodesLeft }}
+                required={requireSecond}
+                account={{ name: session.user.name, username: session.user.username }}
+              />
+            </Card>
+          </div>
+        ) : null}
         {showRecovery ? (
           <Card title={t("recovery.title")}>
             <RecoveryCard
@@ -72,6 +99,8 @@ export default async function AccountPage() {
             />
           </Card>
         ) : null}
+        {!forced ? <SessionsCard sessions={sessions} /> : null}
+        {!forced ? <DevicesCard devices={devices} /> : null}
       </div>
     </>
   );

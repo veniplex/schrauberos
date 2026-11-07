@@ -7,24 +7,22 @@ import { getSession } from "@/server/auth/session";
 import { safeNext } from "@/lib/safe-next";
 import { getWorkshop } from "@/server/workshop";
 import { LoginForm } from "./login-form";
-import { Card, TextLink } from "@/components/ui/layout";
-import { ClearDrafts } from "@/components/ui/clear-drafts";
+import { Alert, Card, TextLink } from "@/components/ui/layout";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return { title: t("auth.signIn") };
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; expired?: string; notice?: string }> }) {
   // Frische Installation: erst den Administrator einrichten
   if ((await db.user.count()) === 0) redirect("/setup");
-  const [{ t }, workshop, { next }] = await Promise.all([getI18n(), getWorkshop(), searchParams]);
+  const [{ t }, workshop, params] = await Promise.all([getI18n(), getWorkshop(), searchParams]);
+  const { next, expired, notice } = params;
   // Die Anmeldeseite prüft die Sitzung selbst (der Proxy sieht nur, ob ein Cookie da ist): Ein totes Cookie führt hierher, nicht im Kreis.
   if (await getSession()) redirect(safeNext(next));
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
-      <ClearDrafts />
-      <ClearDrafts />
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           {workshop.logoDataUrl ? (
@@ -42,6 +40,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </div>
         <Card as="div">
           <h2 className="mb-4 text-base font-semibold">{t("auth.signIn")}</h2>
+          {expired === "1" || notice === "twoFactorExpired" ? (
+            <Alert tone="info" className="mb-4">
+              {notice === "twoFactorExpired" ? t("auth.secondFactor.expired") : t("auth.sessionEnded")}
+            </Alert>
+          ) : null}
           <LoginForm next={safeNext(next)} />
           <p className="mt-4 text-center text-sm">
             <TextLink href="/login/recover">

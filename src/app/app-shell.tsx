@@ -12,6 +12,8 @@ import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { NAV_COOKIE, parseCollapsed } from "@/lib/nav-state";
 import type { AppSession } from "@/server/auth/session";
 import { RecoveryBanner } from "@/platform/account/recovery-banner";
+import { SecurityBanner } from "@/platform/account/security-banner";
+import { deviceCookieName } from "@/lib/session-cookie";
 import { FlashNotice } from "@/components/shell/flash-notice";
 import { DraftScope } from "@/components/ui/draft-scope";
 import { getWorkshop } from "@/server/workshop";
@@ -48,7 +50,9 @@ export async function AppShell({ session, children }: { session: AppSession; chi
     return { id: a.id, href: a.href, label: t(a.labelKey), icon: <Icon className="size-4 shrink-0" aria-hidden /> };
   });
 
-  const user = { name: session.user.name, roles: session.user.roleNames.join(", ") || "–", locale, theme, logoutAction };
+  // Das Abmelden bietet „Gerät vergessen“ nur an, wenn dieser Browser überhaupt ein Geräte-Cookie trägt
+  const hasDevice = jar.has(deviceCookieName(false)) || jar.has(deviceCookieName(true));
+  const user = { name: session.user.name, roles: session.user.roleNames.join(", ") || "–", locale, theme, logoutAction, hasDevice };
 
   return (
     <DraftScope userId={session.user.id}>
@@ -68,6 +72,7 @@ export async function AppShell({ session, children }: { session: AppSession; chi
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[88rem] px-4 py-6 outline-none sm:px-6 lg:py-8">
         <FlashNotice />
         <RecoveryBanner user={{ id: session.user.id, isAdmin: session.user.isAdmin }} />
+        <SecurityBanner userId={session.user.id} />
         {children}
       </main>
     </Sidebar>
