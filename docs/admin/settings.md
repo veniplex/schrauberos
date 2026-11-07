@@ -3,7 +3,7 @@
 Die **Einstellungen** sind in Reiter gegliedert. Welche Reiter es gibt, hängt von den aktiven Funktionen ab: Jede Funktion bringt
 ihre eigenen Einstellungen mit.
 
-* **Werkstatt:** Name, Untertitel, Adresse, Logo, Akzentfarbe (eine frei gewählte Farbe, die als Schrift zu blass wäre, wird mit einem Hinweis markiert), **Zeitzone** (gilt sofort) und Öffnungszeiten.
+* **Werkstatt:** Name, Untertitel, Adresse, Logo, Akzentfarbe (eine frei gewählte Farbe, die als Schrift zu blass wäre, wird mit einem Hinweis markiert), **Zeitzone** (gilt sofort) und Öffnungszeiten. Alle Tage und Uhrzeiten der Anwendung – Termine und Kalender, Öffnungszeiten, Fristen, Rechnungsdaten, Abwesenheiten, die Saison im Reifenlager und die Uhrzeit der nächtlichen Sicherung – gelten in dieser Zeitzone, unabhängig von der Einstellung des Servers.
 * **Sicherheit – Sitzungen:** **Abmelden nach Leerlauf (Stunden)**: Sitzungen enden, wenn so lange keine Seite aufgerufen wurde (auf etwa eine Minute genau; 0 = aus, Standard; höchstens 720). Wer sich dann
   neu anmeldet, landet auf derselben Seite, und nicht gespeicherte Eingaben bleiben im Browser erhalten. **Zwei-Faktor-Anmeldung für Administratoren verpflichtend** (Standard: aus): Administrator-Konten ohne
   eingerichteten zweiten Faktor erreichen dann nach der Anmeldung nur „Mein Konto“ und können ihn nicht ausschalten. Vorher sicherstellen, dass jeder Administrator ein Handy mit Authenticator-App hat; ein

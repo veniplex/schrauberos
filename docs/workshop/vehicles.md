@@ -33,6 +33,7 @@ Fahrzeuge sind eigenständig und brauchen **keinen** Kunden. Erfasst werden Kenn
 
 * **Kilometerstand** (zuletzt bekannt; Tausenderpunkte sind erlaubt), **Kraftstoff** (Benzin, Diesel, Hybrid, Elektro, Autogas, Erdgas, Wasserstoff, Sonstiges),
   **Erstzulassung** und **HSN/TSN** (4 und 3 Zeichen, Felder 2.1 und 2.2 der Zulassungsbescheinigung).
+* **Halter:** Auf der Fahrzeugseite steht der Name des Halters; seine **Telefonnummer** sehen nur Personen, die Kunden sehen dürfen (dasselbe gilt auf der Seite eines Reifensatzes).
 * **Halterwechsel:** Über „Halterwechsel“ (Datum, optional Notiz) wechselt der Halter. Die **Historie** bleibt sichtbar; Reifensätze
   und Termine bleiben am Fahrzeug.
 

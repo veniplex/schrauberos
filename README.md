@@ -123,7 +123,7 @@ Vor jedem Abschluss: `npm run typecheck && npm run lint && npm test` – bei gr�
 | **Modul** | Fachlicher Bereich, als Ganzes ein-/ausschaltbar | Werkstatt, Büro, IT |
 | **Funktion** | Abgegrenzter Teil eines Moduls mit eigenen Seiten, Rechten, Texten, Einstellungen; einzeln schaltbar | Termine, Reifenlager, Rechnungsarchiv |
 | **Querschnittsfunktion** | Baustein, den mehrere Funktionen nutzen (`src/capabilities`) | Dokumentation (Markdown-Seiten mit Kapiteln und Rollen-Sichtbarkeit; genutzt von `handbook.manual` und `it.docs`) |
-| **Adapter** | Anbindung an ein Fremdsystem (geplant: Werbas, Active Directory) | `src/server/integrations` |
+| **Adapter** | Anbindung an ein Fremdsystem (bisher keiner; geplant: Active Directory über `AuthProvider`) | `src/server/integrations/<system>` (bei Bedarf) |
 
 Das Modul `admin` ist ein **Pflichtmodul** (`required: true`) und seine Funktionen sind ebenfalls Pflicht: Sie sind Plattform und
 lassen sich nicht ausschalten (sonst sperrt man sich aus). Die Seite „Module & Funktionen“ zeigt nur die fachlichen Module.
@@ -136,12 +136,13 @@ src/
     catalog.ts            Katalog aller Module und Funktionen (Quelle der Wahrheit)
     define.ts             Typen und defineModule()/defineFeature()
     features.ts           Aktivierung: Schalter lesen/schreiben (Datenbank)
+    seed.ts               sammelt die Start- und Demo-Daten der Funktionen (`<funktion>/seed.ts`, `SeedDef`) ein; `src/server/seed` führt sie nur der Reihe nach aus
     registry.ts           sammelt Dashboard-Bausteine, Einstellungs-Reiter und Suchanbieter (`<funktion>/search.ts`) der Funktionen ein; `quickActionsFor` (Neu-Menü) liest die `quickActions` der `feature.ts`
     jobs.ts               sammelt die geplanten Jobs und Outbox-Abnehmer der Funktionen (`<funktion>/jobs.ts`) ein
     api.ts                sammelt die API-Endpunkte der Funktionen (`<funktion>/api.ts`) ein; api-exceptions.ts: UI-Aktionen ohne API-Pendant
     default-roles.ts      mitgelieferte Rollen
     workshop/ office/ it/ admin/      je Modul: module.ts + ein Ordner je Funktion
-      <funktion>/feature.ts, public.ts, operations.ts, actions.ts, api.ts, queries.ts, domain.ts, forms.tsx, widgets.tsx, settings-tab.tsx …
+      <funktion>/feature.ts (inkl. `auditActions`, `routes` auch unter `api/`), public.ts, operations.ts, actions.ts, api.ts, queries.ts (Lesezugriffe), seed.ts, domain.ts, forms.tsx, widgets.tsx, settings-tab.tsx …
   capabilities/docs/      Querschnittsfunktion Dokumentation
   platform/               Plattform-Bausteine (Konto, Hilfe)
   app/                    Next.js-Routen (dünn: laden Daten, setzen Bausteine zusammen)
@@ -230,7 +231,7 @@ Recht (wie Widgets) und aggregiert (`searchFor`, `quickActionsFor`; ein fehlerha
   `normalizePlate`: Unicode wird zusammengesetzt (NFC, sonst wäre ein „Ü“ vom Mac ein anderes Kennzeichen), Umlaute bleiben Umlaute, „ß“ wird zu „SS“; Tests mit Ä/Ö/Ü, ß, A und CH in `lib/plate.test.ts`.
 * **Liste, Druckliste, Baustein:** Filter `?inspection=soon|none` und `?month=JJJJ-MM` (`vehicleListWhere` in `vehicles/queries.ts`, gemeinsam für Liste und Druckliste), Sortierung `inspection`. `/vehicles/print` (Art `print` in `pages.ts`) druckt dieselben Filter als Tabelle (höchstens 1000, Telefon nur mit `customers.view`); `window.print()` über `PrintButton`,
   die Bildschirmteile sind `print:hidden`. Dashboard-Baustein `inspection-due` (`widgets.tsx`) mit „Termin planen“ → `/appointments?new=1&vehicle=<id>` (weich: nur mit aktiver Terminfunktion und `appointments.create`). **CSV-Export** der gefilterten Liste: Abschnitt „Datenaustausch (CSV)“. API: neue Felder, Filter `inspectionDue`, `allowDuplicate` (`openapi-structure.txt` ist der Schnappschuss).
-* **Demo-Seed** (`seed/demo.ts`): Fristen relativ zu heute (überfällig, laufender Monat, +1, +2 samt Gasprüfung, +8, +14), damit Baustein, Filter und Druckliste Beispiele haben.
+* **Demo-Seed** (`vehicles/seed.ts`): Fristen relativ zu heute (überfällig, laufender Monat, +1, +2 samt Gasprüfung, +8, +14), damit Baustein, Filter und Druckliste Beispiele haben.
 
 ### Kalender (`src/modules/workshop/appointments/calendar.tsx`)
 
@@ -243,6 +244,40 @@ Recht (wie Widgets) und aggregiert (`searchFor`, `quickActionsFor`; ein fehlerha
 * **Tastatur:** Zeitfenster sind Links (`data-slot`) mit **einem** Tab-Stopp (`SlotGrid`, Roving-Tabindex; `moveSlot` in `calendar-layout.ts`): Pfeiltasten bewegen im Raster, Bild auf/ab vier Fenster, Pos1/Ende an den Rand der Spalte; der Stopp liegt zuerst am jetzigen Zeitfenster. Termine bleiben Links in Tab-Reihenfolge (nach Zeit, Tag für Tag), ihr Name nennt Zeit, Arbeitsplatz, Status und Notizen.
 * **Lesen ohne `appointments.edit`:** Termine führen mit dem Recht ins Formular (`?edit=`), sonst in die Leseansicht (`?show=`, `AppointmentDetail`: Zeit, Status, Art, Fahrzeug, Kunde nur als Anzeigename, Arbeitsplatz, Zuständiger, Reifensatz, Notizen im Volltext); Schnellsuche und „Heutige Termine“ verlinken ebenso (`appointmentOpenParams`).
 * **Farbe:** Die Terminfarbe ist frei wählbar; die Blockfläche mischt sie mit `EVENT_TINT_PERCENT` (12 %) in die Kartenfläche (`eventSurface`) – mehr ließe gedämpften Text auf Schwarz unter 4,5 : 1 fallen (`calendar-contrast.test.ts`, rechnet aus `tokens.css`).
+
+### Datenzugriff (`queries.ts`)
+
+Seiten, Dashboard-Bausteine, Suche, API und Austausch lesen Daten mit sensiblen Spalten nicht mit rohen `db.<modell>.find…`-Aufrufen und nicht mit `include: { … : true }`, sondern über die **`queries.ts` ihrer Funktion**:
+
+* **Explizites `select`** (keine Voll-Relationen auf Kunden oder Mitarbeiter: `customerNameSelect` aus `customers/public.ts` für den Anzeigenamen, `customerContacts(viewer, ids)` für Telefon/Ort).
+* **Betrachter-Parameter** (`Viewer` = `Pick<AppSession, "can">`, also die Sitzung oder das Prinzipal einer Operation): Die Abfrage liest sensible Spalten **nur**, wenn der Betrachter das Recht hat – sie werden gar nicht aus der Datenbank geholt, statt
+  nachträglich maskiert zu werden. `visibleAbsenceType` in der Oberfläche bleibt als zweite Linie. Abfragen prüfen das Leserecht zusätzlich (`requireView`, wirft sonst).
+* **Mitarbeiter** (`office/employees/queries.ts`): `listEmployees`/`getEmployeeDetail`/`getEmployeeForEdit` (Notfallkontakt als `emergency`, sonst `null`; eigene Abfrage nur mit `employees.sensitive`), Abwesenheiten (`absencesOverlapping`/`absencesAround`: Krankheitszeilen ohne
+  Recht werden **ohne Art und Anmerkung** gelesen und als `masked` geliefert), `expiringQualifications`, `searchEmployees`, `staffWithAccount`, `activeEmployees` (nur Name; für andere Funktionen über `public.ts`), `linkableAccounts`. Die API liest per `select: employeeBaseSelect` nie
+  den Notfallkontakt und per `scope` nie Krankheitszeilen (`defineResource`-Optionen `select`/`scope`). Die Operation liest den bisherigen Notfallkontakt nur mit dem Recht und gibt nach dem Speichern nur Id und Namen zurück.
+* **Kunden** (`workshop/customers/queries.ts`): Liste/Detail/Bearbeiten; Fahrzeuge, Reifensätze und Termine am Kunden nur mit `vehicles.view`/`tires.view`/`appointments.view`. Telefon des Halters auf Fahrzeug-, Reifen- und Druckseite, Ort im Rechnungsformular: nur mit `customers.view` (Richtlinie D7;
+  vorher stand das Telefon auch ohne das Recht auf diesen Seiten). Fahrzeuge: `getVehicleDetail(viewer, id)`. Fuhrpark: Fahrer nur als Name, `listDrivers` mit Auswahl.
+* **Test:** `employees/queries.test.ts` schreibt das SQL mit (zweiter Client mit `log: query` unter `globalThis.__db`) und prüft, dass ohne `employees.sensitive` keine Anweisung `emergency*` auswählt und Krankheitszeilen weder `type` noch `note` liefern; mit dem Recht sind sie da.
+  `architecture.test.ts` („Datenzugriff“): keine `db.employee/absence/qualification` in Seiten und Bausteinen, kein `.emergencyName` & Co. dort (und in Suche und API), kein `db.customer` in Seiten, kein `include: { customer|employee|driver: true }`, die API-Ressource der Mitarbeiter hat `select`/`scope`.
+* **Neue Funktion mit sensiblen Daten:** `queries.ts` anlegen (Spaltenmengen als Konstanten, Funktion mit Betrachter, sensible Spalten in eigener Abfrage oder bedingtem `select`), Seiten/Bausteine/Suche/API darauf umstellen, Test mit SQL-Protokoll nach dem Muster oben, Modell in die Liste des Architekturtests aufnehmen.
+  Noch nicht umgestellt (kein sensibles Feld, nur `include`s mit Fachdaten): Listen und Details von Rechnungen, Reifen, Termin-Modal; sie bekommen ihr `queries.ts` mit dem nächsten Eingriff.
+
+### Zeitzone
+
+Die **Werkstatt-Zone** (Einstellung `Workshop.timezone`, IANA-Name) bestimmt, was „heute“, „Montag“, „Oktober“ und „10:30 Uhr“ heißen – **nicht** `process.env.TZ`. Alles läuft durch `src/lib/zone.ts` (rein, auf `Intl`):
+
+* `workshopZone()`/`setWorkshopZone()` (Zustand in `globalThis`): gesetzt beim Start aus der Datenbank (`startApp` → `applyTimezone`), nach der Einrichtung, beim Speichern der Einstellungen und – als Sicherung – bei jedem Lesen des Werkstatt-Profils (`getWorkshop`). Ohne gesetzte Zone (Tests, vor der
+  Einrichtung) gilt als Rückfall die Prozess-Zone. `applyTimezone` setzt zusätzlich `process.env.TZ` (Kompatibilität für Bibliotheken; die Datumslogik hängt nicht daran und `architecture.test.ts` erlaubt `process.env.TZ` nur in `zone.ts` und `startup.ts`).
+* Funktionen heißen wie die von `date-fns` und haben die Zone als letzten Parameter (Standard Werkstatt-Zone): `startOfDay`, `endOfDay`, `addDays`, `addMonths`, `startOfWeek`, `startOfMonth`, `endOfMonth`, `eachDayOfInterval`, `isSameDay`, `differenceInCalendarDays`, `getDay`/`getHours`/`getMinutes`/`getDate`/`getMonth`/`getFullYear`,
+  `minutesOfDay`, `getISOWeek`; dazu `wallOf` (Wandzeit eines Zeitpunkts), `instantOf` (Zeitpunkt einer Wandzeit), `dayKey`/`timeKey`/`monthKeyOf` (Texte `JJJJ-MM-TT`, `HH:MM`, `JJJJ-MM`), Kalender auf Texten ohne Zone (`addDaysToKey`, `weekdayOfKey`, `daysBetweenKeys`) und `parseZoned`.
+  `lib/dates.ts` bleibt die Fassade der Formulare (`toDateInput`, `toTimeInput`, `parseLocalDateTime`, `parseDateParam`, `todayInput`, `currentYear`, `parseMonthParam`, `noon`, `startOfDayIn`, `endOfDayIn`).
+* **Kalendertage** (Rechnungsdatum, Fälligkeit, Abwesenheit, Prüfdatum …) werden als **12:00 Uhr der Werkstatt-Zone** gespeichert (`noon(day)`) und mit `toDateInput`/`dayKey` in dieser Zone gelesen; „von … bis …“-Filter nutzen `startOfDayIn`/`endOfDayIn`. Es gibt keine kopierten `noon`-Hilfen mehr.
+* **Sommerzeit:** `parseZoned`/`parseLocalDateTime` lehnen eine Wandzeit ab, die es nicht gibt (02:30 am Umstellungstag), die doppelte gilt einmal (die erste); Berechnungen (`instantOf`, `addDays`) rücken in der Lücke auf den Zeitpunkt danach und behalten die Uhrzeit über die Umstellung. Ein Tag hat 23 oder 25 Stunden
+  (`startOfDay`/`endOfDay`); Abstände in Tagen zählen Kalendertage (`differenceInCalendarDays`). Die Jobs (Cron) nutzen dieselben Primitive (`lib/jobs/schedule.ts` importiert sie aus `zone.ts`).
+* **Anzeige:** `getI18n()` übergibt `workshopZone()` an den Übersetzer, `date()` und `{name|time}` zeigen Zeitpunkte in der Werkstatt-Zone (`createTranslator(locale, messages, timeZone?)`).
+* **Regeln (Architekturtest „Zeitzone“):** kein `date-fns` im Produktivcode, keine Ortszeit-Getter/-Setter von `Date` (`getHours`, `setDate` …), keine Ortszeit-Konstruktoren (`new Date(2026, 0, 1)`, `new Date("…T12:00:00")`). Die Abhängigkeit `date-fns` wird im Produktivcode nicht mehr gebraucht.
+* **Tests** sind unabhängig von der Prozess-Zone: `withWorkshopZone(zone, fn, decoy?)` (`src/test/zone.ts`) setzt die Werkstatt-Zone und lässt den Prozess in einer anderen laufen (Standard Pacific/Auckland). `lib/zone.test.ts`: Berlin, Zürich, UTC, Auckland, Umstellungstage (letzter Sonntag im März/Oktober), `noon`,
+  Mitternachtsfenster, ISO-Woche, Invarianz über verschiedene Prozess-Zonen; `modules/zone-domain.test.ts`: Termine, Abwesenheiten, Rechnungen, Reifen-Saison, Monate. Die Testläufe sind zusätzlich unter `TZ=America/Los_Angeles` und `TZ=Pacific/Auckland` grün.
 
 ### Regeln für sauber getrennten Code
 
@@ -261,6 +296,13 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
 6. **Globale UI-Bausteine** (`src/components/ui`) kennen keine Fachlogik – und sind der **einzige** Ort, an dem Buttons, Felder, Tabellen,
    Karten usw. definiert werden (siehe „UI-Bausteine“ unter Konventionen).
 7. **Betriebsaufgaben sind Funktionen der App**, keine Umgebungsvariablen oder Kommandos am Server.
+8. **Beiträge statt zentraler Listen (Modulautonomie).** Was eine Funktion betrifft, steht bei ihr: Rechte, Navigation und **Audit-Aktionen** in der `feature.ts` (`auditActions`; die Plattform behält nur ihre eigenen in `PLATFORM_AUDIT_ACTIONS`,
+   `src/lib/audit-actions.ts`), **Start- und Demo-Daten** in `seed.ts`, Seiten in `pages.ts`, Jobs in `jobs.ts` … Die Composition Roots in `src/modules/` sammeln sie ein; die Plattform kennt keine Funktion. Jede Datei einer Funktion gehört zu ihr
+   (Ordner `modules/<modul>/<funktion>/`, Seiten und Route Handler über `routes` der `feature.ts`, auch `api/<name>`); Funktions-IDs dürfen Ziffern und Bindestriche enthalten (`time-tracking`), ein Ordner ohne Katalogeintrag und ein Route Handler ohne Funktion
+   (außer begründet in `PLATFORM_API_ROUTES`) brechen `architecture.test.ts`. `audit-actions.test.ts`: jede Aktion gehört genau einer Stelle, wird verwendet, hat Beschriftungen; `seed.test.ts`: jede `seed.ts` ist eingetragen, der Demo-Seed deckt jeden Seed-Verweis der
+   Routen-Inventur ab (`pages.ts`), ein zweiter Lauf legt nichts doppelt an. Seeds finden Daten anderer Funktionen über natürliche Schlüssel (Kennzeichen, Nachname), nie über Ids oder Imports; sie importieren nichts mit `server-only` (das Seed-Skript lädt sie; der Architekturtest prüft die Importkette).
+9. **Datenzugriff über `queries.ts`** – siehe „Datenzugriff (`queries.ts`)“.
+10. **Zeit in der Werkstatt-Zone** – siehe „Zeitzone“.
 
 ## Datenhaltung
 
@@ -285,6 +327,13 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
 * **Sensible Mitarbeiterdaten** (Notfallkontakt, Krankheit) nur mit `employees.sensitive`.
 * **Einstellungen zur Laufzeit** liegen in `AppSetting`; Geheimnisse (Update-Token) verschlüsselt über `setSecret/getSecret`
   (`src/server/settings.ts`), Schlüsseldatei `/data/secret.key` – bewusst nicht Teil der Backups.
+
+### Ein Schema oder eins je Funktion? (geprüft, verworfen)
+
+Geprüft (P1c-1): ein Mehrdatei-Schema `prisma/schema/*.prisma` je Funktion. Technisch geht es – in einer Kopie mit 13 Dateien lieferten `prisma migrate diff --to-schema prisma/schema` und `prisma validate` dasselbe Ergebnis, `prisma.config.ts` bräuchte nur
+`schema: "prisma/schema"`. Es bringt für die Modulautonomie aber nichts Wesentliches: Prisma verlangt die **Gegenfelder jeder Relation in beiden Modellen** (`Customer.appointments`, `Customer.invoices` neben `Appointment.customer`); eine Funktionsdatei müsste also die Modelle
+anderer Funktionen mitführen bzw. deren Datei ändern – genau die Kopplung, die vermieden werden soll – und die Tabellen aller Funktionen liegen ohnehin in einer Datenbank (ausgeschaltete Funktionen behalten ihre Daten). Dagegen stehen Eingriffe in `db:baseline`/`db:check`/`db:fresh`,
+`pages.test.ts` (liest `schema.prisma`), die Reihenfolge der Tabellen in der Baseline (nach Dateinamen) und die Regel „Schema nur in `prisma/schema.prisma`“. Es bleibt bei **einer** Datei; die Abschnittsüberschriften gliedern sie nach Funktionen.
 
 ### Migrationen
 
@@ -340,7 +389,7 @@ Beim App-Start (`src/server/startup.ts`) erzeugt `ensureSetupToken` (`src/server
 zufälliges Token (160 Bit), schreibt es als `<DATA_DIR>/setup-token` (Modus 0600, nicht Teil der Backups) und ins Container-Log. Die
 Ersteinrichtung (`src/app/setup/actions.ts`) prüft in dieser Reihenfolge: gibt es schon einen Benutzer (→ `/login`, nichts anderes
 wird angefasst), Token (Vergleich über SHA-256 in konstanter Zeit, global gedrosselt: 5 freie Versuche, dann 5 s … 60 s), Eingaben,
-dann Anlegen in einer Transaktion; **erst danach** wird die Zeitzone angewendet (`applyTimezone`, vorher `isValidTimezone`) und das
+dann Anlegen in einer Transaktion; **erst danach** wird die Zeitzone als Werkstatt-Zone gesetzt (`applyTimezone`, vorher `isValidTimezone`; siehe „Zeitzone“) und das
 Token gelöscht. Dasselbe gilt für die Einstellungen (Zeitzone erst nach dem Speichern). Das Token ist die bewusste Ausnahme vom Grundsatz
 „alles über die Weboberfläche“: **einmalige Installationshandlung, kein laufender Betrieb**.
 
@@ -392,7 +441,7 @@ export const saveThing = defineAction(saveThingOperation, { form: …, revalidat
   zwei immer vorhandene Live-Regionen, unten über Safe-Area und `FormActions`). Dieselbe Quelle nutzt `Form` für `state.message`. Es gibt kein `?saved=`/`?error=` mehr in Adressen. `redirect()`/`notFound()` werden nie verschluckt (`unstable_rethrow`, Test). Anmeldung/Recht prüft der Adapter wie bisher mit `requireSession`/`requirePermission`
   (ohne Sitzung `/login`, `mustChangePassword` → `/account`, falsches Recht `/forbidden`, ausgeschaltete Funktion 404); der Kern prüft das Recht zusätzlich.
 * **Adapter API** (`runApiOperation` in `src/server/operations/api.ts`): übersetzt Ergebnis und Fehler einer Operation in HTTP-Semantik (Problem-Format, Statuscodes). Pipeline und Ressourcen: Abschnitt „Programmierschnittstelle“. Formular- und API-Eingabeschemas bleiben getrennt (Formular: Text-Schemas wie `moneyCents`, `dateText` aus `src/lib/zod-fields.ts`; API: JSON-Typen, Geld als Cent); geteilt wird die Domänenebene (Prüfung, Audit).
-* **Audit:** `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Beschriftungen `audit.actions.*`) oder `audit: false` mit `auditReason` (Begründung Pflicht). Fehlschläge außerhalb der
+* **Audit:** `audit: "<aktion>"` (Aktion in `auditActions` der `feature.ts` der Funktion bzw. in `PLATFORM_AUDIT_ACTIONS` + Beschriftungen `audit.actions.*`) oder `audit: false` mit `auditReason` (Begründung Pflicht). Fehlschläge außerhalb der
   Transaktion (z. B. `system.updateFailed`, `backup.restoreFailed`) schreibt `onFailure`. Bei `transaction: false` (Wiederherstellung, Update, Backup) ist die Wirkung beim Protokollieren schon eingetreten: Ein Fehler im Audit-Eintrag wird **protokolliert, bricht die Operation aber nicht ab**
   (sonst bliebe z. B. der vorgemerkte Neustart aus); innerhalb der Transaktion gilt weiter „keine Änderung ohne Eintrag“. Das Audit-Log wird nach der eingestellten Frist (Standard 730 Tage, **mindestens 30 Tage** oder 0 = unbegrenzt; Einstellungen → Sicherheit, die Änderung steht mit altem und neuem Wert im Log;
   `src/server/audit-retention.ts`) vom Job-Runner (Job `audit.retention`, täglich nachts) bereinigt; scheitert ein Lauf, wiederholt der Runner mit Wartezeit.
@@ -1050,7 +1099,7 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
 
 1. Ordner `src/modules/workshop/warranty/` anlegen.
 2. **`feature.ts`** mit `defineFeature({...})`: ID, Modul, Name/Beschreibung (Übersetzungsschlüssel), Reihenfolge, Abhängigkeiten
-   (`requires` / `uses`), Rechte-Gruppe mit Schlüsseln (`warranty.view` …), Navigation, Routen-Präfixe.
+   (`requires` / `uses`), Rechte-Gruppe mit Schlüsseln (`warranty.view` …), Navigation, Routen-Präfixe (auch `api/<name>` für eigene Route Handler), **`auditActions`** (die Audit-Aktionen der Funktion).
 3. In **`src/modules/catalog.ts`** eintragen (Import und `FEATURES`). Ab jetzt kennt das System Rechte, Aktivierung und Admin-Seite.
 4. **Texte** in `src/i18n/messages/modules/warranty.de.ts` / `.en.ts` (englisch typisiert als `typeof warrantyDe`), in `de.ts` /
    `en.ts` einbinden; nötig sind `feature.name`, `feature.description`, Beschriftungen unter `permissionGroups.*` und `permissions.*`.
@@ -1067,12 +1116,14 @@ Beispiel: Funktion `warranty` im Modul `workshop`.
     (Anlegen-Aktionen, Recht aus der eigenen Gruppe). `src/modules/search.test.ts` verlangt für jede fachliche Funktion einen Anbieter (Definition of Done); ein Eintrag in der Navigation gehört nur Funktionen, die
     eine eigene Seite brauchen (Navigationskonzept: Aufträge, Angebote & Ausgangsrechnungen, Teile & Lager, Zeiterfassung, Berichte, API & Webhooks; E-Mail, Checklisten, Druck, iCal, „Dokumente & Fotos“ und der Tresor hängen
     am Fahrzeug, Auftrag bzw. der IT-Dokumentation). Das Symbol des Eintrags steht in `src/components/shell/nav-icons/<modul>.ts` (je Gruppe geladen, keine gemeinsame Tabelle).
+6c. **Daten:** `queries.ts` für alle Lesezugriffe der Seiten, Bausteine, Suche und API (explizites `select`, Betrachter-Parameter, sensible Spalten nur mit Recht – siehe „Datenzugriff“); `seed.ts` (`export const seeds: SeedDef[]` mit `base` = Grunddaten einer frischen Installation
+    und/oder `demo` = Beispieldaten, die jede `[id]`-Seite der `pages.ts` bedienen) und Eintrag in `src/modules/seed.ts`. Tage und Uhrzeiten nur über `lib/dates.ts`/`lib/zone.ts` (siehe „Zeitzone“).
 6a. Hintergrundarbeit (Aufräumen, regelmäßige Prüfungen, Zustellung von Ereignissen): `jobs.ts` (`export const jobs: JobDef[]`, `feature` ist die eigene Funktion; Abnehmer für Outbox-Ereignisse als `OutboxHandlerDef`),
     eingetragen in `src/modules/jobs.ts` – siehe „Job-Runner“. Der Job muss wiederholbar sein; ein Beschriftungsschlüssel `system.names.<bereich>.<name>` zeigt ihn im Systemstatus.
 7. Soll eine andere Funktion etwas nutzen, exportiert `public.ts` genau das – und die andere deklariert `requires`/`uses`.
 8. Neue Rechte in `default-roles.ts` den passenden Rollen zuordnen (Administratoren haben sie sofort) – **ausgenommen gekennzeichnete Rechte** (Export, Import, sensible Daten …: `permissions.marked`, Regel 9), die nie automatisch in eine Standardrolle kommen.
 9. Server Actions **immer** über den Aktions-Rahmen (`defineOperation` + `defineAction`, siehe „Aktionen und Operationen“): Bearbeiten-Formulare tragen `version` mit, `run` nutzt `claimRow(tx.modell, id, version)`;
-   Dateien nur über `files.ts`; jede Operation nennt `audit: "<aktion>"` (Aktion in `src/lib/audit-actions.ts` + Texte `audit.actions.*`) oder begründet den Verzicht. Neue Funktionen standardmäßig mit `defaultEnabled: false`.
+   Dateien nur über `files.ts`; jede Operation nennt `audit: "<aktion>"` (Aktion in `auditActions` der `feature.ts` + Texte `audit.actions.*`) oder begründet den Verzicht. Neue Funktionen standardmäßig mit `defaultEnabled: false`.
 10. **API:** Operationen nach `operations.ts`, `api.ts` mit `defineResource` und Eintrag in `src/modules/api.ts` (siehe „Programmierschnittstelle“); schreibende UI-Aktionen ohne Endpunkt mit Begründung in `src/modules/api-exceptions.ts` – der Vertragstest `src/modules/api.test.ts` verlangt eines von beidem.
 11. `npm run typecheck && npm run lint && npm test` – der Architektur-Test meldet verbotene Importe und fehlende Deklarationen.
 
@@ -1409,8 +1460,7 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 * Nicht enthalten: E-Mail/SMS-Erinnerungen, Druck-Etiketten/QR-Codes für Lagerplätze, Ressourcen-Kalender pro Mitarbeiter, echte
   Netzwerk-Überwachung (derzeit Demo), Zwei-Faktor-Anmeldung. Anmeldung rein lokal; Active Directory ist über `AuthProvider` in
   `src/server/auth/providers.ts` vorgesehen.
-* Werbas-Anbindung (später): Kunden/Fahrzeuge tragen `externalSource`/`externalId`/`syncedAt`; `src/server/integrations/werbas/`
-  enthält Austauschformat und Abgleichslogik, offen ist nur `client.ts`.
+* Eine Anbindung an Fremdsysteme (früher als Werbas-Platzhalter vorgesehen) gibt es nicht; der nie eingebundene Abgleichscode und die Spalten `externalSource`/`externalId`/`syncedAt` wurden entfernt. Kommt eine Anbindung, dann als Operation mit Audit in der betroffenen Funktion.
 * Gebaut wird `linux/amd64` (das Siegel trägt `arch`; weitere Architekturen bräuchten ein Siegel je Architektur).
 * **Starter-Vertrauensanker:** schützt vor dem Überleben fremden Codes über Neustarts, nicht vor Laufzeit-Manipulation, Daten-Persistenz, gestohlenem Release-Schlüssel oder dem Wiedereinspielen einer echten alten signierten Version oberhalb der eingebauten (Details im Abschnitt „Starter-Vertrauensanker“). Zusätzliche Dateien von NAS-Diensten im Versionsordner (`@eaDir`, `.DS_Store`, `Thumbs.db`) führen zur Ablehnung der Version (Meldung nennt den Pfad); der Installer setzt Setgid/Sticky zurück, die vom Elternordner geerbt wurden („Gruppe vererben“), der Starter lehnt es danach weiterhin an jeder Stelle ab;
   der `st_dev`-Vergleich im Baum (16 `device`) kann auf **Union-Dateisystemen** (unRAID/shfs, Overlay ohne `xino`) auch ohne Manipulation anschlagen – dort ist das Volume für die Web-Updates nicht geeignet (die Version wird abgelehnt, die eingebaute läuft); der Start aus dem geprüften Ordner schließt den Austausch ganzer Ordner nach der Prüfung, die Änderung einzelner Dateien zwischen Hash und Start

@@ -10,4 +10,4 @@ Stammdaten der Mitarbeiter: Name, Personalnummer, Funktion, Abteilung, Kontakt, 
   Datum „Von“, zieht „Bis“ mit, solange Sie es nicht bewusst später setzen. Auf dem Handy (unter Tabletbreite) gibt es statt des Rasters die Liste „Einträge in diesem Monat“
   und den Knopf **Abwesenheit eintragen**.
 * **Besonders geschützt:** Notfallkontakt und Krankheit sehen und ändern nur Personen mit dem Sonderrecht dafür. Ohne dieses
-  Recht erscheinen Krankheitstage nur als neutrale „abwesend“-Einträge.
+  Recht erscheinen Krankheitstage nur als neutrale „abwesend“-Einträge. Diese Angaben werden ohne das Recht gar nicht erst abgerufen – auch nicht für Übersicht, Suche und Programmierschnittstelle.

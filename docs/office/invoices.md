@@ -3,7 +3,7 @@
 Das Rechnungsarchiv sammelt **Eingangsrechnungen** (von Lieferanten) und **Ausgangsrechnungen** (an Kunden) getrennt.
 
 * **Erfassen:** Rechnungsnummer, Geschäftspartner, Datum, Fälligkeit, Beträge (Netto, MwSt., Brutto), Kategorie, Referenz und Notizen.
-  Netto und MwSt. werden gegen den Bruttobetrag geprüft. Bei Ausgangsrechnungen lässt sich ein Kunde verknüpfen.
+  Netto und MwSt. werden gegen den Bruttobetrag geprüft. Bei Ausgangsrechnungen lässt sich ein Kunde verknüpfen (im Formular erscheint sein Ort nur für Personen, die Kunden sehen dürfen).
 * **Beleg:** Zur Rechnung kann ein Beleg (PDF, PNG, JPEG, WebP oder XML-E-Rechnung, bis 10 MB) hochgeladen werden. Die Anwendung prüft den Inhalt der Datei,
   nicht nur die Endung: Eine Datei, die sich als PDF ausgibt, aber etwas anderes ist, wird abgelehnt. Belege (PDF, Bilder) lassen sich im Browser ansehen (die **PDF-Vorschau** gibt es am Computer und erst nach Klick auf „Vorschau anzeigen“; auf Handy und Tablet bleiben „Öffnen“ und „Herunterladen“),
   XML-Dateien nur herunterladen. Ein Beleg kann ersetzt oder entfernt werden.
