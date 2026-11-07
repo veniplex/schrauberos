@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -39,6 +39,28 @@ describe("XRechnung-Prüfung: Gerüst", () => {
     assert.match(job, /EINVOICE_SAMPLES_DIR/);
     assert.match(job, /scripts\/validate-xrechnung\.sh/);
     assert.doesNotMatch(job, /secrets\./, "der Job braucht keine Geheimnisse");
+  });
+
+  it("seit F3 gilt das Gate: ein leerer Beispielordner ist ein Fehler (XRECHNUNG_REQUIRE_SAMPLES=1), der Job ist Voraussetzung für Image und Release", () => {
+    const job = /\n  xrechnung:\n([\s\S]*?)(?=\n  [a-z-]+:\n)/.exec(workflow)?.[1] ?? "";
+    assert.match(job, /XRECHNUNG_REQUIRE_SAMPLES: "1"/);
+    assert.match(job, /exit 1/, "keine Tests *.einvoice.test.ts: Fehler statt Gerüst");
+    const publish = /\n  publish:\n([\s\S]*?)(?=\n  [a-z-]+:\n)/.exec(workflow)?.[1] ?? "";
+    assert.match(publish, /needs: \[[^\]]*\bxrechnung\b[^\]]*\]/);
+    assert.match(publish, /needs\.xrechnung\.result == 'success' \|\| needs\.xrechnung\.result == 'skipped'/);
+    const release = /\n  release:\n([\s\S]*?)(?=\n  [a-z-]+:\n|$)/.exec(workflow)?.[1] ?? "";
+    assert.match(release, /needs\.xrechnung\.result == 'success'/);
+    // die Tests, die Beispiele schreiben, gibt es (der Job fände sie sonst nicht)
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = path.join(dir, name);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (name.endsWith(".einvoice.test.ts")) found.push(full);
+      }
+    };
+    walk(path.resolve(process.cwd(), "src"));
+    assert.ok(found.length >= 2, "Beispiele aus dem Schreiber und aus echten Belegen");
   });
 
   it("ohne Beispiele meldet das Skript das Gerüst und endet erfolgreich; mit XRECHNUNG_REQUIRE_SAMPLES=1 ist es ein Fehler – beide laden nichts herunter", (t) => {
