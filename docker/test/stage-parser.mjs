@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { materializeCorpusCase } from "../../src/lib/updates/testdata/anchor/corpus-fs.ts";
 import { TEST_RELEASE } from "../../src/lib/updates/testdata/anchor/test-keys.ts";
 import { createSeal, SEAL_CONTEXT, sealFieldsFor } from "../../src/lib/updates/seal.ts";
-import { parseTree, treeStats } from "../../src/lib/updates/tree.ts";
+import { parseTree } from "../../src/lib/updates/tree.ts";
 import { buildStarter, removeTree, tempDir } from "./lib.mjs";
 import { corpus, disagreement, judgeBoth } from "./stage-corpus.mjs";
 

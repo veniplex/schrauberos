@@ -47,8 +47,8 @@ for (const stage of stages) {
   const started = Date.now();
   let ok;
   try {
-    const module = await import(`./stage-${stage}.mjs`);
-    ok = await module[`${stage}Stage`](log, { fuzzSeconds });
+    const stageModule = await import(`./stage-${stage}.mjs`);
+    ok = await stageModule[`${stage}Stage`](log, { fuzzSeconds });
   } catch (error) {
     console.error(error);
     ok = false;

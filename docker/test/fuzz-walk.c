@@ -99,6 +99,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     for (size_t k = 0; k < n.content_len; k++) n.content[k] = (uint8_t)rd(&r);
     snprintf(n.target, sizeof n.target, "%s", targets[rd(&r) % (sizeof targets / sizeof targets[0])]);
     if (dup || count >= MAX_NODES) continue;
+    if (n.parent < 0 && strcmp(name, "SOS-SEAL") == 0) continue; /* der Name gehört im Wurzelordner dem echten Siegel (Harness legt es an); in Unterordnern ist er ein gewöhnlicher Name */
     if (n.type != 'f') n.exec = 0;
     if (n.type == 'd') dirs[ndirs++] = count;
     nodes[count++] = n;

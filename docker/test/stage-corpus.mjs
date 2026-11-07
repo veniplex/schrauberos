@@ -68,7 +68,11 @@ export function disagreement(both) {
 
 export async function corpusStage(log) {
   const binaries = new Map();
+  // SOS_STARTER_BINARY: ein anderweitig gebautes Binary (z. B. aus dem Dockerfile-Ziel bootstrap-test-build, Debian-Compiler) für Fälle mit der Untergrenze SOS_STARTER_FLOOR (Standard 0.2.0-dev.abc1234)
+  const external = process.env.SOS_STARTER_BINARY;
+  const externalFloor = process.env.SOS_STARTER_FLOOR ?? "0.2.0-dev.abc1234";
   const binaryFor = (floor) => {
+    if (external && floor === externalFloor) return external;
     if (!binaries.has(floor)) binaries.set(floor, buildStarter(floor));
     return binaries.get(floor);
   };

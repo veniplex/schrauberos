@@ -380,9 +380,15 @@ static verify_class verify_in_child(const char *version, const char *dir, report
   }
   int code = WEXITSTATUS(status);
   if (n == (ssize_t)sizeof got && got.code == code) {
+    /* Der Bericht kommt aus dem Prüfkind (Speicherfehler dort wären denkbar): nur Anzeige, und vor jeder Verwendung erneut bereinigt – Grund auf [a-z0-9:-], Pfad ohne Steuerzeichen */
     *rep = got;
     rep->reason[sizeof rep->reason - 1] = 0;
     rep->path[sizeof rep->path - 1] = 0;
+    for (char *p = rep->reason; *p; p++)
+      if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == ':' || *p == '-')) *p = '?';
+    char clean[SOS_REPORT_PATH + 1];
+    sos_clean(rep->path, strlen(rep->path), clean, sizeof clean);
+    memcpy(rep->path, clean, sizeof clean);
   } else {
     rep->code = code;
   }

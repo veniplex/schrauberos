@@ -392,7 +392,7 @@ export async function starterStage(log) {
   });
 
   // ───── 11. Schnittstellen ─────
-  await scenario("--print-keys", async (ctx) => {
+  await scenario("--print-keys", async () => {
     const r = run(env.starter, ["--print-keys"]);
     const header = readFileSync(join(headerDir(FLOOR), "trust-keys.h"), "utf8");
     const keyBytes = (name) => Buffer.from([...new RegExp(`${name}\\[32\\] = \\{([^}]*)\\}`).exec(header)[1].matchAll(/0x([0-9a-f]{2})/g)].map((m) => parseInt(m[1], 16)));
@@ -407,7 +407,7 @@ export async function starterStage(log) {
     const r = run(env.starter, ["--unbekannt"]);
     check("unbekanntes Argument: Code 2", r.status === 2);
   });
-  await scenario("--healthcheck", async (ctx) => {
+  await scenario("--healthcheck", async () => {
     check("healthcheck ohne Server: 1", run(env.starter, ["--healthcheck"], { env: { PORT: "1" } }).status === 1);
     for (const [status, expected] of [[200, 0], [503, 1]]) {
       const server = createServer((req, res) => {
