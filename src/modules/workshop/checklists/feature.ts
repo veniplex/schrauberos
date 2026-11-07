@@ -25,5 +25,9 @@ export const checklistsFeature = defineFeature({
     { id: "checklists.open", kind: "open", labelKey: "checklists.quick.open", href: "/checklists", icon: "checklists", permission: "checklists.view", order: 207 },
   ],
   routes: ["checklists", "api/checklists"],
+  webhookEvents: [
+    { type: "checklist.started", resource: "checklists" },
+    { type: "checklist.completed", resource: "checklists" },
+  ],
   auditActions: ["checklists.templateCreate", "checklists.templateUpdate", "checklists.templateArchive", "checklists.start", "checklists.complete", "checklists.reopen", "checklists.discard"],
 });

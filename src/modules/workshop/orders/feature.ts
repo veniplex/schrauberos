@@ -25,6 +25,14 @@ export const ordersFeature = defineFeature({
     { id: "orders.open", kind: "open", labelKey: "orders.quick.open", href: "/orders", icon: "orders", permission: "orders.view", order: 203 },
   ],
   routes: ["orders", "api/orders"],
+  // Ereignisse für Webhooks (nur Typ und ID; der Empfänger holt den Auftrag über die API)
+  webhookEvents: [
+    { type: "order.created", resource: "orders" },
+    { type: "order.status", resource: "orders" },
+    { type: "order.closed", resource: "orders" },
+    { type: "order.reopened", resource: "orders" },
+    { type: "order.approved", resource: "orders" },
+  ],
   auditActions: [
     "orders.create",
     "orders.update",

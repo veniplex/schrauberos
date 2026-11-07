@@ -27,6 +27,14 @@ export const billingFeature = defineFeature({
     { id: "billing.newInvoice", labelKey: "billing.quick.newInvoice", href: "/billing/new?type=invoice", icon: "invoices", permission: "billing.edit", order: 91 },
   ],
   routes: ["billing", "api/billing"],
+  // Ereignisse für Webhooks (nur Typ und ID; der Empfänger holt den Beleg über die API)
+  webhookEvents: [
+    { type: "billing.finalized", resource: "billing-documents" },
+    { type: "billing.accepted", resource: "billing-documents" },
+    { type: "billing.paid", resource: "billing-documents" },
+    { type: "billing.sent", resource: "billing-documents" },
+    { type: "billing.cancelled", resource: "billing-documents" },
+  ],
   auditActions: [
     "billing.create",
     "billing.update",

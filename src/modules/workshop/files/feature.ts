@@ -18,5 +18,6 @@ export const filesFeature = defineFeature({
   nav: [{ id: "files", href: "/files", labelKey: "nav.files", icon: "files", permission: "files.view", order: 25 }],
   quickActions: [{ id: "files.open", kind: "open", labelKey: "files.quick.open", href: "/files", icon: "files", permission: "files.view", order: 206 }],
   routes: ["files", "api/files"],
+  webhookEvents: [{ type: "file.uploaded", resource: "files" }],
   auditActions: ["files.upload", "files.update", "files.archive"],
 });
