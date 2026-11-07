@@ -59,36 +59,81 @@ export async function invoiceYears(currentYear: number): Promise<number[]> {
  */
 const COUNTS_AS_REVENUE = { NOT: { status: "cancelled", cancelsInvoiceId: null, cancelledBy: { is: null } } } as const satisfies Prisma.InvoiceWhereInput;
 
-export type RevenueMonth = { month: string; count: number; netCents: number; vatCents: number; grossCents: number; /** Belege ohne Netto-/Steuerangabe (von Hand erfasste Rechnungen): sie zählen nur im Brutto */ withoutNet: number };
+export type RevenueMonth = {
+  month: string;
+  count: number;
+  netCents: number;
+  vatCents: number;
+  grossCents: number;
+  /** Belege **ohne** Netto- und ohne Steuerangabe (von Hand erfasste Rechnungen): sie zählen nur im Brutto, Netto + Steuer ergibt in diesem Monat weniger als das Brutto */
+  incomplete: number;
+  /** Belege mit nur einer der beiden Angaben: die fehlende wird als Brutto − Angabe abgeleitet (Brutto = Netto + Steuer) */
+  derived: number;
+};
 
 /**
  * **Umsatz je Monat** (Ausgangsrechnungen nach Rechnungsdatum, Monate der Werkstatt-Zone) – Rechnung, Abschlag, Schlussrechnung und **Gegenbeleg als negative Beträge**. Gerechnet wird in der Datenbank
- * (`aggregate` je Monat), und zwar **nur über die Ausgangsliste** (`ledgerWhere`): **Angebote, Auftragsbestätigungen und Entwürfe sind nie Umsatz**. Eine Schlussrechnung zählt Brutto abzüglich der angerechneten
- * Abschläge (die Abschläge zählen in ihrem eigenen Monat), Netto und Steuer abzüglich Netto und Steuer der angerechneten Abschläge – sonst stünde dieselbe Leistung doppelt im Bericht. Verlangt `invoices.view`
- * (`null` ohne das Recht). `months`: `JJJJ-MM`, aufsteigend.
+ * (`aggregate` je Monat), und zwar **nur über die Ausgangsliste** (`ledgerWhere`): **Angebote, Auftragsbestätigungen und Entwürfe sind nie Umsatz**.
+ *
+ * Alle drei Beträge eines Monats stammen **aus den Spalten der Belege dieses Monats** – nie aus anderen Tabellen oder dem späteren Zustand: Eine Schlussrechnung zählt Brutto, Netto und Steuer abzüglich des
+ * Anteils der angerechneten Abschläge (`deductedCents`/`deductedNetCents`/`deductedVatCents`, beim Festschreiben am Beleg festgeschrieben; die Abschläge zählen in ihrem eigenen Monat – sonst stünde dieselbe Leistung
+ * doppelt im Bericht). Der Gegenbeleg trägt dieselben Spalten negiert und ist damit das exakte Negativ des Originals im Monat des Gegenbelegs; ein abgeschlossener Monat ändert sich nie rückwirkend, und je Monat gilt
+ * Netto + Steuer = Brutto (außer bei Belegen ganz ohne Netto-/Steuerangabe, s. `incomplete`). Verlangt `invoices.view`. `months`: `JJJJ-MM`, aufsteigend.
+ *
+ * Von Hand erfasste Rechnungen können Netto oder Steuer auslassen: Fehlt eines, wird es aus dem Brutto abgeleitet (`derived`); fehlen beide, zählt der Beleg nur im Brutto (`incomplete`).
  */
 export async function revenueByMonth(viewer: Viewer, months: readonly string[]): Promise<RevenueMonth[] | null> {
   if (!viewer.can("invoices.view")) return null;
-  return Promise.all(
-    months.map(async (month): Promise<RevenueMonth> => {
-      const range = { issueDate: { gte: startOfDay(`${month}-01`), lt: startOfDay(`${addMonthsTo(month, 1)}-01`) } };
-      const base: Prisma.InvoiceWhereInput = { AND: [ledgerWhere, COUNTS_AS_REVENUE, { direction: "outgoing" }, range] };
-      const [sum, withoutNet, partials] = await Promise.all([
-        db.invoice.aggregate({ where: base, _sum: { netCents: true, vatCents: true, grossCents: true, deductedCents: true }, _count: { _all: true } }),
-        db.invoice.count({ where: { AND: [base, { netCents: null }] } }),
-        // Abschläge, die eine festgeschriebene Schlussrechnung dieses Monats anrechnet (finalKey: nur wirksame Anrechnungen – eine stornierte Schlussrechnung gibt sie wieder frei)
-        db.invoice.aggregate({ where: { AND: [ledgerWhere, { direction: "outgoing" }, { deductedIn: { some: { finalKey: { not: null }, final: { is: base } } } }] }, _sum: { netCents: true, vatCents: true } }),
-      ]);
-      return {
-        month,
-        count: sum._count._all,
-        netCents: (sum._sum.netCents ?? 0) - (partials._sum.netCents ?? 0),
-        vatCents: (sum._sum.vatCents ?? 0) - (partials._sum.vatCents ?? 0),
-        grossCents: (sum._sum.grossCents ?? 0) - (sum._sum.deductedCents ?? 0),
-        withoutNet,
-      };
+  if (months.length === 0) return [];
+  const rangeOf = (from: string, to: string) => ({ issueDate: { gte: startOfDay(`${from}-01`), lt: startOfDay(`${addMonthsTo(to, 1)}-01`) } });
+  const baseOf = (range: Prisma.InvoiceWhereInput): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, COUNTS_AS_REVENUE, { direction: "outgoing" }, range] });
+  const SUMS = { netCents: true, vatCents: true, grossCents: true, deductedCents: true, deductedNetCents: true, deductedVatCents: true } as const;
+
+  const [complete, partial] = await Promise.all([
+    // vollständige Belege (Netto und Steuer vorhanden): ein Aggregat je Monat
+    Promise.all(
+      months.map((month) =>
+        db.invoice.aggregate({ where: { AND: [baseOf(rangeOf(month, month)), { netCents: { not: null } }, { vatCents: { not: null } }] }, _sum: SUMS, _count: { _all: true } }),
+      ),
+    ),
+    // unvollständige Belege (selten, von Hand erfasst): in einer Abfrage über den ganzen Zeitraum, die Monate ordnet die Werkstatt-Zone zu
+    db.invoice.findMany({
+      where: { AND: [baseOf(rangeOf(months[0], months[months.length - 1])), { OR: [{ netCents: null }, { vatCents: null }] }] },
+      select: { issueDate: true, netCents: true, vatCents: true, grossCents: true, deductedCents: true, deductedNetCents: true, deductedVatCents: true },
     }),
-  );
+  ]);
+
+  const rows = months.map((month, index): RevenueMonth => {
+    const sum = complete[index]._sum;
+    const row: RevenueMonth = {
+      month,
+      count: complete[index]._count._all,
+      netCents: (sum.netCents ?? 0) - (sum.deductedNetCents ?? 0),
+      vatCents: (sum.vatCents ?? 0) - (sum.deductedVatCents ?? 0),
+      grossCents: (sum.grossCents ?? 0) - (sum.deductedCents ?? 0),
+      incomplete: 0,
+      derived: 0,
+    };
+    return row;
+  });
+  const byMonth = new Map(rows.map((row) => [row.month, row]));
+  for (const doc of partial) {
+    const row = byMonth.get(dayKey(doc.issueDate).slice(0, 7));
+    if (!row) continue;
+    row.count += 1;
+    row.grossCents += doc.grossCents - doc.deductedCents;
+    if (doc.netCents === null && doc.vatCents === null) {
+      row.incomplete += 1;
+    } else {
+      // nur eine Angabe vorhanden: die andere ist Brutto − Angabe (Brutto = Netto + Steuer)
+      const net = doc.netCents ?? doc.grossCents - (doc.vatCents ?? 0);
+      const vat = doc.vatCents ?? doc.grossCents - (doc.netCents ?? 0);
+      row.netCents += net - doc.deductedNetCents;
+      row.vatCents += vat - doc.deductedVatCents;
+      row.derived += 1;
+    }
+  }
+  return rows;
 }
 
 /** Offene Posten: Ausgangs- oder Eingangsrechnungen mit Status „offen“ (Rechnung, Abschlag, Schlussrechnung – kein Gegenbeleg), nur Ausgangsliste. */

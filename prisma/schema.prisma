@@ -896,6 +896,10 @@ model Invoice {
   sourceDocId    String?
   // Summe der angerechneten Abschläge (brutto, Schlussrechnung) und der bisherigen Zahlungen; zu zahlen = Brutto − angerechnet − gezahlt
   deductedCents  Int       @default(0)
+  // Netto- und Steueranteil der angerechneten Abschläge (Schlussrechnung): beim Festschreiben festgeschrieben, beim Gegenbeleg negiert – der Umsatzbericht rechnet nur aus den Spalten des Belegs,
+  // damit sich ein abgeschlossener Monat nie rückwirkend ändert (auch nicht, wenn die Anrechnung nach einem Storno wieder frei wird)
+  deductedNetCents Int     @default(0)
+  deductedVatCents Int     @default(0)
   paidCents      Int       @default(0)
   // Versand per E-Mail: wann zuletzt und wie oft (die Adresse steht nur im Sendeprotokoll)
   sentAt         DateTime?

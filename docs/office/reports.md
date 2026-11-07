@@ -10,8 +10,8 @@ Ausgangsrechnungen nach **Rechnungsdatum**, je Monat der Werkstatt-Zeitzone: **N
 
 * **Was zählt:** festgeschriebene Ausgangsrechnungen, Abschläge und Schlussrechnungen sowie von Hand erfasste Ausgangsrechnungen. **Angebote, Auftragsbestätigungen und Entwürfe zählen nie.**
 * **Stornorechnungen** zählen mit **negativen Beträgen** in ihrem eigenen Monat und heben die Rechnung damit auf. Von Hand als „storniert“ markierte Rechnungen ohne Stornorechnung zählen nicht.
-* **Abschläge:** Eine Schlussrechnung zählt abzüglich der angerechneten Abschläge; die Abschläge zählen in ihrem eigenen Monat. So steht dieselbe Leistung nicht doppelt im Bericht.
-* **Von Hand erfasste Rechnungen** ohne Netto- und Steuerangabe zählen nur im Brutto; ein Hinweis nennt, wie viele es sind.
+* **Abschläge:** Eine Schlussrechnung zählt abzüglich der angerechneten Abschläge (brutto, netto und Steuer; den Anteil hält der Beleg beim Festschreiben fest); die Abschläge zählen in ihrem eigenen Monat. So steht dieselbe Leistung nicht doppelt im Bericht. Wird die Schlussrechnung storniert, steht ihr **exaktes Negativ** im Monat der Stornorechnung; **ein abgeschlossener Monat ändert sich dadurch nie**, und in jedem Monat ergibt Netto plus Steuer das Brutto.
+* **Von Hand erfasste Rechnungen** mit nur einer Angabe (Netto **oder** Steuer): die fehlende Angabe wird aus dem Brutto abgeleitet (Brutto − Angabe). Ohne beide Angaben zählt der Beleg nur im Brutto, Netto und Steuer des Monats liegen dann entsprechend darunter. Für beides erscheint ein Hinweis mit der Anzahl der Belege.
 * Der Bericht ist eine **Auswertung der Rechnungsdaten, keine Umsatzsteuer-Voranmeldung und keine Buchführung.** Maßgeblich ist das Rechnungsdatum, nicht der Zahlungseingang; ob diese Auswertung für Ihre Buchhaltung taugt, klärt die Steuerberatung.
 
 ## Offene Posten

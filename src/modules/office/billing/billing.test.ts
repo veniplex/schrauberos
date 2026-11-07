@@ -328,6 +328,8 @@ describe("Abschlag, Schlussrechnung und Storno", () => {
     const row = await fresh(finalId);
     assert.equal(row.grossCents, 23800);
     assert.equal(row.deductedCents, 5950);
+    assert.equal(row.deductedNetCents, 5000, "Netto-Anteil der Anrechnung steht am Beleg (Umsatzbericht)");
+    assert.equal(row.deductedVatCents, 950, "Steuer-Anteil ebenso");
     const sums = await invoiceQueries.invoiceSums({ direction: "outgoing" });
     assert.equal(sums.openCents, 5950 + 23800 - 5950, "Abschlag offen + Schlussrechnung nach Abzug");
     // zweite Schlussrechnung kann denselben Abschlag nicht anrechnen
@@ -339,6 +341,10 @@ describe("Abschlag, Schlussrechnung und Storno", () => {
     // Storno der Schlussrechnung: Abschlag wird frei
     const cancelled = await invoiceOps.cancelInvoiceOperation.execute(session, { id: finalId, version: versionOf(await fresh(finalId)) });
     assert.ok(cancelled.ok);
+    // der Gegenbeleg trägt die Anrechnung negiert: das exakte Negativ der Schlussrechnung nach Abzug (brutto, netto, Steuer)
+    const counter = await fresh(cancelled.data.counterId);
+    assert.deepEqual([counter.deductedCents, counter.deductedNetCents, counter.deductedVatCents], [-5950, -5000, -950]);
+    assert.deepEqual([counter.grossCents - counter.deductedCents, (counter.netCents ?? 0) - counter.deductedNetCents, (counter.vatCents ?? 0) - counter.deductedVatCents], [-17850, -15000, -2850]);
     const retry = await ops.saveDraftOperation.execute(session, { docType: "final", customerId, deductPartialIds: [a], items: items(), serviceFrom: todayInput() });
     assert.ok(retry.ok);
   });

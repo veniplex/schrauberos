@@ -92,9 +92,14 @@ export default async function RevenueReportPage({ searchParams }: { searchParams
           }
         />
       </div>
-      {report.total.withoutNet > 0 ? (
+      {report.total.incomplete > 0 ? (
         <Alert tone="info" className="mb-5">
-          {tp("reports.revenue.withoutNet", report.total.withoutNet)}
+          {tp("reports.revenue.incomplete", report.total.incomplete)}
+        </Alert>
+      ) : null}
+      {report.total.derived > 0 ? (
+        <Alert tone="info" className="mb-5">
+          {tp("reports.revenue.derived", report.total.derived)}
         </Alert>
       ) : null}
 

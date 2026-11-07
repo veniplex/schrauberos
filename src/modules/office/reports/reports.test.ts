@@ -81,7 +81,7 @@ describe("Umsatz je Monat", () => {
     await invoice({ number: "G-1", issueDate: await d("2026-04-05"), netCents: -10_000, vatCents: -1_900, grossCents: -11_900, docType: "credit", status: "cancelled", cancelsInvoiceId: manual.id, finalizedAt: new Date("2026-06-01T10:00:00Z") });
     await env.db.invoice.update({ where: { id: manual.id }, data: { status: "cancelled" } });
     // Mai: Schlussrechnung rechnet den Abschlag an (brutto 11.900)
-    const final = await invoice({ number: "S-1", issueDate: await d("2026-05-20"), netCents: 40_000, vatCents: 7_600, grossCents: 47_600, deductedCents: 11_900, docType: "final", ...base });
+    const final = await invoice({ number: "S-1", issueDate: await d("2026-05-20"), netCents: 40_000, vatCents: 7_600, grossCents: 47_600, deductedCents: 11_900, deductedNetCents: 10_000, deductedVatCents: 1_900, docType: "final", ...base });
     await env.db.invoiceDeduction.create({ data: { finalId: final.id, partialId: partial.id, finalKey: partial.id } });
   });
 
@@ -92,12 +92,12 @@ describe("Umsatz je Monat", () => {
     assert.equal(report.to, "2026-05-31");
     const [mar, apr, may] = report.months;
     // März: M-1 (11.900/10.000/1.900) + B-1 (23.800/20.000/3.800) + M-2 (5.000, ohne Netto) = 40.700 brutto, 30.000 netto, 5.700 Steuer, 3 Belege
-    assert.deepEqual(mar, { month: "2026-03", count: 3, netCents: 30_000, vatCents: 5_700, grossCents: 40_700, withoutNet: 1 });
+    assert.deepEqual(mar, { month: "2026-03", count: 3, netCents: 30_000, vatCents: 5_700, grossCents: 40_700, incomplete: 1, derived: 0 });
     // April: B-2 (1.190/1.000/190) + Abschlag A-1 (11.900/10.000/1.900) + Gegenbeleg G-1 (−11.900/−10.000/−1.900) = 1.190 / 1.000 / 190, 3 Belege
-    assert.deepEqual(apr, { month: "2026-04", count: 3, netCents: 1_000, vatCents: 190, grossCents: 1_190, withoutNet: 0 });
+    assert.deepEqual(apr, { month: "2026-04", count: 3, netCents: 1_000, vatCents: 190, grossCents: 1_190, incomplete: 0, derived: 0 });
     // Mai: Schlussrechnung 47.600 − angerechneter Abschlag 11.900 = 35.700 brutto; netto 40.000 − 10.000 = 30.000; Steuer 7.600 − 1.900 = 5.700
-    assert.deepEqual(may, { month: "2026-05", count: 1, netCents: 30_000, vatCents: 5_700, grossCents: 35_700, withoutNet: 0 });
-    assert.deepEqual(report.total, { count: 7, netCents: 61_000, vatCents: 11_590, grossCents: 77_590, withoutNet: 1 });
+    assert.deepEqual(may, { month: "2026-05", count: 1, netCents: 30_000, vatCents: 5_700, grossCents: 35_700, incomplete: 0, derived: 0 });
+    assert.deepEqual(report.total, { count: 7, netCents: 61_000, vatCents: 11_590, grossCents: 77_590, incomplete: 1, derived: 0 });
   });
 
   it("Angebote, Auftragsbestätigungen, Entwürfe, Eingangsrechnungen und von Hand als storniert markierte Rechnungen zählen nie – auch nicht in einem Monat nur mit ihnen", async () => {
@@ -131,6 +131,136 @@ describe("Umsatz je Monat", () => {
 
   it("ohne invoices.view gibt es keinen Umsatz (null)", async () => {
     assert.equal(await queries.revenueReport(await session(["reports.view"]), { from: "2026-03-01", to: "2026-03-31" }), null);
+  });
+});
+
+describe("Umsatz: Storno einer Schlussrechnung mit Anrechnung (Netto, Steuer und Brutto je Monat)", () => {
+  const MONTHS = { from: "2026-04-01", to: "2026-04-30" };
+  const stornoMonth = () => dayKeyOf(new Date()).slice(0, 7);
+  let dayKeyOf: (d: Date) => string;
+  let final: { id: string };
+  let partialA: { id: string };
+  let partialB: { id: string };
+  const base = { source: "billing", finalizedAt: new Date("2026-06-01T10:00:00Z") };
+
+  const report = async () => (await queries.revenueReport(await session(["invoices.view"]), { from: MONTHS.from, to: `${stornoMonth()}-28` }))!;
+  const month = (r: Awaited<ReturnType<typeof report>>, key: string) => r.months.find((m) => m.month === key)!;
+  const cents = (m: { netCents: number; vatCents: number; grossCents: number }) => [m.netCents, m.vatCents, m.grossCents];
+
+  before(async () => {
+    dayKeyOf = (await import("@/lib/zone")).dayKey;
+    await clearInvoices();
+    // zwei Abschläge (April, Anfang Mai) und eine Schlussrechnung (Mai), die beide anrechnet
+    partialA = await invoice({ number: "A-1", issueDate: await noon("2026-04-10"), netCents: 10_000, vatCents: 1_900, grossCents: 11_900, docType: "partial", ...base });
+    partialB = await invoice({ number: "A-2", issueDate: await noon("2026-05-05"), netCents: 5_000, vatCents: 950, grossCents: 5_950, docType: "partial", ...base });
+    final = await invoice({
+      number: "S-1",
+      issueDate: await noon("2026-05-20"),
+      netCents: 40_000,
+      vatCents: 7_600,
+      grossCents: 47_600,
+      deductedCents: 17_850,
+      deductedNetCents: 15_000,
+      deductedVatCents: 2_850,
+      docType: "final",
+      ...base,
+    });
+    await env.db.invoiceDeduction.createMany({ data: [{ finalId: final.id, partialId: partialA.id, finalKey: partialA.id }, { finalId: final.id, partialId: partialB.id, finalKey: partialB.id }] });
+  });
+
+  it("vor dem Storno: Mai zählt die Schlussrechnung nach Abzug beider Abschläge plus den zweiten Abschlag, Netto + Steuer = Brutto in jedem Monat", async () => {
+    const r = await report();
+    assert.deepEqual(cents(month(r, "2026-04")), [10_000, 1_900, 11_900]);
+    // Mai: Abschlag A-2 (5.000/950/5.950) + Schlussrechnung 40.000/7.600/47.600 abzüglich 15.000/2.850/17.850 = 30.000 / 5.700 / 35.700
+    assert.deepEqual(cents(month(r, "2026-05")), [30_000, 5_700, 35_700]);
+    assert.equal(month(r, "2026-05").count, 2);
+    for (const m of r.months) assert.equal(m.netCents + m.vatCents, m.grossCents, `${m.month}: Netto + Steuer = Brutto`);
+  });
+
+  it("ein noch angerechneter Abschlag lässt sich nicht stornieren (der Bericht bleibt unverändert)", async () => {
+    const { cancelInvoiceOperation } = await import("@/modules/office/invoices/operations");
+    const { versionOf } = await import("@/lib/concurrency");
+    const S = await session(["invoices.view", "invoices.edit"]);
+    const before = await report();
+    const row = await env.db.invoice.findUniqueOrThrow({ where: { id: partialA.id } });
+    const res = await cancelInvoiceOperation.execute(S, { id: partialA.id, version: versionOf(row) } as never);
+    assert.equal(res.ok, false);
+    assert.deepEqual(await report(), before);
+  });
+
+  it("Storno der Schlussrechnung: Mai und April ändern sich nie rückwirkend; der Storno-Monat zeigt das exakte Negativ der Schlussrechnung nach Abzug (netto, Steuer, brutto)", async () => {
+    const { cancelInvoiceOperation } = await import("@/modules/office/invoices/operations");
+    const { versionOf } = await import("@/lib/concurrency");
+    const S = await session(["invoices.view", "invoices.edit"]);
+    const before = await report();
+    const row = await env.db.invoice.findUniqueOrThrow({ where: { id: final.id } });
+    const res = await cancelInvoiceOperation.execute(S, { id: final.id, version: versionOf(row) } as never);
+    assert.ok(res.ok, JSON.stringify(!res.ok && res.failure));
+    const after = await report();
+    for (const key of ["2026-04", "2026-05"]) assert.deepEqual(month(after, key), month(before, key), `${key} unverändert`);
+    // 40.000/7.600/47.600 − 15.000/2.850/17.850 = 25.000 / 4.750 / 29.750, negativ im Monat des Gegenbelegs
+    const stamp = month(after, stornoMonth());
+    assert.deepEqual(cents(stamp), [-25_000, -4_750, -29_750]);
+    assert.equal(stamp.count, 1);
+    for (const m of after.months) assert.equal(m.netCents + m.vatCents, m.grossCents, `${m.month}: Netto + Steuer = Brutto`);
+    // Summe über alle Monate: nur noch die beiden Abschläge (der Beleg ist aufgehoben), und zwar in jeder der drei Größen
+    assert.deepEqual(cents(after.total), [15_000, 2_850, 17_850]);
+  });
+
+  it("nach dem Storno sind die Abschläge frei: eine zweite Schlussrechnung rechnet sie wieder an – kein Abzug wird doppelt oder gar nicht gezählt", async () => {
+    const second = await invoice({ number: "S-2", issueDate: await noon("2026-05-28"), netCents: 20_000, vatCents: 3_800, grossCents: 23_800, deductedCents: 17_850, deductedNetCents: 15_000, deductedVatCents: 2_850, docType: "final", ...base });
+    await env.db.invoiceDeduction.createMany({ data: [{ finalId: second.id, partialId: partialA.id, finalKey: partialA.id }, { finalId: second.id, partialId: partialB.id, finalKey: partialB.id }] });
+    const r = await report();
+    // Mai jetzt: A-2 + S-1 (30.000/5.700/35.700 zusammen) + S-2 nach Abzug 5.000/950/5.950
+    assert.deepEqual(cents(month(r, "2026-05")), [35_000, 6_650, 41_650]);
+    // gesamt: beide Abschläge 15.000/2.850/17.850 + S-2 5.000/950/5.950 + S-1 samt Storno 0
+    assert.deepEqual(cents(r.total), [20_000, 3_800, 23_800]);
+    await env.db.invoiceDeduction.deleteMany({ where: { finalId: second.id } });
+    await env.db.invoice.delete({ where: { id: second.id } });
+  });
+
+  it("CSV, API und Widget zeigen dieselben Monatswerte wie der Bericht (Cent genau, in Brutto, Netto und Steuer)", async () => {
+    await env.db.featureSetting.upsert({ where: { key: "office.reports" }, update: { enabled: true }, create: { key: "office.reports", enabled: true, updatedByName: "test" } });
+    const S = await session(["reports.view", "invoices.view"]);
+    const rep = (await queries.revenueReport(S, { from: "2026-04-01", to: "2026-05-31" }))!;
+    // CSV (Sitzung mit reports.export)
+    await session(["reports.export", "reports.view", "invoices.view"]);
+    const { GET } = await import("@/app/api/exchange/[kind]/route");
+    const res = await GET(new NextRequest("http://localhost/api/exchange/report-revenue?from=2026-04-01&to=2026-05-31&format=international", { headers: { "x-requested-with": "schrauberos", host: "localhost" } }), { params: Promise.resolve({ kind: "report-revenue" }) });
+    assert.equal(res.status, 200);
+    const lines = (await res.text()).replace(new RegExp("^" + String.fromCharCode(0xfeff)), "").trim().split("\r\n");
+    const money = (value: number) => (value / 100).toFixed(2);
+    for (const [index, m] of rep.months.entries()) assert.equal(lines[index + 1], [m.month, m.count, money(m.netCents), money(m.vatCents), money(m.grossCents), m.incomplete, m.derived].join(","));
+    // API (Token mit den beiden Rechten)
+    const router = await import("@/server/api/router");
+    (await import("@/server/api/state")).apiLimits.failuresGlobal = 1_000_000;
+    await env.db.featureSetting.upsert({ where: { key: "office.reports" }, update: { enabled: true }, create: { key: "office.reports", enabled: true, updatedByName: "test" } });
+    const t = await makeToken(env, { ownerPermissions: ["reports.view", "invoices.view"], scope: ["reports.view", "invoices.view"] });
+    const api = await router.handleApiRequest(apiRequest("GET", "/reports/revenue?from=2026-04-01&to=2026-05-31", { token: t.token }));
+    const json = JSON.parse(await api.text());
+    assert.deepEqual(json.data.months, rep.months);
+    assert.deepEqual(json.data.total, rep.total);
+    // Widget und Seiten haben keine eigene Rechnung: sie rufen revenueReport (dieselbe Quelle wie CSV und API)
+    const { readFileSync } = await import("node:fs");
+    assert.match(readFileSync(new URL("./widgets.tsx", import.meta.url), "utf8"), /revenueReport/);
+    assert.match(readFileSync(new URL("../../../app/(app)/(office)/reports/revenue/page.tsx", import.meta.url), "utf8"), /revenueReport/);
+  });
+});
+
+describe("Umsatz: Belege mit nur Netto oder nur Steuer (von Hand erfasst)", () => {
+  before(async () => {
+    await clearInvoices();
+    // Brutto 11.900 in allen drei Belegen; N-1 hat nur das Netto, N-2 nur die Steuer, N-3 weder noch (nur Brutto), N-4 beides
+    await invoice({ number: "N-1", issueDate: await noon("2026-02-10"), netCents: 10_000, grossCents: 11_900 });
+    await invoice({ number: "N-2", issueDate: await noon("2026-02-11"), vatCents: 1_900, grossCents: 11_900 });
+    await invoice({ number: "N-3", issueDate: await noon("2026-02-12"), grossCents: 11_900 });
+    await invoice({ number: "N-4", issueDate: await noon("2026-02-13"), netCents: 10_000, vatCents: 1_900, grossCents: 11_900 });
+  });
+
+  it("die fehlende Angabe wird aus dem Brutto abgeleitet (Netto 10.000 / Steuer 1.900 je Beleg), ein Beleg ganz ohne beides zählt nur im Brutto; der Hinweis zählt jede unvollständige Zeile", async () => {
+    const r = await queries.revenueReport(await session(["invoices.view"]), { from: "2026-02-01", to: "2026-02-28" });
+    assert.deepEqual(r!.months[0], { month: "2026-02", count: 4, netCents: 30_000, vatCents: 5_700, grossCents: 47_600, incomplete: 1, derived: 2 });
+    assert.deepEqual(r!.total, { count: 4, netCents: 30_000, vatCents: 5_700, grossCents: 47_600, incomplete: 1, derived: 2 });
   });
 });
 
@@ -360,9 +490,9 @@ describe("CSV-Export (Datenaustausch)", () => {
     assert.match(res.headers.get("content-disposition") ?? "", /bericht-umsatz-2026-03-01_2026-03-31\.csv/);
     const text = (await res.text()).replace(new RegExp("^" + String.fromCharCode(0xfeff)), "");
     const lines = text.trim().split("\r\n");
-    assert.equal(lines[0], "Monat,Belege,Netto,Steuer,Brutto,Belege ohne Netto-/Steuerangabe");
-    assert.equal(lines[1], "2026-03,1,100.00,19.00,119.00,0");
-    assert.equal(lines[2], ",1,100.00,19.00,119.00,0", "Summenzeile");
+    assert.equal(lines[0], "Monat,Belege,Netto,Steuer,Brutto,Belege ohne Netto-/Steuerangabe,Belege mit abgeleiteter Angabe");
+    assert.equal(lines[1], "2026-03,1,100.00,19.00,119.00,0,0");
+    assert.equal(lines[2], ",1,100.00,19.00,119.00,0,0", "Summenzeile");
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "reports.export" } });
     assert.match(entry.target ?? "", /^2 Zeilen · Umsatz 2026-03-01\.\.2026-03-31$/);
   });
@@ -415,7 +545,7 @@ describe("API (lesend)", () => {
   it("liefert die Zahlen des Berichts als Cent; ungültiger Zeitraum 422; Fälligkeiten mit null für fehlende Teile", async () => {
     const t = await makeToken(env, { ownerPermissions: ["reports.view", "invoices.view", "vehicles.view"], scope: ["reports.view", "invoices.view", "vehicles.view"] });
     const revenue = await get(t.token, "/reports/revenue?from=2026-03-01&to=2026-03-31");
-    assert.deepEqual(revenue.json.data.total, { count: 1, netCents: 10_000, vatCents: 1_900, grossCents: 11_900, withoutNet: 0 });
+    assert.deepEqual(revenue.json.data.total, { count: 1, netCents: 10_000, vatCents: 1_900, grossCents: 11_900, incomplete: 0, derived: 0 });
     assert.equal((await get(t.token, "/reports/revenue?from=2026-03-31&to=2026-03-01")).status, 422);
     assert.equal((await get(t.token, "/reports/revenue?from=2026-02-30&to=2026-03-01")).status, 422);
     const due = await get(t.token, "/reports/due?months=3");

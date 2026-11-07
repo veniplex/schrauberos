@@ -52,8 +52,10 @@ async function demo(db: PrismaClient) {
     const issueDate = noonOf(atDay(-(spec.issuedAgo ?? 0)));
     const invoiceLike = spec.docType === "invoice" || spec.docType === "partial" || spec.docType === "final";
     const deductions = (spec.deduct ?? []).map((k) => created[k]).filter(Boolean);
-    const deductedRows = deductions.length ? await db.invoice.findMany({ where: { id: { in: deductions } }, select: { id: true, grossCents: true } }) : [];
+    const deductedRows = deductions.length ? await db.invoice.findMany({ where: { id: { in: deductions } }, select: { id: true, grossCents: true, netCents: true, vatCents: true } }) : [];
     const deductedCents = deductedRows.reduce((sum, r) => sum + r.grossCents, 0);
+    const deductedNetCents = deductedRows.reduce((sum, r) => sum + (r.netCents ?? r.grossCents), 0);
+    const deductedVatCents = deductedCents - deductedNetCents;
     let number = "";
     let outgoingKey: string | null = null;
     if (issued) ({ number, key: outgoingKey } = await allocateDocumentNumber(db, spec.docType, workshop.invoiceNumberFormat, new Date()));
@@ -78,6 +80,8 @@ async function demo(db: PrismaClient) {
         vatCents: totals.taxCents,
         grossCents: totals.grossCents,
         deductedCents,
+        deductedNetCents,
+        deductedVatCents,
         paidCents,
         status: spec.cancelled ? "cancelled" : paidCents > 0 && paidCents >= totals.grossCents - deductedCents ? "paid" : "open",
         paidAt: paidCents > 0 && paidCents >= totals.grossCents - deductedCents ? noonOf(atDay(-Math.max((spec.issuedAgo ?? 0) - 3, 1))) : null,

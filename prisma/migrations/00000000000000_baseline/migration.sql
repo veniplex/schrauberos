@@ -623,6 +623,8 @@ CREATE TABLE "Invoice" (
     "orderId" TEXT,
     "sourceDocId" TEXT,
     "deductedCents" INTEGER NOT NULL DEFAULT 0,
+    "deductedNetCents" INTEGER NOT NULL DEFAULT 0,
+    "deductedVatCents" INTEGER NOT NULL DEFAULT 0,
     "paidCents" INTEGER NOT NULL DEFAULT 0,
     "sentAt" DATETIME,
     "sentCount" INTEGER NOT NULL DEFAULT 0,

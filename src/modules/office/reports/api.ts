@@ -36,8 +36,8 @@ export const endpoints: ApiEndpoint[] = [
     response: z.object({
       from: day,
       to: day,
-      months: z.array(z.object({ month, count: z.number().int(), netCents: cents, vatCents: cents, grossCents: cents, withoutNet: z.number().int() })),
-      total: z.object({ count: z.number().int(), netCents: cents, vatCents: cents, grossCents: cents, withoutNet: z.number().int() }),
+      months: z.array(z.object({ month, count: z.number().int(), netCents: cents, vatCents: cents, grossCents: cents, incomplete: z.number().int(), derived: z.number().int() })),
+      total: z.object({ count: z.number().int(), netCents: cents, vatCents: cents, grossCents: cents, incomplete: z.number().int(), derived: z.number().int() }),
     }),
     handler: async (call) => {
       requireReport(call, "revenue");

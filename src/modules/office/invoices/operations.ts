@@ -331,6 +331,8 @@ export const cancelInvoiceOperation = defineOperation({
           mileageKm: original.mileageKm,
           orderId: original.orderId,
           deductedCents: 0 - original.deductedCents,
+          deductedNetCents: 0 - original.deductedNetCents,
+          deductedVatCents: 0 - original.deductedVatCents,
           createdByName: who,
         }
       : {};

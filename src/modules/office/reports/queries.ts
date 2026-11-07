@@ -19,7 +19,7 @@ import { MAX_REVENUE_MONTHS, REPORT_LIST_LIMIT, daysOf, lastDayOfMonth, monthKey
 
 /* ───────────── Umsatz je Monat ───────────── */
 
-export type RevenueReport = { from: string; to: string; months: RevenueMonth[]; total: { count: number; netCents: number; vatCents: number; grossCents: number; withoutNet: number } };
+export type RevenueReport = { from: string; to: string; months: RevenueMonth[]; total: { count: number; netCents: number; vatCents: number; grossCents: number; incomplete: number; derived: number } };
 
 /** Der Umsatz der Monate, die der Zeitraum berührt (auf ganze Monate gerundet), höchstens `MAX_REVENUE_MONTHS`. */
 export async function revenueReport(viewer: Viewer, period: { from: string; to: string }): Promise<RevenueReport | null> {
@@ -28,7 +28,7 @@ export async function revenueReport(viewer: Viewer, period: { from: string; to: 
   if (months.length > MAX_REVENUE_MONTHS) throw new Error("Zeitraum zu lang");
   const rows = await revenueByMonth(viewer, months);
   if (!rows) return null;
-  const total = rows.reduce((sum, r) => ({ count: sum.count + r.count, netCents: sum.netCents + r.netCents, vatCents: sum.vatCents + r.vatCents, grossCents: sum.grossCents + r.grossCents, withoutNet: sum.withoutNet + r.withoutNet }), { count: 0, netCents: 0, vatCents: 0, grossCents: 0, withoutNet: 0 });
+  const total = rows.reduce((sum, r) => ({ count: sum.count + r.count, netCents: sum.netCents + r.netCents, vatCents: sum.vatCents + r.vatCents, grossCents: sum.grossCents + r.grossCents, incomplete: sum.incomplete + r.incomplete, derived: sum.derived + r.derived }), { count: 0, netCents: 0, vatCents: 0, grossCents: 0, incomplete: 0, derived: 0 });
   return { from: snapped.from, to: snapped.to, months: rows, total };
 }
 

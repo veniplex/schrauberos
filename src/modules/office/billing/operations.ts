@@ -77,19 +77,29 @@ export type DraftInput = z.output<typeof draftInput>;
 
 /**
  * Prüft die Abschläge einer Schlussrechnung: festgeschriebene, nicht stornierte Abschlagsrechnungen **desselben Kunden**, die noch in keiner festgeschriebenen Schlussrechnung angerechnet sind.
- * Liefert ihre Bruttosumme. (Die Eindeutigkeit der Anrechnung sichert zusätzlich der Unique-Schlüssel `finalKey`.)
+ * Liefert ihre Bruttosumme und deren Netto- und Steueranteil (für den Umsatzbericht am Beleg festgeschrieben). (Die Eindeutigkeit der Anrechnung sichert zusätzlich der Unique-Schlüssel `finalKey`.)
  */
-async function checkPartials(tx: Tx, ids: readonly string[], customerId: string | null, finalId: string | null): Promise<number> {
-  if (ids.length === 0) return 0;
+type Deducted = { grossCents: number; netCents: number; vatCents: number };
+const NO_DEDUCTION: Deducted = { grossCents: 0, netCents: 0, vatCents: 0 };
+
+async function checkPartials(tx: Tx, ids: readonly string[], customerId: string | null, finalId: string | null): Promise<Deducted> {
+  if (ids.length === 0) return NO_DEDUCTION;
   if (!customerId) failField("customerId", "billing.errors.finalCustomer");
   const unique = [...new Set(ids)];
   const rows = await tx.invoice.findMany({
     where: { id: { in: unique }, source: "billing", docType: "partial", customerId, finalizedAt: { not: null }, status: { not: "cancelled" }, cancelledBy: null },
-    select: { id: true, grossCents: true, deductedIn: { where: { finalKey: { not: null }, ...(finalId ? { finalId: { not: finalId } } : {}) }, select: { id: true } } },
+    select: { id: true, grossCents: true, netCents: true, vatCents: true, deductedIn: { where: { finalKey: { not: null }, ...(finalId ? { finalId: { not: finalId } } : {}) }, select: { id: true } } },
   });
   if (rows.length !== unique.length || rows.some((row) => row.deductedIn.length > 0)) failField("deductPartialIds", "billing.errors.deduction");
-  return rows.reduce((sum, row) => sum + row.grossCents, 0);
+  // Netto und Steuer eines Abschlags stehen bei Belegen der Rechnungserstellung immer am Beleg; fehlt das Netto, gilt Brutto = Netto + Steuer
+  return rows.reduce((sum, row) => {
+    const net = row.netCents ?? row.grossCents - (row.vatCents ?? 0);
+    return { grossCents: sum.grossCents + row.grossCents, netCents: sum.netCents + net, vatCents: sum.vatCents + (row.grossCents - net) };
+  }, NO_DEDUCTION);
 }
+
+/** Die drei Spalten der angerechneten Abschläge am Beleg (brutto, netto, Steuer). */
+const deductionColumns = (d: Deducted) => ({ deductedCents: d.grossCents, deductedNetCents: d.netCents, deductedVatCents: d.vatCents });
 
 /** Entwurf anlegen oder ändern (`billing.edit`). Summen, Steuersätze und Grenzen prüft der Server selbst; ein Entwurf ist nie verbindlich. */
 export const saveDraftOperation = defineOperation({
@@ -136,8 +146,8 @@ export const saveDraftOperation = defineOperation({
 
     const rows = normalizeItems(d.items, exempt);
     const totals = totalsOf(rows, exempt);
-    const deductedCents = docType === "final" ? await checkPartials(tx, d.deductPartialIds ?? [], customer?.id ?? null, current?.id ?? null) : 0;
-    if (deductedCents > totals.grossCents && docType === "final") failField("deductPartialIds", "billing.errors.deductionTooHigh");
+    const deducted = docType === "final" ? await checkPartials(tx, d.deductPartialIds ?? [], customer?.id ?? null, current?.id ?? null) : NO_DEDUCTION;
+    if (deducted.grossCents > totals.grossCents && docType === "final") failField("deductPartialIds", "billing.errors.deductionTooHigh");
 
     const today = todayInput();
     const data = {
@@ -170,7 +180,7 @@ export const saveDraftOperation = defineOperation({
       vehicleId: vehicle?.id ?? null,
       vehicleLabel: vehicle?.label ?? null,
       mileageKm: d.mileageKm ?? null,
-      deductedCents,
+      ...deductionColumns(deducted),
       createdByName: current?.createdByName ?? who(principal),
     };
 
@@ -258,10 +268,10 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
   });
   if (doc.docType === "offer" && doc.validUntil && dayKey(doc.validUntil) < today) problems.push("validUntilPast");
   // Schlussrechnung: die Abschläge noch einmal gegen den aktuellen Stand prüfen (storniert? inzwischen anderswo angerechnet?)
-  let deductedCents = 0;
+  let deducted = NO_DEDUCTION;
   if (doc.docType === "final") {
-    deductedCents = await checkPartials(tx, doc.deductions.map((d) => d.partialId), doc.customerId, doc.id);
-    if (deductedCents > totals.grossCents) problems.push("deductionTooHigh");
+    deducted = await checkPartials(tx, doc.deductions.map((d) => d.partialId), doc.customerId, doc.id);
+    if (deducted.grossCents > totals.grossCents) problems.push("deductionTooHigh");
   }
   if (problems.length > 0) throw new OperationError({ code: "invalid", key: "billing.errors.incomplete", data: { problems: problems.join(",") } });
 
@@ -276,14 +286,14 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
   const issueDay = today;
   const paymentDays = doc.paymentDays ?? 0;
   // Zahlbetrag 0 (die Abschläge decken die Schlussrechnung voll): gilt von Anfang an als bezahlt – sonst bliebe der Beleg offen und würde überfällig
-  const settled = expect === "invoice" && totals.grossCents - deductedCents <= 0;
+  const settled = expect === "invoice" && totals.grossCents - deducted.grossCents <= 0;
   const data = {
     number: allocated.number,
     outgoingKey: allocated.key,
     issueDate: noon(issueDay),
     dueDate: expect === "invoice" ? noon(dueDayKey(issueDay, paymentDays)) : null,
     ...amountColumns(totals),
-    deductedCents,
+    ...deductionColumns(deducted),
     exempt: doc.exempt,
     finalizedAt: now,
     finalizedByName: who(principal),

@@ -33,10 +33,10 @@ export const revenueExport: ExportDef = {
     if (!period.ok) return { error: "reports.errors.invalid" };
     const report = await revenueReport(session, period);
     if (!report) return { error: "reports.errors.invalid" };
-    const rows: Cell[][] = report.months.map((m) => [m.month, intCell(m.count), moneyCell(m.netCents, format), moneyCell(m.vatCents, format), moneyCell(m.grossCents, format), intCell(m.withoutNet)]);
-    rows.push(["", intCell(report.total.count), moneyCell(report.total.netCents, format), moneyCell(report.total.vatCents, format), moneyCell(report.total.grossCents, format), intCell(report.total.withoutNet)]);
+    const rows: Cell[][] = report.months.map((m) => [m.month, intCell(m.count), moneyCell(m.netCents, format), moneyCell(m.vatCents, format), moneyCell(m.grossCents, format), intCell(m.incomplete), intCell(m.derived)]);
+    rows.push(["", intCell(report.total.count), moneyCell(report.total.netCents, format), moneyCell(report.total.vatCents, format), moneyCell(report.total.grossCents, format), intCell(report.total.incomplete), intCell(report.total.derived)]);
     return {
-      columns: [{ labelKey: "reports.exporting.cols.month" }, { labelKey: "reports.exporting.cols.docs" }, { labelKey: "reports.exporting.cols.net" }, { labelKey: "reports.exporting.cols.vat" }, { labelKey: "reports.exporting.cols.gross" }, { labelKey: "reports.exporting.cols.withoutNet" }],
+      columns: [{ labelKey: "reports.exporting.cols.month" }, { labelKey: "reports.exporting.cols.docs" }, { labelKey: "reports.exporting.cols.net" }, { labelKey: "reports.exporting.cols.vat" }, { labelKey: "reports.exporting.cols.gross" }, { labelKey: "reports.exporting.cols.incomplete" }, { labelKey: "reports.exporting.cols.derived" }],
       count: rows.length,
       target: `Umsatz ${report.from}..${report.to}`,
       rows: rowsOf(rows),
