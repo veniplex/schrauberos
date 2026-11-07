@@ -10,6 +10,7 @@ import { Stepper, Timeline, type TimelineItem } from "@/components/ui/timeline";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { versionOf } from "@/lib/concurrency";
+import { lineResult } from "@/lib/line-items";
 import { formatCents } from "@/lib/money";
 import { PageSections } from "@/modules/page-sections";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
@@ -81,8 +82,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const steps = ORDER_STEPS.map((step) => ({ id: step, label: td(`orders.status.${step}`, step) }));
   const lineNet = (item: (typeof order.items)[number]) => {
     if (item.unitCents === undefined || item.discountBp === undefined) return null;
-    const base = Math.round((item.quantityMilli * item.unitCents) / 1000);
-    return base - Math.round((base * item.discountBp) / 10_000);
+    // dieselbe Rechenregel wie Editor und Server (kaufmännisch gerundet, exakt)
+    return lineResult({ quantityMilli: item.quantityMilli, unitCents: item.unitCents, taxBp: item.taxBp ?? 0, discountBp: item.discountBp }).netCents;
   };
 
   return (
