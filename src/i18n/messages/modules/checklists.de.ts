@@ -14,7 +14,7 @@ export const checklistsDe = {
   count_one: "{count} Checkliste",
   count_other: "{count} Checklisten",
   empty: "Keine Checklisten gefunden.",
-  emptyHint: "Eine Checkliste beginnen Sie am Auftrag, am Fahrzeug oder hier mit „Checkliste beginnen“.",
+  emptyHint: "Checklisten beginnen am Auftrag, am Fahrzeug oder hier mit „Checkliste beginnen“.",
   progressText: "{done} von {total}",
   manageTemplates: "Vorlagen verwalten",
   new: {
@@ -102,7 +102,7 @@ export const checklistsDe = {
     unarchive: "Wieder aktivieren",
     standard: "mitgeliefert",
     installDefaults: "Mitgelieferte Vorlagen einrichten",
-    installHint: "Legt Annahmeprotokoll, Ölwechsel, Reifenwechsel und HU-Vorbereitung an, soweit es sie noch nicht gibt. Die Werte (Drehmoment, Profiltiefe, Reifendruck) sind übliche Richtwerte: passen Sie sie an Ihre Fahrzeuge an.",
+    installHint: "Legt Annahmeprotokoll, Ölwechsel, Reifenwechsel und HU-Vorbereitung an, soweit es sie noch nicht gibt. Die Werte (Drehmoment, Profiltiefe, Reifendruck) sind übliche Richtwerte: bitte an die eigenen Fahrzeuge anpassen.",
     empty: "Noch keine Vorlagen.",
     versions: { title: "Versionen", version: "Version {version}", by: "{name}, {time}", usedBy_one: "{count} Checkliste", usedBy_other: "{count} Checklisten", items_one: "{count} Punkt", items_other: "{count} Punkte", current: "aktuell" },
     editor: {

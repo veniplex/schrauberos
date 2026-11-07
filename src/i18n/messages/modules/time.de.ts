@@ -12,8 +12,8 @@ export const timeDe = {
   teamDescription: "Ist, Soll und Saldo der Woche je Mitarbeiter.",
   tabs: { today: "Heute", entries: "Einträge", team: "Team" },
   noProfile: {
-    none: "Mit Ihrem Konto ist noch kein Mitarbeiter verknüpft. Die Verwaltung trägt das unter Mitarbeiter ein (Feld „Benutzerkonto“); danach lässt sich stempeln.",
-    inactive: "Der mit Ihrem Konto verknüpfte Mitarbeiter ist als ausgeschieden markiert; es lässt sich nicht mehr stempeln.",
+    none: "Mit dem Konto ist noch kein Mitarbeiter verknüpft. Die Verwaltung trägt das unter Mitarbeiter ein (Feld „Benutzerkonto“); danach lässt sich stempeln.",
+    inactive: "Der mit dem Konto verknüpfte Mitarbeiter ist als ausgeschieden markiert; es lässt sich nicht mehr stempeln.",
   },
   stamp: {
     title: "Stempeln",
@@ -144,7 +144,7 @@ export const timeDe = {
     transferred: "Zeiten als Positionen übernommen.",
   },
   errors: {
-    noEmployee: "Mit Ihrem Konto ist kein Mitarbeiter verknüpft.",
+    noEmployee: "Mit dem Konto ist kein Mitarbeiter verknüpft.",
     inactive: "Der verknüpfte Mitarbeiter ist ausgeschieden.",
     alreadyRunning: "Es läuft schon ein Eintrag. Bitte zuerst beenden.",
     notRunning: "Es läuft kein Eintrag.",

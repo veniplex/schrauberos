@@ -23,7 +23,7 @@ export const filesDe = {
   count_one: "{count} Datei",
   count_other: "{count} Dateien",
   listEmpty: "Keine Dateien gefunden.",
-  listEmptyHint: "Fotos und Dokumente laden Sie auf der Seite eines Fahrzeugs oder Auftrags hoch.",
+  listEmptyHint: "Fotos und Dokumente werden auf der Seite eines Fahrzeugs oder Auftrags hochgeladen.",
   categories: {
     photo: "Foto",
     intake: "Annahme",

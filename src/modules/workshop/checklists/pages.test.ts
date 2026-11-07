@@ -6,8 +6,8 @@ import { createTestEnv, isNotFound, redirectOf, type TestEnv } from "@/test/harn
 import { resolveServerTree } from "@/test/server-tree";
 import { blur, click, plain, type, wait } from "@/test/ui";
 
-function omit<T extends Record<string, unknown>>(row: T, keys: string[]): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(row).filter(([key]) => !keys.includes(key)));
+function omit<T extends Record<string, unknown>, K extends string>(row: T, keys: K[]): Omit<T, K> {
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !(keys as string[]).includes(key))) as Omit<T, K>;
 }
 
 /** Die Seiten der Checklisten wirklich gerendert; die Punkte speichern über die echte Aktion (Haken, Messwert beim Verlassen, Auswahl), der Abschnitt am Auftrag und der Baustein der Übersicht. */
