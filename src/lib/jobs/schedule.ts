@@ -9,6 +9,8 @@
  * jeden Kalendertag genau einmal – auch an den Umstellungstagen.
  */
 
+import { instantOfWallTime, wallOf } from "@/lib/zone";
+
 export type Schedule = { every: number } | { cron: string };
 
 type CronField = ReadonlySet<number>;
@@ -57,44 +59,12 @@ export function validateSchedule(schedule: Schedule): void {
   } else parseCron(schedule.cron);
 }
 
-/* ───────────── Zeitzonen ───────────── */
-
-const formatters = new Map<string, Intl.DateTimeFormat>();
-function formatter(timeZone: string): Intl.DateTimeFormat {
-  let f = formatters.get(timeZone);
-  if (!f) {
-    f = new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
-    formatters.set(timeZone, f);
-  }
-  return f;
-}
-
-/** Wandzeit in der Zeitzone als „UTC-Zeitstempel derselben Zahlen“ – die Differenz zum echten Zeitstempel ist der Versatz der Zone. */
-function wallAsUtc(ts: number, timeZone: string): number {
-  const p: Record<string, number> = {};
-  for (const part of formatter(timeZone).formatToParts(new Date(ts))) if (part.type !== "literal") p[part.type] = Number(part.value);
-  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-}
-
-const offsetAt = (ts: number, timeZone: string) => wallAsUtc(ts, timeZone) - Math.floor(ts / 1000) * 1000;
-
-/** Der Zeitpunkt einer Wandzeit (Zahlen als UTC übergeben): beim Zurückstellen der erste, in der Lücke der Zeitpunkt unmittelbar danach. */
-export function instantOfWallTime(wallUtc: number, timeZone: string): number {
-  const DAY = 86_400_000;
-  const candidates = new Set<number>();
-  for (const o of new Set([offsetAt(wallUtc - DAY, timeZone), offsetAt(wallUtc + DAY, timeZone)])) {
-    const ts = wallUtc - o;
-    if (offsetAt(ts, timeZone) === o) candidates.add(ts);
-  }
-  if (candidates.size > 0) return Math.min(...candidates);
-  // Lücke der Umstellung auf Sommerzeit: mit dem Versatz davor ergibt sich der Zeitpunkt direkt nach der Lücke
-  return wallUtc - offsetAt(wallUtc - DAY, timeZone);
-}
+/* ───────────── Zeitzonen (Rechnung in src/lib/zone.ts) ───────────── */
 
 /** Wandzeit-Bestandteile eines Zeitpunkts in der Zone. */
 function wallParts(ts: number, timeZone: string) {
-  const d = new Date(wallAsUtc(ts, timeZone));
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  const w = wallOf(ts, timeZone);
+  return { year: w.year, month: w.month, day: w.day };
 }
 
 /** Nächster Zeitpunkt strikt nach `after`, der zum Cron-Ausdruck passt (Wandzeit in `timeZone`). */

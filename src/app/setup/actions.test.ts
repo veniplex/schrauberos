@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { setWorkshopZone } from "@/lib/zone";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { browser, createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
@@ -80,6 +81,7 @@ describe("completeSetup", () => {
   it("stellt die Termine der Cron-Jobs auf die gewählte Zeitzone um (vorher berechnet in der Zeitzone des Prozesses)", async () => {
     const { jobRunner } = await import("@/server/jobs");
     process.env.TZ = "UTC";
+    setWorkshopZone("UTC"); // die Jobs rechnen in der Werkstatt-Zone, nicht in `TZ`
     await env.db.jobState.deleteMany();
     await jobRunner().sync();
     const nextOf = async () => (await env.db.jobState.findUniqueOrThrow({ where: { id: "audit.retention" } })).nextRunAt!;

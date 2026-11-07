@@ -2,6 +2,7 @@ import "server-only";
 import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
 import { logError } from "@/lib/log-safe";
+import { isValidTimeZone, setWorkshopZone } from "@/lib/zone";
 import { writeAudit } from "@/server/audit";
 import { loadCspMode } from "@/server/csp-setting";
 import { db } from "@/server/db";
@@ -19,20 +20,16 @@ export { startupState, type StartupState };
 
 /** Ist das ein gültiger Zeitzonen-Name? Ändert nichts. */
 export function isValidTimezone(timezone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("de-DE", { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
+  return isValidTimeZone(timezone);
 }
 
 /**
- * Wendet die Zeitzone der Werkstatt auf den Prozess an (Termine u. a. rechnen in lokaler Zeit). Aktionen prüfen vorher mit
- * `isValidTimezone` und rufen dies erst auf, wenn gespeichert ist – ein abgebrochener Vorgang ändert die Zeitzone nie.
+ * Macht die Zeitzone der Werkstatt wirksam: Sie wird als **Werkstatt-Zone** gesetzt (`setWorkshopZone`, `src/lib/zone.ts` – darin rechnen Termine, Öffnungszeiten, Fristen, Jobs
+ * und die Anzeige von Zeitpunkten) und zusätzlich als `process.env.TZ` (Gewohnheit für Bibliotheken, die die Prozesszeit lesen; die Datumslogik hängt nicht daran). Aktionen
+ * prüfen vorher mit `isValidTimezone` und rufen dies erst auf, wenn gespeichert ist – ein abgebrochener Vorgang ändert die Zeitzone nie.
  */
 export function applyTimezone(timezone: string): boolean {
-  if (!isValidTimezone(timezone)) return false;
+  if (!setWorkshopZone(timezone)) return false;
   process.env.TZ = timezone;
   return true;
 }

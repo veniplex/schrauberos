@@ -907,25 +907,27 @@ describe("Automatisches Backup: Reihenfolge und Teilfehler (ZP3-A-12)", () => {
 });
 
 describe("Zeitzone: Backup-Uhrzeit und Neuberechnung", () => {
-  it("runAutoBackup rechnet in der aktuellen Prozess-Zeitzone: nach einem Wechsel der Werkstatt-Zeitzone gilt die neue Ortszeit", async () => {
+  it("runAutoBackup rechnet in der Werkstatt-Zone (nicht in TZ): nach einem Wechsel der Zone gilt die neue Ortszeit", async () => {
     const { runAutoBackup } = await import("@/server/backup/auto");
     const core = await import("@/server/backup/core");
+    const { withWorkshopZone } = await import("@/test/zone");
+    const { setWorkshopZone } = await import("@/lib/zone");
     await env.db.appSetting.upsert({ where: { key: "backup.hour" }, update: { value: "21" }, create: { key: "backup.hour", value: "21" } });
-    const previous = process.env.TZ;
     const at = new Date("2026-06-01T10:00:00Z"); // UTC 10:00, Auckland 22:00
-    try {
-      process.env.TZ = "UTC";
+    // der Prozess läuft in Berlin (12:00): weder UTC noch Auckland – nur die Werkstatt-Zone entscheidet
+    await withWorkshopZone("UTC", async () => {
       assert.equal(await runAutoBackup(at), null, "10 Uhr UTC: die Uhrzeit 21 ist noch nicht erreicht");
-      process.env.TZ = "Pacific/Auckland";
-      const result = await runAutoBackup(at);
-      assert.ok(result?.name, "22 Uhr in Auckland: die Uhrzeit ist erreicht");
-      // „heute schon eins“ gilt je Kalendertag der Ortszeit (das Backup trägt die echte Uhrzeit, deshalb mit der echten Uhr prüfen)
-      await env.db.appSetting.update({ where: { key: "backup.hour" }, data: { value: "0" } });
-      assert.equal(await runAutoBackup(new Date()), null, "heute (Ortszeit) ist schon eins da");
-    } finally {
-      process.env.TZ = previous;
-      for (const b of await core.listBackups()) await core.deleteBackup(b.name);
-    }
+      setWorkshopZone("Pacific/Auckland");
+      try {
+        const result = await runAutoBackup(at);
+        assert.ok(result?.name, "22 Uhr in Auckland: die Uhrzeit ist erreicht");
+        // „heute schon eins“ gilt je Kalendertag der Ortszeit (das Backup trägt die echte Uhrzeit, deshalb mit der echten Uhr prüfen)
+        await env.db.appSetting.update({ where: { key: "backup.hour" }, data: { value: "0" } });
+        assert.equal(await runAutoBackup(new Date()), null, "heute (Ortszeit) ist schon eins da");
+      } finally {
+        for (const b of await core.listBackups()) await core.deleteBackup(b.name);
+      }
+    }, "Europe/Berlin");
   });
 
   it("reschedule: rechnet Cron-Termine in der neuen Zone neu (auch über die Sommerzeit-Lücke), lässt Intervalle, Fehlerserien und laufende Jobs unberührt", async () => {

@@ -1,5 +1,5 @@
 import "server-only";
-import { startOfDay } from "date-fns";
+import { startOfDay, wallOf } from "@/lib/zone";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { InvoiceTotals } from "./domain";
@@ -29,7 +29,7 @@ export async function invoiceSums(where: Prisma.InvoiceWhereInput = {}, now = ne
 /** Die Jahre, für die es Rechnungen gibt (von der Datenbank: kleinstes und größtes Datum), absteigend; das laufende Jahr ist immer dabei. */
 export async function invoiceYears(currentYear: number): Promise<number[]> {
   const { _min, _max } = await db.invoice.aggregate({ _min: { issueDate: true }, _max: { issueDate: true } });
-  const first = Math.min(_min.issueDate?.getFullYear() ?? currentYear, currentYear);
-  const last = Math.max(_max.issueDate?.getFullYear() ?? currentYear, currentYear);
+  const first = Math.min((_min.issueDate ? wallOf(_min.issueDate).year : currentYear), currentYear);
+  const last = Math.max((_max.issueDate ? wallOf(_max.issueDate).year : currentYear), currentYear);
   return Array.from({ length: last - first + 1 }, (_, i) => last - i);
 }

@@ -1,4 +1,5 @@
 import { WEEKDAYS, type Weekday } from "./constants";
+import { getDay, workshopZone } from "./zone";
 
 export type OpeningHours = Record<Weekday, [string, string] | null>;
 
@@ -39,7 +40,7 @@ export function isValidTime(value: string): boolean {
   return TIME.test(value);
 }
 
-/** Wochentag-Schlüssel eines Datums (Mo = "mon"). */
-export function weekdayKey(date: Date): Weekday {
-  return WEEKDAYS[(date.getDay() + 6) % 7];
+/** Wochentag-Schlüssel eines Zeitpunkts in der Zone der Werkstatt (Mo = "mon"). */
+export function weekdayKey(date: Date, timeZone: string = workshopZone()): Weekday {
+  return WEEKDAYS[(getDay(date, timeZone) + 6) % 7];
 }

@@ -1,3 +1,4 @@
+import { wallOf, workshopZone } from "@/lib/zone";
 import { TIRE_CONDITIONS, TIRE_POSITIONS, type TireCondition, type TirePosition, type TireSetStatus } from "./constants";
 
 /** Winterfenster in Kalendermonaten (1–12), beide einschließlich. Liegt der Beginn nach dem Ende, geht das Fenster über den Jahreswechsel (Standard: Oktober bis März). */
@@ -132,9 +133,9 @@ export function minTread(tires: { treadDepthMm: number | null }[]): number | nul
   return values.length ? Math.min(...values) : null;
 }
 
-/** Welche Saison sollte jetzt montiert sein? Im Winterfenster (Standard Okt–Mär) Winter, sonst Sommer. */
-export function wantedSeason(now = new Date(), window: SeasonWindow = DEFAULT_SEASON_WINDOW): "summer" | "winter" {
-  const month = now.getMonth() + 1; // 1 = Jan
+/** Welche Saison sollte jetzt montiert sein? Im Winterfenster (Standard Okt–Mär) Winter, sonst Sommer – der Monat zählt in der Zeitzone der Werkstatt. */
+export function wantedSeason(now = new Date(), window: SeasonWindow = DEFAULT_SEASON_WINDOW, timeZone: string = workshopZone()): "summer" | "winter" {
+  const month = wallOf(now, timeZone).month; // 1 = Jan
   const { winterStartMonth: from, winterEndMonth: to } = window;
   const winter = from <= to ? month >= from && month <= to : month >= from || month <= to;
   return winter ? "winter" : "summer";
@@ -216,7 +217,7 @@ export type TireRowData = {
  * `errors` nennt je Feld (`tire.<POS>.dot` / `tire.<POS>.tread`) den Fehler: ungültiges oder zukünftiges DOT (vermutlich vertippt,
  * z. B. 1234 = Woche 12/2034), Profiltiefe außerhalb 0–15 mm (Komma als Dezimalzeichen erlaubt).
  */
-export function parseTireRows(rows: Partial<Record<TirePosition, RawTireRow>>, withSpare: boolean, now = new Date()): { tires: TireRowData[]; errors: Record<string, "dot" | "tread"> } {
+export function parseTireRows(rows: Partial<Record<TirePosition, RawTireRow>>, withSpare: boolean, now = new Date(), timeZone: string = workshopZone()): { tires: TireRowData[]; errors: Record<string, "dot" | "tread"> } {
   const errors: Record<string, "dot" | "tread"> = {};
   const positions: readonly TirePosition[] = withSpare ? TIRE_POSITIONS : TIRE_POSITIONS.filter((p) => p !== "SPARE");
   const tires = positions.map((position) => {
@@ -226,7 +227,7 @@ export function parseTireRows(rows: Partial<Record<TirePosition, RawTireRow>>, w
     const conditionRaw = row.condition ?? "good";
 
     const dot = dotRaw ? parseDot(dotRaw) : null;
-    if (dotRaw && (!dot || dot.year > now.getFullYear())) errors[`tire.${position}.dot`] = "dot";
+    if (dotRaw && (!dot || dot.year > wallOf(now, timeZone).year)) errors[`tire.${position}.dot`] = "dot";
     const tread = treadRaw !== undefined ? Number(treadRaw) : null;
     if (tread !== null && (!Number.isFinite(tread) || tread < 0 || tread > 15)) errors[`tire.${position}.tread`] = "tread";
     const condition = (TIRE_CONDITIONS as readonly string[]).includes(conditionRaw) ? conditionRaw : "good";

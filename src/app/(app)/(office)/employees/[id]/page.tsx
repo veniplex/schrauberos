@@ -9,7 +9,7 @@ import { getI18n } from "@/i18n/server";
 import { currentYear } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
-import { employeeName, workdaysBetween, workdaysWithin } from "@/modules/office/employees/domain";
+import { employeeName, workdaysBetween, workdaysWithinKeys } from "@/modules/office/employees/domain";
 import { employeeTitle, getEmployeeDetail } from "@/modules/office/employees/queries";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { deleteAbsence, deleteEmployee, deleteQualification } from "@/modules/office/employees/actions";
@@ -34,9 +34,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   const e = await getEmployeeDetail(session, id);
   if (!e) notFound();
 
-  const yearFrom = new Date(year, 0, 1);
-  const yearTo = new Date(year, 11, 31);
-  const vacationUsed = e.absences.filter((a) => a.type === "vacation").reduce((n, a) => n + workdaysWithin(a, yearFrom, yearTo), 0);
+  const vacationUsed = e.absences.filter((a) => a.type === "vacation").reduce((n, a) => n + workdaysWithinKeys(a, `${year}-01-01`, `${year}-12-31`), 0);
   const returnTo = `/employees/${e.id}`;
 
   return (

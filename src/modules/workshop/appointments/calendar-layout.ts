@@ -1,3 +1,5 @@
+import { isSameDay, minutesOfDay } from "@/lib/zone";
+
 export type Positioned<T> = { item: T; lane: number; lanes: number };
 
 /**
@@ -37,7 +39,7 @@ export function assignLanes<T>(items: T[], range: (item: T) => [number, number])
   return result;
 }
 
-export const minutesOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes();
+export { minutesOfDay };
 
 /**
  * Beginn und Ende eines Termins in Minuten ab Mitternacht seines Starttages – für Lage und Spuren im Raster. Jeder Termin belegt **mindestens `minDuration`** (das
@@ -46,7 +48,7 @@ export const minutesOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes();
  */
 export function eventSpan(startsAt: Date, endsAt: Date, minDuration: number): [start: number, end: number] {
   const start = minutesOfDay(startsAt);
-  const sameDay = startsAt.getFullYear() === endsAt.getFullYear() && startsAt.getMonth() === endsAt.getMonth() && startsAt.getDate() === endsAt.getDate();
+  const sameDay = isSameDay(startsAt, endsAt);
   const end = sameDay ? minutesOfDay(endsAt) : 24 * 60;
   return [start, Math.max(end, start + Math.max(minDuration, 15))];
 }
@@ -95,7 +97,7 @@ export function moveSlot(from: { col: number; row: number }, key: string, size: 
 
 /** Das Zeitfenster, das der Tab-Stopp des Rasters zuerst bekommt: das jetzige, wenn heute im Raster liegt, sonst das erste des ersten Tages. */
 export function initialSlot(opts: { days: Date[]; now: Date; startMin: number; slotMinutes: number; rows: number }): { col: number; row: number } {
-  const col = opts.days.findIndex((d) => d.getFullYear() === opts.now.getFullYear() && d.getMonth() === opts.now.getMonth() && d.getDate() === opts.now.getDate());
+  const col = opts.days.findIndex((d) => isSameDay(d, opts.now));
   if (col < 0) return { col: 0, row: 0 };
   const row = Math.floor((minutesOfDay(opts.now) - opts.startMin) / opts.slotMinutes);
   return { col, row: Math.min(Math.max(row, 0), Math.max(opts.rows - 1, 0)) };

@@ -1,3 +1,4 @@
+import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { logError } from "@/lib/log-safe";
@@ -9,7 +10,6 @@ import { defineOperation, fail, failField, mapPrismaError } from "@/server/opera
 import { storeFile } from "@/server/files";
 import { removeInvoiceFile, syncInvoiceFile } from "./files";
 
-const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 /** Die Felder einer Rechnung, wie Formular und CSV-Import sie kennen (ohne Kennung, Version, Beleg und Kunden-Verknüpfung). */
 const invoiceShape = {

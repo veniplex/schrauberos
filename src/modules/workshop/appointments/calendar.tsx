@@ -1,7 +1,6 @@
 import clsx from "clsx";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { addDays, getISOWeek, isSameDay, startOfDay, startOfWeek } from "date-fns";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { STATUS_TONE } from "./status-tone";
 import { Card, EmptyState, Plate, StatusBadge } from "@/components/ui/layout";
@@ -12,6 +11,7 @@ import { isHexColor } from "@/lib/color";
 import { toDateInput } from "@/lib/dates";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { weekdayKey, type OpeningHours } from "@/lib/opening-hours";
+import { addDays, getDate, getHours, getISOWeek, getMinutes, instantOf, isSameDay, minutesOfDay, startOfDay, startOfWeek, wallOf } from "@/lib/zone";
 import type { AppointmentRow } from "./queries";
 import { assignLanes, eventSpan, eventSurface, initialSlot } from "./calendar-layout";
 import { quickStatusOptions } from "./domain";
@@ -193,8 +193,8 @@ function visibleHours(ctx: Ctx, events: AppointmentRow[]) {
   let start = ctx.dayStartHour;
   let end = ctx.dayEndHour;
   for (const a of events) {
-    start = Math.min(start, a.startsAt.getHours());
-    end = Math.max(end, a.endsAt.getHours() + (a.endsAt.getMinutes() > 0 ? 1 : 0));
+    start = Math.min(start, getHours(a.startsAt));
+    end = Math.max(end, getHours(a.endsAt) + (getMinutes(a.endsAt) > 0 ? 1 : 0));
   }
   return { startHour: Math.max(0, start), endHour: Math.min(24, Math.max(end, start + 1)) };
 }
@@ -205,7 +205,7 @@ function TimeColumn({ ctx, startHour, endHour }: { ctx: Ctx; startHour: number; 
     <div className="sticky left-0 z-20 w-12 shrink-0 bg-surface" style={{ height: px((endHour - startHour) * 60) }} aria-hidden>
       {hours.map((h, i) => (
         <span key={h} className="absolute right-2 -translate-y-1/2 text-xs tabular text-ink-muted" style={{ top: px(i * 60) }}>
-          {i === 0 ? "" : ctx.i18n.date(new Date(2000, 0, 1, h), { hour: "2-digit", minute: "2-digit" })}
+          {i === 0 ? "" : ctx.i18n.date(instantOf(2000, 1, 1, h), { hour: "2-digit", minute: "2-digit" })}
         </span>
       ))}
     </div>
@@ -223,7 +223,7 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
     const [s, e] = eventSpan(a.startsAt, a.endsAt, ctx.slotMinutes);
     return [Math.max(s, startMin), e];
   });
-  const nowMin = ctx.now.getHours() * 60 + ctx.now.getMinutes();
+  const nowMin = minutesOfDay(ctx.now);
   const today = isSameDay(column.day, ctx.now);
 
   return (
@@ -246,9 +246,11 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
 
       {ctx.canCreate
         ? Array.from({ length: slots }, (_, i) => {
-            const at = new Date(column.day);
-            at.setHours(0, startMin + i * ctx.slotMinutes, 0, 0);
-            const params: Record<string, string> = { new: "1", at: `${toDateInput(at)}T${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}` };
+            // Wandzeit des Rasterfensters in der Zone der Werkstatt (Tag der Spalte + Minuten ab Mitternacht)
+            const minutes = startMin + i * ctx.slotMinutes;
+            const dayWall = wallOf(column.day);
+            const at = instantOf(dayWall.year, dayWall.month, dayWall.day, 0, minutes);
+            const params: Record<string, string> = { new: "1", at: `${toDateInput(column.day)}T${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}` };
             if (column.bayId) params.bay = column.bayId;
             return (
               <Link
@@ -379,7 +381,7 @@ function WeekStrip({ ctx, week, view, counts }: { ctx: Ctx; week: Date[]; view: 
                 )}
               >
                 <span className="text-xs uppercase tracking-wide">{i18n.date(d, { weekday: "short" })}</span>
-                <span className="text-sm font-semibold tabular">{d.getDate()}</span>
+                <span className="text-sm font-semibold tabular">{getDate(d)}</span>
                 {counts ? (
                   <span className="text-xs tabular">
                     {count > 0 ? (
@@ -450,7 +452,7 @@ export function WeekView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
       head: (
         <Link href={calendarHref("day", d)} className="block min-h-(--tap-row) px-2 py-2 text-center hover:bg-surface-hover">
           <span className="block text-xs uppercase tracking-wide text-ink-muted">{ctx.i18n.date(d, { weekday: "short" })}</span>
-          <span className={clsx("mx-auto mt-0.5 grid size-7 place-items-center rounded-full text-sm font-semibold tabular", today && "bg-accent text-accent-ink")}>{d.getDate()}</span>
+          <span className={clsx("mx-auto mt-0.5 grid size-7 place-items-center rounded-full text-sm font-semibold tabular", today && "bg-accent text-accent-ink")}>{getDate(d)}</span>
           <span className="sr-only">, {ctx.i18n.t("appointments.views.day")}</span>
         </Link>
       ),

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
-import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, isSameDay, startOfDay } from "date-fns";
 import { CalendarPlus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Card, EmptyState, StatusBadge, Table, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,7 +8,8 @@ import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
-import { isCalendarDay, nowDate, parseMonthParam, todayInput } from "@/lib/dates";
+import { isCalendarDay, nowDate, parseMonthParam, toDateInput, todayInput } from "@/lib/dates";
+import { addMonths, eachDayOfInterval, endOfMonth, getDate, getDay, isSameDay, monthKeyOf, startOfDay } from "@/lib/zone";
 import { employeeName, workdaysBetween } from "@/modules/office/employees/domain";
 import { absencesOverlapping, activeEmployees } from "@/modules/office/employees/queries";
 import { requirePermission } from "@/server/auth/session";
@@ -45,7 +45,7 @@ export default async function AbsencesPage({
   const monthStart = parseMonthParam(sp.month);
   const monthEnd = endOfMonth(monthStart);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const monthKey = format(monthStart, "yyyy-MM");
+  const monthKey = monthKeyOf(monthStart);
   const base = `/employees/absences?month=${monthKey}`;
 
   const [employees, absences] = await Promise.all([
@@ -76,13 +76,13 @@ export default async function AbsencesPage({
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
-          <LinkButton size="icon" href={`/employees/absences?month=${format(addMonths(monthStart, -1), "yyyy-MM")}`} aria-label={t("common.previous")}>
+          <LinkButton size="icon" href={`/employees/absences?month=${monthKeyOf(addMonths(monthStart, -1))}`} aria-label={t("common.previous")}>
             <ChevronLeft className="size-4" aria-hidden />
           </LinkButton>
           <LinkButton href="/employees/absences">
             {t("common.today")}
           </LinkButton>
-          <LinkButton size="icon" href={`/employees/absences?month=${format(addMonths(monthStart, 1), "yyyy-MM")}`} aria-label={t("common.next")}>
+          <LinkButton size="icon" href={`/employees/absences?month=${monthKeyOf(addMonths(monthStart, 1))}`} aria-label={t("common.next")}>
             <ChevronRight className="size-4" aria-hidden />
           </LinkButton>
         </div>
@@ -124,7 +124,7 @@ export default async function AbsencesPage({
                     className={clsx("min-w-[max(1.75rem,var(--tap-row))] border-b border-l border-line px-0.5 py-1 text-center font-normal tabular", weekend ? "bg-surface-2 text-ink-muted" : "", isSameDay(d, today) && "font-bold text-accent-text")}
                   >
                     <span className="block text-xs uppercase">{date(d, { weekday: "narrow" })}</span>
-                    {d.getDate()}
+                    {getDate(d)}
                   </th>
                 );
               })}
@@ -150,7 +150,7 @@ export default async function AbsencesPage({
                     const weekend = getDay(d) === 0 || getDay(d) === 6;
                     const type = a ? a.type : null;
                     const label = type ? (type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)) : "";
-                    const key = format(d, "yyyy-MM-dd");
+                    const key = toDateInput(d);
                     return (
                       <td key={key} className={clsx("h-7 border-b border-l border-line p-0.5", weekend && "bg-surface-2")}>
                         {type ? (

@@ -1,3 +1,4 @@
+import { endOfDayIn, startOfDayIn } from "@/lib/dates";
 import { findCustomerIdsByNumber, numberKey } from "@/modules/workshop/customers/public";
 import type { AppSession } from "@/server/auth/session";
 import { columnSpecs } from "@/server/csv/columns";
@@ -18,8 +19,8 @@ const mayUseCustomer = (session: AppSession) => session.features.has("workshop.c
 const columnsFor = (session: AppSession) => (mayUseCustomer(session) ? INVOICE_COLUMNS : INVOICE_COLUMNS.filter((c) => c.key !== "customerNumber"));
 
 const isDay = (value: string | null): value is string => !!value && /^\d{4}-\d{2}-\d{2}$/.test(value) && parseDay(value) === value;
-const startOf = (day: string) => new Date(`${day}T00:00:00`);
-const endOf = (day: string) => new Date(`${day}T23:59:59.999`);
+const startOf = (day: string) => startOfDayIn(day);
+const endOf = (day: string) => endOfDayIn(day);
 
 /**
  * Export des Rechnungsarchivs (`invoices.export` und `invoices.view`) mit allen Feldern des Formulars – ohne Belege. Auswahl: `direction=incoming|outgoing` (sonst beide),

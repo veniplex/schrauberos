@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { backoffDelay, nextRun, validateSchedule } from "@/lib/jobs/schedule";
+import { workshopZone } from "@/lib/zone";
 import { describeError, logError, stripControl } from "@/lib/log-safe";
 import { FEATURES, MODULES } from "@/modules/catalog";
 import { effectiveFeatureIds } from "@/modules/catalog-logic";
@@ -65,7 +66,6 @@ export async function activeFeatureSet(db: Pick<PrismaClient, "featureSetting"> 
   return effectiveFeatureIds(MODULES, FEATURES, Object.fromEntries(rows.map((r) => [r.key, r.enabled])));
 }
 
-const processZone = () => process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 const MESSAGE_MAX = 300;
 const LOCK_GRACE_MS = 60_000;
 
@@ -74,7 +74,7 @@ type Flight = { startedAt: number; timeoutMs: number };
 export function createJobRunner(options: RunnerOptions) {
   const db = options.db ?? appDb;
   const now = options.now ?? (() => new Date());
-  const timeZone = options.timeZone ?? processZone;
+  const timeZone = options.timeZone ?? workshopZone;
   const processId = randomBytes(6).toString("hex");
   /** Laufende Jobs dieses Prozesses (bis die Funktion wirklich zurückkehrt – auch nach Zeitüberschreitung) */
   const inFlight = new Map<string, Flight>();

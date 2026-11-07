@@ -1,4 +1,4 @@
-import { isCalendarDay } from "@/lib/dates";
+import { dayKey, isCalendarDay } from "@/lib/zone";
 import { parseMoneyToCents } from "@/lib/money";
 
 /**
@@ -39,10 +39,9 @@ export function formatDecimal(value: number, format: CsvFormat): string {
   return String(value).replace(".", format.decimal);
 }
 
-/** Kalendertag (lokale Mitternacht oder Mittag, wie die Anwendung ihn speichert) → `JJJJ-MM-TT`. */
+/** Kalendertag (in der Zeitzone der Werkstatt, wie die Anwendung ihn speichert) → `JJJJ-MM-TT`. */
 export function formatDay(date: Date): string {
-  const y = String(date.getFullYear()).padStart(4, "0");
-  return `${y}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return dayKey(date);
 }
 
 /** `JJJJ-MM-TT` oder `TT.MM.JJJJ` (auch `T.M.JJJJ`) → `JJJJ-MM-TT`, sonst `null`; ungültige Tage (30. Februar) sind `null`. */

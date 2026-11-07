@@ -1,4 +1,4 @@
-import { addDays } from "date-fns";
+import { addDays } from "@/lib/zone";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { atDay, noonOf } from "@/lib/seed-days";
 import type { SeedDef } from "@/modules/types";

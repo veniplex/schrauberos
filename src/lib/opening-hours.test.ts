@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { withWorkshopZone } from "@/test/zone";
+import { noon } from "./zone";
 import { DEFAULT_OPENING_HOURS, isValidTime, parseOpeningHours, weekdayKey } from "./opening-hours";
 
 /** Öffnungszeiten (als JSON in den Werkstatt-Einstellungen): defensiv gelesen, Wochentage aus Datum. */
@@ -37,6 +39,13 @@ describe("isValidTime", () => {
 describe("weekdayKey", () => {
   it("Montag bis Sonntag (die Woche beginnt am Montag)", () => {
     const expected = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-    for (let i = 0; i < 7; i++) assert.equal(weekdayKey(new Date(2026, 10, 2 + i)), expected[i]); // 2. November 2026 ist ein Montag
+    for (let i = 0; i < 7; i++) assert.equal(weekdayKey(noon(`2026-11-0${2 + i}`, "Europe/Berlin"), "Europe/Berlin"), expected[i]); // 2. November 2026 ist ein Montag
   });
+
+  it("der Wochentag zählt in der Zone der Werkstatt, nicht in der des Prozesses", () =>
+    withWorkshopZone("Europe/Berlin", () => {
+      const lateSaturdayUtc = new Date("2030-06-01T22:30:00Z"); // Samstag in UTC, in Berlin schon Sonntag 00:30
+      assert.equal(weekdayKey(lateSaturdayUtc), "sun");
+      assert.equal(weekdayKey(lateSaturdayUtc, "UTC"), "sat");
+    }));
 });

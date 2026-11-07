@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Absence, Employee, Qualification } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
+import { endOfDayIn, startOfDayIn } from "@/lib/dates";
 import { dateOnly, dayOrNull, iso, nullableString, oneOf, optionalDate, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
@@ -178,8 +179,8 @@ export const absenceEndpoints = defineResource({
       type: type ?? { not: "sick" },
       ...(employeeId ? { employeeId } : {}),
       // Überschneidung mit dem Zeitraum
-      ...(from ? { endDate: { gte: new Date(`${from}T00:00:00`) } } : {}),
-      ...(to ? { startDate: { lte: new Date(`${to}T23:59:59`) } } : {}),
+      ...(from ? { endDate: { gte: startOfDayIn(from) } } : {}),
+      ...(to ? { startDate: { lte: endOfDayIn(to) } } : {}),
     }),
     sorts: { startDate: (dir) => ({ startDate: dir }), endDate: (dir) => ({ endDate: dir }), createdAt: (dir) => ({ createdAt: dir }) },
     defaultSort: [{ key: "startDate", dir: "desc" }],

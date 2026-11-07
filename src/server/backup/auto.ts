@@ -1,16 +1,15 @@
 import "server-only";
 import { logError } from "@/lib/log-safe";
+import { getHours, isSameDay } from "@/lib/zone";
 import { audit } from "@/server/audit";
 import { cleanupBackupTemp, createBackup, listBackups, pruneBackups } from "./core";
 import { getBackupSettings } from "./settings";
-
-const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 export type AutoBackupResult = { name: string; pruned: number; pruneFailed: boolean };
 
 /**
  * Legt eine automatische Sicherung an, wenn die Uhrzeit erreicht und heute noch keine erstellt wurde (Job `backup.auto`, prüft alle 10 Minuten; „heute“ ist der
- * Kalendertag der Werkstatt-Zeitzone, die die App als Prozess-Zeitzone setzt). Mit `force` („Jetzt ausführen“) gelten Uhrzeit und „heute schon“ nicht (ausgeschaltet bleibt
+ * Kalendertag und die Uhrzeit der Werkstatt-Zone, `workshopZone()`). Mit `force` („Jetzt ausführen“) gelten Uhrzeit und „heute schon“ nicht (ausgeschaltet bleibt
  * ausgeschaltet). Scheitert das Anlegen, wirft die Funktion: Der Runner wiederholt mit wachsender Wartezeit und zeigt den Fehler an.
  *
  * Reihenfolge: Backup anlegen → **Audit** (`backup.create`) → Aufbewahrung. Scheitert die Aufbewahrung, ist das Backup trotzdem da und protokolliert; der Fehler wird
@@ -21,8 +20,8 @@ export async function runAutoBackup(now = new Date(), options: { force?: boolean
   const settings = await getBackupSettings();
   if (!settings.enabled) return null;
   if (!options.force) {
-    if (now.getHours() < settings.hour) return null;
-    if ((await listBackups()).some((b) => b.kind === "auto" && sameDay(b.createdAt, now))) return null;
+    if (getHours(now) < settings.hour) return null;
+    if ((await listBackups()).some((b) => b.kind === "auto" && isSameDay(b.createdAt, now))) return null;
   }
   const info = await createBackup("auto");
   // Das Backup ist da: scheitert nur das Protokollieren, bleibt der Lauf ein Erfolg (sonst käme beim Wiederholen ein zweites Backup)

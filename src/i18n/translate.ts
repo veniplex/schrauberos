@@ -38,24 +38,27 @@ function lookup(messages: Messages, key: string): string | undefined {
 }
 
 /**
- * Platzhalter `{name}`; `{name|time}` formatiert einen Zeitpunkt (ISO-Text, Date-Zahl) als Uhrzeit der Sprache (de „14:30“, en „2:30 PM“) in der Zeitzone des Prozesses.
+ * Platzhalter `{name}`; `{name|time}` formatiert einen Zeitpunkt (ISO-Text, Date-Zahl) als Uhrzeit der Sprache (de „14:30“, en „2:30 PM“) in der Zeitzone der Werkstatt (`timeZone`; ohne Angabe die des Prozesses).
  * So bleiben Operationen sprachneutral: Sie geben den Zeitpunkt weiter, nicht schon einen formatierten Text.
  */
-function interpolate(template: string, vars: Vars | undefined, intl: string): string {
+function interpolate(template: string, vars: Vars | undefined, intl: string, timeZone?: string): string {
   if (!vars) return template;
   return template.replace(/\{(\w+)(?:\|(time))?\}/g, (match, name: string, format?: string) => {
     if (!(name in vars)) return `{${name}}`;
     if (format === "time") {
       const at = new Date(vars[name]);
-      return Number.isNaN(at.getTime()) ? String(vars[name]) : new Intl.DateTimeFormat(intl, { timeStyle: "short" }).format(at);
+      return Number.isNaN(at.getTime()) ? String(vars[name]) : new Intl.DateTimeFormat(intl, { timeStyle: "short", timeZone }).format(at);
     }
     return String(vars[name]);
   });
 }
 
-export function createTranslator(locale: Locale, messages: Messages): Translator {
+/**
+ * `timeZone`: Zone, in der Zeitpunkte angezeigt werden (auf dem Server die der Werkstatt, siehe `getI18n`); ohne Angabe die des Prozesses bzw. des Browsers.
+ */
+export function createTranslator(locale: Locale, messages: Messages, timeZone?: string): Translator {
   const intl = INTL_LOCALE[locale];
-  const t = (key: string, vars?: Vars) => interpolate(lookup(messages, key) ?? key, vars, intl);
+  const t = (key: string, vars?: Vars) => interpolate(lookup(messages, key) ?? key, vars, intl, timeZone);
   return {
     locale,
     t: t as Translator["t"],
@@ -65,7 +68,7 @@ export function createTranslator(locale: Locale, messages: Messages): Translator
     }) as Translator["tp"],
     has: (key) => lookup(messages, key) !== undefined,
     td: (key, fallback) => lookup(messages, key) ?? fallback ?? key,
-    date: (d, opts = { dateStyle: "medium" }) => new Intl.DateTimeFormat(intl, opts).format(new Date(d)),
+    date: (d, opts = { dateStyle: "medium" }) => new Intl.DateTimeFormat(intl, { timeZone, ...opts }).format(new Date(d)),
     number: (n, opts) => new Intl.NumberFormat(intl, opts).format(n),
   };
 }

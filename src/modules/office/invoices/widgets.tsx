@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
-import { startOfDay } from "date-fns";
+import { startOfDay } from "@/lib/zone";
 import type { InvoiceTotals } from "@/modules/office/invoices/domain";
 import { invoiceSums } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";

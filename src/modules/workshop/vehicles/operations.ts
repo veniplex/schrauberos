@@ -1,3 +1,4 @@
+import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
@@ -7,7 +8,6 @@ import { parseMonthInput } from "@/lib/month";
 import { defineOperation, fail, failField, failFields } from "@/server/operations";
 import { EXTRA_INSPECTION_KINDS, FUEL_TYPES, HSN_PATTERN, TSN_PATTERN, normalizeKey, parseMileage } from "./domain";
 
-const noon = (day: string) => new Date(`${day}T12:00:00`);
 /** Häkchen und Knopf des Formulars („1“, „on“) und Wahrheitswerte der API; fehlt der Wert, gilt `false`. */
 const flag = z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean());
 
@@ -139,7 +139,7 @@ export const transferVehicleOperation = defineOperation({
     if (newId === vehicle.customerId) failField("newCustomerId", "vehicles.errors.sameOwner");
     if (newId && !(await tx.customer.findUnique({ where: { id: newId }, select: { id: true } }))) failField("newCustomerId", "validation.invalid");
 
-    const when = new Date(`${d.date}T12:00:00`);
+    const when = noon(d.date);
     await tx.vehicleOwnership.updateMany({ where: { vehicleId: vehicle.id, toDate: null }, data: { toDate: when } });
     if (newId) await tx.vehicleOwnership.create({ data: { vehicleId: vehicle.id, customerId: newId, fromDate: when, note: d.note ?? null } });
     await tx.vehicle.update({ where: { id: vehicle.id }, data: { customerId: newId } });

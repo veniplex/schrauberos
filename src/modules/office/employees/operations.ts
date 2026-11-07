@@ -1,3 +1,4 @@
+import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
@@ -6,7 +7,6 @@ import { writeAudit } from "@/server/audit";
 import { defineOperation, fail, failField } from "@/server/operations";
 
 const date = dateText().optional();
-const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 /* ───────────── Mitarbeiter ───────────── */
 

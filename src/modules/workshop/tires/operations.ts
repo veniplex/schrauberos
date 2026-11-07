@@ -1,3 +1,4 @@
+import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
@@ -55,7 +56,7 @@ export function tireSetRecord(d: TireSetInput, vehicleId: string) {
     speedIndex: d.speedIndex ?? null,
     rimType: d.rimType,
     storageLocation: d.storageLocation ?? null,
-    ...(d.storedAt ? { storedAt: new Date(`${d.storedAt}T12:00:00`) } : {}),
+    ...(d.storedAt ? { storedAt: noon(d.storedAt) } : {}),
     notes: d.notes ?? null,
   };
 }

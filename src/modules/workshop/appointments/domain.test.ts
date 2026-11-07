@@ -1,3 +1,4 @@
+import { resetWorkshopZone, setWorkshopZone } from "@/lib/zone";
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { APPOINTMENT_STATUSES } from "./constants";
@@ -95,10 +96,13 @@ describe("findBayClash", () => {
 
 describe("Zeitumstellung (Europe/Berlin)", () => {
   const before0 = process.env.TZ;
+  // wie im Betrieb (`applyTimezone`): die Werkstatt-Zone ist gesetzt, `TZ` spiegelt sie nur
   before(() => {
     process.env.TZ = "Europe/Berlin";
+    setWorkshopZone("Europe/Berlin");
   });
   after(() => {
+    resetWorkshopZone();
     if (before0 === undefined) delete process.env.TZ;
     else process.env.TZ = before0;
   });

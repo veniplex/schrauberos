@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Invoice, InvoiceFile } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
+import { endOfDayIn, startOfDayIn } from "@/lib/dates";
 import { centsText, dateOnly, day, dayOrNull, iso, nullableString, oneOf } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
@@ -113,7 +114,7 @@ export const endpoints = defineResource({
       ...(direction ? { direction } : {}),
       ...(status ? { status } : {}),
       ...(customerId ? { customerId } : {}),
-      ...(issuedFrom || issuedTo ? { issueDate: { ...(issuedFrom ? { gte: new Date(`${issuedFrom}T00:00:00`) } : {}), ...(issuedTo ? { lte: new Date(`${issuedTo}T23:59:59`) } : {}) } } : {}),
+      ...(issuedFrom || issuedTo ? { issueDate: { ...(issuedFrom ? { gte: startOfDayIn(issuedFrom) } : {}), ...(issuedTo ? { lte: endOfDayIn(issuedTo) } : {}) } } : {}),
       ...(q ? { OR: [{ number: contains(q) }, { partyName: contains(q) }, { reference: contains(q) }, { category: contains(q) }] } : {}),
     }),
     sorts: {

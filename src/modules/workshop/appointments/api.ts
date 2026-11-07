@@ -1,8 +1,8 @@
-import { addDays } from "date-fns";
 import { z } from "zod";
 import type { Appointment, AppointmentType, Bay } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
 import { parseLocalDateTime, toDateInput, toTimeInput } from "@/lib/dates";
+import { addDays } from "@/lib/zone";
 import { dateOnly, iso, nullableString, optionalRef } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";

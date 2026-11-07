@@ -1,3 +1,4 @@
+import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
@@ -47,8 +48,8 @@ export const saveDeviceOperation = defineOperation({
       rackInfo: d.rackInfo ?? null,
       portCount: d.portCount ?? null,
       assignedTo: d.assignedTo ?? null,
-      purchaseDate: purchaseDate ? new Date(`${purchaseDate}T12:00:00`) : null,
-      warrantyUntil: warrantyUntil ? new Date(`${warrantyUntil}T12:00:00`) : null,
+      purchaseDate: purchaseDate ? noon(purchaseDate) : null,
+      warrantyUntil: warrantyUntil ? noon(warrantyUntil) : null,
       monitorEnabled: d.monitorEnabled,
       notes: d.notes ?? null,
     };

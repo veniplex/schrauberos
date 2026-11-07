@@ -3,6 +3,8 @@
  * (`"2026-09" < "2026-11"`), in der Datenbank genügt deshalb eine Textspalte.
  */
 
+import { instantOf, monthKeyOf, workshopZone } from "./zone";
+
 /** „JJJJ-MM“ mit Monat 01–12 */
 export const MONTH_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
@@ -11,8 +13,8 @@ export const isMonth = (value: string): boolean => {
   return !!m && Number(m[1]) >= 1950 && Number(m[1]) <= 2100;
 };
 
-/** Monat einer Zeit als „JJJJ-MM“ (Ortszeit, wie das Datum der Anwendung). */
-export const monthOf = (date: Date): string => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+/** Monat einer Zeit als „JJJJ-MM“ in der Zeitzone der Werkstatt (wie das Datum der Anwendung). */
+export const monthOf = (date: Date, timeZone: string = workshopZone()): string => monthKeyOf(date, timeZone);
 
 /** Monat plus `n` Monate (auch negativ) als „JJJJ-MM“. */
 export function addMonths(month: string, n: number): string {
@@ -43,9 +45,9 @@ export function parseMonthInput(text: string): string | null {
   return isMonth(month) ? month : null;
 }
 
-/** Erster Tag des Monats (Ortszeit, 12 Uhr – ohne Zeitzonen-Sprünge) zum Formatieren mit `Intl` („November 2026“). */
-export function monthStart(month: string): Date {
+/** Erster Tag des Monats (12 Uhr der Werkstatt-Zone – ohne Zeitzonen-Sprünge) zum Formatieren mit `Intl` („November 2026“). */
+export function monthStart(month: string, timeZone: string = workshopZone()): Date {
   const m = MONTH_PATTERN.exec(month);
   if (!m) throw new Error(`Kein Monat: ${month}`);
-  return new Date(Number(m[1]), Number(m[2]) - 1, 1, 12);
+  return instantOf(Number(m[1]), Number(m[2]), 1, 12, 0, 0, 0, timeZone);
 }

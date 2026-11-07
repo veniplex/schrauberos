@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { addDays, startOfDay } from "date-fns";
 import { Badge, Card, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { DUE_TONE, dueState } from "@/lib/due";
+import { addDays, startOfDay } from "@/lib/zone";
 import { employeeName } from "@/modules/office/employees/domain";
 import { absencesAround, expiringQualifications } from "@/modules/office/employees/queries";
 import { getSession } from "@/server/auth/session";

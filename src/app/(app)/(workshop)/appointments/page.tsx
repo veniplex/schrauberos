@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { addDays, startOfWeek } from "date-fns";
 import { Settings } from "lucide-react";
 import { LinkButton } from "@/components/ui/buttons";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { parseDateParam, toDateInput } from "@/lib/dates";
+import { addDays, startOfWeek } from "@/lib/zone";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { getWorkshop } from "@/server/workshop";

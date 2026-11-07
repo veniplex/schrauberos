@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { addDays, startOfDay } from "date-fns";
 import { Card, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { getSession } from "@/server/auth/session";
@@ -9,6 +8,7 @@ import { AppointmentQuickStatus } from "./appointment-quick-status";
 import { appointmentOpenParams, calendarHref } from "./calendar";
 import { appointmentsBetween } from "./queries";
 import { STATUS_TONE } from "./status-tone";
+import { addDays, startOfDay } from "@/lib/zone";
 import type { WidgetDef } from "@/modules/types";
 
 /** Alle Termine des heutigen Tages – jede Zeile führt zum Termin, „Starten“/„Fertig“ gehen direkt von hier. */

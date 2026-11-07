@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
+import { noon } from "@/lib/zone";
 import type { SeedDef } from "@/modules/types";
 
 /** Beispiel-Netzwerk: Standorte, VLANs, Subnetze, Geräte mit Adressen und Verkabelung. */
@@ -22,7 +23,7 @@ async function demo(db: PrismaClient) {
   const sMgmt = await subnet("Management", "192.168.99.0/24", 99, { gateway: "192.168.99.1", description: "Switches, Access Points, Firewall." });
   const sn = { 10: sBuero, 20: sWerk, 30: sGast, 99: sMgmt } as const;
 
-  const day = (d: string) => new Date(`${d}T12:00:00`);
+  const day = (d: string) => noon(d);
   type Extra = Partial<{ manufacturer: string; model: string; serialNumber: string; rackInfo: string; portCount: number; assignedTo: string; warrantyUntil: string; purchaseDate: string; monitor: boolean; notes: string }>;
   const dev = async (name: string, type: string, location: string, extra: Extra = {}, ips: Array<[10 | 20 | 30 | 99, string, string?, string?]> = []) => {
     const { warrantyUntil, purchaseDate, monitor, ...rest } = extra;

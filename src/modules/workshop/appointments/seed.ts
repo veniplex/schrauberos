@@ -1,6 +1,6 @@
-import { addDays, setHours, setMinutes, startOfDay, startOfWeek } from "date-fns";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { normalizePlate } from "@/lib/plate";
+import { addDaysToKey, dayKey, getDay, instantOf, startOfWeek } from "@/lib/zone";
 import type { SeedDef } from "@/modules/types";
 
 /** Basisdaten: Einstellungszeile, Arbeitsplätze und Terminarten einer frischen Installation. */
@@ -33,9 +33,13 @@ async function demo(db: PrismaClient) {
   const types = await db.appointmentType.findMany();
   const bays = await db.bay.findMany({ orderBy: { sortOrder: "asc" } });
   const type = (name: string) => types.find((t) => t.name === name);
-  const monday = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const at = (dayOffset: number, h: number, m = 0) => setMinutes(setHours(startOfDay(addDays(monday, dayOffset)), h), m);
-  const today = (new Date().getDay() + 6) % 7;
+  // Wochentage in der Zeitzone der Werkstatt (nicht der des Prozesses)
+  const mondayKey = dayKey(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const at = (dayOffset: number, h: number, m = 0) => {
+    const [y, mo, d] = addDaysToKey(mondayKey, dayOffset).split("-").map(Number);
+    return instantOf(y, mo, d, h, m);
+  };
+  const today = (getDay(new Date()) + 6) % 7;
 
   const appts = [
     { day: today, h: 8, m: 0, min: 90, type: "Inspektion", bay: 0, plate: "B-AB 1234", status: "in_progress" },

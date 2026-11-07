@@ -1,4 +1,4 @@
-import { startOfDay } from "date-fns";
+import { dayKey, startOfDay } from "@/lib/zone";
 import { safeName } from "@/lib/filename";
 
 export const INVOICE_DIRECTIONS = ["incoming", "outgoing"] as const;
@@ -56,7 +56,8 @@ const FILE_EXTENSIONS: Record<string, string> = { "application/pdf": "pdf", "ima
  * `rechnungen/<Jahr>/<eingang|ausgang>/<Rechnungsdatum>_<Geschäftspartner>_<Nummer>.<Endung>`.
  */
 export function invoiceFileLocation(inv: { direction: string; issueDate: Date; number: string; partyName: string }, mime: string): { dir: string; name: string } {
-  const day = inv.issueDate.toISOString().slice(0, 10);
+  // Das Rechnungsdatum ist ein Kalendertag der Werkstatt-Zone (gespeichert um 12 Uhr), nicht der UTC-Tag des Zeitpunkts
+  const day = dayKey(inv.issueDate);
   return {
     dir: `rechnungen/${day.slice(0, 4)}/${inv.direction === "incoming" ? "eingang" : "ausgang"}`,
     name: `${day}_${safeName(inv.partyName, 40)}_${safeName(inv.number, 40)}.${FILE_EXTENSIONS[mime] ?? "bin"}`,

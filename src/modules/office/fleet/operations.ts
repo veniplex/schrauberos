@@ -1,3 +1,4 @@
+import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { dateText, moneyCents } from "@/lib/zod-fields";
@@ -10,7 +11,6 @@ import type { Tx } from "@/server/operations";
 const flag = z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean());
 const dateOpt = dateText().optional();
 const dateReq = dateText();
-const noon = (d: string) => new Date(`${d}T12:00:00`);
 
 /** Das Dienstfahrzeug laden (Verweise aus dem Formular nie ungeprüft verwenden); sonst Feldfehler. */
 async function requireFleetVehicle(tx: Tx, id: string, field: string): Promise<{ id: string; plate: string }> {

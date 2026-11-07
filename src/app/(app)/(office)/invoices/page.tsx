@@ -11,7 +11,7 @@ import { TabNav } from "@/components/ui/tab-nav";
 import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
-import { currentYear, nowDate } from "@/lib/dates";
+import { currentYear, startOfDayIn, todayInput } from "@/lib/dates";
 import { clampPage, listHref, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { INVOICE_DIRECTIONS, paymentState, type InvoiceDirection } from "@/modules/office/invoices/domain";
 import { invoiceSums, invoiceYears } from "@/modules/office/invoices/queries";
@@ -45,11 +45,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const state = (STATES as readonly string[]).includes(sp.status ?? "") ? sp.status! : "";
   const thisYear = currentYear();
   const year = /^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : sp.year === "all" ? 0 : thisYear;
-  const today = nowDate();
-  today.setHours(0, 0, 0, 0);
+  const today = startOfDayIn(todayInput());
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT, dirParam: ORDER_PARAM });
 
-  const yearRange = year ? { issueDate: { gte: new Date(year, 0, 1), lt: new Date(year + 1, 0, 1) } } : {};
+  const yearRange = year ? { issueDate: { gte: startOfDayIn(`${year}-01-01`), lt: startOfDayIn(`${year + 1}-01-01`) } } : {};
   const text = searchWhere<Prisma.InvoiceWhereInput>(q, session.can, [
     { where: (term) => ({ number: contains(term) }) },
     { where: (term) => ({ partyName: contains(term) }) },

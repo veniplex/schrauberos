@@ -1,3 +1,4 @@
+import { resetWorkshopZone, setWorkshopZone } from "@/lib/zone";
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { isCalendarDay } from "@/lib/dates";
@@ -188,10 +189,13 @@ describe("Formular-Aktionen: dieselbe Prüfung in den Operationen (Zod-Eingabe d
 
 describe("Termin-Filter über die Sommerzeitumstellung (TZ=Europe/Berlin)", () => {
   const before0 = process.env.TZ;
+  // wie im Betrieb (`applyTimezone`): die Werkstatt-Zone ist gesetzt, `TZ` spiegelt sie nur
   before(() => {
     process.env.TZ = "Europe/Berlin";
+    setWorkshopZone("Europe/Berlin");
   });
   after(() => {
+    resetWorkshopZone();
     if (before0 === undefined) delete process.env.TZ;
     else process.env.TZ = before0;
   });
