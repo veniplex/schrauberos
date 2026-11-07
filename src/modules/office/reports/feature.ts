@@ -12,7 +12,7 @@ export const reportsFeature = defineFeature({
   descriptionKey: "reports.feature.description",
   order: 32,
   defaultEnabled: false,
-  uses: ["office.invoices", "office.billing", "workshop.appointments", "workshop.tires", "workshop.vehicles", "office.fleet", "workshop.customers"],
+  uses: ["office.invoices", "workshop.appointments", "workshop.tires", "workshop.vehicles", "office.fleet"],
   permissions: {
     group: "reports",
     keys: ["reports.view", "reports.export"],

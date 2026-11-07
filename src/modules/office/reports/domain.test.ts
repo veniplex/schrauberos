@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createHolidayCalendar, NO_HOLIDAYS } from "@/lib/holidays";
 import { DEFAULT_OPENING_HOURS, type OpeningHours } from "@/lib/opening-hours";
-import { ageBucketOf, ageBucketRange, AGE_BUCKETS } from "@/modules/office/invoices/domain";
+import { ageBucketOf, ageBucketRange, AGE_BUCKETS } from "@/modules/office/invoices/domain"; // reine Funktionen, ohne server-only: die public.ts zieht die Datenbank mit
 import { daysOf, lastDayOfMonth, monthKeys, nextMonth, openingIntervals, overlapMinutes, parsePeriod, parseRevenuePeriod, snapToMonths, totalMinutes, utilizationPercent } from "./domain";
 
 /** Rechenregeln der Berichte gegen handgerechnete Fälle: Zeiträume und Monate, Altersstufen offener Posten, Öffnungszeiten (Feiertage, Sommerzeit-Umstellung), Überschneidung, Auslastung. */
