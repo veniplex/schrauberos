@@ -11,6 +11,7 @@ import { customersFeature } from "./workshop/customers/feature";
 import { vehiclesFeature } from "./workshop/vehicles/feature";
 import { invoicesFeature } from "./office/invoices/feature";
 import { employeesFeature } from "./office/employees/feature";
+import { timeFeature } from "./office/time/feature";
 import { fleetFeature } from "./office/fleet/feature";
 import { networkFeature } from "./it/network/feature";
 import { itDocsFeature } from "./it/docs/feature";
@@ -43,6 +44,7 @@ export const FEATURES = [
   vehiclesFeature,
   invoicesFeature,
   employeesFeature,
+  timeFeature,
   fleetFeature,
   networkFeature,
   itDocsFeature,

@@ -65,6 +65,13 @@ export const permissionHintsDe = {
     delete: "Mitarbeiter endgültig löschen.",
     sensitive: "Notfallkontakt und die Art von Abwesenheiten (Krankheit) sehen und ändern.",
   },
+  time: {
+    view: "Die eigenen Zeiten ansehen: Stempel, Einträge, Wochenübersicht mit Ist, Soll und Saldo.",
+    stamp: "Kommen und Gehen stempeln, einen Auftrag starten und beenden.",
+    correct: "Eigene Zeiten korrigieren, stornieren oder nachtragen – immer mit Begründung im Korrekturverlauf.",
+    viewAll: "Zeiten aller Mitarbeiter ansehen (Team-Übersicht). Personenbezogen, wird nie automatisch vergeben.",
+    correctAll: "Zeiten aller Mitarbeiter korrigieren, stornieren und nachtragen (zusätzlich zu „korrigieren“). Wird nie automatisch vergeben.",
+  },
   fleet: {
     view: "Firmenfahrzeuge, Fristen und Kosten ansehen.",
     edit: "Firmenfahrzeuge, Fristen und Kosten eintragen und ändern.",

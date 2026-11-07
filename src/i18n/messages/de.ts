@@ -7,6 +7,7 @@ import { appointmentsDe } from "./modules/appointments.de";
 import { tiresDe } from "./modules/tires.de";
 import { ordersDe } from "./modules/orders.de";
 import { partsDe } from "./modules/parts.de";
+import { timeDe } from "./modules/time.de";
 import { customersDe } from "./modules/customers.de";
 import { exchangeDe } from "./modules/exchange.de";
 import { usersDe } from "./modules/users.de";
@@ -176,6 +177,7 @@ export const de = {
     invoices: "Rechnungsarchiv",
     employees: "Mitarbeiter",
     absences: "Abwesenheiten",
+    time: "Zeiterfassung",
     fleet: "Fuhrpark",
     docsIt: "IT-Dokumentation",
     handbook: "Handbuch",
@@ -217,6 +219,7 @@ export const de = {
     presets: {
       basic: { name: "Basis", description: "Termine, Reifenlager, Kunden, Fahrzeuge, Rechnungsarchiv, Mitarbeiter, Fuhrpark, Handbuch und IT-Dokumentation." },
       orders: { name: "Mit Aufträgen und Lager", description: "Zusätzlich Werkstattaufträge (Arbeitskarten) und Teile & Lager für den Werkstattalltag." },
+      daily: { name: "Werkstattalltag", description: "Aufträge, Teile & Lager und Zeiterfassung (Stempeln, Arbeitszeiten, Wochenübersicht)." },
     },
     demo: "Mit Beispieldaten starten",
     demoHint: "Legt Beispiel-Kunden, -Fahrzeuge, -Termine usw. zum Ausprobieren an (nur sinnvoll für einen Test).",
@@ -312,6 +315,7 @@ export const de = {
   tires: tiresDe,
   orders: ordersDe,
   parts: partsDe,
+  time: timeDe,
   customers: customersDe,
   exchange: exchangeDe,
   users: usersDe,
@@ -330,6 +334,7 @@ export const de = {
     network: "IT & Netzwerk",
     invoices: "Rechnungsarchiv",
     employees: "Mitarbeiter",
+    time: "Zeiterfassung",
     fleet: "Fuhrpark",
     handbook: "Handbuch",
     docsIt: "Dokumentation IT",
@@ -406,6 +411,13 @@ export const de = {
       edit: "Mitarbeiter und Abwesenheiten bearbeiten",
       delete: "Mitarbeiter löschen",
       sensitive: "Sensible Mitarbeiterdaten (Notfallkontakt, Krankheit)",
+    },
+    time: {
+      view: "Eigene Zeiten ansehen",
+      stamp: "Stempeln (Kommen/Gehen, Auftrag starten/beenden)",
+      correct: "Eigene Zeiten korrigieren, stornieren und nachtragen",
+      viewAll: "Zeiten aller Mitarbeiter ansehen (personenbezogen)",
+      correctAll: "Zeiten aller Mitarbeiter korrigieren, stornieren und nachtragen",
     },
     fleet: {
       view: "Fuhrpark ansehen",

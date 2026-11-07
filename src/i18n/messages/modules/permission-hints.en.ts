@@ -66,6 +66,13 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     delete: "Delete employees permanently.",
     sensitive: "See and change the emergency contact and the type of absences (sickness).",
   },
+  time: {
+    view: "View your own times: clock, entries, weekly overview with actual, target and balance.",
+    stamp: "Clock in and out, start and stop an order.",
+    correct: "Correct, void or add your own times – always with a reason in the correction history.",
+    viewAll: "View the times of all employees (team overview). Personal data, never granted automatically.",
+    correctAll: "Correct, void and add the times of all employees (in addition to “correct”). Never granted automatically.",
+  },
   fleet: {
     view: "View company vehicles, deadlines and costs.",
     edit: "Enter and change company vehicles, deadlines and costs.",

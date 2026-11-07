@@ -7,6 +7,9 @@
  * Anzeigeeinstellungen). Beides sind nie API-Ressourcen.
  */
 export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
+  "time.correct": "Eine Korrektur ändert einen Arbeitszeitnachweis und braucht die Begründung einer Person (Pflichtfeld, Korrekturverlauf): eine bewusste Handlung in der Oberfläche, kein Weg für Integrationen. Stempeln und Nachtragen gibt es über die API.",
+  "time.void": "Stornieren nimmt einen Arbeitszeitnachweis aus der Zählung und braucht die Begründung einer Person: nur in der Oberfläche (der Eintrag bleibt mit Begründung im Verlauf).",
+  "time.transfer": "Zeiten als Auftragspositionen übernehmen ist ein Abrechnungsschritt mit Rückfrage am Auftrag (Preise, Stundensatz aus dem Profil): in der Oberfläche; Positionen eines Auftrags schreibt die API über POST /orders/{id}/items.",
   "parts.count": "Inventur: eine Zählung vor Ort mit Soll-/Ist-Abgleich in der Oberfläche; die API bucht Bestand nur über den Wareneingang (POST /stock-movements).",
   "orders.reopen": "Wieder öffnen hebt einen Abschluss samt den Rückbuchungen anderer Funktionen auf (eigenes, gekennzeichnetes Recht orders.reopen): eine bewusste Handlung in der Oberfläche, kein Weg für Integrationen.",
   "orders.removeFinding": "Befunde sind Aufzeichnungen der Werkstatt; die API legt sie nur an. Entfernen ist eine Korrektur in der Oberfläche.",

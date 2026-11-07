@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { currentYear } from "@/lib/dates";
-import { lineItemsInput } from "@/lib/line-items";
+import { computeTotals, lineItemsInput } from "@/lib/line-items";
 import { moneyCents } from "@/lib/zod-fields";
 import { parseSignatureValue } from "@/lib/signature";
 import { nextCounterValue } from "@/server/counters";
@@ -409,3 +409,33 @@ export const approveOperation = defineOperation({
     if (!ok && prepared?.path) await removeFile(prepared.path);
   },
 });
+
+/* ───────────── Positionen anhängen (andere Funktionen) ───────────── */
+
+/** Eine Position, die eine andere Funktion an einen offenen Auftrag hängt (Menge in Tausendsteln, Preis netto in Cent). */
+export type AppendedLine = { kind: "labor" | "part" | "other"; description: string; unit: string; quantityMilli: number; unitCents: number; taxBp: number; refType: string; refId: string };
+
+const MAX_ITEMS = 200;
+
+/**
+ * Hängt Positionen **in der Transaktion des Aufrufers** an einen offenen Auftrag (Zeiten als Positionen übernehmen, F5): fügt am Ende ein, hebt die Version des Auftrags (offene Bearbeiten-Formulare
+ * melden danach einen Konflikt statt die neuen Positionen still zu überschreiben) und prüft Obergrenzen (Zahl der Positionen, Gesamtbetrag). Rechte prüft der Aufrufer (`orders.edit` und `orders.prices`);
+ * die Hooks von `orders.saveItems` laufen nicht (die Verweise tragen eine fremde `refType`). Liefert die Kennungen der neuen Positionen in der Reihenfolge der `lines`.
+ */
+export async function appendOrderItems(tx: Tx, orderId: string, lines: readonly AppendedLine[]): Promise<string[]> {
+  const order = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });
+  if (!order) fail("notFound");
+  if (!isOpen(order.status)) fail("invalid", "orders.errors.closed");
+  const existing = await tx.orderItem.findMany({ where: { orderId }, orderBy: { position: "asc" }, select: { position: true, quantityMilli: true, unitCents: true, taxBp: true, discountBp: true } });
+  if (existing.length + lines.length > MAX_ITEMS) fail("invalid", "validation.tooLong");
+  const totals = computeTotals([...existing, ...lines.map((l) => ({ quantityMilli: l.quantityMilli, unitCents: l.unitCents, taxBp: l.taxBp, discountBp: 0 }))], { exempt: false });
+  if (totals.exceedsLimit) fail("invalid", "validation.tooLarge");
+  let position = existing.reduce((max, item) => Math.max(max, item.position), -1) + 1;
+  const ids: string[] = [];
+  for (const line of lines) {
+    const row = await tx.orderItem.create({ data: { orderId, position: position++, kind: line.kind, description: line.description, unit: line.unit, quantityMilli: line.quantityMilli, unitCents: line.unitCents, taxBp: line.taxBp, discountBp: 0, refType: line.refType, refId: line.refId }, select: { id: true } });
+    ids.push(row.id);
+  }
+  await tx.order.update({ where: { id: orderId }, data: { updatedAt: new Date() } });
+  return ids;
+}

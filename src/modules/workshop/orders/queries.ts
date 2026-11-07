@@ -174,3 +174,34 @@ export async function orderLines(orderId: string) {
 
 /** Der (nicht stornierte) Auftrag zu einem Termin – Grundlage von „Auftrag aus Termin“. */
 export const orderForAppointment = (appointmentId: string) => db.order.findFirst({ where: { appointmentId, status: { not: "cancelled" } }, select: { id: true, number: true } });
+
+/**
+ * Kurzbeschreibung eines Auftrags für Funktionen, die sich an ihn hängen (Zeiterfassung, Dokumente, Checklisten): Nummer, Status, Kennzeichen und ob an ihm neue Verknüpfungen erlaubt sind –
+ * nicht, wenn er abgeschlossen/storniert ist (`open`) oder der Kunde eingeschränkt verarbeitet wird (`restricted`, Art. 18 DSGVO). Kein Betrachter nötig: nichts über `orders.view` hinaus.
+ * `client` darf die Transaktion einer Operation sein.
+ */
+export async function orderRef(orderId: string, client: Pick<Prisma.TransactionClient, "order"> = db): Promise<{ id: string; number: string; status: string; open: boolean; restricted: boolean; vehicleId: string; plate: string } | null> {
+  const order = await client.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, number: true, status: true, vehicleId: true, vehicle: { select: { plate: true } }, customer: { select: { processingRestrictedAt: true } } },
+  });
+  return order ? { id: order.id, number: order.number, status: order.status, open: isOpen(order.status), restricted: Boolean(order.customer?.processingRestrictedAt), vehicleId: order.vehicleId, plate: order.vehicle.plate } : null;
+}
+
+/** Aufträge zur Auswahl beim Stempeln: offene Aufträge (Angenommen, In Arbeit, Fertig), neueste zuerst, ohne Kunden mit eingeschränkter Verarbeitung. */
+export async function stampableOrders(limit = 40): Promise<Array<{ id: string; number: string; plate: string; status: string }>> {
+  const rows = await db.order.findMany({
+    where: { status: { in: ["accepted", "in_progress", "ready"] }, OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] },
+    orderBy: { acceptedAt: "desc" },
+    take: limit,
+    select: { id: true, number: true, status: true, vehicle: { select: { plate: true } } },
+  });
+  return rows.map((o) => ({ id: o.id, number: o.number, status: o.status, plate: o.vehicle.plate }));
+}
+
+/** Aufträge zu den Kennungen (Anzeige von Zeiten und Dateien): Nummer und Kennzeichen. */
+export async function orderLabels(ids: readonly string[]): Promise<Map<string, { number: string; plate: string }>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db.order.findMany({ where: { id: { in: [...ids] } }, select: { id: true, number: true, vehicle: { select: { plate: true } } } });
+  return new Map(rows.map((o) => [o.id, { number: o.number, plate: o.vehicle.plate }]));
+}

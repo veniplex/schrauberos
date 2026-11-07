@@ -8,6 +8,7 @@ import { seeds as customers } from "./workshop/customers/seed";
 import { seeds as vehicles } from "./workshop/vehicles/seed";
 import { seeds as invoices } from "./office/invoices/seed";
 import { seeds as employees } from "./office/employees/seed";
+import { seeds as time } from "./office/time/seed";
 import { seeds as fleet } from "./office/fleet/seed";
 import { seeds as network } from "./it/network/seed";
 import { seeds as itDocs } from "./it/docs/seed";
@@ -26,6 +27,7 @@ export const ALL_SEEDS: readonly SeedDef[] = [
   ...vehicles,
   ...invoices,
   ...employees,
+  ...time,
   ...fleet,
   ...network,
   ...itDocs,

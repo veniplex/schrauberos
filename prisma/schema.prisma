@@ -671,6 +671,8 @@ model Employee {
   qualifications Qualification[]
   fleetVehicles  FleetVehicle[]
   licenseChecks  FleetLicenseCheck[]
+  // Zeiterfassung (F5): Mitarbeiter mit Zeiteinträgen sind nicht löschbar (Aufzeichnungspflicht), nur inaktiv zu setzen
+  timeEntries    TimeEntry[]
 
   @@index([lastName])
 }
@@ -1168,6 +1170,8 @@ model Order {
   findings    OrderFinding[]
   approvals   OrderApproval[]
   events      OrderEvent[]
+  // Zeiterfassung (F5): Zeiten auf diesen Auftrag (Aufträge werden nie gelöscht)
+  timeEntries TimeEntry[]
 
   @@index([status, acceptedAt])
   @@index([vehicleId])
@@ -1304,4 +1308,69 @@ model StockMovement {
 
   @@index([articleId, createdAt])
   @@index([orderId])
+}
+
+// ───────────── Zeiterfassung (F5, office.time) ─────────────
+
+// Einstellungen der Zeiterfassung (Singleton): Sollzeit je Arbeitstag der Person (Arbeitstage: Employee.workWeekdays)
+model TimeSettings {
+  id                 String   @id @default("default")
+  dailyTargetMinutes Int      @default(480)
+  updatedAt          DateTime @updatedAt
+}
+
+// Zeiteintrag eines Mitarbeiters, optional auf einen Auftrag. Zeiten werden nie überschrieben und nie gelöscht: Korrekturen stehen mit Begründung in TimeCorrection, Stornierte tragen voidedAt.
+model TimeEntry {
+  id                String    @id @default(cuid())
+  employeeId        String
+  orderId           String?
+  startedAt         DateTime
+  // null = läuft
+  endedAt           DateTime?
+  // manuell erfasste Pause in Minuten (wird von der Dauer abgezogen)
+  breakMinutes      Int       @default(0)
+  activity          String?
+  note              String?
+  // stamp (gestempelt) | manual (nachgetragen, mit Begründung)
+  source            String    @default("stamp")
+  // Eindeutig, solange der Eintrag läuft (= employeeId), danach null: so läuft je Mitarbeiter höchstens ein Eintrag, auch bei gleichzeitigem Start
+  runningKey        String?   @unique
+  // Idempotenzschlüssel von Start und Ende (Doppeltippen, Wiederholung nach verlorener Antwort)
+  startKey          String?   @unique
+  stopKey           String?   @unique
+  voidedAt          DateTime?
+  // Als Position in den Auftrag übernommen (einmalig)
+  transferredAt     DateTime?
+  transferredItemId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  employee    Employee         @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  order       Order?           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  corrections TimeCorrection[]
+
+  @@index([employeeId, startedAt])
+  @@index([orderId])
+  @@index([startedAt])
+}
+
+// Korrekturverlauf: der Stand VOR der Änderung samt Begründung (Original bleibt nachvollziehbar)
+model TimeCorrection {
+  id               String    @id @default(cuid())
+  entryId          String
+  // edit (geändert) | void (storniert) | create (nachgetragen)
+  kind             String
+  reason           String
+  byName           String
+  at               DateTime  @default(now())
+  prevStartedAt    DateTime?
+  prevEndedAt      DateTime?
+  prevBreakMinutes Int?
+  prevOrderId      String?
+  prevActivity     String?
+  prevNote         String?
+
+  entry TimeEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+
+  @@index([entryId, at])
 }

@@ -8,6 +8,7 @@ import { appointmentsEn } from "./modules/appointments.en";
 import { tiresEn } from "./modules/tires.en";
 import { ordersEn } from "./modules/orders.en";
 import { partsEn } from "./modules/parts.en";
+import { timeEn } from "./modules/time.en";
 import { customersEn } from "./modules/customers.en";
 import { exchangeEn } from "./modules/exchange.en";
 import { usersEn } from "./modules/users.en";
@@ -175,6 +176,7 @@ export const en: Messages = {
     invoices: "Invoice archive",
     employees: "Employees",
     absences: "Absences",
+    time: "Time tracking",
     fleet: "Fleet",
     docsIt: "IT documentation",
     handbook: "Handbook",
@@ -216,6 +218,7 @@ export const en: Messages = {
     presets: {
       basic: { name: "Basic", description: "Appointments, tire storage, customers, vehicles, invoice archive, employees, fleet, handbook and IT documentation." },
       orders: { name: "With orders and stock", description: "Additionally workshop orders (job cards) and parts & stock for the daily workshop routine." },
+      daily: { name: "Daily workshop routine", description: "Orders, parts & stock and time tracking (clocking in, working times, weekly overview)." },
     },
     demo: "Start with sample data",
     demoHint: "Creates sample customers, vehicles, appointments etc. for trying things out (only sensible for a test).",
@@ -311,6 +314,7 @@ export const en: Messages = {
   tires: tiresEn,
   orders: ordersEn,
   parts: partsEn,
+  time: timeEn,
   customers: customersEn,
   exchange: exchangeEn,
   users: usersEn,
@@ -330,6 +334,7 @@ export const en: Messages = {
     network: "IT & network",
     invoices: "Invoice archive",
     employees: "Employees",
+    time: "Time tracking",
     fleet: "Fleet",
     handbook: "Handbook",
     docsIt: "IT documentation",
@@ -406,6 +411,13 @@ export const en: Messages = {
       edit: "Edit employees and absences",
       delete: "Delete employees",
       sensitive: "Sensitive employee data (emergency contact, sickness)",
+    },
+    time: {
+      view: "View your own times",
+      stamp: "Clock in and out (arrive/leave, start/stop an order)",
+      correct: "Correct, void and add your own times",
+      viewAll: "View the times of all employees (personal data)",
+      correctAll: "Correct, void and add the times of all employees",
     },
     fleet: {
       view: "View fleet",

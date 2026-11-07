@@ -913,6 +913,53 @@ CREATE TABLE "StockMovement" (
     CONSTRAINT "StockMovement_articleId_fkey" FOREIGN KEY ("articleId") REFERENCES "Article" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "TimeSettings" (
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "dailyTargetMinutes" INTEGER NOT NULL DEFAULT 480,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "TimeEntry" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "employeeId" TEXT NOT NULL,
+    "orderId" TEXT,
+    "startedAt" DATETIME NOT NULL,
+    "endedAt" DATETIME,
+    "breakMinutes" INTEGER NOT NULL DEFAULT 0,
+    "activity" TEXT,
+    "note" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'stamp',
+    "runningKey" TEXT,
+    "startKey" TEXT,
+    "stopKey" TEXT,
+    "voidedAt" DATETIME,
+    "transferredAt" DATETIME,
+    "transferredItemId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "TimeEntry_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "TimeEntry_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "TimeCorrection" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "entryId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "byName" TEXT NOT NULL,
+    "at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "prevStartedAt" DATETIME,
+    "prevEndedAt" DATETIME,
+    "prevBreakMinutes" INTEGER,
+    "prevOrderId" TEXT,
+    "prevActivity" TEXT,
+    "prevNote" TEXT,
+    CONSTRAINT "TimeCorrection_entryId_fkey" FOREIGN KEY ("entryId") REFERENCES "TimeEntry" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
@@ -1215,3 +1262,24 @@ CREATE INDEX "StockMovement_articleId_createdAt_idx" ON "StockMovement"("article
 
 -- CreateIndex
 CREATE INDEX "StockMovement_orderId_idx" ON "StockMovement"("orderId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TimeEntry_runningKey_key" ON "TimeEntry"("runningKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TimeEntry_startKey_key" ON "TimeEntry"("startKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TimeEntry_stopKey_key" ON "TimeEntry"("stopKey");
+
+-- CreateIndex
+CREATE INDEX "TimeEntry_employeeId_startedAt_idx" ON "TimeEntry"("employeeId", "startedAt");
+
+-- CreateIndex
+CREATE INDEX "TimeEntry_orderId_idx" ON "TimeEntry"("orderId");
+
+-- CreateIndex
+CREATE INDEX "TimeEntry_startedAt_idx" ON "TimeEntry"("startedAt");
+
+-- CreateIndex
+CREATE INDEX "TimeCorrection_entryId_at_idx" ON "TimeCorrection"("entryId", "at");

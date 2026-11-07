@@ -30,6 +30,8 @@ export const DEFAULT_ROLES: Array<{
       "appointments.view", "tires.view", "customers.view", "vehicles.view",
       "orders.view", "orders.prices",
       "parts.view", "parts.prices",
+      // Zeiterfassung: eigene Zeiten stempeln, ansehen und korrigieren; `time.viewAll`/`time.correctAll` sind gekennzeichnet (personenbezogen, Regel 9) und gehören in keine Standardrolle
+      "time.view", "time.stamp", "time.correct",
     ],
   },
   {
@@ -43,6 +45,7 @@ export const DEFAULT_ROLES: Array<{
       "handbook.view", "handbook.edit",
       "customers.view", "appointments.view",
       "orders.view", "orders.prices",
+      "time.view", "time.stamp", "time.correct",
     ],
   },
   {
@@ -57,6 +60,7 @@ export const DEFAULT_ROLES: Array<{
       // Aufträge: annehmen, bearbeiten, Preise erfassen und abschließen; „Wieder öffnen“ (orders.reopen) ist gekennzeichnet (Regel 9) und gehört in keine Standardrolle
       "orders.view", "orders.create", "orders.edit", "orders.close", "orders.prices",
       "parts.view", "parts.prices",
+      "time.view", "time.stamp", "time.correct",
       "handbook.view",
     ],
   },
@@ -67,14 +71,14 @@ export const DEFAULT_ROLES: Array<{
     // `tires.stock` (Ein-/Ausbuchen) gehört ausdrücklich dazu: Wer den Wechsel am Fahrzeug macht, bucht den Satz um (Vorschlag nach dem erledigten Termin). Das ist kein
     // sensibles/Export-/Verwaltungsrecht (Regel 9) und gibt nicht das Bearbeiten (`tires.edit`) oder Löschen von Sätzen frei.
     // Aufträge: ansehen und bearbeiten (Status, Befunde) – bewusst ohne `orders.prices`: Preise und Summen bekommen Mechaniker nicht zu sehen und werden für sie nicht gelesen
-    permissions: ["appointments.view", "appointments.edit", "tires.view", "tires.stock", "customers.view", "vehicles.view", "orders.view", "orders.edit", "parts.view", "handbook.view"],
+    permissions: ["appointments.view", "appointments.edit", "tires.view", "tires.stock", "customers.view", "vehicles.view", "orders.view", "orders.edit", "parts.view", "time.view", "time.stamp", "time.correct", "handbook.view"],
   },
   {
     key: "warehouse",
     name: "Lager",
     description: "Reifenlager pflegen.",
     // Teile & Lager: das Lager pflegt Artikel, bucht Wareneingang und Inventur und sieht die Preise (Mechaniker nicht)
-    permissions: ["tires.view", "tires.create", "tires.edit", "tires.stock", "tires.delete", "customers.view", "vehicles.view", "appointments.view", "parts.view", "parts.edit", "parts.stock", "parts.prices", "handbook.view"],
+    permissions: ["tires.view", "tires.create", "tires.edit", "tires.stock", "tires.delete", "customers.view", "vehicles.view", "appointments.view", "parts.view", "parts.edit", "parts.stock", "parts.prices", "time.view", "time.stamp", "time.correct", "handbook.view"],
   },
   {
     key: "it_admin",

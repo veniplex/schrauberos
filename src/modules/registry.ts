@@ -19,6 +19,9 @@ import { settingsTabs as employeesSettings } from "./office/employees/settings-t
 import { settingsTabs as customersSettings } from "./workshop/customers/settings-tab";
 import { widgets as invoicesWidgets } from "./office/invoices/widgets";
 import { widgets as employeesWidgets } from "./office/employees/widgets";
+import { widgets as timeWidgets } from "./office/time/widgets";
+import { sections as timeSections } from "./office/time/sections";
+import { settingsTabs as timeSettings } from "./office/time/settings-tab";
 import { widgets as fleetWidgets } from "./office/fleet/widgets";
 import { widgets as networkWidgets } from "./it/network/widgets";
 import { widgets as itDocsWidgets } from "./it/docs/widgets";
@@ -43,6 +46,7 @@ import { searchProviders as customersSearch } from "./workshop/customers/search"
 import { searchProviders as vehiclesSearch } from "./workshop/vehicles/search";
 import { searchProviders as invoicesSearch } from "./office/invoices/search";
 import { searchProviders as employeesSearch } from "./office/employees/search";
+import { searchProviders as timeSearch } from "./office/time/search";
 import { searchProviders as fleetSearch } from "./office/fleet/search";
 import { searchProviders as networkSearch } from "./it/network/search";
 import { searchProviders as itDocsSearch } from "./it/docs/search";
@@ -60,6 +64,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   ...vehiclesWidgets,
   ...invoicesWidgets,
   ...employeesWidgets,
+  ...timeWidgets,
   ...fleetWidgets,
   ...networkWidgets,
   ...itDocsWidgets,
@@ -77,6 +82,7 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...vehiclesSearch,
   ...invoicesSearch,
   ...employeesSearch,
+  ...timeSearch,
   ...fleetSearch,
   ...networkSearch,
   ...itDocsSearch,
@@ -87,9 +93,9 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
  * Beiträge von Funktionen zu Seiten anderer Funktionen („Erweiterungspunkte“): Der Gastgeber (Auftragsseite, Termin) fragt `sectionsFor(session, host)` und kennt seine Gäste nicht.
  * Neue Funktion mit Abschnitten: `sections.tsx` anlegen und hier eintragen.
  */
-const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections];
+const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections];
 
-const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
+const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...timeSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
 
 /** Punkte der Einrichtungs-Checkliste (Administration). Neue Funktion mit Einrichtungsschritten: `setup-checks.ts` anlegen und hier eintragen. */
 const ALL_SETUP_CHECKS: SetupCheckDef[] = [...settingsChecks, ...usersChecks, ...backupChecks, ...mailChecks, ...appointmentsChecks, ...employeesChecks];

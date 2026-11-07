@@ -5,7 +5,7 @@ import { db } from "@/server/db";
 import { contains } from "@/server/search";
 import { versionOf } from "@/lib/concurrency";
 import { endOfDayIn, startOfDayIn, todayInput } from "@/lib/dates";
-import { dayKey } from "@/lib/zone";
+import { addDaysToKey, dayKey, daysBetweenKeys } from "@/lib/zone";
 import { getHolidays } from "@/server/holidays";
 import { absenceHints, type AbsenceHints, type PlannedAbsence } from "./absence-overlap";
 import { ABSENCE_TYPES, employeeName, type AbsenceType } from "./domain";
@@ -280,6 +280,63 @@ export async function absenceHintsFor(viewer: Viewer, planned: PlannedAbsence & 
 export async function userAbsentBetween(userId: string, from: string, to: string): Promise<boolean> {
   const count = await db.absence.count({ where: { employee: { userId }, startDate: { lte: endOfDayIn(to) }, endDate: { gte: startOfDayIn(from) } } });
   return count > 0;
+}
+
+/**
+ * Das Mitarbeiterprofil zu einem Benutzerkonto (für die Zeiterfassung: Wer stempelt, ist über das Konto bekannt). Nur Kennung, Name und Arbeitstage – nichts Sensibles. `client` darf die
+ * Transaktion einer Operation sein. Ohne Profil: null.
+ */
+export async function employeeForUser(
+  userId: string,
+  client: Pick<Prisma.TransactionClient, "employee"> = db,
+): Promise<{ id: string; firstName: string; lastName: string; active: boolean; workWeekdays: string } | null> {
+  return client.employee.findUnique({ where: { userId }, select: { id: true, firstName: true, lastName: true, active: true, workWeekdays: true } });
+}
+
+/** Kennung, Name und Aktivität eines Mitarbeiters (Nachträge der Zeiterfassung für andere); `client` darf die Transaktion einer Operation sein. */
+export async function employeeSummary(id: string, client: Pick<Prisma.TransactionClient, "employee"> = db): Promise<{ id: string; firstName: string; lastName: string; active: boolean; workWeekdays: string } | null> {
+  return client.employee.findUnique({ where: { id }, select: { id: true, firstName: true, lastName: true, active: true, workWeekdays: true } });
+}
+
+/** Name und Aktivität zu Mitarbeiter-Kennungen (Anzeige von Zeiten anderer, `employeeIds` kommen aus Zeiteinträgen). */
+export async function employeeNames(employeeIds: readonly string[]): Promise<Map<string, { name: string; active: boolean }>> {
+  if (employeeIds.length === 0) return new Map();
+  const rows = await db.employee.findMany({ where: { id: { in: [...employeeIds] } }, select: { id: true, firstName: true, lastName: true, active: true } });
+  return new Map(rows.map((r) => [r.id, { name: employeeName(r), active: r.active }]));
+}
+
+/** Aktive Mitarbeiter mit Konto – Kennung des Mitarbeiters und des Kontos, Name (Teamübersicht der Zeiterfassung). */
+export async function staffWithAccountIds(): Promise<Array<{ id: string; userId: string; name: string }>> {
+  const rows = await db.employee.findMany({
+    where: { active: true, userId: { not: null } },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: { id: true, userId: true, firstName: true, lastName: true },
+  });
+  return rows.flatMap((row) => (row.userId ? [{ id: row.id, userId: row.userId, name: employeeName(row) }] : []));
+}
+
+/**
+ * Arbeitstage-Muster und **abwesende Tage** (`JJJJ-MM-TT`, einschließlich `from`…`to`) der Mitarbeiter – für die Sollzeit der Zeiterfassung. Gelesen werden nur die Zeiträume der Abwesenheiten,
+ * nie Art oder Anmerkung: Krankheit bleibt auch hier unsichtbar („abwesend“ ist alles, was andere Funktionen erfahren).
+ */
+export async function staffSchedules(employeeIds: readonly string[], from: string, to: string): Promise<Map<string, { workWeekdays: string; absentDays: Set<string> }>> {
+  const out = new Map<string, { workWeekdays: string; absentDays: Set<string> }>();
+  if (employeeIds.length === 0) return out;
+  const [people, absences] = await Promise.all([
+    db.employee.findMany({ where: { id: { in: [...employeeIds] } }, select: { id: true, workWeekdays: true } }),
+    db.absence.findMany({ where: { employeeId: { in: [...employeeIds] }, startDate: { lte: endOfDayIn(to) }, endDate: { gte: startOfDayIn(from) } }, select: { employeeId: true, startDate: true, endDate: true } }),
+  ]);
+  for (const p of people) out.set(p.id, { workWeekdays: p.workWeekdays, absentDays: new Set() });
+  for (const a of absences) {
+    const set = out.get(a.employeeId)?.absentDays;
+    if (!set) continue;
+    const s = dayKey(a.startDate);
+    const e = dayKey(a.endDate);
+    const first = s > from ? s : from;
+    const last = e < to ? e : to;
+    for (let i = 0, n = daysBetweenKeys(first, last); i <= n; i++) set.add(addDaysToKey(first, i));
+  }
+  return out;
 }
 
 /* ───────────── Qualifikationen ───────────── */

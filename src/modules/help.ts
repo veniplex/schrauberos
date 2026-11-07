@@ -10,6 +10,7 @@ import { help as customers } from "./workshop/customers/help";
 import { help as vehicles } from "./workshop/vehicles/help";
 import { help as invoices } from "./office/invoices/help";
 import { help as employees } from "./office/employees/help";
+import { help as time } from "./office/time/help";
 import { help as fleet } from "./office/fleet/help";
 import { help as network } from "./it/network/help";
 import { help as itDocs } from "./it/docs/help";
@@ -37,6 +38,7 @@ export const ALL_HELP_TOPICS: readonly HelpTopicDef[] = [
   ...vehicles,
   ...invoices,
   ...employees,
+  ...time,
   ...fleet,
   ...network,
   ...itDocs,
