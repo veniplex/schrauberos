@@ -3,7 +3,7 @@
 import { Field, Form, FormActions, Select } from "@/components/ui/form";
 import { Card, Plate } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
-import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
+import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/client";
 import { startChecklist } from "./actions";
 
 /**

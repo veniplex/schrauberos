@@ -6,7 +6,7 @@ import { Field, Form, FormActions, Input, Select, Textarea } from "@/components/
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Alert } from "@/components/ui/layout";
 import { SearchCombobox, type SearchOption } from "@/components/ui/search-combobox";
-import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
+import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/client";
 import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { useI18n } from "@/i18n/client";
 import { createAppointment, deleteAppointment, updateAppointment } from "./actions";

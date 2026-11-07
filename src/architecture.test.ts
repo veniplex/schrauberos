@@ -111,7 +111,7 @@ describe("Architektur", () => {
       for (const imp of importsOf(file)) {
         const target = featureTarget(resolve(file, imp.spec) ?? "");
         if (!target || target.id === owner) continue;
-        if (target.rest !== "public") violations.push(`${rel}:${imp.line} importiert ${imp.spec} (nur ${target.id}/public erlaubt)`);
+        if (target.rest !== "public" && target.rest !== "client") violations.push(`${rel}:${imp.line} importiert ${imp.spec} (nur ${target.id}/public bzw. client erlaubt)`);
       }
     }
     assert.deepEqual(violations, []);
@@ -132,6 +132,59 @@ describe("Architektur", () => {
       }
     }
     assert.deepEqual(violations, []);
+  });
+
+  it("Client-Bündel: Client-Komponenten (und alles, was sie importieren) erreichen keinen Server-Code", () => {
+    // Wurzeln: Dateien mit "use client" und die client.ts der Funktionen (der Einstieg für Client-Komponenten anderer Funktionen).
+    // Server-Code im Browserbündel = Seite 500 in next dev / Bruch im next build; Tests laden alles als Node-Module und sehen es nie.
+    const fileSet = new Set(files.map((f) => path.relative(SRC, f).split(path.sep).join("/")));
+    const info = new Map<string, { directive: string | null; imports: string[]; serverish: boolean }>();
+    const importRe = /(?:^|\n)\s*(?:import|export)\s+(type\s+)?([^;"']*?)\s*from\s*["']([^"']+)["']|(?:^|\n)\s*import\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g;
+    for (const file of files) {
+      const rel = path.relative(SRC, file).split(path.sep).join("/");
+      const source = readFileSync(file, "utf8");
+      const directive = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*["']use (client|server)["']/.exec(source)?.[1] ?? null;
+      const imports: string[] = [];
+      let serverish = false;
+      for (const m of source.matchAll(importRe)) {
+        const spec = m[3] ?? m[4] ?? m[5];
+        if (!spec) continue;
+        // reine Typimporte (`import type …`, `import { type A }`) entfallen beim Übersetzen
+        const named = m[2]?.trim().match(/^\{([^}]*)\}$/);
+        if (m[1] || (named && named[1].split(",").map((p) => p.trim()).filter(Boolean).every((p) => p.startsWith("type ")))) continue;
+        if (spec === "server-only" || spec.startsWith("node:") || spec === "@prisma/client" || spec.startsWith("@/generated/") || spec === "better-sqlite3") serverish = true;
+        const resolved = resolve(file, spec);
+        if (!resolved) continue;
+        const hit = [`${resolved}.ts`, `${resolved}.tsx`, `${resolved}/index.ts`, `${resolved}/index.tsx`].find((c) => fileSet.has(c));
+        if (hit) imports.push(hit);
+      }
+      info.set(rel, { directive, imports, serverish });
+    }
+    const roots = [...info.keys()].filter((rel) => info.get(rel)!.directive === "client" || /^modules\/[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*\/client\.ts$/.test(rel));
+    assert.ok(roots.length > 50, "Client-Wurzeln gefunden");
+    const violations = new Set<string>();
+    for (const root of roots) {
+      const via = new Map<string, string | null>([[root, null]]);
+      const queue = [root];
+      while (queue.length) {
+        const rel = queue.shift()!;
+        const entry = info.get(rel)!;
+        // Server Actions ("use server") ersetzt das Browserbündel durch Verweise: ihr Inhalt gelangt nicht dorthin
+        if (rel !== root && entry.directive === "server") continue;
+        if (entry.serverish) {
+          const chain: string[] = [];
+          for (let c: string | null | undefined = rel; c; c = via.get(c)) chain.unshift(c);
+          violations.add(chain.join(" -> "));
+          continue;
+        }
+        for (const next of entry.imports) {
+          if (via.has(next)) continue;
+          via.set(next, rel);
+          queue.push(next);
+        }
+      }
+    }
+    assert.deepEqual([...violations].sort(), []);
   });
 
   it("Funktionen importieren nicht aus Seiten oder anderen Funktionsordnern per relativem Pfad", () => {

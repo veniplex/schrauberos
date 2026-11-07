@@ -1,7 +1,7 @@
 /**
  * Öffentliche Schnittstelle der Funktion workshop.vehicles. Andere Funktionen importieren NUR aus dieser Datei
  * (und nur, wenn sie die Funktion in `requires`/`uses` ihrer feature.ts deklariert haben).
+ * Client-Komponenten importieren stattdessen aus `client.ts` (nur client-sichere Teile; `public.ts` bringt Abfragen mit).
  */
-export { VehiclePicker, type VehicleOption } from "./vehicle-picker";
-export { toVehicleOption } from "./vehicle-option";
+export { VehiclePicker, toVehicleOption, type VehicleOption } from "./client";
 export { vehicleLabels, vehicleRef, vehicleTextWhere } from "./queries";

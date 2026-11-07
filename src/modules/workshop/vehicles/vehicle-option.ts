@@ -1,4 +1,4 @@
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerDisplayName } from "@/modules/workshop/customers/client";
 import type { VehicleOption } from "./vehicle-picker";
 
 type VehicleWithCustomer = {

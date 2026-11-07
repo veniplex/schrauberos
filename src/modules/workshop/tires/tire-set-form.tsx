@@ -5,7 +5,7 @@ import { Copy } from "lucide-react";
 import { Checkbox, Field, FieldLabel, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { Button } from "@/components/ui/buttons";
 import { Card, Plate } from "@/components/ui/layout";
-import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
+import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/client";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
 import { useI18n } from "@/i18n/client";
 import { createTireSet, updateTireSet } from "./actions";

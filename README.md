@@ -527,7 +527,7 @@ Diese Regeln prüfen `src/architecture.test.ts` und `src/modules/catalog.test.ts
    `src/capabilities` importieren nichts aus `src/modules/<modul>/<funktion>` (Ausnahmen: `catalog`, `define`, `features`,
    `registry`, `types`, `default-roles`, `jobs`, `operation-hooks`, `api`).
 2. **Funktionen sprechen nur über `public.ts` miteinander** – und nur, wenn die Abhängigkeit in der `feature.ts` deklariert ist:
-   `requires` (zwingend) oder `uses` (optional).
+   `requires` (zwingend) oder `uses` (optional). **Client-Komponenten** (`"use client"`) importieren fremde Funktionen nie über `public.ts` (das bringt Abfragen mit `server-only`/Datenbank mit und zöge Server-Code ins Browserbündel: `next dev` 500, `next build` bricht), sondern über `client.ts` der Funktion (nur Typen, reine Hilfsfunktionen, Auswahlfelder; Beispiel `vehicles/client.ts`, `customers/client.ts`); `public.ts` darf `client.ts` re-exportieren. `architecture.test.ts` („Client-Bündel“) prüft den Importgraphen aller Client-Komponenten und `client.ts` statisch auf `server-only`, Prisma, `node:*`.
 3. **Weiche Abhängigkeiten werden zur Laufzeit geprüft** (`session.features.has("workshop.customers")`).
 4. **Jede Seite und jede Server Action prüft selbst** (`requirePermission` / `requireSession`). Navigation und `proxy.ts` sind
    Komfort, kein Schutz.
@@ -1838,9 +1838,6 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 * Der Job-Runner setzt genau einen Prozess voraus (ein Container, eine SQLite-Datei): Nach einem Neustart gelten laufende Läufe als unterbrochen. Jobs sind deshalb wiederholbar auszulegen.
 * **Tests mit Symlinks** (`archive.test.ts`: Prüfung auf dem Dateisystem, Verzeichnis-Symlink) laufen nur unter Linux/macOS (unter Windows ohne Entwicklermodus fehlt das Recht, sie werden übersprungen) – die Linux-Pipeline muss sie ausführen; `safe-fetch.test.ts` bindet `127.0.0.2` (sonst Ausweichen auf `127.0.0.1`).
 * API: noch ohne Oberfläche zur Token-Verwaltung, ohne Webhooks, ohne Datei-Upload (Rechnungsbelege) und ohne Doku-Seite der Ressourcen (F11); Tokens entstehen bis dahin nur über die Server-Funktion `createApiTokenOperation`. Rate-Limit und Drosselung liegen im Speicher des Prozesses (ein Prozess, eine Datenbank).
-* **Client-Bausteine und `public.ts` mit Server-Code (im Browserlauf bei F3 entdeckt, nicht behoben):** `modules/workshop/vehicles/public.ts` exportiert neben `VehiclePicker` (Client) auch Abfragen (`vehicleRef` …), `vehicle-option.ts` zieht `customers/public.ts` (mit `customers/queries.ts`, `server-only`, Datenbank) – ein **Client**-Modul, das `vehicles/public` importiert
-  (`appointment-form`, `tire-set-form`, `order-form`, `start-form`), bringt Server-Code ins Browserbündel: `next dev` meldet `'server-only' cannot be imported from a Client Component module` bzw. einen Turbopack-Absturz (`node:module`), die Seiten `/appointments`, `/orders/new` … liefern 500, `next build` dürfte scheitern. F3 umgeht es (`DocumentForm` bekommt das Fahrzeugfeld vom Server als `ReactNode`);
-  die eigentliche Lösung (Client-sicheres `public`-Teil getrennt von Abfragen, oder `vehicle-option.ts` ohne `customers/public`) gehört zu den Funktionen `vehicles`/`customers` und steht für Block 13 an.
 * Die Suche unterscheidet bei Umlauten Groß-/Kleinschreibung (SQLite).
 * Urlaubstage zählen Mo–Fr ohne Feiertage; kein Genehmigungs-Workflow.
 * Nicht enthalten: E-Mail/SMS-Erinnerungen, Druck-Etiketten/QR-Codes für Lagerplätze, Ressourcen-Kalender pro Mitarbeiter, echte
