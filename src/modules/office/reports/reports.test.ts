@@ -402,7 +402,8 @@ describe("Einlagerungsbestand", () => {
     await mk({ season: "allseason", storageLocation: "Halle A / Regal 10", storedAt: new Date("2026-01-05T10:00:00Z") });
     await mk({ season: "allseason", storageLocation: "Halle A / Regal 2", storedAt: new Date("2026-01-06T10:00:00Z") });
     await mk({ season: "winter", storageLocation: null, storedAt: new Date("2026-02-01T10:00:00Z") });
-    await env.db.tireSet.create({ data: { vehicleId: ids.carRestricted, season: "summer", storageLocation: "Halle A / Regal 2", storedAt: new Date("2026-03-01T10:00:00Z") } });
+    // Satz eines Kunden mit eingeschränkter Verarbeitung: der Lagerplatz ist Freitext und kann Namen oder Kennzeichen tragen (hier: ein Name)
+    await env.db.tireSet.create({ data: { vehicleId: ids.carRestricted, season: "summer", storageLocation: "Regal 7 – Frau Gesperrt B-GS 9", storedAt: new Date("2026-03-01T10:00:00Z") } });
     await mk({ season: "summer", storageLocation: "Halle B", status: "mounted" });
     await mk({ season: "winter", storageLocation: "Halle B", status: "disposed" });
   });
@@ -410,22 +411,23 @@ describe("Einlagerungsbestand", () => {
   it("nur eingelagerte Sätze, je Lagerplatz und Saison (natürliche Sortierung, ohne Lagerplatz zuletzt) mit der ältesten Einlagerung", async () => {
     const report = await queries.storageReport(await session(["tires.view"]));
     assert.ok(report);
-    assert.deepEqual(report.bySeason, { summer: 2, winter: 3, allseason: 2 });
+    assert.deepEqual(report.bySeason, { summer: 2, winter: 3, allseason: 2 }, "der Satz des eingeschränkten Kunden zählt im Bestand");
     assert.equal(report.total, 7);
+    assert.deepEqual(report.restricted, { summer: 1, winter: 0, allseason: 0, total: 1 });
     assert.deepEqual(
       report.rows.map((r) => [r.location, r.summer, r.winter, r.allseason, r.total, r.oldestDay]),
       [
         ["Halle A / Regal 1", 1, 2, 0, 3, "2024-11-02"],
-        ["Halle A / Regal 2", 1, 0, 1, 2, "2026-01-06"],
+        ["Halle A / Regal 2", 0, 0, 1, 1, "2026-01-06"],
         ["Halle A / Regal 10", 0, 0, 1, 1, "2026-01-05"],
         [null, 0, 1, 0, 1, "2026-02-01"],
       ],
     );
   });
 
-  it("keine Namen und Kennzeichen im Ergebnis; auch Sätze eines Kunden mit eingeschränkter Verarbeitung zählen als Zahl; ohne tires.view null", async () => {
+  it("keine Namen und Kennzeichen im Ergebnis; Sätze eines Kunden mit eingeschränkter Verarbeitung zählen nur als Zahl (ihr Lagerplatz-Freitext nie); ohne tires.view null", async () => {
     const json = JSON.stringify(await queries.storageReport(await session(["tires.view"])));
-    for (const secret of ["B-AB 1", "B-GS 9", "Muster", "Gesperrt", "plate", "vehicle"]) assert.ok(!json.includes(secret), secret);
+    for (const secret of ["B-AB 1", "B-GS 9", "Muster", "Gesperrt", "plate", "vehicle", "Regal 7", "Frau"]) assert.ok(!json.includes(secret), `${secret}: der Lagerplatz eines eingeschränkten Kunden steht nirgends`);
     assert.equal(await queries.storageReport(await session(["reports.view"])), null);
   });
 });

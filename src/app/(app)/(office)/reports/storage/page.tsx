@@ -64,6 +64,11 @@ export default async function StorageReportPage() {
               rows={report.rows}
             />
           </div>
+          {report.restricted.total > 0 ? (
+            <Alert tone="info" className="mb-5">
+              {tp("reports.storage.restricted", report.restricted.total)}
+            </Alert>
+          ) : null}
           {report.moreLocations > 0 ? (
             <Alert tone="info" className="mb-5">
               {tp("reports.storage.more", report.moreLocations)}

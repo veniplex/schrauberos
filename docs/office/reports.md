@@ -35,7 +35,7 @@ Der Anteil der **Öffnungszeit**, in dem ein **Arbeitsplatz mit Terminen belegt*
 
 ## Einlagerungsbestand
 
-Die **eingelagerten Reifensätze** nach **Lagerplatz** und **Saison** (Sommer, Winter, Ganzjahr) mit der Einlagerung des ältesten Satzes. Es stehen **nur Anzahlen** darin – keine Namen, keine Kennzeichen. Gezählt werden Sätze mit dem Status „eingelagert“; ausgelagerte (beim Kunden montierte) und entsorgte nicht.
+Die **eingelagerten Reifensätze** nach **Lagerplatz** und **Saison** (Sommer, Winter, Ganzjahr) mit der Einlagerung des ältesten Satzes. Es stehen **nur Anzahlen** darin – keine Namen, keine Kennzeichen. Gezählt werden Sätze mit dem Status „eingelagert“; ausgelagerte (beim Kunden montierte) und entsorgte nicht. Der Lagerplatz ist ein freier Text; deshalb zählen Sätze von **Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO)** nur im Gesamtbestand und je Saison, **ihr Lagerplatz wird nicht aufgeführt** – ein Hinweis nennt die Anzahl.
 
 ## Fälligkeiten
 

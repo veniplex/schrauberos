@@ -98,6 +98,7 @@ export const storageExport: ExportDef = {
     const report = await storageReport(session);
     if (!report) return { error: "reports.errors.invalid" };
     const rows: Cell[][] = report.rows.map((r) => [r.location ?? t("reports.storage.noLocation"), intCell(r.summer), intCell(r.winter), intCell(r.allseason), intCell(r.total), r.oldestDay]);
+    if (report.restricted.total > 0) rows.push([t("reports.storage.restrictedRow"), intCell(report.restricted.summer), intCell(report.restricted.winter), intCell(report.restricted.allseason), intCell(report.restricted.total), ""]);
     return {
       columns: [{ labelKey: "reports.exporting.cols.location" }, { labelKey: "reports.exporting.cols.summer" }, { labelKey: "reports.exporting.cols.winter" }, { labelKey: "reports.exporting.cols.allseason" }, { labelKey: "reports.exporting.cols.total" }, { labelKey: "reports.exporting.cols.oldest" }],
       count: rows.length,

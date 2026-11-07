@@ -104,12 +104,13 @@ export const endpoints: ApiEndpoint[] = [
     method: "GET",
     path: "/reports/storage",
     operationId: "reports.storage",
-    summary: "Stored tire sets by storage location and season (counts only). Needs tires.view as well",
+    summary: "Stored tire sets by storage location and season (counts only). Needs tires.view as well; sets of customers with restricted processing are only counted per season, their storage location is never listed",
     response: z.object({
       total: z.number().int(),
       bySeason: z.object({ summer: z.number().int(), winter: z.number().int(), allseason: z.number().int() }),
       rows: z.array(z.object({ location: z.string().nullable(), summer: z.number().int(), winter: z.number().int(), allseason: z.number().int(), total: z.number().int(), oldestDay: day })),
       moreLocations: z.number().int(),
+      restricted: z.object({ summer: z.number().int(), winter: z.number().int(), allseason: z.number().int(), total: z.number().int() }),
     }),
     handler: async (call) => {
       requireReport(call, "storage");

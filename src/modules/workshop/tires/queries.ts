@@ -90,19 +90,39 @@ export async function tireLabelData(viewer: Viewer, id: string) {
 export type TireLabelData = NonNullable<Awaited<ReturnType<typeof tireLabelData>>>;
 
 export type StorageRow = { location: string | null; summer: number; winter: number; allseason: number; total: number; /** Einlagerung des ältesten Satzes (Kalendertag der Werkstatt-Zone) */ oldestDay: string };
-export type StorageOverview = { total: number; bySeason: { summer: number; winter: number; allseason: number }; rows: StorageRow[]; /** Lagerplätze über der Anzeigegrenze (die Summen zählen alle) */ moreLocations: number };
+export type StorageOverview = {
+  total: number;
+  bySeason: { summer: number; winter: number; allseason: number };
+  rows: StorageRow[];
+  /** Lagerplätze über der Anzeigegrenze (die Summen zählen alle) */
+  moreLocations: number;
+  /** Sätze von Kunden mit eingeschränkter Verarbeitung (Art. 18): in `total`/`bySeason` enthalten, aber ohne Lagerplatz (dessen Freitext kann Namen oder Kennzeichen tragen) – nur nach Saison gezählt */
+  restricted: { summer: number; winter: number; allseason: number; total: number };
+};
 
 /** So viele Lagerplätze zeigt der Bericht höchstens. */
 export const STORAGE_LOCATION_LIMIT = 200;
 
 /**
  * **Einlagerungsbestand** für den Bericht (F9): die eingelagerten Reifensätze (Status „eingelagert“) nach Lagerplatz und Saison, von der Datenbank gezählt (`groupBy`). Es stehen **keine Namen und keine
- * Kennzeichen** darin – nur Anzahlen je Lagerplatz (auch Sätze von Kunden mit eingeschränkter Verarbeitung zählen mit: eine Zahl ist keine personenbezogene Angabe). Verlangt `tires.view`.
+ * Kennzeichen** darin – nur Anzahlen je Lagerplatz. Der **Lagerplatz ist Freitext** ("Regal 3 – Müller" oder ein Kennzeichen kann dort stehen): Sätze von Kunden mit eingeschränkter Verarbeitung (Art. 18) zählen
+ * deshalb nur in den Gesamtzahlen (je Saison, `restricted`), **ihr Lagerplatz erscheint nie** – die Reifenliste verbirgt diese Sätze ebenso. Verlangt `tires.view`.
  */
 export async function storageOverview(viewer: Viewer): Promise<StorageOverview | null> {
   if (!viewer.can("tires.view")) return null;
-  const groups = await db.tireSet.groupBy({ by: ["storageLocation", "season"], where: { status: "stored" }, _count: { _all: true }, _min: { storedAt: true } });
+  const unrestricted = { vehicle: { is: { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] } } };
+  const [groups, restrictedGroups] = await Promise.all([
+    db.tireSet.groupBy({ by: ["storageLocation", "season"], where: { status: "stored", ...unrestricted }, _count: { _all: true }, _min: { storedAt: true } }),
+    db.tireSet.groupBy({ by: ["season"], where: { status: "stored", NOT: unrestricted }, _count: { _all: true } }),
+  ]);
   const bySeason = { summer: 0, winter: 0, allseason: 0 };
+  const restricted = { summer: 0, winter: 0, allseason: 0, total: 0 };
+  for (const g of restrictedGroups) {
+    const season = g.season === "summer" || g.season === "winter" ? g.season : "allseason";
+    restricted[season] += g._count._all;
+    restricted.total += g._count._all;
+    bySeason[season] += g._count._all;
+  }
   const byLocation = new Map<string, StorageRow>();
   for (const g of groups) {
     const key = g.storageLocation?.trim() ? g.storageLocation.trim() : "";
@@ -116,5 +136,5 @@ export async function storageOverview(viewer: Viewer): Promise<StorageOverview |
     byLocation.set(key, row);
   }
   const all = [...byLocation.values()].sort((a, b) => (a.location === null ? 1 : b.location === null ? -1 : a.location.localeCompare(b.location, "de", { numeric: true })));
-  return { total: bySeason.summer + bySeason.winter + bySeason.allseason, bySeason, rows: all.slice(0, STORAGE_LOCATION_LIMIT), moreLocations: Math.max(0, all.length - STORAGE_LOCATION_LIMIT) };
+  return { total: bySeason.summer + bySeason.winter + bySeason.allseason, bySeason, rows: all.slice(0, STORAGE_LOCATION_LIMIT), moreLocations: Math.max(0, all.length - STORAGE_LOCATION_LIMIT), restricted };
 }
