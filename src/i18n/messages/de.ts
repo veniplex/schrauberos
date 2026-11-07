@@ -22,9 +22,11 @@ import { systemDe } from "./modules/system.de";
 import { holidaysDe } from "./modules/holidays.de";
 import { archiveDe } from "./modules/archive.de";
 import { privacyDe } from "./modules/privacy.de";
+import { uiDe } from "./modules/ui.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
+  ui: uiDe,
   security: securityDe,
   holidays: holidaysDe,
   archive: archiveDe,

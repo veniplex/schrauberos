@@ -35,12 +35,12 @@ function photo(name: string, size: number, head: number[] = jpegHead) {
   return new File([body], name, { type: "image/jpeg" });
 }
 
-function engine(options: { scaledBytes?: number; fail?: boolean; gate?: Promise<void> } = {}): ImageEngine & { encoded: number } {
+function engine(options: { scaledBytes?: number; fail?: boolean; failIf?: (file: File) => boolean; gate?: Promise<void> } = {}): ImageEngine & { encoded: number } {
   const e = {
     encoded: 0,
-    async decode() {
+    async decode(file: Blob) {
       await options.gate;
-      if (options.fail) throw new Error("kein Dekoder");
+      if (options.fail || options.failIf?.(file as File)) throw new Error("kein Dekoder");
       return { width: 4000, height: 3000 };
     },
     async encode(_r: unknown, _w: number, _h: number, type: OutputType) {
@@ -183,6 +183,29 @@ describe("FileInput variant=photo", () => {
     assert.ok(mainFiles[0].size < 2 * MB);
     assert.equal(changes.length, 1, "genau eine Meldung");
     assert.equal(e.encoded, 1, "nicht doppelt verkleinert");
+  });
+
+  it("Mehrfachauswahl: eine HEIC-Datei, die nicht zu dekodieren ist, hält die übrigen nicht auf – sie bleiben im Feld, ein Hinweis nennt den Grund", async () => {
+    const e = engine({ scaledBytes: 500 * 1024, failIf: (f) => /.heic$/i.test(f.name) });
+    const { main, changes, text } = await mountPhoto({ maxBytes: 2 * MB, imageEngine: e, multiple: true });
+    await choose(main, [photo("a.jpg", 5 * MB), new File([new Uint8Array(3 * MB)], "b.HEIC", { type: "image/heic" }), photo("c.jpg", 4 * MB)]);
+    const current = () => Array.from(main.files ?? []);
+    assert.deepEqual(current().map((f) => f.name), ["a.jpg", "c.jpg"], "die HEIC-Datei ist aussortiert, die anderen verkleinert");
+    assert.ok(current().every((f) => f.size < 2 * MB));
+    assert.equal(changes.length, 1);
+    assert.match(text(), /HEIC/);
+  });
+
+  it("Mehrfachauswahl: zu große Dateien fallen einzeln weg, bleibt nichts übrig, wird abgelehnt und das Feld geleert", async () => {
+    const e = engine({ scaledBytes: 500 * 1024 });
+    const { main, changes, text } = await mountPhoto({ maxBytes: 2 * MB, imageEngine: e, multiple: true });
+    const pdf = (name: string, size: number) => new File([new Uint8Array(size)], name, { type: "application/pdf" });
+    await choose(main, [pdf("klein.pdf", MB), pdf("riesig.pdf", 5 * MB)]);
+    assert.deepEqual(Array.from(main.files ?? []).map((f) => f.name), ["klein.pdf"]);
+    assert.equal(changes.length, 1);
+    assert.match(text(), /Datei zu groß \(max\. 2 MB\)/);
+    await choose(main, [pdf("riesig1.pdf", 5 * MB), pdf("riesig2.pdf", 6 * MB)]);
+    assert.equal(changes.length, 1, "nichts übrig: abgelehnt");
   });
 
   it("camera={false} lässt den Kamera-Knopf weg; die normale Variante verarbeitet nichts und hat keine Kamera", async () => {

@@ -318,18 +318,50 @@ export function FileInput({
     onReject?.(file, reason);
   };
 
-  /** Verarbeitet die gewählten Dateien; gibt die zu sendenden zurück oder null, wenn abgelehnt (das Feld ist dann geleert). */
+  /** Eine aussortierte Datei bei Mehrfachauswahl: ein Hinweis, der den Rest nicht aufhält (das Feld behält die übrigen Dateien). */
+  const note = (file: File, reason: FileProblem) => {
+    setProblem(onReject ? null : reason);
+    onReject?.(file, reason);
+  };
+
+  /**
+   * Verarbeitet die gewählten Dateien; gibt die zu sendenden zurück oder null, wenn abgelehnt (das Feld ist dann geleert). Bei **Mehrfachauswahl** (`multiple`) scheitert nicht die ganze
+   * Auswahl an einer Datei: HEIC, das der Browser nicht dekodiert, oder eine zu große Datei wird aussortiert (Hinweis) und die übrigen gehen weiter – nur wenn nichts übrig bleibt, wird abgelehnt.
+   */
   async function settle(input: HTMLInputElement, picked: File[]): Promise<File[] | null> {
     let files = picked;
+    let dropped: { file: File; reason: FileProblem } | null = null;
     if (photo && picked.some((file) => !prepared.current.has(file))) {
       const mine = ++run.current;
       setPending(true);
       try {
         const out: File[] = [];
-        for (const file of picked) out.push(prepared.current.has(file) ? file : (await prepareImage(file, imageEngine, { maxBytes })).file);
+        for (const file of picked) {
+          if (prepared.current.has(file)) {
+            out.push(file);
+            continue;
+          }
+          try {
+            out.push((await prepareImage(file, imageEngine, { maxBytes })).file);
+          } catch (error) {
+            if (!props.multiple) throw error;
+            dropped ??= { file, reason: error instanceof ImageError && error.code === "heic" ? "heic" : "failed" };
+          }
+        }
         if (mine !== run.current) return null; // inzwischen wurde etwas anderes gewählt
-        // zurück ins Feld; geht das nicht (sehr alter Browser), bleiben die Originale stehen
-        files = out.some((file, i) => file !== picked[i]) ? (setInputFiles(input, out) ? out : picked) : out;
+        if (out.length === 0 && dropped) {
+          reject(dropped.file, dropped.reason);
+          return null;
+        }
+        // zurück ins Feld; geht das nicht (sehr alter Browser), bleiben die Originale stehen – außer es fielen Dateien weg: dann lieber nichts
+        if (out.length !== picked.length || out.some((file, i) => file !== picked[i])) {
+          if (setInputFiles(input, out)) files = out;
+          else if (out.length === picked.length) files = picked;
+          else {
+            reject(dropped?.file ?? picked[0], dropped?.reason ?? "failed");
+            return null;
+          }
+        }
         for (const file of files) prepared.current.add(file);
       } catch (error) {
         if (mine !== run.current) return null;
@@ -339,18 +371,26 @@ export function FileInput({
         if (mine === run.current) setPending(false);
       }
     }
-    return withinLimit(files) ? files : null;
+    return withinLimit(input, files, dropped);
   }
 
-  /** Größenprüfung (für das, was gesendet würde); bei Überschreitung abgelehnt und das Feld geleert. */
-  function withinLimit(files: File[]) {
-    const tooBig = files.find((file) => file.size > maxBytes);
-    if (tooBig) {
-      reject(tooBig, "tooLarge");
-      return false;
+  /** Größenprüfung (für das, was gesendet würde); bei Überschreitung abgelehnt und das Feld geleert – bei Mehrfachauswahl fallen nur die zu großen Dateien weg. Gibt die zu sendenden Dateien zurück oder null. */
+  function withinLimit(input: HTMLInputElement, files: File[], dropped: { file: File; reason: FileProblem } | null = null): File[] | null {
+    const tooBig = files.filter((file) => file.size > maxBytes);
+    if (tooBig.length === 0) {
+      if (dropped) note(dropped.file, dropped.reason);
+      else setProblem(null);
+      return files;
     }
-    setProblem(null);
-    return true;
+    if (props.multiple && tooBig.length < files.length) {
+      const fits = files.filter((file) => file.size <= maxBytes);
+      if (setInputFiles(input, fits)) {
+        note(tooBig[0], "tooLarge");
+        return fits;
+      }
+    }
+    reject(tooBig[0], "tooLarge");
+    return null;
   }
 
   async function handleChange(event: ChangeEvent<HTMLInputElement>) {
@@ -363,7 +403,7 @@ export function FileInput({
     }
     // ohne Foto-Verarbeitung gleich, ohne Umweg über eine asynchrone Wartezeit
     if (!photo) {
-      if (withinLimit(picked)) onChange?.(event);
+      if (withinLimit(input, picked)) onChange?.(event);
       return;
     }
     if (await settle(input, picked)) onChange?.(event);

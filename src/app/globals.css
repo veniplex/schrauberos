@@ -10,6 +10,8 @@
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-control: var(--control-border);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -362,6 +364,32 @@ html[data-form-actions] {
 @media print {
   .no-print {
     display: none !important;
+  }
+}
+
+/* ───────── Druck (PrintLayout, components/ui/print-layout.tsx) ─────────
+   A4 mit 15 mm Rand als benannte Seite (nur Bereiche mit `.print-a4`; Etiketten und andere Formate bringen ihre eigene benannte Seite mit). Beim Drucken ist alles hell:
+   Das dunkle Design druckt sonst helle Schrift auf Papier. `.print-break` beginnt eine neue Seite, `.print-keep` hält einen Block zusammen. */
+@page a4 {
+  size: A4 portrait;
+  margin: 15mm;
+}
+.print-a4 {
+  page: a4;
+}
+.print-break {
+  break-before: page;
+}
+.print-keep {
+  break-inside: avoid;
+}
+@media print {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    background: var(--paper);
+    color: var(--paper-ink);
   }
 }
 

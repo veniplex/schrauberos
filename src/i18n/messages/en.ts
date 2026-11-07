@@ -23,8 +23,10 @@ import { systemEn } from "./modules/system.en";
 import { holidaysEn } from "./modules/holidays.en";
 import { archiveEn } from "./modules/archive.en";
 import { privacyEn } from "./modules/privacy.en";
+import { uiEn } from "./modules/ui.en";
 
 export const en: Messages = {
+  ui: uiEn,
   holidays: holidaysEn,
   archive: archiveEn,
   privacy: privacyEn,

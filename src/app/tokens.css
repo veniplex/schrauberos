@@ -26,6 +26,10 @@
   --control-border: light-dark(oklch(64% 0.012 255), oklch(56% 0.015 255));
   --overlay: light-dark(oklch(20% 0.02 255 / 0.45), oklch(5% 0.01 255 / 0.65));
 
+  /* Papier: Fläche für Unterschrift und Druck – immer hell (Tinte darauf immer dunkel), auch im dunklen Design */
+  --paper: oklch(100% 0 0);
+  --paper-ink: oklch(18% 0.01 255);
+
   /* Text */
   --ink: light-dark(oklch(23% 0.02 255), oklch(94% 0.006 255));
   --ink-muted: light-dark(oklch(48% 0.02 255), oklch(72% 0.02 255));
