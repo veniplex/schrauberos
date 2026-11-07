@@ -109,20 +109,23 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <span>
                     <strong>{inv.file.name}</strong> <span className="text-ink-muted">({number(inv.file.size / 1024, { maximumFractionDigits: 0 })} KB)</span>
                   </span>
-                  <span className="flex gap-2">
-                    <LinkButton size="sm" external href={`/api/invoices/${inv.id}/file`} target="_blank" rel="noreferrer">
-                      <ExternalLink className="size-3.5" aria-hidden /> {t("invoices.open")}
-                    </LinkButton>
-                    <LinkButton size="sm" external href={`/api/invoices/${inv.id}/file?download=1`}>
-                      <Download className="size-3.5" aria-hidden /> {t("invoices.download")}
-                    </LinkButton>
-                  </span>
+                  {/* PDF: Öffnen, Teilen und Herunterladen bringt der PDF-Baustein selbst mit (unten) */}
+                  {inv.file.mime === "application/pdf" ? null : (
+                    <span className="flex gap-2">
+                      <LinkButton size="sm" external href={`/api/invoices/${inv.id}/file`} target="_blank" rel="noreferrer">
+                        <ExternalLink className="size-3.5" aria-hidden /> {t("invoices.open")}
+                      </LinkButton>
+                      <LinkButton size="sm" external href={`/api/invoices/${inv.id}/file?download=1`}>
+                        <Download className="size-3.5" aria-hidden /> {t("invoices.download")}
+                      </LinkButton>
+                    </span>
+                  )}
                 </div>
                 {isImage ? (
                   // eslint-disable-next-line @next/next/no-img-element -- geschützte Datei aus der Datenbank
                   <img src={`/api/invoices/${inv.id}/file`} alt={inv.file.name} className="max-h-[70vh] w-full object-contain p-4" />
                 ) : inv.file.mime === "application/pdf" ? (
-                  <PdfPreview src={`/api/invoices/${inv.id}/file`} title={inv.file.name} labels={{ show: t("invoices.showPreview"), hide: t("invoices.hidePreview"), mobile: t("invoices.previewDesktopOnly") }} />
+                  <PdfPreview src={`/api/invoices/${inv.id}/file`} title={inv.file.name} fileName={inv.file.name} labels={{ show: t("invoices.showPreview"), hide: t("invoices.hidePreview"), mobile: t("invoices.previewDesktopOnly") }} />
                 ) : (
                   <p className="p-5 text-sm text-ink-muted">{t("invoices.noPreview")}</p>
                 )}

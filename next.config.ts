@@ -60,7 +60,8 @@ const nextConfig: NextConfig = {
       { source: "/sw.js", headers: SERVICE_WORKER_HEADERS },
     ];
   },
-  serverExternalPackages: ["@prisma/client", "@prisma/adapter-better-sqlite3", "better-sqlite3"],
+  // pdfkit/fontkit lesen Dateien neben ihrem Code und werden deshalb nicht gebündelt; die Schrift der PDF-Erzeugung liegt unter `assets/fonts/` (das Dockerfile kopiert `assets/` ins Paket)
+  serverExternalPackages: ["@prisma/client", "@prisma/adapter-better-sqlite3", "better-sqlite3", "pdfkit", "fontkit", "nodemailer"],
   // better-sqlite3 lädt seine native Datei dynamisch (bindings) – die Ablaufverfolgung findet sie nicht von selbst
   outputFileTracingIncludes: { "/*": ["./node_modules/better-sqlite3/build/Release/*.node", "./node_modules/better-sqlite3/package.json"] },
   // Wegen process.cwd()-Zugriffen würde die Ablaufverfolgung sonst das ganze Projekt einpacken; Migrationen und Handbuch kommen separat ins Paket

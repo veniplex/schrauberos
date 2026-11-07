@@ -209,6 +209,43 @@ jobs:
           path: .lighthouseci/
           retention-days: 14
 
+  # E-Rechnungen (XRechnung/EN 16931) gegen den KoSIT-Prüfer: Die Tests der Rechnungserstellung (F3, Dateien *.einvoice.test.ts) schreiben ihre XML-Beispiele nach EINVOICE_SAMPLES_DIR
+  # (src/test/einvoice-samples.ts), scripts/validate-xrechnung.sh lädt Prüfer und Prüfregeln in festgelegter Version, prüft die Prüfsummen und lässt jedes Beispiel prüfen. Ohne Beispiele
+  # (Gerüst vor F3) endet der Job erfolgreich; mit XRECHNUNG_REQUIRE_SAMPLES=1 ist ein leerer Ordner ein Fehler – das wird mit F3 eingeschaltet. Läuft wie e2e nicht bei jedem Push auf main.
+  xrechnung:
+    name: XRechnung (KoSIT-Prüfer)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Beispiele erzeugen (Tests *.einvoice.test.ts)
+        env:
+          EINVOICE_SAMPLES_DIR: ${{ runner.temp }}/xrechnung-samples
+        run: |
+          shopt -s globstar nullglob
+          files=(src/**/*.einvoice.test.ts)
+          if [ "${#files[@]}" -eq 0 ]; then echo "Keine Tests mit XML-Beispielen (Gerüst vor F3)."; else npx tsx --test "${files[@]}"; fi
+      - name: Prüfen (KoSIT-Prüfer, Version und Prüfsumme festgelegt)
+        env:
+          EINVOICE_SAMPLES_DIR: ${{ runner.temp }}/xrechnung-samples
+        run: scripts/validate-xrechnung.sh "$EINVOICE_SAMPLES_DIR" "${{ runner.temp }}/kosit"
+      - name: Berichte
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: xrechnung-reports
+          path: ${{ runner.temp }}/kosit/out/
+          if-no-files-found: ignore
+          retention-days: 14
+
   publish:
     name: Image bauen, testen und nach ghcr.io pushen
     # Nicht bei Pull Requests; bei Tags erst, wenn die Browser-Tests grün sind (auf main sind sie übersprungen) und der Tag auf main liegt

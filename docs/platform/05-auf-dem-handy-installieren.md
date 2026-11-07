@@ -27,8 +27,9 @@ Danach starten Sie SchrauberOS über das Symbol auf dem Startbildschirm. Die Anm
   Programmdateien der Anwendung).
 * **Neue Version:** Nach einem Update erscheint unten der Hinweis **„Neue Version verfügbar“** mit **Neu laden**. Tippen Sie darauf, wenn Sie gerade nichts bearbeiten – die Seite
   lädt dann neu und läuft in der neuen Version. Solange Sie nicht tippen, arbeiten Sie unverändert weiter.
-* **PDF-Dateien** (z. B. ein Rechnungsbeleg) öffnen und laden Sie wie sonst über **Öffnen** bzw. **Herunterladen**; eine Vorschau im Fenster gibt es nur am Computer. Auf dem iPhone
-  und iPad führt „Öffnen“ aus der installierten App heraus zur PDF-Ansicht des Systems; **Fertig** bzw. der Zurück-Pfeil des Systems bringt Sie wieder zurück.
+* **PDF-Dateien** (z. B. ein Rechnungsbeleg oder eine Rechnung) gibt es immer mit drei Wegen: **Öffnen**, **Teilen** (wo Ihr Gerät es anbietet) und **Herunterladen**; eine Vorschau im Fenster gibt es nur am Computer.
+  **Auf dem iPhone und iPad kann „Öffnen“ in der installierten App ohne Rückweg enden:** Die PDF-Ansicht ersetzt dann die App-Ansicht, und je nach Systemversion fehlt ein Zurück-Pfeil. Nehmen Sie dort lieber
+  **Teilen** (zum Beispiel an Mail, WhatsApp oder „In Dateien sichern“) oder **Herunterladen** – die App bleibt dabei stehen. Haben Sie sich doch festgefahren, beenden Sie die App und starten sie neu.
 * Eine installierte App folgt der Einstellung **Hell/Dunkel** der Anwendung und des Geräts.
 
 ## Wenn etwas nicht klappt

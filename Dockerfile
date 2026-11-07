@@ -62,6 +62,7 @@ RUN set -eux; \
     cp -a .next/static /bundle/.next/static; \
     cp -a public /bundle/public; \
     cp -a docs /bundle/docs; \
+    cp -a assets /bundle/assets; \
     cp -a prisma/migrations /bundle/prisma/migrations; \
     cp -a version.json launcher.mjs /bundle/; \
     cp -a /runtime /bundle/runtime; \

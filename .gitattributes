@@ -8,3 +8,6 @@ src/lib/updates/testdata/** -text
 # Vendorte Fremdquellen und Testvektoren des Starters: byte-genau wie im Original (Prüfsummen in SHA256SUMS, src/lib/updates/vendor-monocypher.test.ts)
 docker/vendor/** -text
 docker/test/vectors/** -text
+
+# Schriften der PDF-Erzeugung: byte-genau (Prüfsummen in assets/fonts/SOURCE.txt, src/server/pdf/fonts.test.ts)
+assets/fonts/** -text
