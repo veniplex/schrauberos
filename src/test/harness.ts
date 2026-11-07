@@ -74,12 +74,15 @@ export const browser = {
   /** Alle Schreibzugriffe auf Cookies in der Reihenfolge (für Tests von Name, Secure-Flag …) */
   writes: [] as CookieWrite[],
   revalidated: [] as string[],
+  /** Ziele, zu denen Komponenten per `useRouter().push/replace` navigiert haben (Komponententests mit den Fakes) */
+  navigations: [] as string[],
   /** Zurück auf „frischer Browser ohne Cookies, ohne Header“. */
   reset() {
     this.cookies.clear();
     this.headers = new Headers();
     this.writes.length = 0;
     this.revalidated.length = 0;
+    this.navigations.length = 0;
   },
   /** Setzt die Anfrage-Header (ersetzt die bisherigen), z. B. `{ "x-forwarded-for": "1.2.3.4" }`. */
   setHeaders(values: Record<string, string>) {
@@ -130,6 +133,16 @@ const FAKES: Record<string, unknown> = {
     notFound: (): never => {
       throw new NotFoundSignal();
     },
+    // Hooks für Komponenten, die in Tests mit den Fakes gerendert werden (ohne Router-Laufzeit): `push`/`replace` landen in `browser.navigations`
+    useRouter: () => ({
+      push: (href: string) => void browser.navigations.push(href),
+      replace: (href: string) => void browser.navigations.push(href),
+      back: noop,
+      forward: noop,
+      refresh: noop,
+      prefetch: noop,
+    }),
+    usePathname: () => "/",
     // wie Next: Steuerfluss-Signale (redirect/notFound) weiterreichen, alles andere ignorieren
     unstable_rethrow: (error: unknown): void => {
       if (error instanceof RedirectSignal || error instanceof NotFoundSignal) throw error;
