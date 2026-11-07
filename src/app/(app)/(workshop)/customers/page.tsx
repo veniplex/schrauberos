@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
 import { Badge, EmptyState, Plate } from "@/components/ui/layout";
+import { ExchangeMenu } from "@/components/exchange/exchange-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { DataTable } from "@/components/ui/data-table";
@@ -58,11 +59,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         description={t("customers.description")}
         help="workshop.customers"
         actions={
-          canEdit ? (
-            <LinkButton href="/customers/new" variant="primary">
-              <Plus className="size-4" aria-hidden /> {t("customers.new")}
-            </LinkButton>
-          ) : null
+          <>
+            <ExchangeMenu exportHref={session.can("customers.export") ? "/customers/export" : undefined} importHref={session.can("customers.import") ? "/customers/import" : undefined} />
+            {canEdit ? (
+              <LinkButton href="/customers/new" variant="primary">
+                <Plus className="size-4" aria-hidden /> {t("customers.new")}
+              </LinkButton>
+            ) : null}
+          </>
         }
       />
 

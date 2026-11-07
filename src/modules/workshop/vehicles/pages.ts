@@ -5,6 +5,8 @@ export const pages = definePages("workshop.vehicles", [
   { path: "/vehicles", kind: "list", permission: "vehicles.view", key: true },
   { path: "/vehicles", kind: "list", permission: "vehicles.view", query: "?inspection=soon" },
   { path: "/vehicles/print", kind: "print", permission: "vehicles.view", query: "?inspection=soon" },
+  { path: "/vehicles/export", kind: "other", permission: "vehicles.export" },
+  { path: "/vehicles/import", kind: "other", permission: "vehicles.import" },
   { path: "/vehicles/new", kind: "new", permission: "vehicles.edit" },
   { path: "/vehicles/[id]", kind: "detail", permission: "vehicles.view", params: { id: { table: "Vehicle" } }, key: true },
   { path: "/vehicles/[id]/edit", kind: "edit", permission: "vehicles.edit", params: { id: { table: "Vehicle" } } },

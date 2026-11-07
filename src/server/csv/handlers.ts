@@ -15,7 +15,7 @@ import { CSV_FORMATS, defaultFormatId, isCsvFormatId } from "./format";
 import { CSV_LIMITS } from "./limits";
 import { CsvError } from "./reader";
 import { readTable } from "./table";
-import type { ExportDef, ImportDef } from "./types";
+import type { ExportDef, ImportDef, PreviewResponse, PreviewRow } from "./types";
 import { csvChunks } from "./writer";
 
 /**
@@ -108,22 +108,6 @@ const BODY_OVERHEAD = 64 * 1024;
 /** Von den Zeilen zeigt die Vorschau alle mit Problem (bis zu dieser Zahl) und einige Beispiele der neuen. */
 const PREVIEW_PROBLEMS = 200;
 const PREVIEW_SAMPLES = 8;
-
-export type PreviewRow = { line: number; status: "create" | "duplicate" | "error"; label: string; messages: string[]; forced: boolean };
-export type PreviewResponse = {
-  mode: "preview";
-  digest: string;
-  encoding: string;
-  delimiter: string;
-  columns: Array<{ header: string; label: string | null; note: string | null }>;
-  missing: string[];
-  counts: { rows: number; create: number; duplicate: number; error: number; forced: number };
-  formulaLike: number;
-  rows: PreviewRow[];
-  truncated: boolean;
-  /** Es gibt etwas anzulegen und keine Pflichtspalte fehlt (Zeilenfehler verhindern das Anwenden nur, solange „fehlerhafte Zeilen überspringen“ nicht gewählt ist) */
-  canApply: boolean;
-};
 
 export async function handleImport(request: Request, kind: string | undefined, defs: readonly ImportDef[]): Promise<Response> {
   const session = await authenticate(request);

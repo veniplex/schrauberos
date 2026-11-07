@@ -35,3 +35,18 @@ Fahrzeuge sind eigenständig und brauchen **keinen** Kunden. Erfasst werden Kenn
   **Erstzulassung** und **HSN/TSN** (4 und 3 Zeichen, Felder 2.1 und 2.2 der Zulassungsbescheinigung).
 * **Halterwechsel:** Über „Halterwechsel“ (Datum, optional Notiz) wechselt der Halter. Die **Historie** bleibt sichtbar; Reifensätze
   und Termine bleiben am Fahrzeug.
+
+## Export und Import (CSV)
+
+Über **Export / Import** oben in der Fahrzeugliste. Beides sind eigene Rechte (*Fahrzeuge exportieren*, *Fahrzeuge importieren*), die in keiner mitgelieferten Rolle enthalten sind. Der Export setzt zusätzlich das Recht zum Ansehen der Fahrzeuge voraus.
+
+* **Export der gefilterten Liste:** Öffnen Sie den Export aus der Fahrzeugliste, übernimmt er deren Auswahl (Suche, Prüffrist, „ohne Halter“) – die Seite zeigt, was ausgewählt ist.
+* **Dateiformat:** CSV (Textdatei mit Spalten). Für den Export wählen Sie zwischen **Excel (Deutschland)** – Semikolon als Trennzeichen, Komma als Dezimalzeichen, öffnet sich in deutschem Excel per Doppelklick – und **International** (Komma und Punkt). Die Datei ist UTF-8 mit Kennung, Umlaute erscheinen in Excel richtig. Datum steht als `JJJJ-MM-TT`, Beträge als Zahl ohne Währungszeichen (`1234,56`).
+* **Schutz vor Formeln:** Zellen, die mit `=`, `+`, `-` oder `@` beginnen, bekommen im Export ein vorangestelltes `'`, damit Excel sie nie als Formel ausführt. Der Import nimmt dieses Zeichen wieder weg – ein Export lässt sich unverändert wieder einlesen. Beim Import werden solche Zellen nur als Text gespeichert und nie ausgeführt.
+
+* **Spalten:** Kennzeichen (Pflicht), Hersteller, Modell, FIN, Baujahr, Kilometerstand, Kraftstoff, HSN, TSN, Erstzulassung, HU fällig (JJJJ-MM), Weitere Prüfung samt Datum, Notizen. Der **Halter** erscheint als **Kundennummer** – nur, wenn Sie Kunden sehen dürfen; beim Import ordnet die Kundennummer den Halter zu (unbekannte oder mehrfach vergebene Nummern sind Zeilenfehler). Kraftstoff und Art der weiteren Prüfung dürfen ausgeschrieben oder als Kennung stehen.
+* **Dubletten:** Ein Kennzeichen, das es schon gibt (oder das weiter oben in der Datei steht), ist wie in der Oberfläche eine **Warnung**, keine Sperre: Die Zeile wird übersprungen – oder, wenn Sie **„Dubletten trotzdem anlegen“** wählen, bewusst angelegt.
+
+**So läuft ein Import:** Datei wählen und **„Vorschau erstellen“** – es wird noch nichts gespeichert. Die Vorschau zeigt den erkannten Zeichensatz (UTF-8, Windows-1252 und UTF-16 werden erkannt) und das Trennzeichen, welche Spalten der Datei übernommen werden, die Meldung zu jeder auffälligen Zeile (mit Zeilennummer) und eine Zusammenfassung: **neu**, **Dubletten (übersprungen)** und **fehlerhaft**. Erst mit **„Jetzt importieren“** wird gespeichert – alle neuen Zeilen **in einem Schritt oder gar nicht**; bei einem Fehler bleibt der Bestand unverändert. Enthält die Datei fehlerhafte Zeilen, wird nichts importiert, solange Sie nicht **„Fehlerhafte Zeilen überspringen“** wählen. Der Import **legt nur neue Datensätze an** und ändert bestehende nie. Die Datei darf höchstens 5 MB und 5000 Zeilen haben und wird nur im Arbeitsspeicher verarbeitet, nicht gespeichert. Excel-Arbeitsmappen (.xlsx) werden nicht gelesen: in Excel „Speichern unter“ → „CSV UTF-8“ wählen.
+
+**Datenschutz:** Die Datei enthält personenbezogene Daten. Geben Sie sie nur an Berechtigte weiter, versenden Sie sie nicht unverschlüsselt per E-Mail und löschen Sie sie, wenn Sie sie nicht mehr brauchen. Jeder Export und Import steht mit der Zahl der Zeilen im Audit-Log (Wer, wann, wie viele).

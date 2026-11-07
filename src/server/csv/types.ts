@@ -51,3 +51,21 @@ export type ExportDef = {
   filename(query: URLSearchParams): string;
   open(context: { session: AppSession; query: URLSearchParams; format: CsvFormat; t: Translator["t"] }): Promise<ExportOpened | { error: MessageKey }>;
 };
+
+/* ───────────── Antwort der Import-Vorschau (JSON, Anzeige in `components/exchange/import-panel.tsx`) ───────────── */
+
+export type PreviewRow = { line: number; status: "create" | "duplicate" | "error"; label: string; messages: string[]; forced: boolean };
+export type PreviewResponse = {
+  mode: "preview";
+  digest: string;
+  encoding: string;
+  delimiter: string;
+  columns: Array<{ header: string; label: string | null; note: string | null }>;
+  missing: string[];
+  counts: { rows: number; create: number; duplicate: number; error: number; forced: number };
+  formulaLike: number;
+  rows: PreviewRow[];
+  truncated: boolean;
+  /** Es gibt etwas anzulegen und keine Pflichtspalte fehlt (Zeilenfehler verhindern das Anwenden nur, solange „fehlerhafte Zeilen überspringen“ nicht gewählt ist) */
+  canApply: boolean;
+};

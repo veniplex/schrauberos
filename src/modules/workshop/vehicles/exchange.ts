@@ -21,7 +21,7 @@ const mayUseOwner = (session: AppSession) => session.features.has("workshop.cust
 const columnsFor = (session: AppSession) => (mayUseOwner(session) ? VEHICLE_COLUMNS : VEHICLE_COLUMNS.filter((c) => c.key !== "customerNumber"));
 
 /**
- * Export der Fahrzeuge (`vehicles.export` und `vehicles.view`). Auswahl wie die Fahrzeugliste: Suche `q`, `inspection=soon|none`, `month=JJJJ-MM`, `noOwner=1` – der Knopf „Exportieren“
+ * Export der Fahrzeuge (`vehicles.export` und `vehicles.view`). Auswahl wie die Fahrzeugliste: Suche `q`, `inspection=soon|none`, `month=JJJJ-MM`, `owner=none` (wie die Adresse der Liste) – der Knopf „Exportieren“
  * der Liste reicht die gewählten Filter durch. Kunden erscheinen nur als Kundennummer und nur mit `customers.view`.
  */
 export const vehiclesExport: ExportDef = {
@@ -37,7 +37,7 @@ export const vehiclesExport: ExportDef = {
     const where = vehicleListWhere(
       {
         q: (query.get("q") ?? "").trim().slice(0, 60),
-        noOwnerOnly: query.get("noOwner") === "1",
+        noOwnerOnly: query.get("owner") === "none",
         inspection: inspection === "soon" || inspection === "none" ? inspection : undefined,
         month: month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : undefined,
       },

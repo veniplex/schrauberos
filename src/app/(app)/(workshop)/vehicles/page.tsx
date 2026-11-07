@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus, Printer } from "lucide-react";
 import { Badge, EmptyState, Plate, StatusBadge, TextLink } from "@/components/ui/layout";
+import { ExchangeMenu } from "@/components/exchange/exchange-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { LinkButton } from "@/components/ui/buttons";
@@ -54,6 +55,8 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
   const links = listLinks("/vehicles", filters, list, DEFAULT);
   // Druckliste: dieselben Filter (ohne Sortierung/Seite – die Liste ist nach Frist sortiert)
   const printHref = `/vehicles/print?${new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => !!entry[1])).toString()}`;
+  // Export: dieselben Filter wie die Liste (die Seite „Exportieren“ zeigt die Auswahl an)
+  const exportQuery = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => !!entry[1])).toString();
   const monthLabel = (value: string) => date(monthStart(value), { month: "long", year: "numeric" });
 
   return (
@@ -64,6 +67,10 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         help="workshop.vehicles"
         actions={
           <>
+            <ExchangeMenu
+              exportHref={session.can("vehicles.export") ? `/vehicles/export${exportQuery ? `?${exportQuery}` : ""}` : undefined}
+              importHref={session.can("vehicles.import") ? "/vehicles/import" : undefined}
+            />
             <LinkButton href={printHref}>
               <Printer className="size-4" aria-hidden /> {t("vehicles.print.button")}
             </LinkButton>

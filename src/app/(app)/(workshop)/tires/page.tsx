@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
 import { EmptyState, Plate, StatusBadge, TextLink } from "@/components/ui/layout";
+import { ExchangeMenu } from "@/components/exchange/exchange-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { LinkButton } from "@/components/ui/buttons";
@@ -95,11 +96,14 @@ export default async function TiresPage({ searchParams }: { searchParams: Promis
         description={t("tires.description")}
         help="workshop.tires"
         actions={
-          canCreate ? (
-            <LinkButton href="/tires/new" variant="primary">
-              <Plus className="size-4" aria-hidden /> {t("tires.new")}
-            </LinkButton>
-          ) : null
+          <>
+            <ExchangeMenu exportHref={session.can("tires.export") ? "/tires/export" : undefined} importHref={session.can("tires.import") ? "/tires/import" : undefined} />
+            {canCreate ? (
+              <LinkButton href="/tires/new" variant="primary">
+                <Plus className="size-4" aria-hidden /> {t("tires.new")}
+              </LinkButton>
+            ) : null}
+          </>
         }
       />
 

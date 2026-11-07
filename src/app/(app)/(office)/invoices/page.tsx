@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Paperclip, Plus } from "lucide-react";
 import { EmptyState, StatCard } from "@/components/ui/layout";
+import { ExchangeMenu } from "@/components/exchange/exchange-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { LinkButton } from "@/components/ui/buttons";
@@ -91,11 +92,14 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         description={t("invoices.description")}
         help="office.invoices"
         actions={
-          canEdit ? (
-            <LinkButton href={`/invoices/new?dir=${direction}`} variant="primary">
-              <Plus className="size-4" aria-hidden /> {direction === "incoming" ? t("invoices.newIncoming") : t("invoices.newOutgoing")}
-            </LinkButton>
-          ) : null
+          <>
+            <ExchangeMenu exportHref={session.can("invoices.export") ? "/invoices/export" : undefined} importHref={session.can("invoices.import") ? "/invoices/import" : undefined} />
+            {canEdit ? (
+              <LinkButton href={`/invoices/new?dir=${direction}`} variant="primary">
+                <Plus className="size-4" aria-hidden /> {direction === "incoming" ? t("invoices.newIncoming") : t("invoices.newOutgoing")}
+              </LinkButton>
+            ) : null}
+          </>
         }
       />
       <TabNav label={t("invoices.title")} items={INVOICE_DIRECTIONS.map((value) => ({ href: tabHref(value), label: t(`invoices.tabs.${value}`), active: direction === value }))} />
