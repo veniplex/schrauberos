@@ -26,7 +26,7 @@ export default async function EditUserPage({ params, searchParams }: { params: P
   const [{ t, date }, { id }, sp] = await Promise.all([getI18n(), params, searchParams]);
   const twoFactor = await twoFactorStatus(id);
   const [user, roles, actor] = await Promise.all([
-    db.user.findUnique({ where: { id }, include: { roles: { include: { role: { include: { permissions: true } } } }, employee: true } }),
+    db.user.findUnique({ where: { id }, include: { roles: { include: { role: { include: { permissions: true } } } }, employee: { select: { id: true, firstName: true, lastName: true } } } }),
     db.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }], include: { permissions: true } }),
     loadActor(db, session.user.id),
   ]);

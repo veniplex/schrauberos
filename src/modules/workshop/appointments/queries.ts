@@ -1,12 +1,13 @@
 import "server-only";
 import { db } from "@/server/db";
 import { staffWithAccount } from "@/modules/office/employees/public";
+import { customerNameSelect } from "@/modules/workshop/customers/public";
 
 export const appointmentInclude = {
   type: true,
   bay: true,
-  customer: true,
-  vehicle: { include: { customer: true } },
+  customer: { select: customerNameSelect },
+  vehicle: { include: { customer: { select: customerNameSelect } } },
   assignee: { select: { id: true, name: true } },
   // Verknüpfter Reifensatz: nur, was der Vorschlag „Satz ein-/ausbuchen?“ nach „Fertig“ braucht (Stand, Version, Bezeichnung)
   tireSet: {

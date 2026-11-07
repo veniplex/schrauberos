@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerContacts, customerDisplayName, customerTitle } from "@/modules/workshop/customers/public";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { VehicleForm } from "@/modules/workshop/vehicles/forms";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -12,9 +11,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function NewVehiclePage({ searchParams }: { searchParams: Promise<{ customer?: string; plate?: string }> }) {
-  await requirePermission("vehicles.edit");
+  const session = await requirePermission("vehicles.edit");
   const [{ t }, sp] = await Promise.all([getI18n(), searchParams]);
-  const customer = sp.customer ? await db.customer.findUnique({ where: { id: sp.customer } }) : null;
+  // Vorbelegter Halter: Name immer, Ort nur mit `customers.view` (D7)
+  const customer = sp.customer ? await customerTitle(sp.customer) : null;
+  const city = customer ? (await customerContacts(session, [customer.id])).get(customer.id)?.city : undefined;
 
   return (
     <>
@@ -23,7 +24,7 @@ export default async function NewVehiclePage({ searchParams }: { searchParams: P
         <VehicleForm
           cancelHref={customer ? `/customers/${customer.id}` : "/vehicles"}
           initial={{
-            customer: customer ? { id: customer.id, label: customerDisplayName(customer), sublabel: customer.city ?? undefined } : null,
+            customer: customer ? { id: customer.id, label: customerDisplayName(customer), sublabel: city ?? undefined } : null,
             plate: (sp.plate ?? "").trim().slice(0, 14), make: "", model: "", vin: "", year: "", notes: "",
             mileage: "", fuel: "", hsn: "", tsn: "", firstRegistration: "", inspectionDue: "", extraKind: "", extraDue: "",
           }}

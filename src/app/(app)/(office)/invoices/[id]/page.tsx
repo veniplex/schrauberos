@@ -10,7 +10,7 @@ import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { todayInput } from "@/lib/dates";
 import { paymentState } from "@/modules/office/invoices/domain";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { formatCents } from "@/lib/money";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -33,7 +33,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const inv = await db.invoice.findUnique({
     where: { id },
-    include: { customer: true, file: { select: { name: true, mime: true, size: true, uploadedAt: true } } },
+    include: { customer: { select: customerNameSelect }, file: { select: { name: true, mime: true, size: true, uploadedAt: true } } },
   });
   if (!inv) notFound();
 

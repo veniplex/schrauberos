@@ -10,8 +10,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { DEPARTMENTS, employeeName } from "@/modules/office/employees/domain";
+import { countEmployees, listEmployees } from "@/modules/office/employees/queries";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { contains, searchWhere } from "@/server/search";
 import { SearchInput, Select } from "@/components/ui/form";
 
@@ -45,10 +45,10 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
     ...(status === "active" ? { active: true } : status === "inactive" ? { active: false } : {}),
     ...(text ?? {}),
   };
-  const total = await db.employee.count({ where });
+  const total = await countEmployees(session, where);
   const page = clampPage(list.page, total, list.pageSize);
   const orderBy = list.sort === "role" ? [{ department: list.dir }, { jobTitle: list.dir }, { lastName: "asc" as const }] : [{ lastName: list.dir }, { firstName: list.dir }];
-  const employees = await db.employee.findMany({ where, include: { user: { select: { id: true, username: true } } }, orderBy, ...pageWindow(page, list.pageSize) });
+  const employees = await listEmployees(session, { where, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("employees.edit");
   const links = listLinks("/employees", { q: q || undefined, department: department || undefined, status: status !== "active" ? status : undefined }, list, DEFAULT);
 

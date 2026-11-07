@@ -11,9 +11,9 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
+import { countCustomers, listCustomers } from "@/modules/workshop/customers/queries";
 import { normalizePlate } from "@/lib/plate";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { contains, searchWhere } from "@/server/search";
 import { SearchInput } from "@/components/ui/form";
 
@@ -45,10 +45,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       { permission: "vehicles.view", where: () => (plate ? { vehicles: { some: { plateNorm: { contains: plate } } } } : { id: "" }) },
     ]) ?? {};
 
-  const total = await db.customer.count({ where });
+  const total = await countCustomers(session, where);
   const page = clampPage(list.page, total, list.pageSize);
   const orderBy = list.sort === "city" ? [{ city: list.dir }, { lastName: "asc" as const }] : [{ lastName: list.dir }, { firstName: list.dir }, { company: list.dir }];
-  const customers = await db.customer.findMany({ where, include: { vehicles: { orderBy: { plateNorm: "asc" } } }, orderBy, ...pageWindow(page, list.pageSize) });
+  const customers = await listCustomers(session, { where, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("customers.edit");
   const links = listLinks("/customers", { q: q || undefined }, list, DEFAULT);
 

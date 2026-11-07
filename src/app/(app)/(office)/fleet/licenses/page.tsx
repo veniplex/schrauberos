@@ -10,10 +10,10 @@ import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { todayInput } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
-import { employeeName } from "@/modules/office/employees/public";
+import { activeEmployees, employeeName } from "@/modules/office/employees/public";
 import { FLEET_WARN_DAYS } from "@/modules/office/fleet/domain";
+import { listDrivers } from "@/modules/office/fleet/queries";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { deleteLicenseCheck } from "@/modules/office/fleet/actions";
 import { LicenseCheckForm } from "@/modules/office/fleet/forms";
 
@@ -28,19 +28,12 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
   const canEdit = session.can("fleet.edit");
 
   // Fahrer = aktive Mitarbeiter, denen ein nicht verkauftes Firmenfahrzeug zugeordnet ist
-  const drivers = await db.employee.findMany({
-    where: { active: true, fleetVehicles: { some: { status: { not: "sold" } } } },
-    include: {
-      fleetVehicles: { where: { status: { not: "sold" } }, select: { id: true, plate: true } },
-      licenseChecks: { orderBy: { checkedAt: "desc" }, take: 3 },
-    },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-  });
+  const drivers = await listDrivers(3);
   const rows = drivers.map((d) => {
     const last = d.licenseChecks[0];
     return { d, last, state: last ? dueState(last.nextDue, FLEET_WARN_DAYS) : ("expired" as const) };
   });
-  const allEmployees = canEdit ? await db.employee.findMany({ where: { active: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }) : [];
+  const allEmployees = canEdit ? await activeEmployees() : [];
 
   return (
     <>

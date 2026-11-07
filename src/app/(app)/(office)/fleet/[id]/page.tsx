@@ -16,6 +16,7 @@ import { formatCents } from "@/lib/money";
 import { INTL_LOCALE } from "@/i18n/config";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
+import { fleetPlate, getFleetVehicleDetail } from "@/modules/office/fleet/queries";
 import { deleteCost, deleteFleetVehicle, deleteMileage } from "@/modules/office/fleet/actions";
 import { CostForm, MileageForm } from "@/modules/office/fleet/forms";
 import { DueBadge } from "@/modules/office/fleet/ui";
@@ -23,8 +24,7 @@ import { DueBadge } from "@/modules/office/fleet/ui";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   if (!(await sessionIfAllowed("fleet.view"))) return {};
-  const v = await db.fleetVehicle.findUnique({ where: { id } });
-  return { title: v?.plate };
+  return { title: (await fleetPlate(id)) ?? undefined };
 }
 
 export default async function FleetVehiclePage({ params }: { params: Promise<{ id: string }> }) {
@@ -34,14 +34,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
   const eur = (cents: number) => formatCents(cents, INTL_LOCALE[locale]);
   const canEdit = session.can("fleet.edit");
 
-  const v = await db.fleetVehicle.findUnique({
-    where: { id },
-    include: {
-      driver: { include: { licenseChecks: { orderBy: { checkedAt: "desc" }, take: 1 } } },
-      mileage: { orderBy: [{ date: "desc" }, { km: "desc" }], take: 30 },
-      costs: { orderBy: { date: "desc" }, take: 50 },
-    },
-  });
+  const v = await getFleetVehicleDetail(id);
   if (!v) notFound();
 
   // Summen und Kilometerspanne über ALLE Einträge des Fahrzeugs (von der Datenbank gerechnet) – die Listen darunter zeigen nur die neuesten

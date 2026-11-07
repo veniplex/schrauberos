@@ -3,4 +3,4 @@
  * (und nur, wenn sie die Funktion in `requires`/`uses` ihrer feature.ts deklariert haben).
  */
 export { DEPARTMENTS, employeeName, visibleAbsenceType, workdaysBetween, workdaysWithin } from "./domain";
-export { staffWithAccount } from "./staff";
+export { activeEmployees, staffWithAccount, type EmployeeName } from "./queries";

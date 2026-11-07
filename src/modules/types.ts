@@ -6,6 +6,12 @@ import type { FeatureId, Permission } from "./catalog";
 
 type ServerComponent = () => ReactNode | Promise<ReactNode>;
 
+/**
+ * Betrachter einer Abfrage (`queries.ts` der Funktionen): die Sitzung oder das Prinzipal einer Operation. Eine Abfrage liest sensible Spalten nur, wenn `can(...)` es erlaubt –
+ * sie werden gar nicht erst aus der Datenbank geholt (README, „Datenzugriff“).
+ */
+export type Viewer = Pick<AppSession, "can">;
+
 /** Dashboard-Baustein einer Funktion. Erscheint nur, wenn die Funktion aktiv ist und das Recht vorliegt. */
 export type WidgetDef = {
   id: string;

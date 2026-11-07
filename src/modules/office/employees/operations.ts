@@ -36,6 +36,9 @@ const employeeInput = z
     if (d.hireDate && d.leaveDate && d.leaveDate < d.hireDate) ctx.addIssue({ code: "custom", message: "employees.errors.leaveBeforeHire", path: ["leaveDate"] });
   });
 
+/** Nach dem Speichern wird nur gebraucht, was Audit und Antwort nennen (nie der Notfallkontakt). */
+const SAVED = { id: true, firstName: true, lastName: true } as const;
+
 export const saveEmployeeOperation = defineOperation({
   name: "employees.save",
   permission: "employees.edit",
@@ -47,7 +50,7 @@ export const saveEmployeeOperation = defineOperation({
       if (dup) failField("personnelNumber", "employees.errors.numberTaken");
     }
     if (d.userId) {
-      const user = await tx.user.findUnique({ where: { id: d.userId }, include: { employee: true } });
+      const user = await tx.user.findUnique({ where: { id: d.userId }, include: { employee: { select: { id: true, firstName: true, lastName: true } } } });
       if (!user) failField("userId", "validation.invalid");
       if (user.employee && user.employee.id !== id) failField("userId", "employees.errors.userTaken", { name: employeeName(user.employee) });
     }
@@ -76,13 +79,14 @@ export const saveEmployeeOperation = defineOperation({
     let saved;
     let emergencyChanged = false;
     if (id) {
-      const before = await tx.employee.findUnique({ where: { id }, select: { emergencyName: true, emergencyPhone: true, emergencyRelation: true } });
-      if (!before) fail("notFound");
+      if (!(await tx.employee.findUnique({ where: { id }, select: { id: true } }))) fail("notFound");
+      // Der bisherige Notfallkontakt wird nur gelesen, wenn er sich mit diesem Recht überhaupt ändern lässt
+      const before = sensitive ? await tx.employee.findUnique({ where: { id }, select: { emergencyName: true, emergencyPhone: true, emergencyRelation: true } }) : null;
       if (!(await claimRow(tx.employee, id, version))) fail("conflict");
-      saved = await tx.employee.update({ where: { id }, data });
-      emergencyChanged = sensitive && (before.emergencyName !== emergency.emergencyName || before.emergencyPhone !== emergency.emergencyPhone || before.emergencyRelation !== emergency.emergencyRelation);
+      saved = await tx.employee.update({ where: { id }, data, select: SAVED });
+      emergencyChanged = before !== null && (before.emergencyName !== emergency.emergencyName || before.emergencyPhone !== emergency.emergencyPhone || before.emergencyRelation !== emergency.emergencyRelation);
     } else {
-      saved = await tx.employee.create({ data });
+      saved = await tx.employee.create({ data, select: SAVED });
       emergencyChanged = sensitive && Object.values(emergency).some((value) => value !== null);
     }
     audit({ target: employeeName(saved), entityId: saved.id });

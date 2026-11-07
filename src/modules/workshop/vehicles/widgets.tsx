@@ -5,7 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { nowDate } from "@/lib/dates";
 import { monthStart } from "@/lib/month";
 import type { WidgetDef } from "@/modules/types";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { getSession } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { inspectionState, monthOf } from "./domain";
@@ -21,7 +21,7 @@ export async function InspectionDueWidget() {
   const where = attentionWhere(thisMonth);
   const [total, vehicles] = await Promise.all([
     db.vehicle.count({ where }),
-    db.vehicle.findMany({ where, include: { customer: true }, orderBy: [{ inspectionDue: "asc" }, { plateNorm: "asc" }], take: LIMIT }),
+    db.vehicle.findMany({ where, include: { customer: { select: customerNameSelect } }, orderBy: [{ inspectionDue: "asc" }, { plateNorm: "asc" }], take: LIMIT }),
   ]);
   // Weiche Abhängigkeit (`uses` in feature.ts): „Termin planen“ nur, wenn Termine aktiv sind und die Person welche anlegen darf
   const canPlan = !!session && session.features.has("workshop.appointments") && session.can("appointments.create");

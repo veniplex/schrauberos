@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
+import { linkableAccounts } from "@/modules/office/employees/queries";
 import { EmployeeForm } from "@/modules/office/employees/forms";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -15,7 +15,7 @@ export default async function NewEmployeePage() {
   const [{ t }, users] = await Promise.all([
     getI18n(),
     // nur aktive Konten ohne bereits verknüpften Mitarbeiter
-    db.user.findMany({ where: { active: true, employee: { is: null } }, select: { id: true, name: true, username: true }, orderBy: { name: "asc" } }),
+    linkableAccounts(session),
   ]);
   return (
     <>

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { nowDate } from "@/lib/dates";
 import { isMonth, monthStart } from "@/lib/month";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerContacts, customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { monthOf } from "@/modules/workshop/vehicles/domain";
 import { PrintButton } from "@/modules/workshop/vehicles/print-button";
 import { vehicleListWhere } from "@/modules/workshop/vehicles/queries";
@@ -36,11 +36,13 @@ export default async function VehiclesPrintPage({ searchParams }: { searchParams
 
   const [total, found] = await Promise.all([
     db.vehicle.count({ where }),
-    db.vehicle.findMany({ where, include: { customer: true }, orderBy: [{ inspectionDue: "asc" }, { plateNorm: "asc" }], take: MAX_ROWS }),
+    db.vehicle.findMany({ where, include: { customer: { select: customerNameSelect } }, orderBy: [{ inspectionDue: "asc" }, { plateNorm: "asc" }], take: MAX_ROWS }),
   ]);
   // Fahrzeuge ohne Frist ans Ende (SQLite sortiert leere Werte aufsteigend nach vorn)
   const vehicles = [...found.filter((v) => v.inspectionDue), ...found.filter((v) => !v.inspectionDue)];
+  // Telefon nur mit `customers.view` (D7); sonst wird er gar nicht gelesen
   const canSeePhone = session.can("customers.view");
+  const contacts = await customerContacts(session, found.flatMap((v) => (v.customerId ? [v.customerId] : [])));
   const monthLabel = (value: string) => date(monthStart(value), { month: "long", year: "numeric" });
   const filterText = [
     month ? t("vehicles.print.filterMonth", { month: monthLabel(month) }) : inspection === "soon" ? t("vehicles.print.filterSoon") : inspection === "none" ? t("vehicles.print.filterNone") : t("vehicles.print.filterAll"),
@@ -83,7 +85,7 @@ export default async function VehiclesPrintPage({ searchParams }: { searchParams
                 </td>
                 <td>{[v.make, v.model].filter(Boolean).join(" ") || "–"}</td>
                 <td>{customerDisplayName(v.customer)}</td>
-                {canSeePhone ? <td className="tabular whitespace-nowrap">{v.customer?.phone ?? "–"}</td> : null}
+                {canSeePhone ? <td className="tabular whitespace-nowrap">{contacts.get(v.customerId ?? "")?.phone ?? "–"}</td> : null}
                 <td>
                   <div className="tabular">{v.inspectionDue ? monthLabel(v.inspectionDue) : "–"}</div>
                   {v.extraInspectionKind && v.extraInspectionDue ? (

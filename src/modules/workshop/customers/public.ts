@@ -4,3 +4,4 @@
  */
 export { customerDisplayName } from "./domain";
 export { findCustomerIdsByNumber, numberKey } from "./lookup";
+export { customerContacts, customerNameSelect, customerTitle, type CustomerContact } from "./queries";

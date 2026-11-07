@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
-import { employeeName } from "@/modules/office/employees/public";
+import { activeEmployees, employeeName } from "@/modules/office/employees/public";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { FleetForm } from "@/modules/office/fleet/forms";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -13,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function NewFleetVehiclePage() {
   await requirePermission("fleet.edit");
-  const [{ t }, employees] = await Promise.all([getI18n(), db.employee.findMany({ where: { active: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] })]);
+  const [{ t }, employees] = await Promise.all([getI18n(), activeEmployees()]);
   return (
     <>
       <PageHeader back={{ href: "/fleet", label: t("nav.fleet") }} help="office.fleet" title={t("fleet.new")} />

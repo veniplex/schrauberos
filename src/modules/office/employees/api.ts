@@ -6,6 +6,7 @@ import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
 import { ABSENCE_TYPES, DEPARTMENTS } from "./domain";
+import { employeeBaseSelect } from "./queries";
 import {
   deleteAbsenceOperation,
   deleteEmployeeOperation,
@@ -68,6 +69,8 @@ export const employeeEndpoints = defineResource({
   path: "/employees",
   read: "employees.view",
   model: db.employee as unknown as Delegate<Employee>,
+  // Notfallkontakt (`employees.sensitive`) wird für die API gar nicht erst gelesen
+  select: employeeBaseSelect,
   item,
   version: versionOf,
   toItem: (e): z.input<typeof item> => ({
@@ -156,7 +159,8 @@ export const absenceEndpoints = defineResource({
   path: "/employee-absences",
   read: "employees.view",
   model: db.absence as unknown as Delegate<Absence>,
-  // Krankheit ist besonders geschützt: für die API gibt es sie nicht
+  // Krankheit ist besonders geschützt: für die API gibt es sie nicht – die Zeilen werden gar nicht gelesen (`scope`), `visible` ist die zweite Linie
+  scope: { type: { not: "sick" } },
   visible: (a) => a.type !== "sick",
   item: absenceItem,
   toItem: (a): z.input<typeof absenceItem> => ({

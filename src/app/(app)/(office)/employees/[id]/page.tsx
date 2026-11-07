@@ -9,16 +9,16 @@ import { getI18n } from "@/i18n/server";
 import { currentYear } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
-import { employeeName, visibleAbsenceType, workdaysBetween, workdaysWithin } from "@/modules/office/employees/domain";
+import { employeeName, workdaysBetween, workdaysWithin } from "@/modules/office/employees/domain";
+import { employeeTitle, getEmployeeDetail } from "@/modules/office/employees/queries";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { deleteAbsence, deleteEmployee, deleteQualification } from "@/modules/office/employees/actions";
 import { QualificationForm } from "@/modules/office/employees/forms";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   if (!(await sessionIfAllowed("employees.view"))) return {};
-  const e = await db.employee.findUnique({ where: { id } });
+  const e = await employeeTitle(id);
   return { title: e ? employeeName(e) : undefined };
 }
 
@@ -28,17 +28,10 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   const [{ id }, i18n] = await Promise.all([params, getI18n()]);
   const { t, tp, td, date } = i18n;
   const canEdit = session.can("employees.edit");
-  const sensitive = session.can("employees.sensitive");
   const year = currentYear();
 
-  const e = await db.employee.findUnique({
-    where: { id },
-    include: {
-      user: { select: { id: true, name: true, username: true, active: true } },
-      absences: { orderBy: { startDate: "desc" }, take: 20 },
-      qualifications: { orderBy: [{ expiresAt: "asc" }, { name: "asc" }] },
-    },
-  });
+  // Notfallkontakt (`e.emergency`) und Art/Anmerkung von Krankheit kommen nur mit `employees.sensitive` aus der Datenbank (queries.ts)
+  const e = await getEmployeeDetail(session, id);
   if (!e) notFound();
 
   const yearFrom = new Date(year, 0, 1);
@@ -91,7 +84,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             ) : (
               <ul className="divide-y divide-line">
                 {e.absences.map((a) => {
-                  const type = visibleAbsenceType(a.type, sensitive);
+                  const type = a.type;
                   const days = workdaysBetween(a.startDate, a.endDate);
                   return (
                     <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
@@ -104,7 +97,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                         <span className="text-ink-muted">({tp("employees.workdays", days)})</span>
                         {a.note && type !== "masked" && type !== "sick" ? <span className="text-ink-muted">{a.note}</span> : null}
                       </span>
-                      {canEdit && (a.type !== "sick" || sensitive) ? (
+                      {canEdit && a.type !== "masked" ? (
                         <form action={deleteAbsence}>
                           <input type="hidden" name="id" value={a.id} />
                           <input type="hidden" name="returnTo" value={returnTo} />
@@ -193,13 +186,13 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             )}
           </Card>
 
-          {sensitive ? (
+          {e.emergency ? (
             <Card title={t("employees.sections.emergency")}>
               <DefinitionList
                 items={[
-                  { label: t("employees.fields.emergencyName"), value: e.emergencyName },
-                  { label: t("employees.fields.emergencyPhone"), value: e.emergencyPhone },
-                  { label: t("employees.fields.emergencyRelation"), value: e.emergencyRelation },
+                  { label: t("employees.fields.emergencyName"), value: e.emergency.name },
+                  { label: t("employees.fields.emergencyPhone"), value: e.emergency.phone },
+                  { label: t("employees.fields.emergencyRelation"), value: e.emergency.relation },
                 ]}
               />
             </Card>

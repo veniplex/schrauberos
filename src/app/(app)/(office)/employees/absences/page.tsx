@@ -10,9 +10,9 @@ import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { isCalendarDay, nowDate, parseMonthParam, todayInput } from "@/lib/dates";
-import { employeeName, visibleAbsenceType, workdaysBetween } from "@/modules/office/employees/domain";
+import { employeeName, workdaysBetween } from "@/modules/office/employees/domain";
+import { absencesOverlapping, activeEmployees } from "@/modules/office/employees/queries";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { deleteAbsence } from "@/modules/office/employees/actions";
 import { AbsenceForm } from "@/modules/office/employees/forms";
 import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
@@ -49,12 +49,9 @@ export default async function AbsencesPage({
   const base = `/employees/absences?month=${monthKey}`;
 
   const [employees, absences] = await Promise.all([
-    db.employee.findMany({ where: { active: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
-    db.absence.findMany({
-      where: { startDate: { lte: monthEnd }, endDate: { gte: monthStart } },
-      include: { employee: true },
-      orderBy: { startDate: "asc" },
-    }),
+    activeEmployees(),
+    // Krankheit ohne `employees.sensitive`: Art und Anmerkung werden gar nicht gelesen (type = "masked")
+    absencesOverlapping(session, monthStart, monthEnd),
   ]);
   const today = nowDate();
 
@@ -151,7 +148,7 @@ export default async function AbsencesPage({
                   {days.map((d) => {
                     const a = covering(e.id, d);
                     const weekend = getDay(d) === 0 || getDay(d) === 6;
-                    const type = a ? visibleAbsenceType(a.type, sensitive) : null;
+                    const type = a ? a.type : null;
                     const label = type ? (type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)) : "";
                     const key = format(d, "yyyy-MM-dd");
                     return (
@@ -192,7 +189,7 @@ export default async function AbsencesPage({
           ) : (
             <ul className="divide-y divide-line">
               {absences.map((a) => {
-                const type = visibleAbsenceType(a.type, sensitive);
+                const type = a.type;
                 return (
                   <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                     <span className="flex flex-wrap items-center gap-2">
@@ -205,7 +202,7 @@ export default async function AbsencesPage({
                         {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""} · {tp("employees.workdays", workdaysBetween(a.startDate, a.endDate))}
                       </span>
                     </span>
-                    {canEdit && (a.type !== "sick" || sensitive) ? (
+                    {canEdit && a.type !== "masked" ? (
                       <form action={deleteAbsence}>
                         <input type="hidden" name="id" value={a.id} />
                         <input type="hidden" name="returnTo" value={base} />

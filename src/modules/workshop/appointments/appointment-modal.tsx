@@ -10,6 +10,7 @@ import { toVehicleOption } from "@/modules/workshop/vehicles/public";
 import { AppointmentForm, type AppointmentFormInitial } from "./appointment-form";
 import { appointmentFormOptions } from "./queries";
 import { versionOf } from "@/lib/concurrency";
+import { customerNameSelect } from "@/modules/workshop/customers/public";
 
 const toOption = toVehicleOption;
 
@@ -38,7 +39,7 @@ export async function AppointmentModal({
   if (params.edit) {
     const a = await db.appointment.findUnique({
       where: { id: params.edit },
-      include: { vehicle: { include: { customer: true } }, tireSet: { include: { vehicle: true } } },
+      include: { vehicle: { include: { customer: { select: customerNameSelect } } }, tireSet: { include: { vehicle: true } } },
     });
     if (!a) notFound();
     initial = {
@@ -61,12 +62,12 @@ export async function AppointmentModal({
   } else {
     const at = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(params.at ?? "") ? params.at! : null;
     const tireSet = params.tireSet
-      ? await db.tireSet.findUnique({ where: { id: params.tireSet }, include: { vehicle: { include: { customer: true } } } })
+      ? await db.tireSet.findUnique({ where: { id: params.tireSet }, include: { vehicle: { include: { customer: { select: customerNameSelect } } } } })
       : null;
     const vehicle = tireSet?.vehicle
       ? tireSet.vehicle
       : params.vehicle
-        ? await db.vehicle.findUnique({ where: { id: params.vehicle }, include: { customer: true } })
+        ? await db.vehicle.findUnique({ where: { id: params.vehicle }, include: { customer: { select: customerNameSelect } } })
         : null;
     const type = tireSet ? options.types.find((x) => x.kind === "tire_change") : undefined;
 

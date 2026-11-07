@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
+import { getCustomerForEdit } from "@/modules/workshop/customers/queries";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { CustomerForm } from "@/modules/workshop/customers/forms";
 import { versionOf } from "@/lib/concurrency";
 
@@ -14,9 +14,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function EditCustomerPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePermission("customers.edit");
+  const session = await requirePermission("customers.edit");
   const [{ t }, { id }] = await Promise.all([getI18n(), params]);
-  const c = await db.customer.findUnique({ where: { id } });
+  const c = await getCustomerForEdit(session, id);
   if (!c) notFound();
 
   return (

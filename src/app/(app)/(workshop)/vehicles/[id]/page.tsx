@@ -11,6 +11,7 @@ import { getI18n } from "@/i18n/server";
 import { nowDate, toDateInput, todayInput } from "@/lib/dates";
 import { monthStart } from "@/lib/month";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { getVehicleDetail } from "@/modules/workshop/vehicles/queries";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
@@ -39,16 +40,7 @@ export default async function VehiclePage({
   const [{ id }, sp, i18n, tireRules] = await Promise.all([params, searchParams, getI18n(), getTireRules()]);
   const { t, tp, td, date } = i18n;
 
-  const vehicle = await db.vehicle.findUnique({
-    where: { id },
-    include: {
-      customer: true,
-      ownerships: { include: { customer: true }, orderBy: { fromDate: "desc" } },
-      tireSets: { include: { tires: true } },
-      appointments: { orderBy: { startsAt: "desc" }, take: 8 },
-      _count: { select: { appointments: true } },
-    },
-  });
+  const vehicle = await getVehicleDetail(session, id);
   if (!vehicle) notFound();
 
   const canEdit = session.can("vehicles.edit");
@@ -163,7 +155,7 @@ export default async function VehiclePage({
                 <span className="text-ink-muted">{t("vehicles.noOwner")}</span>
               )}
             </p>
-            {vehicle.customer?.phone ? <p className="mt-1 text-sm">{vehicle.customer.phone}</p> : null}
+            {vehicle.ownerPhone ? <p className="mt-1 text-sm">{vehicle.ownerPhone}</p> : null}
             <h3 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("vehicles.ownerHistory")}</h3>
             {vehicle.ownerships.length === 0 ? (
               <p className="text-sm text-ink-muted">{t("vehicles.noHistory")}</p>

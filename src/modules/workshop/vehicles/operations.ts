@@ -2,7 +2,7 @@ import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { formatPlate, normalizePlate } from "@/lib/plate";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { parseMonthInput } from "@/lib/month";
 import { defineOperation, fail, failField, failFields } from "@/server/operations";
 import { EXTRA_INSPECTION_KINDS, FUEL_TYPES, HSN_PATTERN, TSN_PATTERN, normalizeKey, parseMileage } from "./domain";
@@ -86,7 +86,7 @@ export const saveVehicleOperation = defineOperation({
 
     // Ein Kennzeichen kann mehrfach vorkommen (Halterwechsel, wiederverwendete Kennzeichen, Altfahrzeug noch erfasst): Das ist eine **Warnung mit Bestätigung**, keine Sperre.
     // Die Antwort nennt das vorhandene Fahrzeug (Kennung, Kennzeichen, Halter), damit das Formular „Vorhandenes Fahrzeug öffnen“ und „Trotzdem anlegen“ anbieten kann.
-    const duplicate = await tx.vehicle.findFirst({ where: { plateNorm, ...(id ? { id: { not: id } } : {}) }, include: { customer: true }, orderBy: { createdAt: "asc" } });
+    const duplicate = await tx.vehicle.findFirst({ where: { plateNorm, ...(id ? { id: { not: id } } : {}) }, include: { customer: { select: customerNameSelect } }, orderBy: { createdAt: "asc" } });
     if (duplicate && !d.allowDuplicate) {
       const owner = duplicate.customer ? customerDisplayName(duplicate.customer) : "";
       failFields(

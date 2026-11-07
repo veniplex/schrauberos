@@ -6,6 +6,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { TireSetForm } from "@/modules/workshop/tires/tire-set-form";
 import { editTireSetInitial } from "@/modules/workshop/tires/form-initial";
+import { customerNameSelect } from "@/modules/workshop/customers/public";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -16,7 +17,7 @@ export default async function EditTireSetPage({ params }: { params: Promise<{ id
   await requirePermission("tires.edit");
   const [{ t }, { id }] = await Promise.all([getI18n(), params]);
   const [set, locations] = await Promise.all([
-    db.tireSet.findUnique({ where: { id }, include: { tires: true, vehicle: { include: { customer: true } } } }),
+    db.tireSet.findUnique({ where: { id }, include: { tires: true, vehicle: { include: { customer: { select: customerNameSelect } } } } }),
     db.tireSet.findMany({ where: { storageLocation: { not: null } }, select: { storageLocation: true }, distinct: ["storageLocation"], take: 200 }),
   ]);
   if (!set) notFound();

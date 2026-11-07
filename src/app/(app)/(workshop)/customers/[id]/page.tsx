@@ -10,7 +10,7 @@ import { getI18n } from "@/i18n/server";
 import { customerDisplayName, customerHasLinks } from "@/modules/workshop/customers/domain";
 import { toDateInput } from "@/lib/dates";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
-import { db } from "@/server/db";
+import { customerTitle, getCustomerDetail } from "@/modules/workshop/customers/queries";
 import { deleteCustomer } from "@/modules/workshop/customers/actions";
 import { HealthBadge, SeasonBadge, formatTireSize, getTireRules, setHealth } from "@/modules/workshop/tires/public";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
@@ -18,7 +18,7 @@ import { STATUS_TONE } from "@/modules/workshop/appointments/public";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   if (!(await sessionIfAllowed("customers.view"))) return {};
-  const c = await db.customer.findUnique({ where: { id } });
+  const c = await customerTitle(id);
   return { title: c ? customerDisplayName(c) : undefined };
 }
 
@@ -28,14 +28,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const [{ id }, i18n, tireRules] = await Promise.all([params, getI18n(), canTires ? getTireRules() : null]);
   const { t, tp, td, date } = i18n;
 
-  const customer = await db.customer.findUnique({
-    where: { id },
-    include: {
-      vehicles: { orderBy: { plateNorm: "asc" }, include: { tireSets: { include: { tires: true } } } },
-      appointments: { orderBy: { startsAt: "desc" }, take: 8, include: { vehicle: true } },
-      _count: { select: { appointments: true, ownerships: true, invoices: true, vehicles: true } },
-    },
-  });
+  // Fahrzeuge, Reifensätze und Termine am Kunden werden nur mit dem jeweiligen Recht gelesen (queries.ts)
+  const customer = await getCustomerDetail(session, id);
   if (!customer) notFound();
 
   const canEdit = session.can("customers.edit");

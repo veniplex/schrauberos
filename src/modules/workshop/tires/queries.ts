@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/server/db";
 import { getTireRules } from "./settings";
 import { isWrongSeason, minTread, setHealth, wantedSeason, type Health, type TireHealth } from "@/modules/workshop/tires/domain";
+import { customerNameSelect } from "@/modules/workshop/customers/public";
 
 const OPEN_APPOINTMENT = { notIn: ["cancelled", "done", "no_show"] };
 
@@ -20,7 +21,7 @@ function loadSets(where: object = {}) {
     where,
     include: {
       tires: true,
-      vehicle: { include: { customer: true } },
+      vehicle: { include: { customer: { select: customerNameSelect } } },
       appointments: {
         where: { startsAt: { gte: new Date() }, status: OPEN_APPOINTMENT },
         orderBy: { startsAt: "asc" },

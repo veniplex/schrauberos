@@ -9,7 +9,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { getI18n } from "@/i18n/server";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { nowDate } from "@/lib/dates";
 import { isMonth, monthStart } from "@/lib/month";
 import { inspectionState, monthOf } from "@/modules/workshop/vehicles/domain";
@@ -48,7 +48,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
       : list.sort === "inspection"
         ? [{ inspectionDue: list.dir }, { plateNorm: "asc" as const }]
         : [{ plateNorm: list.dir }];
-  const vehicles = await db.vehicle.findMany({ where, include: { customer: true, _count: { select: { tireSets: true, appointments: true } } }, orderBy, ...pageWindow(page, list.pageSize) });
+  const vehicles = await db.vehicle.findMany({ where, include: { customer: { select: customerNameSelect }, _count: { select: { tireSets: true, appointments: true } } }, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("vehicles.edit");
   const canSeeCustomers = session.can("customers.view");
   const filters = { q: q || undefined, owner: noOwnerOnly ? "none" : undefined, inspection, month };

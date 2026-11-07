@@ -463,3 +463,52 @@ describe("Modulautonomie", () => {
     assert.deepEqual(offenders, []);
   });
 });
+
+/**
+ * Datenzugriff (P1c-2, README „Datenzugriff“): Seiten, Dashboard-Bausteine, Suche und API holen Daten mit sensiblen Spalten nur über die `queries.ts` ihrer Funktion
+ * (explizites `select`, Betrachter-Parameter). Statisch prüfbar ist: kein roher Zugriff auf die Tabellen der Mitarbeiter in Seiten und Bausteinen, kein Lesen des Notfallkontakts
+ * dort, keine Voll-Relationen auf Kunden/Mitarbeiter. Das Verhalten (kein sensibles SQL ohne Recht) prüfen die Tests der `queries.ts`.
+ */
+describe("Datenzugriff", () => {
+  const rel = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
+  const isPage = (r: string) => r.startsWith("app/") && !r.startsWith("app/api/");
+  const isWidget = (r: string) => /^modules\/[a-z0-9-]+\/[a-z0-9-]+\/widgets\.tsx$/.test(r);
+  const sources = files.map((file) => ({ file: rel(file), text: readFileSync(file, "utf8") }));
+
+  it("Seiten und Dashboard-Bausteine lesen die Tabellen der Mitarbeiter (Employee, Absence, Qualification) nie direkt – nur über employees/queries.ts bzw. employees/public.ts", () => {
+    const direct = /\bdb\.(employee|absence|qualification)\b/;
+    const offenders = sources.filter(({ file, text }) => (isPage(file) || isWidget(file)) && direct.test(text)).map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  /** Ohne Zeichenketten (Übersetzungsschlüssel wie "employees.fields.emergencyName") und Kommentarzeilen. */
+  const code = (text: string) =>
+    text
+      .split("\n")
+      .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+      .join("\n")
+      .replace(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g, '""');
+
+  it("Seiten, Bausteine, Suche und API lesen den Notfallkontakt nicht aus Datenbankzeilen (`.emergencyName` …): er kommt als `emergency` nur aus getEmployeeForEdit/getEmployeeDetail", () => {
+    const read = /\.\s*emergency(?:Name|Phone|Relation)\b/;
+    const offenders = sources.filter(({ file, text }) => (isPage(file) || isWidget(file) || /\/(search|api)\.ts$/.test(file)) && read.test(code(text))).map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  it("Seiten lesen die Kundentabelle nie direkt (db.customer): Kunden kommen über customers/queries.ts bzw. customers/public.ts", () => {
+    const offenders = sources.filter(({ file, text }) => isPage(file) && /\bdb\.customer\b/.test(text)).map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  it("keine Voll-Relationen auf Kunden und Mitarbeiter (`include: { customer: true }`): immer `select` – `customerNameSelect` für den Namen, `customerContacts` für Kontaktdaten", () => {
+    const wildcard = /\b(?:customer|employee|driver)\s*:\s*true\b/;
+    const offenders = sources.filter(({ file, text }) => (file.startsWith("app/") || file.startsWith("modules/")) && !/\/seed\.ts$/.test(file) && wildcard.test(code(text))).map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  it("die API der Mitarbeiter liest nur die Spalten ohne besonders geschützte Daten (select) und nie Krankheit (scope)", () => {
+    const api = readFileSync(path.join(SRC, "modules/office/employees/api.ts"), "utf8");
+    assert.match(api, /select:\s*employeeBaseSelect/);
+    assert.match(api, /scope:\s*\{\s*type:\s*\{\s*not:\s*"sick"/);
+  });
+});

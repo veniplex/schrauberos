@@ -4,8 +4,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { toDateInput } from "@/lib/dates";
 import { employeeName } from "@/modules/office/employees/domain";
+import { getEmployeeForEdit, linkableAccounts } from "@/modules/office/employees/queries";
 import { requirePermission } from "@/server/auth/session";
-import { db } from "@/server/db";
 import { EmployeeForm } from "@/modules/office/employees/forms";
 import { versionOf } from "@/lib/concurrency";
 
@@ -17,13 +17,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function EditEmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission("employees.edit");
   const [{ t }, { id }] = await Promise.all([getI18n(), params]);
-  const e = await db.employee.findUnique({ where: { id } });
+  const e = await getEmployeeForEdit(session, id);
   if (!e) notFound();
-  const users = await db.user.findMany({
-    where: { active: true, OR: [{ employee: { is: null } }, { id: e.userId ?? "" }] },
-    select: { id: true, name: true, username: true },
-    orderBy: { name: "asc" },
-  });
+  const users = await linkableAccounts(session, e.userId);
+  // Der Notfallkontakt ist nur mit `employees.sensitive` geladen (`e.emergency`), sonst null
   const canSensitive = session.can("employees.sensitive");
 
   return (
@@ -49,9 +46,9 @@ export default async function EditEmployeePage({ params }: { params: Promise<{ i
           active: e.active,
           vacationDaysPerYear: e.vacationDaysPerYear != null ? String(e.vacationDaysPerYear) : "",
           notes: e.notes ?? "",
-          emergencyName: canSensitive ? (e.emergencyName ?? "") : "",
-          emergencyPhone: canSensitive ? (e.emergencyPhone ?? "") : "",
-          emergencyRelation: canSensitive ? (e.emergencyRelation ?? "") : "",
+          emergencyName: e.emergency?.name ?? "",
+          emergencyPhone: e.emergency?.phone ?? "",
+          emergencyRelation: e.emergency?.relation ?? "",
           userId: e.userId ?? "",
         }}
       />

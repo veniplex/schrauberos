@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerContacts, customerNameSelect } from "@/modules/workshop/customers/public";
 import { formatTireSize, isWrongSeason, pendingStockBooking, setHealth, tireHealth, wantedSeason } from "@/modules/workshop/tires/domain";
 import { getTireRules } from "@/modules/workshop/tires/settings";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
@@ -43,13 +43,15 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
       where: { id },
       include: {
         tires: true,
-        vehicle: { include: { customer: true } },
+        vehicle: { include: { customer: { select: customerNameSelect } } },
         appointments: { orderBy: { startsAt: "desc" }, take: 10, include: { type: true } },
       },
     }),
     getTireRules(),
   ]);
   if (!set) notFound();
+  // Telefon des Halters nur mit `customers.view` (Richtlinie D7); ohne das Recht wird er gar nicht gelesen
+  const ownerPhone = (await customerContacts(session, set.vehicle.customerId ? [set.vehicle.customerId] : [])).get(set.vehicle.customerId ?? "")?.phone;
 
   const overall = setHealth(set.tires, tireRules);
   const byPos = new Map(set.tires.map((x) => [x.position, x]));
@@ -199,7 +201,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
                 <span className="text-ink-muted">{[set.vehicle.make, set.vehicle.model].filter(Boolean).join(" ")}</span>
               )}
             </p>
-            {set.vehicle.customer?.phone ? <p className="mt-1 text-sm">{set.vehicle.customer.phone}</p> : null}
+            {ownerPhone ? <p className="mt-1 text-sm">{ownerPhone}</p> : null}
           </Card>
 
           {canStock || canEdit ? (

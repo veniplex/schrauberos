@@ -3,30 +3,22 @@ import { addDays, startOfDay } from "date-fns";
 import { Badge, Card, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { DUE_TONE, dueState } from "@/lib/due";
-import { employeeName, visibleAbsenceType } from "@/modules/office/employees/domain";
+import { employeeName } from "@/modules/office/employees/domain";
+import { absencesAround, expiringQualifications } from "@/modules/office/employees/queries";
 import { getSession } from "@/server/auth/session";
-import { db } from "@/server/db";
 import type { WidgetDef } from "@/modules/types";
 
 /** Heute abwesende Mitarbeiter und bald ablaufende Qualifikationen. */
 export async function EmployeesWidget() {
   const [{ t, td, date }, session] = await Promise.all([getI18n(), getSession()]);
-  const sensitive = session?.can("employees.sensitive") ?? false;
+  if (!session) return null;
   const today = startOfDay(new Date());
   const soon = addDays(today, 60);
 
   const [absent, qualifications] = await Promise.all([
-    db.absence.findMany({
-      where: { startDate: { lte: addDays(today, 1) }, endDate: { gte: today } },
-      include: { employee: true },
-      orderBy: { endDate: "asc" },
-    }),
-    db.qualification.findMany({
-      where: { expiresAt: { not: null, lte: soon }, employee: { is: { active: true } } },
-      include: { employee: true },
-      orderBy: { expiresAt: "asc" },
-      take: 6,
-    }),
+    // Krankheit ohne `employees.sensitive`: Art und Anmerkung werden gar nicht gelesen (type = "masked")
+    absencesAround(session, today, addDays(today, 1)),
+    expiringQualifications(session, soon, 6),
   ]);
 
   return (
@@ -37,7 +29,7 @@ export async function EmployeesWidget() {
       ) : (
         <ul className="divide-y divide-line">
           {absent.map((a) => {
-            const type = visibleAbsenceType(a.type, sensitive);
+            const type = a.type;
             return (
               <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
                 <Link href={`/employees/${a.employeeId}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">

@@ -4,8 +4,7 @@ import { getI18n } from "@/i18n/server";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { employeeName } from "@/modules/office/employees/public";
 import { FLEET_WARN_DAYS } from "@/modules/office/fleet/domain";
-import { db } from "@/server/db";
-import { listFleet } from "./queries";
+import { listDrivers, listFleet } from "./queries";
 import { DueBadge } from "./ui";
 import type { WidgetDef } from "@/modules/types";
 
@@ -16,10 +15,7 @@ export async function FleetWidget() {
 
   const [vehicles, drivers] = await Promise.all([
     listFleet({ status: { not: "sold" } }),
-    db.employee.findMany({
-      where: { active: true, fleetVehicles: { some: { status: { not: "sold" } } } },
-      include: { licenseChecks: { orderBy: { checkedAt: "desc" }, take: 1 } },
-    }),
+    listDrivers(1),
   ]);
   const dueVehicles = vehicles.filter((v) => v.dues.length > 0).slice(0, 6);
   const dueDrivers = drivers
