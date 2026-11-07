@@ -4,7 +4,7 @@ import { BACKUP_CODE_COUNT, generateBackupCodes, hashBackupCode, NEVER_MATCHING_
 import { base32Decode, base32Encode, generateTotpSecret, matchTotp } from "@/lib/totp";
 import { db } from "@/server/db";
 import { writeAudit } from "@/server/audit";
-import { decryptSecret, encryptSecret } from "@/server/secrets";
+import { decryptSecret, encryptSecret, readSecretKey, SecretKeyUnavailableError } from "@/server/secrets";
 import { authRuntime } from "./runtime";
 import { loginThrottle } from "./throttle";
 
@@ -17,8 +17,9 @@ import { loginThrottle } from "./throttle";
  *  - Ein Code gilt nur einmal: Der zuletzt akzeptierte Zeitschritt steht in `lastStep`, Codes dieses oder eines früheren Schritts werden abgelehnt; das Setzen ist ein
  *    bedingtes Update (zwei gleichzeitige Anmeldungen mit demselben Code: genau eine gewinnt).
  *  - Sicherungscodes sind Einmalcodes (nur als Hash gespeichert, an das Konto gebunden).
- *  - **Restore ohne passenden `secret.key`:** Das Geheimnis ist unlesbar; der zweite Faktor wird für **alle** Konten zurückgesetzt (`resetUnreadableSecondFactors`), bei
- *    der nächsten Anmeldung erscheint der Hinweis, und das Audit-Log hält es fest.
+ *  - **Restore ohne passenden `secret.key`:** Das Geheimnis ist unlesbar. Die Anmeldung bleibt zu (fail-closed, `secondFactorRequired`); zurückgesetzt wird nur beim Start über
+ *    `secret-reset.ts` (`resetUnreadableSecondFactors`: lesbarer Schlüssel, Sicherung der Zeilen, nach einer ausdrücklichen Wiederherstellung bzw. durch die Administration),
+ *    bei der nächsten Anmeldung erscheint der Hinweis, und das Audit-Log hält es fest.
  */
 type Client = Pick<PrismaClient | Prisma.TransactionClient, "twoFactor" | "twoFactorBackupCode">;
 export type ResetReason = "key" | "recovery" | "admin";
@@ -28,9 +29,17 @@ const FAILURE_DECAY_MS = 15 * 60_000;
 
 const nowDate = () => new Date(authRuntime.now());
 
-/** Das Geheimnis als Bytes; null, wenn es fehlt oder mit einem anderen Schlüssel verschlüsselt wurde. */
+/**
+ * Das Geheimnis als Bytes; null, wenn es fehlt, mit einem anderen Schlüssel verschlüsselt wurde **oder der Schlüssel (`secret.key`) gerade nicht lesbar ist** – in allen Fällen
+ * lässt sich damit kein Code prüfen (die Anmeldung bleibt zu). Ob etwas zurückgesetzt werden darf, entscheidet nicht diese Funktion (siehe `secret-reset.ts`).
+ */
 function readSecret(blob: string | null): Buffer | null {
-  const plain = blob ? decryptSecret(blob) : null;
+  let plain: string | null = null;
+  try {
+    plain = blob ? decryptSecret(blob) : null;
+  } catch (error) {
+    if (!(error instanceof SecretKeyUnavailableError)) throw error;
+  }
   return plain ? base32Decode(plain) : null;
 }
 
@@ -59,19 +68,21 @@ export async function twoFactorStatus(userId: string, client: Client = db): Prom
 }
 
 /**
- * Verlangt die Anmeldung dieses Kontos einen zweiten Faktor? Ist das Geheimnis eines eingerichteten zweiten Faktors unlesbar (Backup von einer anderen Installation,
- * `secret.key` fehlt), werden **alle** unlesbaren zurückgesetzt – dieses Konto meldet sich dann nur mit dem Passwort an und sieht den Hinweis.
+ * Verlangt die Anmeldung dieses Kontos einen zweiten Faktor? Ja, sobald er eingerichtet ist – **auch wenn das Geheimnis gerade nicht lesbar ist** (`secret.key` fehlt,
+ * ist nicht lesbar oder gehört nicht zur Datenbank): Die Anmeldung bleibt dann zu (nur ein Sicherungscode geht, er braucht den Schlüssel nicht), statt sich mit dem Passwort
+ * allein zu öffnen. Zurückgesetzt wird hier **nie** etwas – das geschieht ausschließlich beim Start über `secret-reset.ts`, mit Sicherung und nur unter dessen Bedingungen.
  */
 export async function secondFactorRequired(userId: string): Promise<boolean> {
-  const row = await db.twoFactor.findUnique({ where: { userId }, select: { enabledAt: true, secret: true } });
-  if (!row?.enabledAt) return false;
-  if (readSecret(row.secret)) return true;
-  await resetUnreadableSecondFactors();
-  return false;
+  const row = await db.twoFactor.findUnique({ where: { userId }, select: { enabledAt: true } });
+  return !!row?.enabledAt;
 }
 
-/** Setzt jeden zweiten Faktor zurück, dessen Geheimnis nicht gelesen werden kann (fremder Schlüssel); hält es im Audit-Log fest. Gibt die Zahl der Konten zurück. */
+/**
+ * Setzt jeden zweiten Faktor zurück, dessen Geheimnis bei **lesbarem** Schlüssel nicht entschlüsselt werden kann (fremder Schlüssel, beschädigt); hält es im Audit-Log fest.
+ * Gibt die Zahl der Konten zurück. Nur über `resetUnreadableSecrets` aufrufen (prüft die Bedingungen und sichert vorher die Zeilen); ohne lesbaren Schlüssel tut sie nichts.
+ */
 export async function resetUnreadableSecondFactors(): Promise<number> {
+  if (readSecretKey().state !== "readable") return 0;
   const rows = await db.twoFactor.findMany({ select: { userId: true, secret: true, enabledAt: true } });
   const broken = rows.filter((row) => (row.enabledAt || row.secret) && !readSecret(row.secret));
   if (broken.length === 0) return 0;

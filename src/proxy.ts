@@ -9,7 +9,7 @@ import { startupState } from "@/server/startup-state";
 // Nur eine schnelle, optimistische Prüfung (Cookie vorhanden?). Die echte Prüfung der Sitzung und der Berechtigungen passiert
 // serverseitig in getSession()/requirePermission(). Deshalb leitet der Proxy nie „von /login weg“: Ein totes Cookie führte sonst zu
 // einer Schleife (Seite → /login → /). Ob jemand wirklich angemeldet ist, entscheidet die Anmeldeseite selbst.
-const OPEN_PAGES = new Set(["/login", "/login/recover", "/login/verify", "/setup"]);
+const OPEN_PAGES = new Set(["/login", "/login/recover", "/login/verify", "/login/key", "/setup"]);
 
 // Programmierschnittstelle (Bearer-Token) und iCal-Feed (Token in der URL) prüfen sich selbst und brauchen kein Sitzungs-Cookie.
 const SELF_AUTHENTICATED = ["/api/v1", "/api/ical"];

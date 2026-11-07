@@ -10,6 +10,7 @@ import { startJobRunner } from "@/server/jobs";
 import { appliedMigrations, MigrationError, runMigrations } from "@/server/migrate";
 import { ensureBaseData } from "@/server/seed/base";
 import { resetUnreadableSecrets } from "@/server/secret-reset";
+import { ensureSecretKey } from "@/server/secrets";
 import { ensureSetupToken } from "@/server/setup-token";
 import { startupState, type StartupState } from "@/server/startup-state";
 
@@ -74,8 +75,11 @@ export async function startApp(): Promise<void> {
     await loadCspMode();
     const revoked = await revokeApiTokensAfterRestore();
     if (revoked > 0) console.log(`[start] Nach der Wiederherstellung: ${revoked} API-Token(s) widerrufen.`);
-    // Backup ohne passenden Schlüssel (secret.key) und ohne Wiederherstellungsschlüssel: Alle Geheimnisse, die nicht mehr lesbar sind (Zwei-Faktor-Anmeldung, Update-Token, Zugangsdaten …),
-    // werden über das Register der Geheimnis-Verbraucher zurückgesetzt – mit Audit-Eintrag und Hinweis für Administratoren
+    // Geheimnisschlüssel: bei frischer Datenbank anlegen; fehlt er bei vorhandenen Geheimnissen oder ist er nicht lesbar, wird nichts angelegt und nichts gelöscht (siehe secrets.ts)
+    const keyState = ensureSecretKey();
+    if (keyState.state !== "readable") console.error(`[start] secret.key ist ${keyState.state === "missing" ? "nicht vorhanden" : "nicht lesbar"}: Zwei-Faktor-Anmeldung, Update-Token und Zugangsdaten sind gesperrt, bis der Schlüssel wieder da ist (Anmeldeseite: „Schlüssel wiederherstellen“, Verwaltung → Backups → Schlüssel).`);
+    // Geheimnisse, die der Schlüssel dieses Datenträgers nicht entschlüsseln kann (Wiederherstellung ohne Wiederherstellungsschlüssel): werden über das Register der Geheimnis-Verbraucher
+    // zurückgesetzt – nur bei lesbarem Schlüssel, nach Sicherung der Zeilen, mit Audit-Eintrag und Hinweis für Administratoren (Bedingungen: secret-reset.ts)
     const secretsReset = await resetUnreadableSecrets().catch((error) => (logError("start:secrets", error), []));
     if (secretsReset.length > 0) console.log(`[start] Nicht lesbare Geheimnisse zurückgesetzt (Schlüssel passt nicht zum Backup): ${secretsReset.map((i) => `${i.id}=${i.count}`).join(", ")}`);
     const workshop = await db.workshop.findUnique({ where: { id: "default" }, select: { timezone: true } });

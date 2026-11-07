@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
 import { safeNext } from "@/lib/safe-next";
 import { getWorkshop } from "@/server/workshop";
+import { secretKeyIssue } from "@/server/secret-key-issue";
 import { LoginForm } from "./login-form";
 import { Alert, Card, TextLink } from "@/components/ui/layout";
 
@@ -17,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; expired?: string; notice?: string }> }) {
   // Frische Installation: erst den Administrator einrichten
   if ((await db.user.count()) === 0) redirect("/setup");
-  const [{ t }, workshop, params] = await Promise.all([getI18n(), getWorkshop(), searchParams]);
+  const [{ t }, workshop, params, keyIssue] = await Promise.all([getI18n(), getWorkshop(), searchParams, secretKeyIssue()]);
   const { next, expired, notice } = params;
   // Die Anmeldeseite prüft die Sitzung selbst (der Proxy sieht nur, ob ein Cookie da ist): Ein totes Cookie führt hierher, nicht im Kreis.
   if (await getSession()) redirect(safeNext(next));
@@ -52,6 +53,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </TextLink>
           </p>
           <p className="mt-1 text-center text-sm text-ink-muted">{t("auth.forgotPassword")}</p>
+          {keyIssue ? (
+            <Alert tone="warning" className="mt-4">
+              <p>{t("backup.keyIssue.publicIntro")}</p>
+              {keyIssue.recoverable ? (
+                <p className="mt-1">
+                  <TextLink href="/login/key">{t("backup.keyIssue.link")}</TextLink>
+                </p>
+              ) : null}
+            </Alert>
+          ) : null}
         </Card>
       </div>
     </main>

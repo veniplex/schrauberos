@@ -64,5 +64,6 @@ export const PLATFORM_PAGES: readonly PlatformPageDef[] = [
   { path: "/login", kind: "other", public: true, key: true },
   { path: "/login/recover", kind: "other", public: true },
   { path: "/login/verify", kind: "other", public: true },
+  { path: "/login/key", kind: "other", public: true },
   { path: "/forbidden", kind: "other", public: true },
 ];

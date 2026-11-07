@@ -59,6 +59,8 @@ export const auditEn: typeof auditDe = {
       keyCreated: "Recovery key created",
       keyConfirmed: "Recovery key confirmed as saved",
       reset: "Unreadable secrets reset (backup without matching key)",
+      keyReconstructed: "Secret key (secret.key) reconstructed with the recovery key",
+      resetForced: "Unreadable secrets reset by an administrator",
     },
     setup: {
       restore: "Restored from a backup (setup)",

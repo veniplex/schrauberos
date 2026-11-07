@@ -3,7 +3,8 @@ import { randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { formatRecoveryKey } from "@/lib/recovery-key";
 import { deriveOffsiteMasterKey, secretKeyCheck, WRAPPED_SETTING_KEY, wrapSecretKey } from "@/lib/secret-wrap";
-import { secretKeyHex } from "@/server/secrets";
+import { KEY_CHECK_SETTING } from "@/server/secret-key-issue";
+import { readSecretKey, secretKeyHex } from "@/server/secrets";
 import { db } from "@/server/db";
 import { getSecret, setSecret, setSetting } from "@/server/settings";
 
@@ -24,7 +25,7 @@ type Writer = Pick<PrismaClient | Prisma.TransactionClient, "appSetting">;
 const read = async (client: Writer, key: string): Promise<string | null> => (await client.appSetting.findUnique({ where: { key } }))?.value ?? null;
 
 const WRAPPED = WRAPPED_SETTING_KEY;
-const CHECK = "secrets.keyCheck";
+const CHECK = KEY_CHECK_SETTING;
 const CREATED = "secrets.keyCreatedAt";
 const CONFIRMED = "secrets.keyConfirmedAt";
 /** Geheimnis (mit `secret.key` verschlüsselt): Hauptschlüssel der Off-Site-Verschlüsselung, Hex */
@@ -53,7 +54,9 @@ export type RecoveryKeyStatus = {
 export async function recoveryKeyStatus(client: Writer = db): Promise<RecoveryKeyStatus> {
   const [wrapped, check, created, confirmed] = await Promise.all([read(client, WRAPPED), read(client, CHECK), read(client, CREATED), read(client, CONFIRMED)]);
   if (!wrapped) return { exists: false, createdAt: null, confirmed: false, stale: false };
-  const stale = check !== secretKeyCheck(secretKeyHex());
+  // Nicht lesbar ist nicht „veraltet“: ohne lesbaren Schlüssel lässt sich nichts vergleichen, und eine Hülle darf deshalb nie entfernt werden (siehe `secret-key-issue.ts`)
+  const key = readSecretKey();
+  const stale = key.state === "readable" && check !== secretKeyCheck(key.hex);
   return { exists: !stale, createdAt: created ? new Date(created) : null, confirmed: !!confirmed && !stale, stale };
 }
 

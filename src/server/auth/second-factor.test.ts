@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { after, before, beforeEach, describe, it } from "node:test";
@@ -18,6 +18,7 @@ let sf: typeof import("./second-factor");
 let throttleMod: typeof import("./throttle");
 let pendingMod: typeof import("./pending");
 let secrets: typeof import("@/server/secrets");
+let secretReset: typeof import("@/server/secret-reset");
 let loginActions: typeof import("@/app/login/actions");
 let verifyActions: typeof import("@/app/login/verify/actions");
 let sec: typeof import("@/platform/account/security-actions");
@@ -35,6 +36,7 @@ before(async () => {
   throttleMod = await import("./throttle");
   pendingMod = await import("./pending");
   secrets = await import("@/server/secrets");
+  secretReset = await import("@/server/secret-reset");
   loginActions = await import("@/app/login/actions");
   verifyActions = await import("@/app/login/verify/actions");
   sec = await import("@/platform/account/security-actions");
@@ -60,6 +62,7 @@ beforeEach(async () => {
   await env.db.user.deleteMany();
   await env.db.role.deleteMany();
   clock = Date.now();
+  rmSync(path.join(process.env.DATA_DIR!, "restore"), { recursive: true, force: true });
   browser.reset();
   throttleMod.resetLoginThrottle();
   pendingMod.pendingLogins.clear();
@@ -81,6 +84,11 @@ const nextStep = () => (clock += 30_000);
 const admin = async (username = "chef"): Promise<TestUser> => env.user({ username, password: ADMIN_PW, roles: [await env.role({ key: `admin-${username}`, isAdmin: true })] });
 const person = async (username = "anna", permissions: string[] = ["customers.view"]): Promise<TestUser> =>
   env.user({ username, password: PW, roles: [await env.role({ key: `r-${username}`, permissions })] });
+/** Der Launcher hat eine Wiederherstellung eingesetzt und noch nicht bestätigt (`restore/applied.json`): die Person hat „ohne Wiederherstellungsschlüssel“ gewählt. */
+const markRestoreApplied = () => {
+  mkdirSync(path.join(process.env.DATA_DIR!, "restore"), { recursive: true });
+  writeFileSync(path.join(process.env.DATA_DIR!, "restore", "applied.json"), JSON.stringify({ from: "backup", at: new Date().toISOString(), files: false }));
+};
 const sessionCookie = () => browser.cookies.get("so_session");
 const pendingCookie = () => browser.cookies.get("so_2fa");
 /** Passwort-Schritt: gelingt mit Zwischenzustand, ohne Sitzung */
@@ -481,15 +489,33 @@ describe("Zurücksetzen", () => {
     assert.equal(await sf.secondFactorRequired(chef.id), true);
   });
 
-  it("Restore ohne passenden Schlüssel (secret.key): der zweite Faktor wird für ALLE Konten zurückgesetzt, beim ersten Login erscheint der Hinweis, das Audit hält es fest", async () => {
+  it("fremder Schlüssel (secret.key) ohne Wiederherstellung: die Anmeldung bleibt zu (fail-closed), nichts wird zurückgesetzt – auch nicht beim Anmelden", async () => {
+    const anna = await person();
+    const tf = await enableDirect(anna);
+    // anderer Datenträger: der Schlüssel dieser Installation passt nicht zu den Geheimnissen
+    writeFileSync(path.join(process.env.DATA_DIR!, "secret.key"), randomBytes(32).toString("hex"));
+    const first = await passwordStep("anna");
+    assert.equal(first.ok, false, "mit dem Passwort allein kommt Anna nicht hinein");
+    assert.equal((first as { reason?: string }).reason, "secondFactor");
+    assert.equal(await sf.secondFactorRequired(anna.id), true);
+    const row = await env.db.twoFactor.findUniqueOrThrow({ where: { userId: anna.id } });
+    assert.ok(row.secret && row.enabledAt, "der zweite Faktor ist unangetastet");
+    assert.equal(await env.db.twoFactorBackupCode.count({ where: { userId: anna.id } }), 10);
+    assert.equal(await env.db.auditLog.count({ where: { action: "auth.twoFactorReset" } }), 0);
+    // ein Sicherungscode braucht den Schlüssel nicht und geht weiter
+    assert.equal(await redirectOf(() => verifyActions.verifyAction({}, form({ code: tf.codes[0] }))), "/");
+  });
+
+  it("Restore ohne passenden Schlüssel (secret.key): beim Start wird der zweite Faktor für ALLE Konten zurückgesetzt (nach Sicherung der Zeilen), beim ersten Login erscheint der Hinweis, das Audit hält es fest", async () => {
     const anna = await person();
     const bob = await person("bob");
     await enableDirect(anna);
     await enableDirect(bob);
-    // Backup von einer anderen Installation: der Schlüssel dieser Installation passt nicht zu den Geheimnissen
     writeFileSync(path.join(process.env.DATA_DIR!, "secret.key"), randomBytes(32).toString("hex"));
-    const first = await passwordStep("anna");
-    assert.equal(first.ok, true, "Anna meldet sich nur mit dem Passwort an");
+    markRestoreApplied();
+    const items = await secretReset.resetUnreadableSecrets();
+    assert.deepEqual(items, [{ id: "auth.totp", count: 2 }]);
+    assert.equal((await passwordStep("anna")).ok, true, "Anna meldet sich nur mit dem Passwort an");
     for (const user of [anna, bob]) {
       const row = await env.db.twoFactor.findUniqueOrThrow({ where: { userId: user.id } });
       assert.deepEqual({ s: row.secret, e: row.enabledAt, r: row.resetReason }, { s: null, e: null, r: "key" }, user.username);
@@ -531,6 +557,8 @@ describe("Zurücksetzen", () => {
     void tf;
     await env.db.appSetting.create({ data: { key: "auth.require2faAdmins", value: "true" } });
     writeFileSync(path.join(process.env.DATA_DIR!, "secret.key"), randomBytes(32).toString("hex"));
+    markRestoreApplied();
+    await secretReset.resetUnreadableSecrets();
     assert.equal((await passwordStep("chef", ADMIN_PW)).ok, true);
     const current = await session.getSession();
     assert.equal(current?.user.mustSetupTwoFactor, true);
@@ -590,7 +618,7 @@ describe("Richtlinie: Pflicht für Administratoren und Leerlauf-Abmeldung", () =
     await env.signIn(chef);
     const refused = await settingsActions.saveSecurity({}, form({ behindProxy: false, requireTwoFactorAdmins: true }));
     assert.ok(refused.error, "abgelehnt");
-    assert.match(refused.error ?? "", /selbst/);
+    assert.match(refused.error ?? "", /eigene/);
     assert.equal(await env.db.appSetting.findUnique({ where: { key: "auth.require2faAdmins" } }), null, "nichts gespeichert");
     assert.equal(await env.db.auditLog.count({ where: { action: "settings.security" } }), 0);
     assert.equal((await session.getSession())?.user.mustSetupTwoFactor, false);

@@ -57,6 +57,8 @@ export const auditDe = {
       keyCreated: "Wiederherstellungsschlüssel erzeugt",
       keyConfirmed: "Wiederherstellungsschlüssel als gesichert bestätigt",
       reset: "Nicht lesbare Geheimnisse zurückgesetzt (Backup ohne passenden Schlüssel)",
+      keyReconstructed: "Geheimnisschlüssel (secret.key) mit dem Wiederherstellungsschlüssel rekonstruiert",
+      resetForced: "Nicht lesbare Geheimnisse auf Anweisung der Administration zurückgesetzt",
     },
     setup: {
       restore: "Aus einem Backup wiederhergestellt (Einrichtung)",

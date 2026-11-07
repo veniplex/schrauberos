@@ -409,7 +409,7 @@ export const de = {
       logoType: "Erlaubt sind PNG, JPEG, WebP oder SVG.",
       logoSize: "Das Logo darf höchstens 200 KB groß sein.",
       auditRetentionMin: "Mindestens {min} Tage (oder 0 für unbegrenzt).",
-      requireTwoFactorOwn: "Die Pflicht lässt sich erst einschalten, wenn Sie selbst die Zwei-Faktor-Anmeldung eingerichtet haben (Mein Konto → Sicherheit). Sonst würden Sie sich damit selbst aussperren.",
+      requireTwoFactorOwn: "Die Pflicht lässt sich erst einschalten, wenn die eigene Zwei-Faktor-Anmeldung eingerichtet ist (Mein Konto → Sicherheit). Sonst sperrt sie das eigene Konto aus.",
     },
     workshop: {
       identity: "Stammdaten",

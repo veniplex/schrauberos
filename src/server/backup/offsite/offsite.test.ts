@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -330,6 +330,8 @@ describe("Off-Site: Restore ohne passenden Schlüssel", () => {
     await saveWebdav({ password: TARGET_PASSWORD });
     await makeBackups(1);
     writeFileSync(path.join(env.dir, "secret.key"), "ab".repeat(32)); // anderer Datenträger
+    mkdirSync(path.join(env.dir, "restore"), { recursive: true }); // eine Wiederherstellung ohne Schlüssel wurde eingesetzt
+    writeFileSync(path.join(env.dir, "restore", "applied.json"), JSON.stringify({ from: "backup", at: new Date().toISOString(), files: false }));
     assert.equal(await offsiteSettings.getOffsiteCredentials(), null);
     const items = await secretReset.resetUnreadableSecrets();
     assert.ok(items.some((i) => i.id === "backup.offsite"));

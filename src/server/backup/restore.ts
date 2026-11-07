@@ -12,7 +12,7 @@ import { OffsiteCryptoError, createDecryptStream, isOffsiteHeader } from "@/lib/
 import { deriveOffsiteMasterKey, WRAPPED_SETTING_KEY } from "@/lib/secret-wrap";
 import { cancelPending, pendingDbFile, pendingFilesDir, restoreDir, writePending, writePendingSecretKey } from "@/lib/updates/restore";
 import { listMigrations } from "@/server/migrate";
-import { secretKeyHex } from "@/server/secrets";
+import { readSecretKey } from "@/server/secrets";
 import { assertPlainTree, backupPath, backupsDir, checkDatabaseFile, countTree, createBackup, DB_ARCHIVE, gzipFile, linkTree, markTempActive, removeTree, uniqueBackupName, writeInfo } from "./core";
 
 export type RestoreErrorCode =
@@ -124,8 +124,9 @@ export async function stageRestore(name: string, options: { recoveryKey?: string
       const { openWrappedSecretKey } = await import("@/server/recovery-key-input"); // erst bei Bedarf geladen (Drosselung der Anmeldung, `server-only`)
       const opened = await openWrappedSecretKey(entered, wrapped);
       if (!opened.ok) throw new RestoreError(opened.reason === "format" ? "keyFormat" : "wrongKey");
-      // Derselbe Schlüssel wie der laufende: nichts auszutauschen
-      if (opened.secretKeyHex !== secretKeyHex()) {
+      // Derselbe Schlüssel wie der laufende: nichts auszutauschen (fehlt oder ist die Datei nicht lesbar, wird der Schlüssel des Backups eingesetzt)
+      const current = readSecretKey();
+      if (current.state !== "readable" || opened.secretKeyHex !== current.hex) {
         writePendingSecretKey(opened.secretKeyHex);
         secretKeyRestored = true;
       }

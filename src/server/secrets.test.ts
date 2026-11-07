@@ -7,6 +7,7 @@ import { decryptSecret, encryptSecret } from "./secrets";
 
 const dir = mkdtempSync(path.join(tmpdir(), "so-secrets-"));
 process.env.DATA_DIR = dir;
+process.env.DATABASE_URL = `file:${path.join(dir, "none.db")}`; // frische Datenbank: nichts Verschlüsseltes, ein Schlüssel darf angelegt werden
 after(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("Geheimnisse", () => {

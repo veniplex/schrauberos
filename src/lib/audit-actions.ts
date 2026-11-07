@@ -100,6 +100,8 @@ export const AUDIT_ACTIONS = [
   "secrets.keyCreated",
   "secrets.keyConfirmed",
   "secrets.reset",
+  "secrets.keyReconstructed",
+  "secrets.resetForced",
   "apiToken.create",
   "apiToken.revoke",
   "apiToken.restoreRevoked",

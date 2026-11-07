@@ -157,6 +157,7 @@ const LEGACY_ACTION_FILES: Record<string, string> = {
   "app/login/actions.ts": "Anmeldung/Abmeldung vor der Sitzung: eigener Drosselungspfad (Anmeldung), kein Recht prüfbar",
   "app/login/recover/actions.ts": "Notzugang vor der Sitzung: eigener Pfad ohne Konto-Drosselung",
   "app/login/verify/actions.ts": "Zweiter Schritt der Anmeldung vor der Sitzung: Zwischenzustand statt Recht, eigene Drosselung (loginThrottle.totp)",
+  "platform/account/key-recovery-actions.ts": "Schlüssel wiederherstellen vor der Anmeldung: der 256-Bit-Wiederherstellungsschlüssel statt Recht, global gedrosselt (loginThrottle.recoveryKey), nur im Störungsfall wirksam",
   "app/setup/actions.ts": "Ersteinrichtung vor dem ersten Benutzer: Einrichtungs-Token statt Recht",
 };
 
