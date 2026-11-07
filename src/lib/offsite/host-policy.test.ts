@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { networkInterfaces } from "node:os";
 import { afterEach, describe, it } from "node:test";
 import { allowLoopbackForTests, canonicalHost, isAllowedAddress, isForbiddenHost, isPrivateAddress, offsiteNetwork } from "./host-policy";
 import { normalizeWebdavUrl, validateHost } from "./target";
@@ -98,5 +99,36 @@ describe("Private Netze (Freigabe für Mail-Relays und Webhooks)", () => {
     assert.equal(isPrivateAddress("::1"), true);
     assert.equal(isPrivateAddress("169.254.169.254"), false);
     assert.equal(isAllowedAddress("169.254.169.254"), false);
+  });
+});
+
+describe("Eigene Schnittstellenadressen (auch in gemappter und anderer IPv6-Schreibweise)", () => {
+  const own = Object.values(networkInterfaces())
+    .flatMap((list) => list ?? [])
+    .map((info) => info.address.split("%")[0])
+    .filter((address) => !/^(127\.|::1$|fe80:)/i.test(address));
+
+  it("jede eigene Adresse ist verboten – in jeder Schreibweise (IPv4, IPv4-gemappt dezimal und hexadezimal, IPv6 groß/ausgeschrieben)", { skip: own.length === 0 ? "keine eigene Nicht-Loopback-Adresse in dieser Umgebung" : false }, () => {
+    for (const address of own) {
+      assert.equal(isAllowedAddress(address), false, address);
+      assert.equal(isForbiddenHost(address), true, address);
+      const v4 = address.split(".").map(Number);
+      if (v4.length === 4) {
+        const hex = (a: number, b: number) => ((a << 8) | b).toString(16);
+        assert.equal(isAllowedAddress(`::ffff:${address}`), false, `::ffff:${address}`);
+        assert.equal(isAllowedAddress(`::ffff:${hex(v4[0], v4[1])}:${hex(v4[2], v4[3])}`), false, "gemappt hexadezimal");
+        assert.equal(isAllowedAddress(`::FFFF:${hex(v4[0], v4[1]).toUpperCase()}:${hex(v4[2], v4[3]).toUpperCase()}`), false, "gemappt, Großbuchstaben");
+        assert.equal(isAllowedAddress(`0:0:0:0:0:ffff:${address}`), false, "ausgeschrieben");
+        assert.equal(isForbiddenHost(`[::ffff:${address}]`), true);
+      } else {
+        assert.equal(isAllowedAddress(address.toUpperCase()), false, "Großbuchstaben");
+        assert.equal(isAllowedAddress(`[${address}]`.slice(1, -1)), false);
+      }
+    }
+  });
+
+  it("fremde öffentliche Adressen bleiben erlaubt, auch gemappt", () => {
+    assert.equal(isAllowedAddress("::ffff:8.8.8.8"), true);
+    assert.equal(isAllowedAddress("::ffff:808:808"), true);
   });
 });

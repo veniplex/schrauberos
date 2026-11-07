@@ -77,11 +77,29 @@ function embeddedV4(g: number[]): [number, number, number, number] | null {
   return null;
 }
 
-/** Adressen der eigenen Schnittstellen (ein Ziel dort ist wie Loopback der eigene Rechner). */
+/**
+ * Kanonischer Schlüssel einer Adresse zum Vergleichen: IPv4 als `a.b.c.d`, IPv6 als acht Gruppen; **eine eingebettete IPv4-Adresse (`::ffff:a.b.c.d`, `::ffff:c0a8:b21d`) ist dieselbe Adresse wie die IPv4-Schreibweise**.
+ * Der reine Textvergleich ließ die gemappte Schreibweise der eigenen Schnittstellenadresse durch.
+ */
+function addressKey(ip: string): string | null {
+  const bare = ip.split("%")[0];
+  const family = isIP(bare);
+  if (family === 4) return parseV4(bare)?.join(".") ?? null;
+  if (family !== 6) return null;
+  const g = v6Groups(bare);
+  if (!g) return null;
+  const embedded = embeddedV4(g);
+  return embedded ? embedded.join(".") : g.join(":");
+}
+
+/** Schlüssel (`addressKey`) der eigenen Schnittstellenadressen (ein Ziel dort ist wie Loopback der eigene Rechner). */
 function ownAddresses(): Set<string> {
   const own = new Set<string>();
   try {
-    for (const list of Object.values(networkInterfaces())) for (const info of list ?? []) own.add(info.address.toLowerCase().split("%")[0]);
+    for (const list of Object.values(networkInterfaces())) for (const info of list ?? []) {
+      const key = addressKey(info.address);
+      if (key) own.add(key);
+    }
   } catch {
     /* ohne Schnittstellenliste bleibt es bei Loopback */
   }
@@ -113,7 +131,9 @@ export function isAllowedAddress(ip: string): boolean {
   } else {
     return false;
   }
-  return offsiteNetwork.allowLoopback || !ownAddresses().has(ip.toLowerCase().split("%")[0]);
+  if (offsiteNetwork.allowLoopback) return true;
+  const key = addressKey(ip);
+  return key !== null && !ownAddresses().has(key);
 }
 
 export type CanonicalHost = { kind: "ip"; ip: string } | { kind: "name"; name: string };
