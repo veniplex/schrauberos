@@ -203,3 +203,43 @@ describe("Neu und Bearbeiten", () => {
     assert.equal(await redirectOf(() => Page({ params: Promise.resolve({ id: ids.invoiceOpen }) })), `/billing/${ids.invoiceOpen}`);
   });
 });
+
+describe("Kundenseite und Neu-Formular (Fix-Runde 12d)", () => {
+  it("die Kundenseite bietet neues Angebot und neue Rechnung mit vorbelegtem Kunden; nicht für eingeschränkte Kunden und nicht ohne billing.edit", async () => {
+    const customer = await env.db.customer.findFirstOrThrow({ where: { lastName: "Becker" } });
+    const { default: Page } = await import("@/app/(app)/(workshop)/customers/[id]/page");
+    await login(ALL);
+    let root = await render(await Page({ params: Promise.resolve({ id: customer.id }) }));
+    const links = [...root.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+    assert.ok(links.includes(`/billing/new?type=offer&customer=${customer.id}`), "Angebot");
+    assert.ok(links.includes(`/billing/new?type=invoice&customer=${customer.id}`), "Rechnung");
+    await view!.unmount();
+    await login(["customers.view", "billing.view"]);
+    root = await render(await Page({ params: Promise.resolve({ id: customer.id }) }));
+    assert.ok(![...root.querySelectorAll("a")].some((a) => (a.getAttribute("href") ?? "").startsWith("/billing/new")));
+    await view!.unmount();
+    await env.db.customer.update({ where: { id: customer.id }, data: { processingRestrictedAt: new Date() } });
+    try {
+      await login(ALL);
+      root = await render(await Page({ params: Promise.resolve({ id: customer.id }) }));
+      assert.ok(![...root.querySelectorAll("a")].some((a) => (a.getAttribute("href") ?? "").startsWith("/billing/new")));
+    } finally {
+      await env.db.customer.update({ where: { id: customer.id }, data: { processingRestrictedAt: null } });
+    }
+  });
+
+  it("die Schlussrechnung im Neu-Formular zeigt die Karte der Abschläge; mit ?customer= stehen die anrechenbaren Abschläge zur Wahl", async () => {
+    await login(ALL);
+    const partial = await env.db.invoice.findUniqueOrThrow({ where: { id: ids.partial } });
+    const { default: Page } = await import("@/app/(app)/(office)/billing/new/page");
+    let text = plain((await render(await Page({ searchParams: Promise.resolve({ type: "final" }) }))).textContent);
+    assert.match(text, /Anrechnung von Abschlägen/);
+    assert.match(text, /wird ein Kunde gewählt/);
+    await view!.unmount();
+    if (partial.customerId) {
+      const root = await render(await Page({ searchParams: Promise.resolve({ type: "final", customer: partial.customerId }) }));
+      text = plain(root.textContent);
+      assert.doesNotMatch(text, /wird ein Kunde gewählt/);
+    }
+  });
+});
