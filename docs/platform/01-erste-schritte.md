@@ -31,7 +31,9 @@ zurückzusetzen (dort lässt sich auch eine laufende Wartezeit sofort aufheben).
   bleibt immer offen. Sie sehen nur, was Ihre Rolle erlaubt – fehlt ein Eintrag, ist er für Sie nicht freigeschaltet.
 * **Kopfleiste:** Das **Suchfeld** durchsucht alle Bereiche auf einmal (Kunden, Fahrzeuge, Termine, Reifen, Rechnungen, Mitarbeiter, Fuhrpark,
   Netzwerk, Handbuch und IT-Dokumentation) und zeigt nur Treffer, die Ihre Rolle sehen darf. Ab zwei Zeichen erscheinen die Treffer als Links;
-  mit der Pfeil-nach-unten-Taste springen Sie in die Liste, **Enter** im Suchfeld öffnet den ersten Treffer, **Escape** schließt die Liste.
+  mit der Pfeil-nach-unten-Taste springen Sie in die Liste, **Enter** im Suchfeld öffnet den ersten Treffer, **Escape** schließt die Liste (sie schließt sich auch, wenn Sie mit Tab weiterwandern).
+  Lange Texte (Inhalt von Handbuch- und IT-Dokumentationsseiten, Notizen von Terminen) werden erst ab **drei Zeichen** durchsucht, Titel und Namen schon ab zwei. Das Prozentzeichen wird bei der Suche ignoriert; ein Suchtext nur aus Sonderzeichen findet nichts.
+  Wer sehr schnell sehr viele Suchen auslöst, bekommt kurz keine Treffer („Die Suche ist gerade nicht möglich“) und kann nach wenigen Sekunden weitersuchen.
   Rechts daneben legt **Neu** schnell etwas an (Kunde, Termin, Fahrzeug, Rechnung …) – es bietet nur an, was Sie anlegen dürfen.
 * **Tastatur:** Der erste Tabstopp auf jeder Seite ist **Zum Inhalt springen** (überspringt die Navigation).
 * **Übersicht:** Heute anstehende Termine, einzulagernde oder zu prüfende Reifen, offene Rechnungen, Fälligkeiten und angeheftete

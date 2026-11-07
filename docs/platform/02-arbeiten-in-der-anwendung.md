@@ -17,10 +17,13 @@ Bei Terminen kann ein Arbeitsplatz nie doppelt belegt werden, auch wenn zwei Per
   (dann einfach noch einmal speichern). Nur Passwörter und Dateien müssen neu eingegeben bzw. gewählt werden.
 * **Entwurf:** Längere Formulare (Kunde, Fahrzeug, Termin, Reifensatz, Rechnung, Mitarbeiter) merken sich Ihre Eingabe in diesem Browser-Tab. Schließen Sie
   das Formular versehentlich, finden Sie sie beim erneuten Öffnen wieder („Der nicht gespeicherte Entwurf wurde wiederhergestellt“, mit **Entwurf
-  verwerfen**). Nach dem Speichern und beim Abmelden ist der Entwurf gelöscht. Passwörter und die sensiblen Mitarbeiterfelder (Notfallkontakt) werden nie gemerkt.
-* **Speichern und weiter:** Beim Anlegen eines Kunden führt **Speichern und Fahrzeug anlegen** direkt zum Fahrzeugformular – der neue Kunde ist schon als Halter eingetragen.
+  verwerfen**). Erst nach dem **erfolgreichen** Speichern ist der Entwurf gelöscht – scheitert das Speichern (Fehler, abgelaufene Anmeldung, keine Verbindung), bleibt er stehen. Entwürfe gehören
+  Ihrem Benutzerkonto: Beim Abmelden und auf der Anmeldeseite werden alle gelöscht, ein anderer Benutzer am selben Gerät sieht sie nie. Ein Entwurf passt nur zur selben Ausgangslage
+  (z. B. einem Termin zur selben Uhrzeit im Kalender); öffnen Sie das Formular mit anderen Vorgaben, beginnt es neu. Passwörter und die sensiblen Mitarbeiterfelder (Notfallkontakt) werden nie gemerkt.
+* **Enter** in einem Textfeld speichert wie der Hauptknopf – nie „Speichern und weiter“.
+* **Speichern und weiter:** Beim Anlegen eines Kunden führt **Speichern und Fahrzeug anlegen** direkt zum Fahrzeugformular – der neue Kunde ist schon als Halter eingetragen. Den Knopf gibt es nur, wenn Sie Fahrzeuge anlegen dürfen.
 * **Dateien:** Zu große Dateien werden schon beim Auswählen abgelehnt („Datei zu groß (max. 10 MB)“), nicht erst nach dem Hochladen.
-* **Fenster mit Eingaben** (z. B. ein Termin im Kalender) fragen beim Schließen „Änderungen verwerfen?“, wenn Sie schon etwas eingegeben haben.
+* **Fenster mit Eingaben** (z. B. ein Termin im Kalender) fragen beim Schließen „Änderungen verwerfen?“, wenn Sie schon etwas eingegeben haben; **Verwerfen** löscht auch den Entwurf. Nach jeder Rückfrage steht der Fokus wieder auf dem Knopf, der sie geöffnet hat.
 * Die Speichern-Leiste bleibt am unteren Rand sichtbar, solange das Formular länger als der Bildschirm ist; auf dem Handy rückt sie mit geöffneter Tastatur nach oben aus dem Weg.
 
 ## Rückfragen und Rückmeldung
@@ -40,10 +43,10 @@ Bei Terminen kann ein Arbeitsplatz nie doppelt belegt werden, auch wenn zwei Per
 Die **Suche in der Kopfleiste** durchsucht alle Bereiche auf einmal (siehe „Die Oberfläche“ in „Erste Schritte“). Die Listen (Kunden, Fahrzeuge, Reifensätze, Rechnungen, Mitarbeiter, Fuhrpark, Geräte, Verkabelung, Benutzer, Audit-Log …) sind alle gleich aufgebaut:
 
 * **Suchfeld und Filter** stehen oben. Die Suche findet Teile von Wörtern; bei Umlauten kommt es auf die Schreibweise an („müller“ findet „Müller“, „MÜLLER“ findet es nicht). Durchsucht werden nur Angaben, die Sie auch sehen dürfen. Ist ein Filter gesetzt, erscheint **Zurücksetzen**. Auf dem Handy bleibt das Suchfeld immer sichtbar, die übrigen Filter stehen hinter **Weitere Filter**.
-* **Sortieren:** Ein Klick auf eine Spaltenüberschrift mit Pfeil sortiert danach, ein zweiter Klick kehrt die Richtung um. Auf dem Handy stehen die sortierbaren Spalten als Auswahl über der Liste.
+* **Sortieren:** Ein Klick auf eine Spaltenüberschrift mit Pfeil sortiert danach, ein zweiter Klick kehrt die Richtung um. Auf dem Handy stehen die sortierbaren Spalten als Auswahl über der Liste. Die gewählte Sortierung bleibt beim Suchen und Filtern erhalten.
 * **Seiten:** Lange Listen zeigen 25 (Audit-Log 50) Einträge je Seite; unter der Liste stehen **Vorherige/Nächste Seite** und „26–50 von 80“. Die Zahl über der Liste ist immer die **Gesamtzahl** der Treffer, die Summen darüber (z. B. bei Rechnungen) gelten für alle Treffer des Zeitraums, nicht nur für die angezeigte Seite.
 * **Ganze Zeile anklicken:** Ein Klick (oder Tippen) irgendwo in der Zeile öffnet den Eintrag; Links und Knöpfe in der Zeile (z. B. der Fahrer) behalten ihre eigene Wirkung.
-* **Breite Tabellen** lassen sich seitlich wischen (oder per Tastatur: in die Tabelle tabben und die Pfeiltasten nutzen); ein Schatten und ein Hinweis zeigen, dass rechts noch Spalten folgen. Unter Tabletbreite wird jede Zeile zur **Karte** mit den wichtigsten Angaben.
+* **Breite Tabellen** lassen sich seitlich wischen (oder per Tastatur: Passt die Tabelle nicht auf den Bildschirm, ist sie per Tab erreichbar, dann gehen die Pfeiltasten); ein Schatten und ein Hinweis zeigen, dass rechts noch Spalten folgen. Unter Tabletbreite wird jede Zeile zur **Karte** mit den wichtigsten Angaben.
 
 ## Orientierung
 

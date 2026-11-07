@@ -28,5 +28,7 @@ entfernt), sehen nur Bearbeiter.
 * **Adresse einer Seite:** Sie bleibt stabil, auch wenn der Titel später geändert wird – Links auf die Seite bleiben gültig.
 * **Versionsverlauf:** Jede Speicherung legt eine Version an (die letzten 30 je Seite bleiben erhalten). Im **Verlauf** lässt sich
   eine ältere Fassung ansehen und mit einem Klick wiederherstellen.
+* **Nichts geht verloren:** Der Editor merkt sich Ihren Text (auch Änderungen über die Werkzeugleiste) wie die anderen Formulare als **Entwurf** in diesem Browser-Tab. Klicken Sie
+  mit ungespeicherten Änderungen auf einen Link der Anwendung, fragt sie „Änderungen verwerfen?“ – und auch beim Neuladen oder Schließen des Tabs warnt der Browser.
 * **Gleichzeitig bearbeiten:** Speichern zwei Personen dieselbe Seite nacheinander, bekommt die zweite einen Hinweis und
   überschreibt nichts.
