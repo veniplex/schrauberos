@@ -22,6 +22,9 @@ import { widgets as employeesWidgets } from "./office/employees/widgets";
 import { widgets as timeWidgets } from "./office/time/widgets";
 import { sections as timeSections } from "./office/time/sections";
 import { sections as filesSections } from "./workshop/files/sections";
+import { sections as checklistsSections } from "./workshop/checklists/sections";
+import { widgets as checklistsWidgets } from "./workshop/checklists/widgets";
+import { searchProviders as checklistsSearch } from "./workshop/checklists/search";
 import { settingsTabs as timeSettings } from "./office/time/settings-tab";
 import { widgets as fleetWidgets } from "./office/fleet/widgets";
 import { widgets as networkWidgets } from "./it/network/widgets";
@@ -61,6 +64,7 @@ import { searchProviders as handbookSearch } from "./handbook/manual/search";
 const ALL_WIDGETS: WidgetDef[] = [
   ...appointmentsWidgets,
   ...ordersWidgets,
+  ...checklistsWidgets,
   ...partsWidgets,
   ...tiresWidgets,
   ...vehiclesWidgets,
@@ -79,6 +83,7 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...appointmentsSearch,
   ...ordersSearch,
   ...filesSearch,
+  ...checklistsSearch,
   ...partsSearch,
   ...tiresSearch,
   ...customersSearch,
@@ -96,7 +101,7 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
  * Beiträge von Funktionen zu Seiten anderer Funktionen („Erweiterungspunkte“): Der Gastgeber (Auftragsseite, Termin) fragt `sectionsFor(session, host)` und kennt seine Gäste nicht.
  * Neue Funktion mit Abschnitten: `sections.tsx` anlegen und hier eintragen.
  */
-const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections, ...filesSections];
+const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections, ...filesSections, ...checklistsSections];
 
 const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...timeSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
 

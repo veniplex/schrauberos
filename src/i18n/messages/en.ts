@@ -10,6 +10,7 @@ import { ordersEn } from "./modules/orders.en";
 import { partsEn } from "./modules/parts.en";
 import { timeEn } from "./modules/time.en";
 import { filesEn } from "./modules/files.en";
+import { checklistsEn } from "./modules/checklists.en";
 import { customersEn } from "./modules/customers.en";
 import { exchangeEn } from "./modules/exchange.en";
 import { usersEn } from "./modules/users.en";
@@ -166,6 +167,7 @@ export const en: Messages = {
     orders: "Orders",
     parts: "Parts & stock",
     files: "Documents & photos",
+    checklists: "Checklists",
     tires: "Tyre storage",
     customers: "Customers",
     users: "Users",
@@ -318,6 +320,7 @@ export const en: Messages = {
   parts: partsEn,
   time: timeEn,
   files: filesEn,
+  checklists: checklistsEn,
   customers: customersEn,
   exchange: exchangeEn,
   users: usersEn,
@@ -329,6 +332,7 @@ export const en: Messages = {
     orders: "Orders",
     parts: "Parts & stock",
     files: "Documents & photos",
+    checklists: "Checklists",
     tires: "Tyre storage",
     customers: "Customers",
     vehicles: "Vehicles",
@@ -415,6 +419,11 @@ export const en: Messages = {
       edit: "Edit employees and absences",
       delete: "Delete employees",
       sensitive: "Sensitive employee data (emergency contact, sickness)",
+    },
+    checklists: {
+      view: "View checklists (following the rights for vehicle or order)",
+      fill: "Start, fill in, complete and discard checklists",
+      manage: "Maintain templates and reopen completed checklists",
     },
     files: {
       view: "View documents and photos (following the rights for vehicle or order)",

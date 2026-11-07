@@ -21,8 +21,8 @@ export const PRESETS: readonly PresetDef[] = [
   { id: "basic", nameKey: "setup.presets.basic.name", descriptionKey: "setup.presets.basic.description", enable: [] },
   // Aufträge und Teile & Lager (F2/F4); die Rechnungen (F3) kommen mit ihrer Funktion dazu
   { id: "orders", nameKey: "setup.presets.orders.name", descriptionKey: "setup.presets.orders.description", enable: ["workshop.orders", "workshop.parts"] },
-  // Werkstattalltag (F5–F7): zusätzlich Zeiterfassung (Checklisten kommen mit ihrer Funktion dazu)
-  { id: "daily", nameKey: "setup.presets.daily.name", descriptionKey: "setup.presets.daily.description", enable: ["workshop.orders", "workshop.parts", "office.time", "workshop.files"] },
+  // Werkstattalltag (F5–F7): zusätzlich Zeiterfassung, Dokumente & Fotos und Checklisten
+  { id: "daily", nameKey: "setup.presets.daily.name", descriptionKey: "setup.presets.daily.description", enable: ["workshop.orders", "workshop.parts", "office.time", "workshop.files", "workshop.checklists"] },
 ];
 
 export type SkippedReason = "unknown" | "required" | "alreadyOn";

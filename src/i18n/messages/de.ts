@@ -9,6 +9,7 @@ import { ordersDe } from "./modules/orders.de";
 import { partsDe } from "./modules/parts.de";
 import { timeDe } from "./modules/time.de";
 import { filesDe } from "./modules/files.de";
+import { checklistsDe } from "./modules/checklists.de";
 import { customersDe } from "./modules/customers.de";
 import { exchangeDe } from "./modules/exchange.de";
 import { usersDe } from "./modules/users.de";
@@ -167,6 +168,7 @@ export const de = {
     orders: "Aufträge",
     parts: "Teile & Lager",
     files: "Dokumente & Fotos",
+    checklists: "Checklisten",
     tires: "Reifenlager",
     customers: "Kunden",
     users: "Benutzer",
@@ -319,6 +321,7 @@ export const de = {
   parts: partsDe,
   time: timeDe,
   files: filesDe,
+  checklists: checklistsDe,
   customers: customersDe,
   exchange: exchangeDe,
   users: usersDe,
@@ -329,6 +332,7 @@ export const de = {
     orders: "Aufträge",
     parts: "Teile & Lager",
     files: "Dokumente & Fotos",
+    checklists: "Checklisten",
     tires: "Reifenlager",
     customers: "Kunden",
     vehicles: "Fahrzeuge",
@@ -415,6 +419,11 @@ export const de = {
       edit: "Mitarbeiter und Abwesenheiten bearbeiten",
       delete: "Mitarbeiter löschen",
       sensitive: "Sensible Mitarbeiterdaten (Notfallkontakt, Krankheit)",
+    },
+    checklists: {
+      view: "Checklisten ansehen (nach den Rechten für Fahrzeug bzw. Auftrag)",
+      fill: "Checklisten beginnen, ausfüllen, abschließen und verwerfen",
+      manage: "Vorlagen pflegen und abgeschlossene Checklisten wieder öffnen",
     },
     files: {
       view: "Dokumente und Fotos ansehen (nach den Rechten für Fahrzeug bzw. Auftrag)",

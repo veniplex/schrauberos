@@ -33,6 +33,8 @@ export const DEFAULT_ROLES: Array<{
       // Zeiterfassung: eigene Zeiten stempeln, ansehen und korrigieren; `time.viewAll`/`time.correctAll` sind gekennzeichnet (personenbezogen, Regel 9) und gehören in keine Standardrolle
       "time.view", "time.stamp", "time.correct",
       "files.view", "files.delete",
+      // Checklisten ansehen und Vorlagen pflegen (die Leitung); ausfüllen tun die Werkstattrollen
+      "checklists.view", "checklists.manage",
     ],
   },
   {
@@ -64,6 +66,7 @@ export const DEFAULT_ROLES: Array<{
       "time.view", "time.stamp", "time.correct",
       // Dokumente & Fotos: hochladen und – als Leitung der Annahme – auch fremde Dateien entfernen
       "files.view", "files.upload", "files.delete",
+      "checklists.view", "checklists.fill",
       "handbook.view",
     ],
   },
@@ -74,7 +77,7 @@ export const DEFAULT_ROLES: Array<{
     // `tires.stock` (Ein-/Ausbuchen) gehört ausdrücklich dazu: Wer den Wechsel am Fahrzeug macht, bucht den Satz um (Vorschlag nach dem erledigten Termin). Das ist kein
     // sensibles/Export-/Verwaltungsrecht (Regel 9) und gibt nicht das Bearbeiten (`tires.edit`) oder Löschen von Sätzen frei.
     // Aufträge: ansehen und bearbeiten (Status, Befunde) – bewusst ohne `orders.prices`: Preise und Summen bekommen Mechaniker nicht zu sehen und werden für sie nicht gelesen
-    permissions: ["appointments.view", "appointments.edit", "tires.view", "tires.stock", "customers.view", "vehicles.view", "orders.view", "orders.edit", "parts.view", "time.view", "time.stamp", "time.correct", "files.view", "files.upload", "handbook.view"],
+    permissions: ["appointments.view", "appointments.edit", "tires.view", "tires.stock", "customers.view", "vehicles.view", "orders.view", "orders.edit", "parts.view", "time.view", "time.stamp", "time.correct", "files.view", "files.upload", "checklists.view", "checklists.fill", "handbook.view"],
   },
   {
     key: "warehouse",

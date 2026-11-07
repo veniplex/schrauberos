@@ -37,6 +37,7 @@ export const auditEn: typeof auditDe = {
     employee: "Employees",
     time: "Time tracking",
     files: "Documents & photos",
+    checklists: "Checklists",
     fleet: "Fleet",
     network: "Network",
     docs: "Documentation",
@@ -207,6 +208,15 @@ export const auditEn: typeof auditDe = {
       export: "Invoices exported (CSV)",
       import: "Invoices imported (CSV)",
       accountantExport: "Invoices exported for the accountant (CSV)",
+    },
+    checklists: {
+      templateCreate: "Checklist template created",
+      templateUpdate: "Checklist template changed (new version)",
+      templateArchive: "Checklist template archived or reactivated",
+      start: "Checklist started",
+      complete: "Checklist completed",
+      reopen: "Checklist reopened",
+      discard: "Checklist discarded",
     },
     files: {
       upload: "File uploaded",

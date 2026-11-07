@@ -986,6 +986,110 @@ CREATE TABLE "FileAttachment" (
     CONSTRAINT "FileAttachment_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "ChecklistTemplate" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "standardKey" TEXT,
+    "name" TEXT NOT NULL,
+    "archivedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "ChecklistTemplateVersion" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "templateId" TEXT NOT NULL,
+    "version" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "signatureMode" TEXT NOT NULL DEFAULT 'none',
+    "note" TEXT,
+    "createdByName" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ChecklistTemplateVersion_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "ChecklistTemplate" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ChecklistTemplateItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "versionId" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "label" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "unit" TEXT,
+    "minValue" REAL,
+    "maxValue" REAL,
+    "targetValue" REAL,
+    "options" TEXT,
+    "required" BOOLEAN NOT NULL DEFAULT true,
+    "hint" TEXT,
+    CONSTRAINT "ChecklistTemplateItem_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "ChecklistTemplateVersion" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Checklist" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "templateId" TEXT NOT NULL,
+    "versionId" TEXT NOT NULL,
+    "templateName" TEXT NOT NULL,
+    "templateVersion" INTEGER NOT NULL,
+    "standardKey" TEXT,
+    "signatureMode" TEXT NOT NULL DEFAULT 'none',
+    "vehicleId" TEXT NOT NULL,
+    "orderId" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "customerName" TEXT,
+    "signaturePath" TEXT,
+    "signatureHash" TEXT,
+    "signedName" TEXT,
+    "note" TEXT,
+    "completedAt" DATETIME,
+    "completedByName" TEXT,
+    "createdByName" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Checklist_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "ChecklistTemplate" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Checklist_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "ChecklistTemplateVersion" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Checklist_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Checklist_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ChecklistItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "checklistId" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "label" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "unit" TEXT,
+    "minValue" REAL,
+    "maxValue" REAL,
+    "targetValue" REAL,
+    "options" TEXT,
+    "required" BOOLEAN NOT NULL DEFAULT true,
+    "hint" TEXT,
+    "done" BOOLEAN NOT NULL DEFAULT false,
+    "numberValue" REAL,
+    "textValue" TEXT,
+    "doneByName" TEXT,
+    "doneAt" DATETIME,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ChecklistItem_checklistId_fkey" FOREIGN KEY ("checklistId") REFERENCES "Checklist" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ChecklistEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "checklistId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "byName" TEXT NOT NULL,
+    "note" TEXT,
+    "signaturePath" TEXT,
+    "at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ChecklistEvent_checklistId_fkey" FOREIGN KEY ("checklistId") REFERENCES "Checklist" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
@@ -1321,3 +1425,30 @@ CREATE INDEX "FileAttachment_createdAt_idx" ON "FileAttachment"("createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "FileAttachment_uploadedById_uploadKey_key" ON "FileAttachment"("uploadedById", "uploadKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ChecklistTemplate_standardKey_key" ON "ChecklistTemplate"("standardKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ChecklistTemplateVersion_templateId_version_key" ON "ChecklistTemplateVersion"("templateId", "version");
+
+-- CreateIndex
+CREATE INDEX "ChecklistTemplateItem_versionId_position_idx" ON "ChecklistTemplateItem"("versionId", "position");
+
+-- CreateIndex
+CREATE INDEX "Checklist_vehicleId_createdAt_idx" ON "Checklist"("vehicleId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Checklist_orderId_createdAt_idx" ON "Checklist"("orderId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Checklist_status_createdAt_idx" ON "Checklist"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Checklist_signatureHash_idx" ON "Checklist"("signatureHash");
+
+-- CreateIndex
+CREATE INDEX "ChecklistItem_checklistId_position_idx" ON "ChecklistItem"("checklistId", "position");
+
+-- CreateIndex
+CREATE INDEX "ChecklistEvent_checklistId_at_idx" ON "ChecklistEvent"("checklistId", "at");

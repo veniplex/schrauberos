@@ -5,6 +5,7 @@ import { seeds as tires } from "./workshop/tires/seed";
 import { seeds as orders } from "./workshop/orders/seed";
 import { seeds as parts } from "./workshop/parts/seed";
 import { seeds as files } from "./workshop/files/seed";
+import { seeds as checklists } from "./workshop/checklists/seed";
 import { seeds as customers } from "./workshop/customers/seed";
 import { seeds as vehicles } from "./workshop/vehicles/seed";
 import { seeds as invoices } from "./office/invoices/seed";
@@ -25,6 +26,7 @@ export const ALL_SEEDS: readonly SeedDef[] = [
   ...orders,
   ...parts,
   ...files,
+  ...checklists,
   ...customers,
   ...vehicles,
   ...invoices,

@@ -8,6 +8,7 @@ import { tiresFeature } from "./workshop/tires/feature";
 import { ordersFeature } from "./workshop/orders/feature";
 import { partsFeature } from "./workshop/parts/feature";
 import { filesFeature } from "./workshop/files/feature";
+import { checklistsFeature } from "./workshop/checklists/feature";
 import { customersFeature } from "./workshop/customers/feature";
 import { vehiclesFeature } from "./workshop/vehicles/feature";
 import { invoicesFeature } from "./office/invoices/feature";
@@ -41,6 +42,7 @@ export const FEATURES = [
   ordersFeature,
   partsFeature,
   filesFeature,
+  checklistsFeature,
   tiresFeature,
   customersFeature,
   vehiclesFeature,

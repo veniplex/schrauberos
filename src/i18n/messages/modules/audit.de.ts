@@ -32,6 +32,7 @@ export const auditDe = {
     orders: "Aufträge",
     parts: "Teile & Lager",
     files: "Dokumente & Fotos",
+    checklists: "Checklisten",
     invoice: "Rechnungen",
     employee: "Mitarbeiter",
     time: "Zeiterfassung",
@@ -205,6 +206,15 @@ export const auditDe = {
       export: "Rechnungen exportiert (CSV)",
       import: "Rechnungen importiert (CSV)",
       accountantExport: "Rechnungen für den Steuerberater exportiert (CSV)",
+    },
+    checklists: {
+      templateCreate: "Checklisten-Vorlage angelegt",
+      templateUpdate: "Checklisten-Vorlage geändert (neue Version)",
+      templateArchive: "Checklisten-Vorlage archiviert oder wieder aktiviert",
+      start: "Checkliste begonnen",
+      complete: "Checkliste abgeschlossen",
+      reopen: "Checkliste wieder geöffnet",
+      discard: "Checkliste verworfen",
     },
     files: {
       upload: "Datei hochgeladen",

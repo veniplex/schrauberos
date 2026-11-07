@@ -10,6 +10,7 @@ import { endpoints as tires } from "./workshop/tires/api";
 import { endpoints as orders } from "./workshop/orders/api";
 import { endpoints as parts } from "./workshop/parts/api";
 import { endpoints as files } from "./workshop/files/api";
+import { endpoints as checklists } from "./workshop/checklists/api";
 import { endpoints as vehicles } from "./workshop/vehicles/api";
 
 /**
@@ -18,4 +19,4 @@ import { endpoints as vehicles } from "./workshop/vehicles/api";
  * Recht sind erreichbar (ausgeschaltet = 404). Plattform-/Verwaltungsfunktionen (Benutzer, Rollen, Einstellungen, Module, Backups, Updates, Audit,
  * API selbst) sind nie API-Ressourcen – `src/modules/api.test.ts` erzwingt das.
  */
-export const apiEndpoints: readonly ApiEndpoint[] = [...customers, ...vehicles, ...appointments, ...orders, ...parts, ...files, ...tires, ...invoices, ...employees, ...time, ...fleet, ...network];
+export const apiEndpoints: readonly ApiEndpoint[] = [...customers, ...vehicles, ...appointments, ...orders, ...parts, ...files, ...checklists, ...tires, ...invoices, ...employees, ...time, ...fleet, ...network];

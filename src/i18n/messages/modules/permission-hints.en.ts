@@ -66,6 +66,11 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     delete: "Delete employees permanently.",
     sensitive: "See and change the emergency contact and the type of absences (sickness).",
   },
+  checklists: {
+    view: "View checklists on vehicles and orders – only where the person may also see the vehicle or order.",
+    fill: "Start checklists, tick items, record measurements, have the customer sign and complete them.",
+    manage: "Create and change templates (every change becomes a new version) and reopen completed checklists with a reason.",
+  },
   files: {
     view: "View documents and photos on vehicles and orders – only where the person may also see the vehicle or order.",
     upload: "Upload and caption photos (JPEG, PNG) and PDF documents. Location data is removed from photos.",

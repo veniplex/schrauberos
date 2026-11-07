@@ -381,6 +381,8 @@ model Vehicle {
   orders       Order[]
   // Dokumente & Fotos (F6): Fahrzeuge mit Dateien sind nicht löschbar (archivieren)
   files        FileAttachment[]
+  // Checklisten (F7): Fahrzeuge mit Checklisten sind nicht löschbar (archivieren)
+  checklists   Checklist[]
 
   // Kein Unique auf dem Kennzeichen: Dubletten sind erlaubt (Warnung mit Bestätigung in der Anwendung), etwa bei Halterwechsel oder wiederverwendeten Kennzeichen
   @@index([plateNorm])
@@ -1176,6 +1178,8 @@ model Order {
   timeEntries TimeEntry[]
   // Dokumente & Fotos (F6)
   files       FileAttachment[]
+  // Checklisten (F7)
+  checklists  Checklist[]
 
   @@index([status, acceptedAt])
   @@index([vehicleId])
@@ -1420,3 +1424,142 @@ model FileAttachment {
   @@index([orderId, archivedAt, createdAt])
   @@index([createdAt])
 }
+
+// ───────────── Checklisten (F7, workshop.checklists) ─────────────
+
+// Vorlage einer Checkliste (Annahmeprotokoll, Ölwechsel, Reifenwechsel, HU-Vorbereitung oder eigene). Jede Änderung erzeugt eine NEUE Version (ChecklistTemplateVersion); begonnene und abgeschlossene Checklisten
+// tragen ihre Punkte als Kopie und ändern sich nie mit der Vorlage. standardKey kennzeichnet die mitgelieferten Vorlagen (intake | oil | tires | hu).
+model ChecklistTemplate {
+  id          String    @id @default(cuid())
+  standardKey String?   @unique
+  // zuletzt gültiger Name (der Name jeder Version steht an der Version)
+  name        String
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  versions   ChecklistTemplateVersion[]
+  checklists Checklist[]
+}
+
+model ChecklistTemplateVersion {
+  id            String   @id @default(cuid())
+  templateId    String
+  version       Int
+  name          String
+  description   String?
+  // none | optional | required (Kundenunterschrift beim Abschluss)
+  signatureMode String   @default("none")
+  // Anmerkung zur Änderung
+  note          String?
+  createdByName String
+  createdAt     DateTime @default(now())
+
+  template   ChecklistTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  items      ChecklistTemplateItem[]
+  checklists Checklist[]
+
+  @@unique([templateId, version])
+}
+
+// Punkt einer Vorlagenversion. type: check (Haken) | measure (Messwert mit Einheit und Grenzen) | torque (Drehmoment in Nm mit Sollwert) | choice (Auswahl) | text (Freitext) | photo (Foto-Hinweis, wird abgehakt)
+model ChecklistTemplateItem {
+  id        String  @id @default(cuid())
+  versionId String
+  position  Int
+  label     String
+  type      String
+  unit      String?
+  minValue  Float?
+  maxValue  Float?
+  targetValue Float?
+  // Auswahlmöglichkeiten, eine je Zeile
+  options   String?
+  required  Boolean @default(true)
+  hint      String?
+
+  version ChecklistTemplateVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, position])
+}
+
+// Eine Checkliste an einem Fahrzeug (und optional einem Auftrag). Status: open | completed | discarded. Abgeschlossen = unveränderlich; Wiederöffnen nur mit Recht und Begründung (Verlauf).
+model Checklist {
+  id              String    @id @default(cuid())
+  templateId      String
+  versionId       String
+  // Kopie von Name, Version und Art (Annahmeprotokoll) zum Zeitpunkt des Beginns
+  templateName    String
+  templateVersion Int
+  standardKey     String?
+  signatureMode   String    @default("none")
+  vehicleId       String
+  orderId         String?
+  status          String    @default("open")
+  // Kundenname (Unterschrift) und die Unterschrift: PNG unter /data/files oder getippter Name; Prüfsumme gegen Wiederverwendung des Bildes
+  customerName    String?
+  signaturePath   String?
+  signatureHash   String?
+  signedName      String?
+  note            String?
+  completedAt     DateTime?
+  completedByName String?
+  createdByName   String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  template ChecklistTemplate        @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  version  ChecklistTemplateVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  vehicle  Vehicle                  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  order    Order?                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  items    ChecklistItem[]
+  events   ChecklistEvent[]
+
+  @@index([vehicleId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([signatureHash])
+}
+
+// Punkt einer Checkliste: Kopie des Vorlagenpunkts plus Ergebnis. updatedAt ist die Version des einzelnen Punkts (gleichzeitiges Abhaken).
+model ChecklistItem {
+  id          String    @id @default(cuid())
+  checklistId String
+  position    Int
+  label       String
+  type        String
+  unit        String?
+  minValue    Float?
+  maxValue    Float?
+  targetValue Float?
+  options     String?
+  required    Boolean   @default(true)
+  hint        String?
+  done        Boolean   @default(false)
+  numberValue Float?
+  textValue   String?
+  doneByName  String?
+  doneAt      DateTime?
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId, position])
+}
+
+// Verlauf einer Checkliste: begonnen, abgeschlossen, wieder geöffnet (mit Begründung und der bisherigen Unterschrift, die auf dem Datenträger bleibt), verworfen
+model ChecklistEvent {
+  id            String   @id @default(cuid())
+  checklistId   String
+  // created | completed | reopened | discarded
+  kind          String
+  byName        String
+  note          String?
+  signaturePath String?
+  at            DateTime @default(now())
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId, at])
+}
+
