@@ -182,6 +182,11 @@ export async function buildCorpus(): Promise<Corpus> {
   }
   {
     const fs = await fresh();
+    fs.file("a31mb‮c d⁦e‏f؜g", "x");
+    add("extra-file-hostile-chars", "Zusätzliche Datei mit C1-, Bidi- und Zeilentrenner-Zeichen im Namen (die Meldung des Prüfers ersetzt sie durch '?').", fs, neg(15, "extra"));
+  }
+  {
+    const fs = await fresh();
     fs.file("x".repeat(250), "lang"); // NAME_MAX ist 255: längere Namen lassen sich unter Linux nicht anlegen
     add("extra-file-long-name", "Zusätzliche Datei mit sehr langem Namen (250 Zeichen, nahe an NAME_MAX).", fs, neg(15, "extra"));
   }

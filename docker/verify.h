@@ -93,6 +93,9 @@ typedef struct {
   const char *check_expiry; /* JJJJ-MM-TT oder NULL */
   sos_progress_fn progress;
   void *progress_ctx;
+  /* Nicht NULL: Bei Erfolg (Rückgabe 0) wird der Deskriptor des geprüften Versionsordners dorthin übergeben (der Aufrufer schließt ihn), sonst -1. Der Starter startet den Launcher
+     aus genau diesem Ordner (fchdir), nicht aus dem Pfad, der sich zwischen Prüfung und Start geändert haben könnte. */
+  int *keep_dirfd;
 } sos_options;
 
 /* ───────── Bausteine (auch für Tests und Fuzz-Ziele) ───────── */
@@ -101,7 +104,8 @@ int sos_version_parse(const char *s, uint32_t out[3]); /* streng x.y.z: keine f�
 int sos_calendar_date(const char *s); /* genau JJJJ-MM-TT, echtes Datum (gregorianisch, 0000–9999) */
 size_t sos_utf8_seq(const uint8_t *p, size_t n); /* Länge der gültigen UTF-8-Sequenz an p (1–4) oder 0 */
 int sos_utf8_valid(const uint8_t *p, size_t n);
-/* Pfad/Text für Ausgaben bereinigen: Steuerzeichen, ungültiges UTF-8 und U+FFFD werden '?'; höchstens `cap-1` Bytes (an Zeichengrenzen) */
+/* Pfad/Text für Ausgaben bereinigen: Steuerzeichen (C0, DEL, C1), Bidi-Steuerzeichen (U+061C, U+200E/F, U+202A–E, U+2066–9), Zeilentrenner (U+2028/9), ungültiges UTF-8 und U+FFFD
+   werden '?'; höchstens `cap-1` Bytes (an Zeichengrenzen) */
 void sos_clean(const char *in, size_t n, char *out, size_t cap);
 
 /* Ed25519-Prüfung wie im Prüfer: Monocypher plus Abweisung nicht-kanonischer Punktkodierungen von R und A. 1 = gültig. */

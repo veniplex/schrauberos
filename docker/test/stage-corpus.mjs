@@ -122,10 +122,10 @@ export async function corpusStage(log) {
   return failures === 0;
 }
 
-/** Wie `sos_clean` im Prüfer: Steuerzeichen und U+FFFD werden '?', Länge höchstens 200 Bytes. */
+/** Wie `sos_clean` im Prüfer: C0/C1-Steuerzeichen, Bidi-Steuerzeichen, Zeilentrenner und U+FFFD werden '?', Länge höchstens 200 Bytes. */
 function sanitize(value) {
   let out = "";
-  for (const ch of value.replace(/[\u0000-\u001f\u007f�]/g, "?")) {
+  for (const ch of value.replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069\ufffd]/g, "?")) {
     if (Buffer.byteLength(out + ch) > 200) break;
     out += ch;
   }

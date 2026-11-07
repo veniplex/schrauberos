@@ -7,6 +7,7 @@
  *   exit-once FLAG N          beim ersten Mal (FLAG existiert nicht) FLAG anlegen und mit N beenden; sonst weiter
  *   crash-times N FLAG        Zähler in FLAG erhöhen; solange er <= N ist, mit Code 3 beenden; sonst weiter
  *   sleep MS                  wartet
+ *   sleep-once FLAG MS        beim ersten Mal (FLAG existiert nicht) FLAG anlegen und MS warten; sonst weiter
  *   daemon PIDFILE            (nur wenn PIDFILE noch nicht existiert) startet einen entkoppelten Prozess (Doppel-Fork, setsid), der lange schläft; seine PID kommt nach PIDFILE (ein „kompromittierter Überlebender“)
  *   wait-file FILE            wartet (höchstens 30 s), bis FILE existiert
  *   check-dead PIDFILE        protokolliert "dead" oder "alive" je nachdem, ob der Prozess aus PIDFILE noch lebt
@@ -67,6 +68,14 @@ static int run_line(char *line) {
       int fd = open(arg, O_WRONLY | O_CREAT, 0644);
       if (fd >= 0) close(fd);
       exit(atoi(n ? n : "0"));
+    }
+  } else if (strcmp(line, "sleep-once") == 0 && arg) {
+    char *ms = strchr(arg, ' ');
+    if (ms) *ms++ = 0;
+    if (access(arg, F_OK) != 0) {
+      int fd = open(arg, O_WRONLY | O_CREAT, 0644);
+      if (fd >= 0) close(fd);
+      sleep_ms(atol(ms ? ms : "0"));
     }
   } else if (strcmp(line, "crash-times") == 0 && arg) {
     char *flag = strchr(arg, ' ');
@@ -212,9 +221,10 @@ int main(int argc, char **argv) {
   const char *logname = getenv("SOS_TEST_LOG");
   if (logname) logf_ = fopen(logname, "a");
   if (argc < 2) return 97;
-  /* der Pfad des Skripts verrät, welcher Launcher läuft: in die Beschriftung aufnehmen */
-  char head[1100];
-  snprintf(head, sizeof head, "start %s", argv[1]);
+  /* der Pfad des Skripts verrät, welcher Launcher läuft: in die Beschriftung aufnehmen (der Starter ruft mit relativen Pfaden auf: ./launcher.mjs im Arbeitsverzeichnis) */
+  char head[2200], cwd[1024];
+  if (argv[1][0] != '/' && getcwd(cwd, sizeof cwd)) snprintf(head, sizeof head, "start %s/%s", cwd, strncmp(argv[1], "./", 2) == 0 ? argv[1] + 2 : argv[1]);
+  else snprintf(head, sizeof head, "start %s", argv[1]);
   say(head);
   run_script(argv[1]);
   say("end");

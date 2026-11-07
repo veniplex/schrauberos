@@ -42,6 +42,7 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -70,14 +71,15 @@ static int fmt(char *out, size_t cap, const char *format, ...) {
 }
 
 /* Konstanten; die Tests (docker/test) überschreiben sie mit -D, ein Produktions-Build (-DSOS_PRODUCTION) nie */
-#if defined(SOS_PRODUCTION) && (defined(SOS_BUILTIN_DIR) || defined(SOS_VERIFY_TIMEOUT_SECONDS) || defined(SOS_QUIESCE_MILLIS) || defined(SOS_CRASH_WINDOW_SECONDS))
+#if defined(SOS_PRODUCTION) && (defined(SOS_BUILTIN_DIR) || defined(SOS_VERIFY_TIMEOUT_SECONDS) || defined(SOS_QUIESCE_MILLIS) || defined(SOS_CRASH_WINDOW_SECONDS) || defined(SOS_BACKOFF_STEP_MILLIS) || \
+    defined(SOS_TEST_NO_QUIESCE))
 #error "Testkonstanten in einem Produktions-Build"
 #endif
 #ifndef SOS_BUILTIN_DIR
 #define SOS_BUILTIN_DIR "/app"
 #endif
 #ifndef SOS_VERIFY_TIMEOUT_SECONDS
-#define SOS_VERIFY_TIMEOUT_SECONDS 300u /* harte Grenze für eine Prüfung (alarm) */
+#define SOS_VERIFY_TIMEOUT_SECONDS 900u /* harte Grenze für eine Prüfung (alarm); ein Überschreiten ist „unklar“ und zählt nicht (README, Klassen) */
 #endif
 #ifndef SOS_QUIESCE_MILLIS
 #define SOS_QUIESCE_MILLIS 10000u /* so lange wartet der Starter darauf, dass alle Nachfahren weg sind */
@@ -85,6 +87,12 @@ static int fmt(char *out, size_t cap, const char *format, ...) {
 #ifndef SOS_CRASH_WINDOW_SECONDS
 #define SOS_CRASH_WINDOW_SECONDS 30 /* ein Launcher, der kürzer lebt, zählt als „sofort abgestürzt“ */
 #endif
+#ifndef SOS_BACKOFF_STEP_MILLIS
+#define SOS_BACKOFF_STEP_MILLIS 1000u /* Wartezeit nach dem 4. schnellen Neustartwunsch (42) in Folge; verdoppelt sich, höchstens 60 s */
+#endif
+#define BACKOFF_STEP_MILLIS SOS_BACKOFF_STEP_MILLIS
+#define BACKOFF_FREE_ROUNDS 4 /* so viele schnelle Neustartwünsche in Folge sind ohne Wartezeit erlaubt (Rückfall-Ketten: Vorversion, eingebaute Version) */
+#define BACKOFF_MAX_MILLIS 60000u
 #define BUILTIN_DIR SOS_BUILTIN_DIR
 #define VERIFY_TIMEOUT_SECONDS SOS_VERIFY_TIMEOUT_SECONDS
 #define QUIESCE_MILLIS SOS_QUIESCE_MILLIS
@@ -154,12 +162,27 @@ static void anchor_init(sos_anchor *a) {
 
 /* ───────── Marker (Daten für den Launcher der eingebauten Version; nie blockierend, nie einem Link folgend) ───────── */
 
+/*
+ * Der Marker ist ein Hinweis, nie Voraussetzung für den Start. Auch ein Hindernis unter dem Markernamen darf nichts aussperren: ein Link oder eine FIFO verschwindet per unlink,
+ * ein leeres Verzeichnis per rmdir, ein nicht leeres wird beiseite verschoben (die App – uid 1000 – kann so etwas vor dem Neustart anlegen). Gelingt auch das nicht, steht eine Logzeile da.
+ */
 static void write_marker(const char *name, const char *content) {
   char path[PATH_CAP];
   if (!fmt(path, sizeof path, "%s/app/%s", data_dir(), name)) return;
-  unlink(path); /* auch ein untergeschobener Link oder eine FIFO unter diesem Namen verschwindet */
+  if (unlink(path) != 0 && errno != ENOENT && rmdir(path) != 0 && errno != ENOENT) {
+    char aside[PATH_CAP + 40];
+    int moved = fmt(aside, sizeof aside, "%s.blocked-%llu", path, (unsigned long long)monotonic_ms()) && rename(path, aside) == 0;
+    if (!moved) {
+      fprintf(stderr, "[bootstrap] Warnung: Der Marker %s lässt sich nicht schreiben (Hindernis im Weg: %s).\n", name, strerror(errno));
+      return;
+    }
+    fprintf(stderr, "[bootstrap] Hinweis: Unter dem Namen des Markers %s lag etwas anderes als eine Datei; es wurde beiseite verschoben.\n", name);
+  }
   int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0644);
-  if (fd < 0) return;
+  if (fd < 0) {
+    fprintf(stderr, "[bootstrap] Warnung: Der Marker %s lässt sich nicht schreiben (%s).\n", name, strerror(errno));
+    return;
+  }
   size_t len = strlen(content), done = 0;
   while (done < len) {
     ssize_t n = write(fd, content + done, len - done);
@@ -300,12 +323,76 @@ static void print_progress(void *ctx, uint64_t done, uint64_t total, uint32_t fi
 
 typedef enum { VERIFY_OK, VERIFY_NEGATIVE, VERIFY_OUTDATED, VERIFY_INCONCLUSIVE } verify_class;
 
-/* Ergebnis der Prüfung einer installierten Version: Klasse, Grund bei „unklar“, Bericht (nur Anzeige) */
-static verify_class verify_in_child(const char *version, const char *dir, report_t *rep, const char **why) {
+/* Bericht (und bei Erfolg der Deskriptor des geprüften Versionsordners) an den Elternprozess; ein Fehler dabei zeigt sich dort als fehlender Bericht → unklar */
+static void send_report(int sock, const report_t *rep, int dirfd) {
+  struct iovec iov = {(void *)(uintptr_t)rep, sizeof *rep};
+  union {
+    struct cmsghdr align;
+    char buf[CMSG_SPACE(sizeof(int))];
+  } ctl;
+  struct msghdr msg;
+  memset(&msg, 0, sizeof msg);
+  memset(&ctl, 0, sizeof ctl);
+  msg.msg_iov = &iov;
+  msg.msg_iovlen = 1;
+  if (dirfd >= 0) {
+    msg.msg_control = ctl.buf;
+    msg.msg_controllen = sizeof ctl.buf;
+    struct cmsghdr *c = CMSG_FIRSTHDR(&msg);
+    c->cmsg_level = SOL_SOCKET;
+    c->cmsg_type = SCM_RIGHTS;
+    c->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(c), &dirfd, sizeof(int));
+  }
+  ssize_t ignored = sendmsg(sock, &msg, MSG_NOSIGNAL);
+  (void)ignored;
+}
+
+/* Empfängt den Bericht samt Deskriptor (der Absender ist schon beendet; die Nachricht liegt im Puffer des Sockets). Liefert die Größe des Berichts; *dirfd = -1, wenn keiner mitkam. */
+static ssize_t receive_report(int sock, report_t *rep, int *dirfd) {
+  struct iovec iov = {rep, sizeof *rep};
+  union {
+    struct cmsghdr align;
+    char buf[CMSG_SPACE(4 * sizeof(int))];
+  } ctl;
+  struct msghdr msg;
+  memset(&msg, 0, sizeof msg);
+  memset(&ctl, 0, sizeof ctl);
+  msg.msg_iov = &iov;
+  msg.msg_iovlen = 1;
+  msg.msg_control = ctl.buf;
+  msg.msg_controllen = sizeof ctl.buf;
+  *dirfd = -1;
+  ssize_t n;
+  do n = recvmsg(sock, &msg, MSG_DONTWAIT | MSG_CMSG_CLOEXEC);
+  while (n < 0 && errno == EINTR);
+  for (struct cmsghdr *c = CMSG_FIRSTHDR(&msg); c; c = CMSG_NXTHDR(&msg, c)) {
+    if (c->cmsg_level != SOL_SOCKET || c->cmsg_type != SCM_RIGHTS) continue;
+    size_t count = (c->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+    for (size_t i = 0; i < count; i++) {
+      int fd;
+      memcpy(&fd, CMSG_DATA(c) + i * sizeof(int), sizeof fd);
+      if (*dirfd < 0 && i == 0 && count == 1) *dirfd = fd;
+      else close(fd); /* mehr als erwartet: nichts davon weiterverwenden */
+    }
+  }
+  if (msg.msg_flags & MSG_CTRUNC) {
+    if (*dirfd >= 0) close(*dirfd);
+    *dirfd = -1;
+  }
+  return n;
+}
+
+/*
+ * Ergebnis der Prüfung einer installierten Version: Klasse, Grund bei „unklar“, Bericht (nur Anzeige). Bei Erfolg liefert *verified den Deskriptor genau des Versionsordners, den der
+ * Prüfer durchlaufen hat (der Prüfer öffnet ihn selbst per openat/O_NOFOLLOW): Der Launcher startet aus diesem Ordner (fchdir), nicht aus dem Pfad, der sich inzwischen geändert haben könnte.
+ */
+static verify_class verify_in_child(const char *version, const char *dir, report_t *rep, const char **why, int *verified) {
   memset(rep, 0, sizeof *rep);
   *why = "other";
+  *verified = -1;
   int fds[2];
-  if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) != 0) {
+  if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, fds) != 0) {
     *why = "io";
     return VERIFY_INCONCLUSIVE;
   }
@@ -339,6 +426,8 @@ static verify_class verify_in_child(const char *version, const char *dir, report
     progress_ctx pc = {version, monotonic_ms()};
     opt.progress = print_progress;
     opt.progress_ctx = &pc;
+    int kept = -1;
+    opt.keep_dirfd = &kept;
     sos_result r;
     int code = sos_verify_path(dir, data_dir(), &anchor, &opt, &r);
     report_t out;
@@ -350,8 +439,7 @@ static verify_class verify_in_child(const char *version, const char *dir, report
     out.ms = r.ms;
     snprintf(out.reason, sizeof out.reason, "%s", r.reason);
     sos_clean(r.path, strlen(r.path), out.path, sizeof out.path);
-    ssize_t ignored = write(fds[1], &out, sizeof out);
-    (void)ignored;
+    send_report(fds[1], &out, code == 0 ? kept : -1);
     _exit(code & 0xff);
   }
   child = pid;
@@ -368,13 +456,16 @@ static verify_class verify_in_child(const char *version, const char *dir, report
   }
   child = 0;
   report_t got;
-  ssize_t n = read(fds[0], &got, sizeof got);
+  int received = -1;
+  ssize_t n = receive_report(fds[0], &got, &received);
   close(fds[0]);
   if (status == -1) {
+    if (received >= 0) close(received);
     *why = "other";
     return VERIFY_INCONCLUSIVE;
   }
   if (WIFSIGNALED(status)) {
+    if (received >= 0) close(received);
     *why = WTERMSIG(status) == SIGALRM ? "timeout" : "signal";
     return VERIFY_INCONCLUSIVE;
   }
@@ -392,7 +483,15 @@ static verify_class verify_in_child(const char *version, const char *dir, report
   } else {
     rep->code = code;
   }
-  if (code == 0) return VERIFY_OK;
+  if (code == 0) {
+    if (received < 0) { /* „ok“ ohne den geprüften Ordner kann nicht gestartet werden (fail closed) */
+      *why = "io";
+      return VERIFY_INCONCLUSIVE;
+    }
+    *verified = received;
+    return VERIFY_OK;
+  }
+  if (received >= 0) close(received);
   if ((code >= SOS_E_SEAL && code <= SOS_E_DIFFERS) || code == SOS_E_OUTSIDE) return VERIFY_NEGATIVE;
   if (code == SOS_E_OUTDATED) return VERIFY_OUTDATED;
   *why = code == SOS_E_IO ? "io" : "other";
@@ -401,7 +500,11 @@ static verify_class verify_in_child(const char *version, const char *dir, report
 
 /* ───────── Launcher ───────── */
 
-static pid_t spawn_launcher(const char *dir) {
+/*
+ * Startet den Launcher des Verzeichnisses `dir`. `dirfd` >= 0 ist der vom Prüfer durchlaufene Versionsordner: das Kind wechselt per fchdir hinein und ruft alles mit relativen Pfaden auf
+ * (ein inzwischen ausgetauschter Ordner unter demselben Pfad bleibt unbeachtet). Ohne dirfd (die eingebaute Version, root-eigen) wechselt es per chdir.
+ */
+static pid_t spawn_launcher(const char *dir, int dirfd) {
   sigset_t old;
   block_signals(&old);
   pid_t pid = fork();
@@ -416,12 +519,10 @@ static pid_t spawn_launcher(const char *dir) {
   }
   child_reset_signals();
 
-  char loader_file[PATH_CAP], loader_rel[256], loader[PATH_CAP + 256], libs[PATH_CAP], node[PATH_CAP], launcher[PATH_CAP];
-  if (!fmt(loader_file, sizeof loader_file, "%s/runtime/loader", dir) || !fmt(libs, sizeof libs, "%s/runtime/lib", dir) || !fmt(node, sizeof node, "%s/runtime/node", dir) ||
-      !fmt(launcher, sizeof launcher, "%s/launcher.mjs", dir))
-    _exit(126);
-  if (chdir(dir) != 0) _exit(126);
-  FILE *f = fopen(loader_file, "r");
+  char loader_rel[256], loader[sizeof loader_rel + 16];
+  if (dirfd >= 0 ? fchdir(dirfd) != 0 : chdir(dir) != 0) _exit(126);
+  static char libs[] = "./runtime/lib", node[] = "./runtime/node", launcher[] = "./launcher.mjs";
+  FILE *f = fopen("runtime/loader", "r");
   int have_loader = 0;
   if (f) {
     if (fgets(loader_rel, (int)sizeof loader_rel, f)) {
@@ -431,7 +532,7 @@ static pid_t spawn_launcher(const char *dir) {
     fclose(f);
   }
   if (have_loader) {
-    if (!fmt(loader, sizeof loader, "%s/runtime/%s", dir, loader_rel)) _exit(126);
+    if (!fmt(loader, sizeof loader, "./runtime/%s", loader_rel)) _exit(126);
     char *args[] = {loader, "--library-path", libs, node, launcher, NULL};
     execv(loader, args);
   } else {
@@ -532,6 +633,9 @@ int main(int argc, char **argv) {
   setrlimit(RLIMIT_CORE, &nocore);
   int subreaper = prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) == 0;
   int can_quiesce = subreaper || getpid() == 1;
+#ifdef SOS_TEST_NO_QUIESCE
+  can_quiesce = 0; /* nur Tests: die Zusicherung ist nicht erzwingbar */
+#endif
   if (!can_quiesce) fprintf(stderr, "[bootstrap] Warnung: Ruhezustand nicht erzwingbar (weder PID 1 noch Subreaper) – installierte Versionen werden nicht gestartet.\n");
 
   struct sigaction sa;
@@ -540,14 +644,14 @@ int main(int argc, char **argv) {
   sigemptyset(&sa.sa_mask);
   for (size_t i = 0; i < sizeof HANDLED_SIGNALS / sizeof HANDLED_SIGNALS[0]; i++) sigaction(HANDLED_SIGNALS[i], &sa, NULL);
 
-  int force_builtin = 0, crashes = 0;
+  int force_builtin = 0, crashes = 0, quick_restarts = 0;
   char last_dir[POINTER_MAX + 1] = "";
 
   for (;;) {
     if (terminating) return 0;
 
     char dir[POINTER_MAX + 1] = BUILTIN_DIR, version[32] = "";
-    int installed = 0;
+    int installed = 0, verified_fd = -1;
     if (!force_builtin) {
       char target[POINTER_MAX + 1];
       struct stat st;
@@ -560,21 +664,23 @@ int main(int argc, char **argv) {
     if (installed) {
       int quiet = can_quiesce ? quiesce() : -1;
       if (terminating) return 0;
-      if (quiet < 0) {
-        fprintf(stderr, "[bootstrap] Warnung: Ruhezustand nicht erzwingbar – Version %s wird nicht geprüft, es läuft die eingebaute Version.\n", version);
-        installed = 0;
-      } else if (quiet == 0) {
-        fprintf(stderr, "[bootstrap] Nach dem Beenden der App laufen noch Prozesse – Version %s wird nicht geprüft, es läuft die eingebaute Version.\n", version);
+      if (quiet <= 0) {
+        /* Eigenschaft der Umgebung bzw. ein Überlebender, kein Befund über die Version: nie ein Fehlversuch (Grund quiesce zählt nicht), die Update-Seite meldet „installiert, aber nicht gestartet“ */
+        if (quiet < 0) fprintf(stderr, "[bootstrap] Warnung: Ruhezustand nicht erzwingbar – Version %s wird nicht geprüft, es läuft die eingebaute Version.\n", version);
+        else fprintf(stderr, "[bootstrap] Nach dem Beenden der App laufen noch Prozesse – Version %s wird nicht geprüft, es läuft die eingebaute Version.\n", version);
         char marker[64];
-        snprintf(marker, sizeof marker, "%s\nother\n", version);
+        snprintf(marker, sizeof marker, "%s\nquiesce\n", version);
         write_marker("inconclusive", marker);
         installed = 0;
       } else {
         fprintf(stderr, "[bootstrap] Prüfe Version %s …\n", version);
         report_t rep;
         const char *why;
-        verify_class cls = verify_in_child(version, dir, &rep, &why);
-        if (terminating) return 0; /* nach einem Stoppsignal gibt es keinen Befund und keinen Marker */
+        verify_class cls = verify_in_child(version, dir, &rep, &why, &verified_fd);
+        if (terminating) {
+          if (verified_fd >= 0) close(verified_fd);
+          return 0; /* nach einem Stoppsignal gibt es keinen Befund und keinen Marker */
+        }
         if (cls == VERIFY_OK) {
           unsigned long long secs = rep.ms / 1000u, tenths = (rep.ms % 1000u) / 100u;
           fprintf(stderr, "[bootstrap] Version %s geprüft (%llu Einträge, %llu MiB, %llu,%llu s).\n", version, (unsigned long long)rep.files, (unsigned long long)(rep.bytes >> 20), secs, tenths);
@@ -603,7 +709,8 @@ int main(int argc, char **argv) {
 
     fprintf(stderr, "[bootstrap] Starte Launcher aus %s\n", dir);
     uint64_t spawned = monotonic_ms();
-    pid_t pid = spawn_launcher(dir);
+    pid_t pid = spawn_launcher(dir, verified_fd);
+    if (verified_fd >= 0) close(verified_fd);
     if (pid < 0) {
       perror("[bootstrap] fork");
       return 1;
@@ -619,16 +726,27 @@ int main(int argc, char **argv) {
     int code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
 
     if (terminating || code == 0) return code;
+    /* Absturzfenster an der Laufzeit des Launchers, nicht an der Prüfzeit */
+    int quick = monotonic_ms() - spawned < CRASH_WINDOW_SECONDS * 1000u;
     if (code == RESTART_CODE) {
       crashes = 0;
       if (strcmp(dir, BUILTIN_DIR) == 0) force_builtin = 0; /* die eingebaute Version hat den Zustand abgeglichen: der Zeiger entscheidet wieder */
+      /* Meldet ein Launcher wiederholt sofort 42, wäre jede Runde eine volle Prüfung ohne Pause: ab der 5. in Folge wartet der Starter (1 s, 2 s, 4 s … höchstens 60 s; ein Signal bricht die Pause ab) */
+      quick_restarts = quick ? quick_restarts + 1 : 0;
+      if (quick_restarts > BACKOFF_FREE_ROUNDS) {
+        uint64_t wait_ms = (uint64_t)BACKOFF_STEP_MILLIS << (quick_restarts - BACKOFF_FREE_ROUNDS - 1 < 6 ? quick_restarts - BACKOFF_FREE_ROUNDS - 1 : 6);
+        if (wait_ms > BACKOFF_MAX_MILLIS) wait_ms = BACKOFF_MAX_MILLIS;
+        fprintf(stderr, "[bootstrap] Der Launcher verlangt wiederholt sofort einen Neustart – Pause von %llu ms.\n", (unsigned long long)wait_ms);
+        struct timespec nap = {(time_t)(wait_ms / 1000u), (long)(wait_ms % 1000u) * 1000000L};
+        nanosleep(&nap, NULL);
+      }
       continue;
     }
+    quick_restarts = 0;
 
     if (strcmp(dir, BUILTIN_DIR) != 0) {
-      /* Absturzfenster an der Laufzeit des Launchers, nicht an der Prüfzeit */
-      int quick = monotonic_ms() - spawned < CRASH_WINDOW_SECONDS * 1000u;
-      crashes = (strcmp(dir, last_dir) == 0 && quick) ? crashes + 1 : 1;
+      /* ein langsamer Absturz zählt nicht (und beendet eine begonnene Reihe schneller Abstürze): nur Abstürze unter 30 s in Folge derselben Version */
+      crashes = !quick ? 0 : (strcmp(dir, last_dir) == 0 ? crashes + 1 : 1);
       fmt(last_dir, sizeof last_dir, "%s", dir);
       if (crashes >= 2) {
         fprintf(stderr, "[bootstrap] Launcher aus %s stürzt wiederholt ab (Code %d) – nehme die eingebaute Version.\n", dir, code);

@@ -3,7 +3,7 @@
 // Ruhezustand (Überlebende werden beendet, Fremde nicht), geerbte Signalmaske, Schnittstellen --print-keys, --verify (Aufruffehler) und --healthcheck.
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { activate, buildStarter, buildDir, compile, headerDir, makePackage, removeTree, repo, run, tempDir } from "./lib.mjs";
@@ -29,6 +29,8 @@ export function starterEnv({ crashWindow = 2, quiesceMs = 3000 } = {}) {
     builtin,
     starter: buildStarter(FLOOR, { tag: "test", extraDefs: defs(), name: "starter" }),
     starterShortTimeout: buildStarter(FLOOR, { tag: "test", extraDefs: defs(["-DSOS_VERIFY_TIMEOUT_SECONDS=1"]), name: "starter-timeout" }),
+    starterNoQuiesce: buildStarter(FLOOR, { tag: "test", extraDefs: defs(["-DSOS_TEST_NO_QUIESCE=1"]), name: "starter-noquiesce" }),
+    starterBackoff: buildStarter(FLOOR, { tag: "test", extraDefs: defs(["-DSOS_BACKOFF_STEP_MILLIS=200u"]), name: "starter-backoff" }),
   };
 }
 
@@ -151,6 +153,58 @@ export async function starterStage(log) {
       check(`ablehnung ${label}: kein verify-ok`, !readMarker(ctx.dataDir, "verify-ok"));
     });
   }
+
+  // ───── 2b. Hindernisse unter den Markernamen (die App kann sie vor dem Neustart anlegen): der Start darf nie ausgesperrt werden ─────
+  const obstacles = [
+    ["nicht leeres Verzeichnis", (p) => (mkdirSync(p), writeFileSync(join(p, "x"), "x"))],
+    ["leeres Verzeichnis", (p) => mkdirSync(p)],
+    ["Symlink auf eine Fremddatei", (p, ctx) => symlinkSync(join(ctx.dataDir, "outside.txt"), p)],
+    ["FIFO", (p) => run("mkfifo", [p])],
+  ];
+  for (const [label, obstruct] of obstacles) {
+    await scenario(`marker-hindernis verify-failed: ${label}`, async (ctx) => {
+      const dir = await install(ctx, "0.3.0", "log installed\nexit 0\n");
+      writeFileSync(join(dir, "extra.txt"), "x"); // -> 15
+      activate(ctx.dataDir, "0.3.0");
+      writeFileSync(join(ctx.dataDir, "outside.txt"), "ORIGINAL");
+      obstruct(join(ctx.dataDir, "app", "verify-failed"), ctx);
+      const s = startStarter(env, env.starter, ctx);
+      const r = await s.finish(10000);
+      check(`marker-hindernis ${label}: der Start läuft, die eingebaute Version startet`, r.code === 0 && /builtin/.test(s.log()) && !/installed/.test(s.log()), `${r.code}/${r.signal} ${s.log()} ${r.stderr}`);
+      check(`marker-hindernis ${label}: der Marker ist eine Datei mit dem Befund`, readMarker(ctx.dataDir, "verify-failed") === "0.3.0\n15\nextra.txt\n", String(readMarker(ctx.dataDir, "verify-failed")));
+      check(`marker-hindernis ${label}: die Fremddatei blieb unberührt`, readFileSync(join(ctx.dataDir, "outside.txt"), "utf8") === "ORIGINAL");
+    });
+  }
+  await scenario("marker-hindernis launcher-crash als nicht leeres Verzeichnis", async (ctx) => {
+    await install(ctx, "0.3.0", "log inst\nexit 3\n");
+    activate(ctx.dataDir, "0.3.0");
+    mkdirSync(join(ctx.dataDir, "app", "launcher-crash"));
+    writeFileSync(join(ctx.dataDir, "app", "launcher-crash", "x"), "x");
+    const s = startStarter(env, env.starter, ctx);
+    const r = await s.finish(10000);
+    check("marker-hindernis launcher-crash: Rückfall und Marker trotz Hindernis", r.code === 0 && /builtin/.test(s.log()) && readMarker(ctx.dataDir, "launcher-crash") === join(ctx.dataDir, "app", "versions", "0.3.0"), `${r.code} ${s.log()} ${readMarker(ctx.dataDir, "launcher-crash")}`);
+  });
+  await scenario("marker-hindernis inconclusive als nicht leeres Verzeichnis", async (ctx) => {
+    await install(ctx, "0.3.0", "log installed\nexit 0\n");
+    activate(ctx.dataDir, "0.3.0");
+    mkdirSync(join(ctx.dataDir, "app", "inconclusive"));
+    writeFileSync(join(ctx.dataDir, "app", "inconclusive", "x"), "x");
+    const s = startStarter(env, env.starterNoQuiesce, ctx);
+    const r = await s.finish(10000);
+    check("marker-hindernis inconclusive: Marker trotz Hindernis", r.code === 0 && /builtin/.test(s.log()) && readMarker(ctx.dataDir, "inconclusive") === "0.3.0\nquiesce\n", `${r.code} ${s.log()} ${readMarker(ctx.dataDir, "inconclusive")}`);
+  });
+  await scenario("Marker nicht schreibbar: Logzeile, der Start läuft trotzdem", async (ctx) => {
+    const dir = await install(ctx, "0.3.0", "log installed\nexit 0\n");
+    writeFileSync(join(dir, "extra.txt"), "x");
+    activate(ctx.dataDir, "0.3.0");
+    mkdirSync(join(ctx.dataDir, "app", "verify-failed"));
+    writeFileSync(join(ctx.dataDir, "app", "verify-failed", "x"), "x");
+    chmodSync(join(ctx.dataDir, "app"), 0o555); // kein Anlegen, kein Entfernen, kein Verschieben
+    const s = startStarter(env, env.starter, ctx);
+    const r = await s.finish(10000);
+    chmodSync(join(ctx.dataDir, "app"), 0o755);
+    check("Marker nicht schreibbar: Warnzeile und eingebaute Version", r.code === 0 && /builtin/.test(s.log()) && /Der Marker verify-failed lässt sich nicht schreiben/.test(r.stderr), `${r.code} ${s.log()} ${r.stderr}`);
+  });
 
   // ───── 3. veraltet (19): kein Marker, kein Alarm ─────
   await scenario("veraltet", async (ctx) => {
@@ -281,6 +335,16 @@ export async function starterStage(log) {
     const r = await s.finish();
     check("langsamer Absturz: nach drei Läufen kein Rückfall, kein Marker", reached && !readMarker(ctx.dataDir, "launcher-crash") && !/builtin/.test(s.log()), `${s.log()} ${r.stderr}`);
   });
+  await scenario("langsamer Absturz, dann schnelle: der langsame zählt nicht als erster", async (ctx) => {
+    // Lauf 1 lebt länger als das Fenster (2 s) und stürzt ab, jeder weitere stürzt sofort ab: zwei schnelle Abstürze in Folge brauchen den 2. und 3. Lauf
+    await install(ctx, "0.3.0", `log inst\nsleep-once ${ctx.dataDir}/slow 2300\nexit 3\n`);
+    activate(ctx.dataDir, "0.3.0");
+    const s = startStarter(env, env.starter, ctx);
+    const r = await s.finish(30000);
+    const runs = (s.log().match(/^inst$/gm) ?? []).length;
+    check("langsam, dann schnell: drei Läufe der installierten Version, dann die eingebaute", r.code === 0 && runs === 3 && /builtin/.test(s.log()), `${r.code} Läufe ${runs}\n${s.log()}\n${r.stderr}`);
+    check("langsam, dann schnell: Marker launcher-crash erst nach dem zweiten schnellen", readMarker(ctx.dataDir, "launcher-crash") === join(ctx.dataDir, "app", "versions", "0.3.0"), String(readMarker(ctx.dataDir, "launcher-crash")));
+  });
   await scenario("force_builtin endet mit der 42 der eingebauten Version", async (ctx) => {
     await install(ctx, "0.3.0", `crash-times 2 ${ctx.dataDir}/count\nlog recovered\nexit 0\n`);
     activate(ctx.dataDir, "0.3.0");
@@ -288,6 +352,21 @@ export async function starterStage(log) {
     const r = await s.finish();
     const order = s.log().split("\n").filter((l) => /^(recovered|builtin-done)$/.test(l)).join(",");
     check("force_builtin: nach der 42 der eingebauten Version entscheidet der Zeiger wieder", r.code === 0 && order === "recovered", `${r.code} ${order}\n${s.log()}\n${r.stderr}`);
+  });
+
+  // ───── 6b. Ein Launcher, der wiederholt sofort 42 meldet, bekommt Pausen (keine volle Prüfung ohne Atempause) ─────
+  await scenario("wiederholte sofortige 42: Pausen, Signal bricht sie ab", async (ctx) => {
+    await install(ctx, "0.3.0", "log inst\nexit 42\n");
+    activate(ctx.dataDir, "0.3.0");
+    const s = startStarter(env, env.starterBackoff, ctx);
+    await sleep(3000);
+    const runs = (s.log().match(/^inst$/gm) ?? []).length;
+    const t0 = Date.now();
+    s.child.kill("SIGTERM");
+    const r = await s.finish(5000);
+    check("sofortige 42: in 3 s nur eine Handvoll Läufe (4 frei, dann 0,2/0,4/0,8/1,6 s)", runs >= 4 && runs <= 9, `${runs} Läufe`);
+    check("sofortige 42: SIGTERM beendet auch während der Pause schnell", r.code === 0 && Date.now() - t0 < 1500, `${r.code}/${r.signal} ${Date.now() - t0} ms`);
+    check("sofortige 42: Pausenzeile im Log", /Pause von \d+ ms/.test(r.stderr), r.stderr.slice(-400));
   });
 
   // ───── 7. Exit-Codes der eingebauten Version ─────
@@ -365,6 +444,23 @@ export async function starterStage(log) {
     check("Prüfkind-SIGKILL: eingebaute Version, Marker inconclusive/signal", r.code === 0 && /builtin/.test(s.log()) && readMarker(ctx.dataDir, "inconclusive") === "0.3.0\nsignal\n" && !readMarker(ctx.dataDir, "verify-failed"), `${r.code} ${s.log()} ${readMarker(ctx.dataDir, "inconclusive")}\n${r.stderr}`);
   });
 
+  await scenario("Ordner nach der Prüfung ausgetauscht: gestartet wird der geprüfte Ordner", async (ctx) => {
+    // „Angreifer“ tauscht den Versionsordner, während geprüft wird (der Pfad zeigt danach auf eine fremde Version): der Starter ruft den Launcher aus dem Ordner auf, den der Prüfer durchlaufen hat
+    const dir = await install(ctx, "0.3.0", "log installed\nexit 0\n", big);
+    activate(ctx.dataDir, "0.3.0");
+    const s = startStarter(env, env.starter, ctx);
+    check("Tausch: Prüfung läuft", await s.waitFor(() => /Prüfe Version 0\.3\.0/.test(s.stderr()), 10000));
+    await sleep(250);
+    renameSync(dir, `${dir}.orig`);
+    mkdirSync(join(dir, "runtime"), { recursive: true });
+    copyFileSync(env.launcher, join(dir, "runtime", "node"));
+    chmodSync(join(dir, "runtime", "node"), 0o755);
+    writeFileSync(join(dir, "launcher.mjs"), "log EVIL\nexit 0\n");
+    const r = await s.finish(30000);
+    check("Tausch: der geprüfte Ordner läuft, der untergeschobene nie", r.code === 0 && /^installed$/m.test(s.log()) && !/EVIL/.test(s.log()) && /Version 0\.3\.0 geprüft/.test(r.stderr), `${r.code} ${s.log()}\n${r.stderr}`);
+    check("Tausch: der Launcher lief im umbenannten (geprüften) Ordner", s.log().includes(`start ${dir}.orig/launcher.mjs`), s.log());
+  });
+
   // ───── 10. Ruhezustand ─────
   await scenario("Überlebende werden vor der nächsten Prüfung beendet, Fremde nicht", async (ctx) => {
     const outsider = ctx.outsider();
@@ -391,6 +487,15 @@ export async function starterStage(log) {
     check("Ruhezustand: Daemon existiert nicht mehr", daemonGone, String(pid));
   });
 
+  await scenario("Ruhezustand nicht erzwingbar: Marker quiesce, eingebaute Version, keine Prüfung", async (ctx) => {
+    await install(ctx, "0.3.0", "log installed\nexit 0\n");
+    activate(ctx.dataDir, "0.3.0");
+    const s = startStarter(env, env.starterNoQuiesce, ctx);
+    const r = await s.finish();
+    check("quiesce: eingebaute Version, nicht geprüft, Marker inconclusive/quiesce, kein verify-failed", r.code === 0 && /builtin/.test(s.log()) && !/installed/.test(s.log()) && !/Prüfe Version/.test(r.stderr) && readMarker(ctx.dataDir, "inconclusive") === "0.3.0\nquiesce\n" && !readMarker(ctx.dataDir, "verify-failed"), `${r.code} ${s.log()} ${readMarker(ctx.dataDir, "inconclusive")}\n${r.stderr}`);
+    check("quiesce: Warnzeile", /Ruhezustand nicht erzwingbar/.test(r.stderr), r.stderr);
+  });
+
   // ───── 11. Schnittstellen ─────
   await scenario("--print-keys", async () => {
     const r = run(env.starter, ["--print-keys"]);
@@ -398,6 +503,14 @@ export async function starterStage(log) {
     const keyBytes = (name) => Buffer.from([...new RegExp(`${name}\\[32\\] = \\{([^}]*)\\}`).exec(header)[1].matchAll(/0x([0-9a-f]{2})/g)].map((m) => parseInt(m[1], 16)));
     const fp = (b) => createHash("sha256").update(b).digest("hex").slice(0, 16);
     check("--print-keys: Fingerabdrücke = SHA-256 über die einkompilierten Schlüsselbytes", r.status === 0 && r.stdout === `root ${fp(keyBytes("SOS_ROOT_KEY"))}\nrelease ${fp(keyBytes("SOS_RELEASE_KEY"))}\n`, r.stdout);
+  });
+  await scenario("--verify bereinigt C1-, Bidi- und Zeilentrenner-Zeichen in Pfaden", async (ctx) => {
+    const dir = await install(ctx, "0.3.0", "exit 0\n", { files: { "a.txt": "a" } });
+    writeFileSync(join(dir, "x\u009b31;1mEVIL\u202eTXT\u2028y\u2066z\u200fq\u061cw"), "x");
+    const r = run(env.starter, ["--verify", dir, "--expect-version", "0.3.0"], { env: { PATH: process.env.PATH, DATA_DIR: ctx.dataDir } });
+    const json = JSON.parse(r.stdout.trim());
+    check("--verify: Pfad ohne C1/Bidi/Zeilentrenner", r.status === 15 && json.path === "x?31;1mEVIL?TXT?y?z?q?w", `${r.status} ${r.stdout}`);
+    check("--verify: auch die Textausgabe ist sauber", !/[\u0080-\u009f\u202a-\u202e\u2028\u2029\u2066-\u2069\u200e\u200f\u061c]/.test(r.stderr), JSON.stringify(r.stderr));
   });
   await scenario("--verify Aufruffehler", async (ctx) => {
     for (const args of [[], ["--bogus"], ["a", "b"], ["--expect-version"], ["--check-expiry", "2026-13-01", ctx.dataDir], ["--check-expiry", "x", ctx.dataDir], [ctx.dataDir, "--no-floor", "--no-floor"]]) {

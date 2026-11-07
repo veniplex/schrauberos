@@ -139,6 +139,16 @@ int sos_utf8_valid(const uint8_t *p, size_t n) {
   return 1;
 }
 
+/* Zeichen, die in Logs, Markern und der Anzeige nichts zu suchen haben: C1 (U+0080–U+009F), Bidi (U+061C, U+200E/F, U+202A–E, U+2066–9), Zeilentrenner (U+2028/9), U+FFFD */
+static int hostile_seq(const uint8_t *p, size_t k) {
+  if (k == 2) return p[0] == 0xc2 && p[1] >= 0x80 && p[1] <= 0x9f ? 1 : (p[0] == 0xd8 && p[1] == 0x9c);
+  if (k != 3) return 0;
+  if (p[0] == 0xef) return p[1] == 0xbf && p[2] == 0xbd;
+  if (p[0] == 0xe2 && p[1] == 0x80) return p[2] == 0x8e || p[2] == 0x8f || (p[2] >= 0xa8 && p[2] <= 0xae);
+  if (p[0] == 0xe2 && p[1] == 0x81) return p[2] >= 0xa6 && p[2] <= 0xa9;
+  return 0;
+}
+
 void sos_clean(const char *in, size_t n, char *out, size_t cap) {
   size_t o = 0, i = 0;
   if (cap == 0) return;
@@ -147,7 +157,7 @@ void sos_clean(const char *in, size_t n, char *out, size_t cap) {
     size_t k = sos_utf8_seq(p, n - i);
     char tmp[4];
     size_t take;
-    if (k == 0 || (k == 1 && (p[0] < 0x20 || p[0] == 0x7f)) || (k == 3 && p[0] == 0xef && p[1] == 0xbf && p[2] == 0xbd)) {
+    if (k == 0 || (k == 1 && (p[0] < 0x20 || p[0] == 0x7f)) || hostile_seq(p, k)) {
       tmp[0] = '?';
       take = 1;
       k = k ? k : 1;
@@ -849,6 +859,7 @@ int sos_verify_path(const char *dir_in, const char *data_dir_in, const sos_ancho
   int rc;
   int dirfd = -1;
   uint8_t *seal_buf = NULL, *tree_buf = NULL;
+  if (o->keep_dirfd) *o->keep_dirfd = -1;
   sos_tree tree;
   memset(&tree, 0, sizeof tree);
   int ancestor_fds[SOS_DEPTH_LIMIT + 4];
@@ -970,6 +981,10 @@ int sos_verify_path(const char *dir_in, const char *data_dir_in, const sos_ancho
   r->code = 0;
   r->files = tree.n;
   r->bytes = tree.bytes;
+  if (o->keep_dirfd) {
+    *o->keep_dirfd = dirfd; /* der Aufrufer übernimmt den Deskriptor */
+    dirfd = -1;
+  }
   r->floor = !a->has_floor ? 0
              : (seal.major != a->floor_major ? seal.major > a->floor_major : seal.minor != a->floor_minor ? seal.minor > a->floor_minor : seal.patch != a->floor_patch ? seal.patch > a->floor_patch : a->floor_prerelease) ? 3
              : (seal.major == a->floor_major && seal.minor == a->floor_minor && seal.patch == a->floor_patch) ? 2
