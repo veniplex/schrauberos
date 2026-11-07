@@ -32,6 +32,14 @@ export function tiffWith(orientation: number, little = true): Buffer {
   return tiff;
 }
 
+/** Ein kleinstes gültiges ICC-Profil (128-Byte-Kopf mit Größe und „acsp“, keine Tags) – nur Tests. */
+export function iccProfile(extra = 0): Buffer {
+  const profile = Buffer.alloc(132 + extra);
+  profile.writeUInt32BE(profile.length, 0);
+  profile.write("acsp", 36, "latin1");
+  return profile;
+}
+
 export type JpegOptions = { exif?: Buffer; comment?: boolean; iptc?: boolean; icc?: boolean; adobe?: boolean; trailing?: boolean; width?: number; height?: number; thumbnail?: boolean; truncate?: boolean; noScan?: boolean; mpf?: boolean };
 
 export function jpeg(o: JpegOptions = {}): Buffer {
@@ -46,7 +54,7 @@ export function jpeg(o: JpegOptions = {}): Buffer {
   parts.push(seg(0xe1, Buffer.from(`http://ns.adobe.com/xap/1.0/\0<x:xmpmeta>${SECRET}</x:xmpmeta>`, "latin1")));
   if (o.iptc) parts.push(seg(0xed, Buffer.from(`Photoshop 3.0\0${SECRET}`, "latin1")));
   if (o.mpf) parts.push(seg(0xe2, Buffer.from(`MPF\0${SECRET}`, "latin1")));
-  if (o.icc) parts.push(seg(0xe2, Buffer.concat([Buffer.from("ICC_PROFILE\0", "latin1"), Buffer.from([1, 1, 9, 9, 9])])));
+  if (o.icc) parts.push(seg(0xe2, Buffer.concat([Buffer.from("ICC_PROFILE\0", "latin1"), Buffer.concat([Buffer.from([1, 1]), iccProfile()])])));
   if (o.adobe) parts.push(seg(0xee, Buffer.from("Adobe\0\x64\0\0\0\0\x01", "latin1")));
   if (o.comment) parts.push(seg(0xfe, Buffer.from(SECRET, "latin1")));
   parts.push(seg(0xdb, Buffer.concat([Buffer.from([0]), Buffer.alloc(64, 16)])), seg(0xc0, sof), seg(0xc4, dht));
