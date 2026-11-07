@@ -87,6 +87,37 @@ jobs:
           git fetch --tags --force --unshallow || git fetch --tags --force
           npm run db:release-check -- --tag "$GITHUB_REF_NAME"
 
+  # Der C-Prüfer im Starter (docker/verify.c, docker/bootstrap.c; README „Starter-Vertrauensanker“): alle nativen Stufen (Krypto-Vektoren, Goldkorpus, Mutationen, Parser-Differential, ASAN/UBSAN, Starter-Schleife,
+  # PID-Namensraum, libFuzzer-Kurzlauf, winziger Container) – ohne Browser und ohne Bau der App. Fehlt Linux/Compiler, schlägt der Job fehl (REQUIRE_NATIVE=1).
+  native:
+    name: Starter-Prüfer (C), native Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: clang für die libFuzzer-Ziele
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang
+      # Ubuntu 24.04 beschränkt Benutzer-Namensräume per AppArmor; der PID-Namensraum-Test (unshare -rpf) braucht sie
+      - name: Benutzer-Namensräume erlauben (nur für den Test)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: Native Tests
+        env:
+          REQUIRE_NATIVE: "1"
+        run: node --no-warnings docker/test/run.mjs crypto corpus mutation parser asan starter pidns fuzz l3 --fuzz-seconds 30
+      # Der Starter, wie ihn das Dockerfile baut (Debian-Compiler, static-pie, Produktionsflags; nur mit Testschlüsseln), gegen den Goldkorpus – Entwicklungs-gcc und Image-gcc dürfen nicht auseinanderlaufen
+      - name: Starter aus dem Dockerfile gegen den Goldkorpus
+        env:
+          REQUIRE_NATIVE: "1"
+        run: |
+          docker build --target bootstrap-test-build -t so-bootstrap-test --build-arg APP_VERSION=0.2.0-dev.abc1234 .
+          cid="$(docker create so-bootstrap-test)"
+          docker cp "$cid:/bootstrap" ./bootstrap-test
+          docker rm "$cid" >/dev/null
+          SOS_STARTER_BINARY="$PWD/bootstrap-test" node --no-warnings docker/test/run.mjs corpus
+
   guard:
     name: Versions-Tag liegt auf main
     # Nur für Versions-Tags: Wer Schreibrechte hat, kann einen Tag auf einen beliebigen Commit (anderer Branch, Fork-Stand) setzen. Veröffentlicht wird nur, was
@@ -144,8 +175,8 @@ jobs:
   publish:
     name: Image bauen, testen und nach ghcr.io pushen
     # Nicht bei Pull Requests; bei Tags erst, wenn die Browser-Tests grün sind (auf main sind sie übersprungen) und der Tag auf main liegt
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') && (needs.guard.result == 'success' || needs.guard.result == 'skipped') }}
-    needs: [check, guard, e2e]
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && needs.native.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') && (needs.guard.result == 'success' || needs.guard.result == 'skipped') }}
+    needs: [check, native, guard, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -203,6 +234,24 @@ jobs:
       # 2) ... starten (Standard und gehärtet) ...
       - name: Smoke-Test des Images
         run: bash scripts/smoke-image.sh schrauberos:smoke
+      # 2b) Der Vertrauensanker mit der echten App: dasselbe Dockerfile, Ziel runner-test (nur der Starter trägt Testschlüssel statt der echten; alle übrigen Stufen kommen aus dem Cache).
+      #     Dieses Image wird nie veröffentlicht. Nur bei Versions-Tags (kostet einige Minuten).
+      - name: Image mit Testschlüsseln bauen (nur Versions-Tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          target: runner-test
+          load: true
+          push: false
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
+          tags: schrauberos:anchor-test
+          cache-from: type=gha
+      - name: Smoke-Test des Vertrauensankers (Testschlüssel-Image)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: bash scripts/smoke-anchor.sh schrauberos:anchor-test
       # 3) Das Release-Paket ist ein Auszug des GETESTETEN Images (/app), kein zweiter Build (Next erzeugt je Build eine andere BUILD_ID; ein zweiter Build könnte vom getesteten
       #    abweichen). Das Paket enthält damit genau die Dateien und die Dateiliste (SOS-TREE), die der Starter-Vertrauensanker beim Start prüft.
       - name: Dateiliste des Images gegen den Baum prüfen (Referenzprüfer)

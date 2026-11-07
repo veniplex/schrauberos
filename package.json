@@ -24,6 +24,7 @@
     "anchor:corpus": "node --no-warnings scripts/gen-anchor-corpus.mjs",
     "anchor:corpus:check": "node --no-warnings scripts/gen-anchor-corpus.mjs --check",
     "anchor:rehearse": "node --no-warnings scripts/rehearse-release.mjs",
+    "native:test": "node --no-warnings docker/test/run.mjs",
     "e2e": "playwright test",
     "e2e:build": "npm run build && playwright test"
   },
