@@ -7,7 +7,7 @@ import { versionOf } from "@/lib/concurrency";
 import type { AppSession } from "@/server/auth/session";
 import type { Outcome } from "@/server/operations/operation";
 import { createTestEnv, type TestEnv } from "@/test/harness";
-import { makePng } from "@/test/png";
+import { makePng, pngChunk } from "@/test/png";
 
 /**
  * Checklisten gegen eine echte temporäre SQLite: versionierte Vorlagen (jede Änderung eine neue Version, laufende Checklisten behalten ihre), Beginnen, Punkte je Art (jeder mit eigener Version, gleichzeitig),
@@ -18,6 +18,7 @@ let ops: typeof import("./operations");
 let queries: typeof import("./queries");
 let hooks: typeof import("@/server/operations/hooks");
 let lead: AppSession;
+let reopener: AppSession;
 let worker: AppSession;
 let worker2: AppSession;
 let viewer: AppSession;
@@ -56,6 +57,7 @@ before(async () => {
   queries = await import("./queries");
   hooks = await import("@/server/operations/hooks");
   lead = await sessionFor([...WORK, "checklists.manage"], "Leitung");
+  reopener = await sessionFor([...WORK, "checklists.reopen"], "Wiederöffnerin");
   worker = await sessionFor(WORK, "Tom Meyer");
   worker2 = await sessionFor(WORK, "Lena Hoffmann");
   viewer = await sessionFor(["checklists.view", "vehicles.view", "orders.view"], "Nur Lesen");
@@ -300,33 +302,75 @@ describe("Abschließen, Unveränderlichkeit, Wiederöffnen", () => {
     assert.equal((await checklist(id)).status, "open");
   });
 
-  it("Wiederöffnen: nur mit checklists.manage und Begründung; die Unterschrift gilt nicht mehr, ihre Datei bleibt und steht im Verlauf; bei geschlossenem Auftrag nicht möglich", async () => {
+  it("Wiederöffnen: nur mit checklists.reopen (nicht schon mit manage) und Begründung; die Unterschrift gilt nicht mehr, ihre Datei bleibt und steht im Verlauf; bei geschlossenem Auftrag nicht möglich", async () => {
     const id = await start();
     await fillAll(id);
     out(await ops.completeChecklistOperation.execute(worker, { id, version: versionOf(await checklist(id)), customerName: "Erika Muster", signature: signaturePng() }));
     const signedPath = (await checklist(id)).signaturePath!;
     const version = versionOf(await checklist(id));
     assert.equal(failure(await ops.reopenChecklistOperation.execute(worker, { id, version, reason: "Fehler korrigieren" })).code, "forbidden");
-    assert.equal(failure(await ops.reopenChecklistOperation.execute(lead, { id, version, reason: "" })).fields?.reason?.key, "checklists.errors.reasonRequired");
+    assert.equal(failure(await ops.reopenChecklistOperation.execute(lead, { id, version, reason: "Fehler korrigieren" })).code, "forbidden", "checklists.manage pflegt nur Vorlagen");
+    assert.equal(failure(await ops.reopenChecklistOperation.execute(reopener, { id, version, reason: "" })).fields?.reason?.key, "checklists.errors.reasonRequired");
     await env.db.order.update({ where: { id: orderId }, data: { status: "picked_up" } });
-    assert.equal(failure(await ops.reopenChecklistOperation.execute(lead, { id, version, reason: "Fehler korrigieren" })).key, "checklists.errors.orderClosed");
+    assert.equal(failure(await ops.reopenChecklistOperation.execute(reopener, { id, version, reason: "Fehler korrigieren" })).key, "checklists.errors.orderClosed");
     await env.db.order.update({ where: { id: orderId }, data: { status: "in_progress" } });
-    out(await ops.reopenChecklistOperation.execute(lead, { id, version, reason: "Messwert falsch abgelesen" }));
+    const hash = (await checklist(id)).signatureHash;
+    out(await ops.reopenChecklistOperation.execute(reopener, { id, version, reason: "Messwert falsch abgelesen" }));
     const row = await checklist(id);
     assert.deepEqual([row.status, row.signaturePath, row.signatureHash, row.signedName, row.completedAt], ["open", null, null, null, null]);
     assert.ok(existsSync(path.join(env.dir, "files", ...signedPath.split("/"))), "die Datei bleibt");
     const event = await env.db.checklistEvent.findFirstOrThrow({ where: { checklistId: id, kind: "reopened" } });
-    assert.deepEqual([event.note, event.signaturePath], ["Messwert falsch abgelesen", signedPath]);
+    assert.deepEqual([event.note, event.signaturePath, event.signatureHash], ["Messwert falsch abgelesen", signedPath, hash]);
     assert.equal(await env.db.auditLog.count({ where: { action: "checklists.reopen" } }), 1);
     // wieder änderbar und erneut abschließbar (mit neuer Unterschrift)
     out(await setItem(worker, "Profiltiefe", id, { numberValue: "3" }));
-    assert.equal(failure(await ops.reopenChecklistOperation.execute(lead, { id, version: versionOf(await checklist(id)), reason: "noch offen" })).key, "checklists.errors.notCompleted");
+    assert.equal(failure(await ops.reopenChecklistOperation.execute(reopener, { id, version: versionOf(await checklist(id)), reason: "noch offen" })).key, "checklists.errors.notCompleted");
+  });
+
+  it("die Bild-Sperre überdauert das Wiederöffnen und lässt sich nicht mit einem Zusatzteil im PNG umgehen (Prüfsumme über die Bildpunkte); die Checkliste selbst darf ihr Bild erneut nehmen", async () => {
+    const id = await start();
+    await fillAll(id);
+    out(await ops.completeChecklistOperation.execute(worker, { id, version: versionOf(await checklist(id)), customerName: "Erika Muster", signature: signaturePng() }));
+    const other = await start();
+    await fillAll(other);
+    // dasselbe Bild mit einem zusätzlichen Textteil: gleiche Bildpunkte, andere Bytes
+    const plain = makePng(300, 100);
+    const withText = Buffer.concat([plain.subarray(0, plain.length - 12), pngChunk("tEXt", Buffer.from("Comment\0versteckt")), plain.subarray(plain.length - 12)]);
+    const tagged = `data:image/png;base64,${withText.toString("base64")}`;
+    assert.equal(failure(await ops.completeChecklistOperation.execute(worker, { id: other, version: versionOf(await checklist(other)), customerName: "Erika Muster", signature: tagged })).fields?.signature?.key, "checklists.errors.signatureReused", "Zusatzteil ändert die Pixelsumme nicht");
+    // wiederöffnen: die Sperre bleibt (über den Verlauf)
+    out(await ops.reopenChecklistOperation.execute(reopener, { id, version: versionOf(await checklist(id)), reason: "Messwert falsch abgelesen" }));
+    assert.equal((await checklist(id)).signatureHash, null);
+    assert.equal(failure(await ops.completeChecklistOperation.execute(worker, { id: other, version: versionOf(await checklist(other)), customerName: "Erika Muster", signature: signaturePng() })).fields?.signature?.key, "checklists.errors.signatureReused");
+    assert.equal((await checklist(other)).status, "open");
+    // dieselbe Checkliste darf ihr Bild erneut verwenden
+    out(await ops.completeChecklistOperation.execute(worker, { id, version: versionOf(await checklist(id)), customerName: "Erika Muster", signature: signaturePng() }));
+    // gespeichert wird nur die bereinigte Datei (ohne den Zusatzteil)
+    const saved = readFileSync(path.join(env.dir, "files", ...((await checklist(id)).signaturePath ?? "").split("/")));
+    assert.ok(!saved.includes(Buffer.from("versteckt")));
+  });
+
+  it("Fahrzeug mit Checkliste ist nicht löschbar: inUse mit Zählung (nicht erst am Fremdschlüssel), nur archivierbar", async () => {
+    const { vehicleDeletable } = await import("@/modules/workshop/vehicles/domain");
+    assert.equal(vehicleDeletable({ appointments: 0, tireSets: 0, orders: 0, transfers: 0, checklists: 1 }), false);
+    assert.equal(vehicleDeletable({ appointments: 0, tireSets: 0, orders: 0, transfers: 0, checklists: 0 }), true);
+    const own = await env.db.vehicle.create({ data: { plate: "B CL 1", plateNorm: "BCL1" } });
+    out(await ops.startChecklistOperation.execute(worker, { templateId, vehicleId: own.id }));
+    const { deleteVehicleOperation } = await import("@/modules/workshop/vehicles/operations");
+    const admin = await sessionFor(["vehicles.delete", "vehicles.view"], "Löscher");
+    const refused = failure(await deleteVehicleOperation.execute(admin, { id: own.id }));
+    assert.equal(refused.code, "inUse");
+    assert.equal(refused.params?.checklists, 1);
+    assert.ok(await env.db.vehicle.findUnique({ where: { id: own.id } }));
   });
 
   it("Verwerfen: wer begonnen hat oder die Leitung; danach nicht mehr änderbar; bleibt mit Verlauf erhalten", async () => {
     const id = await start();
     const version = versionOf(await checklist(id));
     assert.equal(failure(await ops.discardChecklistOperation.execute(worker2, { id, version })).code, "forbidden");
+    // gleichnamiges Konto: der Anzeigename berechtigt nicht
+    const namesake = await sessionFor(WORK, "Tom Meyer");
+    assert.equal(failure(await ops.discardChecklistOperation.execute(namesake, { id, version })).code, "forbidden");
     out(await ops.discardChecklistOperation.execute(worker, { id, version }));
     assert.equal((await checklist(id)).status, "discarded");
     const item = await itemId(id, "Sichtprüfung");

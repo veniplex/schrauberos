@@ -4,6 +4,7 @@
  * bestätigen“; beide Ergebnisse haben dieselbe Form (`SignatureValue`) und werden mit `parseSignatureValue` serverseitig gelesen.
  */
 
+import { sanitizeImage } from "./image-sanitize";
 import { inspectPng } from "./png";
 import { checkUpload } from "./upload-sniff";
 
@@ -142,7 +143,7 @@ export const serializeSignature = (value: SignatureValue | null): string => (val
 
 /**
  * Liest den Wert aus dem Formularfeld **auf dem Server** (Fremdeingabe!): gezeichnet → echte PNG-Bytes (Größengrenze, Inhaltserkennung `checkUpload`, Struktur und Maße `inspectPng`: IHDR,
- * Teilekette mit CRC bis IEND, keine Anhängsel), getippt → bereinigter Name. `null` bei allem anderen.
+ * Teilekette mit CRC bis IEND, keine Anhängsel) und **neu zusammengesetzt** (`sanitizeImage` mit `criticalOnly`: nur IHDR, PLTE, IDAT, IEND), getippt → bereinigter Name. `null` bei allem anderen.
  * Der Aufrufer speichert die PNG-Bytes als Datei (`files.ts`), nie die Data-URL in der Datenbank.
  */
 export function parseSignatureValue(raw: string, options: { maxBytes?: number } = {}): { kind: "drawn"; png: Buffer } | { kind: "typed"; name: string } | null {
@@ -154,7 +155,10 @@ export function parseSignatureValue(raw: string, options: { maxBytes?: number } 
     if (png.length === 0 || png.length > maxBytes) return null;
     if (!checkUpload(png, "image/png", ["image/png"]).ok) return null;
     if (!inspectPng(png, { maxWidth: SIGNATURE_MAX_WIDTH, maxHeight: SIGNATURE_MAX_HEIGHT }).ok) return null;
-    return { kind: "drawn", png };
+    // Der Server nimmt nur auf, was er selbst neu zusammensetzt: nur IHDR, PLTE, IDAT, IEND – Zusatzteile (Texte, Nutzlast) fallen weg
+    const clean = sanitizeImage(png, { maxPixels: SIGNATURE_MAX_WIDTH * SIGNATURE_MAX_HEIGHT, maxSide: Math.max(SIGNATURE_MAX_WIDTH, SIGNATURE_MAX_HEIGHT) }, { criticalOnly: true });
+    if (!clean.ok) return null;
+    return { kind: "drawn", png: clean.bytes };
   }
   if (raw.startsWith(TYPED_PREFIX)) {
     // Steuerzeichen aus Fremdeingabe entfernen

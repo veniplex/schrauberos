@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { claimRow, versionOf } from "@/lib/concurrency";
+import { pngPixelHash } from "@/lib/png-pixels";
 import { parseSignatureValue } from "@/lib/signature";
 import { orderRef } from "@/modules/workshop/orders/public";
 import { db } from "@/server/db";
@@ -17,7 +18,7 @@ import { checkAnswer, itemDefProblem, openRequired, sameItems, sameName, type It
  *  - **Beginnen** kopiert die aktuelle Version der Vorlage in eine Checkliste an Fahrzeug oder Auftrag.
  *  - **Punkte** werden einzeln gespeichert (Haken, Messwert, Drehmoment, Auswahl, Text); jeder Punkt hat seine eigene Version (gleichzeitiges Abhaken zweier Personen), Person und Zeit stehen am Punkt.
  *  - **Abschließen** verlangt alle Pflichtpunkte und – je nach Vorlage – die Kundenunterschrift (gezeichnet oder getippter Name wie bei der Freigabe in Aufträgen; ein Bild gilt für genau eine Checkliste).
- *    Danach ist die Checkliste **unveränderlich**; Wiederöffnen nur mit `checklists.manage` und Begründung (Verlauf; die bisherige Unterschrift bleibt als Datei liegen, gilt aber nicht mehr).
+ *    Danach ist die Checkliste **unveränderlich**; Wiederöffnen nur mit `checklists.reopen` und Begründung (Verlauf; die bisherige Unterschrift bleibt als Datei liegen, gilt aber nicht mehr).
  */
 
 const byName = (principal: { user: { name: string } }): string => principal.user.name.slice(0, 80);
@@ -106,7 +107,7 @@ export const saveTemplateOperation = defineOperation({
     const latest = template.versions[0];
     const unchanged = latest && latest.name === data.name && (latest.description ?? null) === data.description && latest.signatureMode === data.signatureMode && sameItems(latest.items as unknown as ItemDef[], defs);
     if (unchanged) {
-      audit({ target: `${d.name} · v${latest.version} (unverändert)`, entityId: template.id });
+      audit({ target: `${d.name} · v${latest.version} (unchanged)`, entityId: template.id });
       return { id: template.id, version: latest.version, changed: false };
     }
     const next = (latest?.version ?? 0) + 1;
@@ -127,7 +128,7 @@ export const archiveTemplateOperation = defineOperation({
     const template = await tx.checklistTemplate.findUnique({ where: { id: d.id }, select: { name: true } });
     if (!template) fail("notFound");
     await tx.checklistTemplate.update({ where: { id: d.id }, data: { archivedAt: d.archived ? new Date() : null } });
-    audit({ target: `${template.name}: ${d.archived ? "archiviert" : "aktiv"}`, entityId: d.id });
+    audit({ target: `${template.name}: ${d.archived ? "archived" : "active"}`, entityId: d.id });
     return { id: d.id };
   },
 });
@@ -178,6 +179,7 @@ export const startChecklistOperation = defineOperation({
         vehicleId: owner.vehicleId,
         orderId: owner.orderId,
         createdByName: who,
+        createdById: principal.user.id,
         items: { create: version.items.map((item) => ({ position: item.position, label: item.label, type: item.type, unit: item.unit, minValue: item.minValue, maxValue: item.maxValue, targetValue: item.targetValue, options: item.options, required: item.required, hint: item.hint })) },
         events: { create: [{ kind: "created", byName: who }] },
       },
@@ -225,7 +227,9 @@ export const setItemOperation = defineOperation({
     const item = await tx.checklistItem.findFirst({ where: { id: d.id, checklist: { is: where } }, include: { checklist: { select: { status: true, orderId: true } } } });
     if (!item) fail("notFound");
     await assertEditable(tx, item.checklist);
-    const checked = checkAnswer(item, { done: d.done, numberValue: d.numberValue ?? null, textValue: d.textValue ?? null });
+    // PATCH-Semantik: fehlt `done`, bleibt der Haken eines reinen Haken-Punkts (check/photo) unverändert (ein Wert ohne `done` hakt ihn nie ab oder zurück); Messwert, Auswahl und Text leiten `done` aus dem Wert ab
+    const keepsDone = item.type === "check" || item.type === "photo";
+    const checked = checkAnswer(item, { done: d.done ?? (keepsDone ? item.done : undefined), numberValue: d.numberValue ?? null, textValue: d.textValue ?? null });
     if (!checked.ok) failField(checked.field, checked.key as never);
     if (!(await claimRow(tx.checklistItem, d.id, d.version))) fail("conflict");
     const updated = await tx.checklistItem.update({
@@ -277,7 +281,8 @@ export const completeChecklistOperation = defineOperation({
       if (!sameName(value.name, d.customerName)) failField("signature", "checklists.errors.nameMismatch");
       return { kind: "typed", name: value.name };
     }
-    const hash = createHash("sha256").update(value.png).digest("hex");
+    // Prüfsumme über die Bildpunkte (nicht über die Bytes): angehängte Teile oder andere Kompression ändern sie nicht
+    const hash = pngPixelHash(value.png) ?? createHash("sha256").update(value.png).digest("hex");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     return { kind: "drawn", hash, path: await storeFile("checklisten/unterschriften", `unterschrift-${stamp}.png`, value.png) };
   },
@@ -291,7 +296,12 @@ export const completeChecklistOperation = defineOperation({
     if (open.length > 0) fail("invalid", "checklists.errors.requiredOpen", { count: open.length });
     if (checklist.signatureMode === "required" && prepared.kind === "none") failField("signature", "checklists.errors.signatureRequired");
     // Ein Bild gilt für genau eine Checkliste
-    if (prepared.kind === "drawn" && (await tx.checklist.findFirst({ where: { signatureHash: prepared.hash }, select: { id: true } }))) failField("signature", "checklists.errors.signatureReused");
+    // (auch gegen Unterschriften, die beim Wiederöffnen aufgehoben wurden – ausgenommen die Checkliste selbst)
+    if (prepared.kind === "drawn") {
+      const reused =
+        (await tx.checklist.findFirst({ where: { signatureHash: prepared.hash, id: { not: d.id } }, select: { id: true } })) ?? (await tx.checklistEvent.findFirst({ where: { signatureHash: prepared.hash, checklistId: { not: d.id } }, select: { id: true } }));
+      if (reused) failField("signature", "checklists.errors.signatureReused");
+    }
     if (!(await claimRow(tx.checklist, d.id, d.version))) fail("conflict");
     const who = byName(principal);
     await tx.checklist.update({
@@ -320,10 +330,13 @@ export const completeChecklistOperation = defineOperation({
 
 /* ───────────── Wiederöffnen und Verwerfen ───────────── */
 
-/** Öffnet eine abgeschlossene Checkliste wieder (nur `checklists.manage`, Begründung Pflicht, Audit). Die bisherige Unterschrift gilt nicht mehr; ihre Datei bleibt liegen und steht im Verlauf. */
+/**
+ * Öffnet eine abgeschlossene Checkliste wieder (nur mit dem gekennzeichneten Recht `checklists.reopen`, Begründung Pflicht, Audit). Die bisherige Unterschrift gilt nicht mehr; ihre Datei bleibt liegen und steht im Verlauf,
+ * ebenso ihre **Prüfsumme**: das Bild bleibt für jede andere Checkliste gesperrt (der Verlauf trägt sie, die Checkliste selbst nicht mehr).
+ */
 export const reopenChecklistOperation = defineOperation({
   name: "checklists.reopen",
-  permission: "checklists.manage",
+  permission: "checklists.reopen",
   input: z.object({ id: z.string().min(1), version: z.string().min(1), reason: z.string().trim().min(5, { error: "checklists.errors.reasonRequired" }).max(300) }),
   audit: "checklists.reopen",
   run: async ({ input: d, principal, tx, audit }) => {
@@ -338,7 +351,7 @@ export const reopenChecklistOperation = defineOperation({
     }
     if (!(await claimRow(tx.checklist, d.id, d.version))) fail("conflict");
     await tx.checklist.update({ where: { id: d.id }, data: { status: "open", completedAt: null, completedByName: null, signaturePath: null, signatureHash: null, signedName: null } });
-    await tx.checklistEvent.create({ data: { checklistId: d.id, kind: "reopened", byName: byName(principal), note: d.reason, signaturePath: checklist.signaturePath } });
+    await tx.checklistEvent.create({ data: { checklistId: d.id, kind: "reopened", byName: byName(principal), note: d.reason, signaturePath: checklist.signaturePath, signatureHash: checklist.signatureHash } });
     audit({ target: `${checklist.templateName} · ${checklist.order?.number ?? checklist.vehicle.plate}`, entityId: d.id });
     return { id: d.id };
   },
@@ -356,7 +369,7 @@ export const discardChecklistOperation = defineOperation({
     const checklist = await tx.checklist.findFirst({ where: { id: d.id, ...where }, include: { vehicle: { select: { plate: true } }, order: { select: { number: true } } } });
     if (!checklist) fail("notFound");
     if (checklist.status !== "open") fail("invalid", "checklists.errors.notOpen");
-    if (checklist.createdByName !== byName(principal) && !principal.can("checklists.manage")) fail("forbidden");
+    if (checklist.createdById !== principal.user.id && !principal.can("checklists.manage")) fail("forbidden");
     if (!(await claimRow(tx.checklist, d.id, d.version))) fail("conflict");
     await tx.checklist.update({ where: { id: d.id }, data: { status: "discarded" } });
     await tx.checklistEvent.create({ data: { checklistId: d.id, kind: "discarded", byName: byName(principal) } });

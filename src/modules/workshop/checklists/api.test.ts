@@ -88,6 +88,12 @@ describe("Checklisten: API", () => {
     assert.equal(ticked.json.data.done, true);
     assert.equal((await call("PATCH", `/checklist-items/${tick.id}`, full, { body: { done: false }, headers: { "if-match": `"${tick.version}"` } })).status, 412, "veraltete Version des Punkts");
 
+    // PATCH ohne `done`: der Haken eines reinen Haken-Punkts bleibt (ein Text ohne done hakt nie ab oder zurück)
+    const kept = await call("PATCH", `/checklist-items/${tick.id}`, full, { body: { textValue: "Notiz" }, headers: { "if-match": `"${ticked.json.data.version}"` } });
+    assert.equal(kept.status, 200);
+    assert.equal(kept.json.data.done, true);
+    ticked.json.data.version = kept.json.data.version;
+
     const torque = items.find((i) => i.label === "Drehmoment")!;
     const out = await call("PATCH", `/checklist-items/${torque.id}`, full, { body: { numberValue: 150 }, headers: { "if-match": `"${torque.version}"` } });
     assert.equal(out.status, 200);

@@ -74,7 +74,8 @@ export const permissionHintsDe = {
   checklists: {
     view: "Checklisten an Fahrzeugen und Aufträgen ansehen – nur dort, wo die Person auch das Fahrzeug bzw. den Auftrag sehen darf.",
     fill: "Checklisten beginnen, Punkte abhaken, Messwerte erfassen, den Kunden unterschreiben lassen und abschließen.",
-    manage: "Vorlagen anlegen und ändern (jede Änderung wird eine neue Version) und abgeschlossene Checklisten mit Begründung wieder öffnen.",
+    manage: "Vorlagen anlegen und ändern (jede Änderung wird eine neue Version).",
+    reopen: "Abgeschlossene (ggf. vom Kunden unterschriebene) Checklisten mit Begründung wieder öffnen. Hebt die Unveränderlichkeit auf; wird nie automatisch vergeben.",
   },
   files: {
     view: "Dokumente und Fotos an Fahrzeugen und Aufträgen ansehen – nur dort, wo die Person auch das Fahrzeug bzw. den Auftrag sehen darf.",

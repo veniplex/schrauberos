@@ -25,6 +25,8 @@ export const archiveDe = {
     orders_other: "{count} Aufträge (Aufträge werden nie gelöscht)",
     files_one: "{count} Datei oder Foto",
     files_other: "{count} Dateien und Fotos",
+    checklists_one: "{count} Checkliste",
+    checklists_other: "{count} Checklisten",
     transfers_one: "{count} Halterwechsel",
     transfers_other: "{count} Halterwechsel",
   },

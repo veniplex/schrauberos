@@ -21,8 +21,8 @@ export const ownershipTransfers = (ownerships: ReadonlyArray<{ toDate: Date | nu
  * Darf ein Fahrzeug gelöscht werden? Nur ohne Geschichte: keine Termine, keine Reifensätze, keine Aufträge (Aufträge werden nie gelöscht) und kein Halterwechsel (`transfers`, siehe `ownershipTransfers`). Sonst wird es
  * archiviert. Der erste Halter-Eintrag allein zählt nicht (er fällt mit dem Fahrzeug weg).
  */
-export const vehicleDeletable = (links: { appointments: number; tireSets: number; orders: number; transfers: number; /** Dokumente & Fotos (F6); fehlt die Angabe, zählt sie nicht */ files?: number }): boolean =>
-  links.appointments === 0 && links.tireSets === 0 && links.orders === 0 && links.transfers === 0 && (links.files ?? 0) === 0;
+export const vehicleDeletable = (links: { appointments: number; tireSets: number; orders: number; transfers: number; /** Dokumente & Fotos (F6) und Checklisten (F7); fehlt die Angabe, zählt sie nicht */ files?: number; checklists?: number }): boolean =>
+  links.appointments === 0 && links.tireSets === 0 && links.orders === 0 && links.transfers === 0 && (links.files ?? 0) === 0 && (links.checklists ?? 0) === 0;
 
 export const INSPECTION_SOON_MONTHS = 2;
 

@@ -89,7 +89,7 @@ export default async function ChecklistPage({ params }: { params: Promise<{ id: 
             items={items}
             editable={editable}
             canFill={session.can("checklists.fill")}
-            canDiscard={session.can("checklists.fill") && (checklist.createdByName === session.user.name.slice(0, 80) || session.can("checklists.manage"))}
+            canDiscard={session.can("checklists.fill") && (checklist.createdById === session.user.id || session.can("checklists.manage"))}
             signatureMode={checklist.signatureMode}
           />
 
@@ -116,7 +116,7 @@ export default async function ChecklistPage({ params }: { params: Promise<{ id: 
             </Card>
           ) : null}
 
-          {checklist.status === "completed" && checklist.ownerOpen && session.can("checklists.manage") ? <ReopenForm id={checklist.id} version={checklist.version} /> : null}
+          {checklist.status === "completed" && checklist.ownerOpen && session.can("checklists.reopen") ? <ReopenForm id={checklist.id} version={checklist.version} /> : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">

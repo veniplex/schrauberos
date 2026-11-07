@@ -227,11 +227,12 @@ export default async function VehiclePage({
               { kind: "tireSets", count: vehicle._count.tireSets },
               { kind: "orders", count: vehicle._count.orders },
               { kind: "files", count: vehicle._count.files },
+              { kind: "checklists", count: vehicle._count.checklists },
               { kind: "transfers", count: transfers },
             ]}
             canArchive={canEdit}
             canDelete={session.can("vehicles.delete")}
-            deletable={vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers, files: vehicle._count.files })}
+            deletable={vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers, files: vehicle._count.files, checklists: vehicle._count.checklists })}
             archive={archiveVehicle}
             unarchive={unarchiveVehicle}
             remove={deleteVehicle}

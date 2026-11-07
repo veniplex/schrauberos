@@ -224,7 +224,7 @@ export const en: Messages = {
     presets: {
       basic: { name: "Basic", description: "Appointments, tire storage, customers, vehicles, invoice archive, employees, fleet, handbook and IT documentation." },
       orders: { name: "With orders and stock", description: "Additionally workshop orders (job cards) and parts & stock for the daily workshop routine." },
-      daily: { name: "Daily workshop routine", description: "Orders, parts & stock and time tracking (clocking in, working times, weekly overview)." },
+      daily: { name: "Daily workshop routine", description: "Orders, parts & stock, time tracking (clocking in, working times, weekly overview), documents & photos and checklists (intake report, oil change, tyre change, inspection preparation)." },
       invoicing: { name: "With quotes and invoicing", description: "Additionally orders, parts & stock and quotes & invoicing (quotes, invoices, XRechnung, sending by e-mail)." },
     },
     demo: "Start with sample data",
@@ -434,7 +434,8 @@ export const en: Messages = {
     checklists: {
       view: "View checklists (following the rights for vehicle or order)",
       fill: "Start, fill in, complete and discard checklists",
-      manage: "Maintain templates and reopen completed checklists",
+      manage: "Maintain checklist templates",
+      reopen: "Reopen completed checklists",
     },
     files: {
       view: "View documents and photos (following the rights for vehicle or order)",

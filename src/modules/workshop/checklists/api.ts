@@ -243,7 +243,7 @@ export const endpoints: ApiEndpoint[] = [
     path: "/checklist-items/{id}",
     permission: "checklists.fill",
     operationId: "checklist-items.update",
-    summary: "Save the result of one item: done (tick), numberValue (measurement, torque), textValue (choice, text). Send the item's own version as the ETag in If-Match",
+    summary: "Save the result of one item: done (tick), numberValue (measurement, torque), textValue (choice, text). Fields that are missing stay unchanged for a plain tick item (a value without done never ticks or unticks it); for measurement, choice and text the value decides. Send the item's own version as the ETag in If-Match",
     operations: [setItemOperation.name],
     body: z.strictObject({ done: z.boolean().optional(), numberValue: z.number().nullable().optional(), textValue: text(4000) }),
     response: itemShape,

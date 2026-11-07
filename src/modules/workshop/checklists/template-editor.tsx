@@ -40,10 +40,8 @@ function reduce(items: EditorItem[], action: Action): EditorItem[] {
   }
 }
 
-const number = (text: string): number | null => {
-  const trimmed = text.trim().replace(",", ".");
-  return trimmed === "" ? null : Number(trimmed);
-};
+/** Zahlenfelder gehen als Text an den Server (Dezimalkomma wie getippt): er liest und prüft sie und meldet Unlesbares als Feldfehler am Punkt – nichts wird hier still zu `null`. */
+const numberText = (text: string): string | null => (text.trim() === "" ? null : text.trim());
 
 /** Fehler des Servers zu einem Punkt (`items.<n>.<feld>`) als Liste unter dem Punkt. */
 function ItemErrors({ index }: { index: number }) {
@@ -74,9 +72,9 @@ export function TemplateEditor({ initial }: { initial: EditorInitial }) {
           type: i.type,
           required: i.required,
           unit: i.unit || null,
-          minValue: number(i.minValue),
-          maxValue: number(i.maxValue),
-          targetValue: number(i.targetValue),
+          minValue: numberText(i.minValue),
+          maxValue: numberText(i.maxValue),
+          targetValue: numberText(i.targetValue),
           options: i.options || null,
           hint: i.hint || null,
         })),

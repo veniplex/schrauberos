@@ -26,6 +26,8 @@ export const archiveEn: typeof archiveDe = {
     orders_other: "{count} orders (orders are never deleted)",
     files_one: "{count} file or photo",
     files_other: "{count} files and photos",
+    checklists_one: "{count} checklist",
+    checklists_other: "{count} checklists",
     transfers_one: "{count} change of keeper",
     transfers_other: "{count} changes of keeper",
   },

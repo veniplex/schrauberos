@@ -10,7 +10,7 @@ export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
   "checklists.saveTemplate": "Vorlagen pflegt die Leitung in der Oberfläche (Einrichtung der Werkstatt; jede Änderung ist eine neue Version): Die API liest die Vorlagen (GET /checklist-templates) und beginnt Checklisten daraus.",
   "checklists.archiveTemplate": "Vorlagen archivieren oder wieder aktivieren gehört zur Einrichtung der Werkstatt durch die Leitung: nur in der Oberfläche.",
   "checklists.installDefaults": "Die mitgelieferten Vorlagen einzurichten ist ein einmaliger Einrichtungsschritt der Leitung: nur in der Oberfläche.",
-  "checklists.reopen": "Wieder öffnen hebt die Unveränderlichkeit einer abgeschlossenen Checkliste auf (Recht checklists.manage, Begründung Pflicht, Verlauf): eine bewusste Handlung in der Oberfläche, kein Weg für Integrationen.",
+  "checklists.reopen": "Wieder öffnen hebt die Unveränderlichkeit einer abgeschlossenen Checkliste auf (gekennzeichnetes Recht checklists.reopen, Begründung Pflicht, Verlauf): eine bewusste Handlung in der Oberfläche, kein Weg für Integrationen.",
   "checklists.discard": "Verwerfen einer falsch begonnenen Checkliste ist eine Korrektur in der Oberfläche; die API beginnt, füllt aus und schließt ab.",
   "time.correct": "Eine Korrektur ändert einen Arbeitszeitnachweis und braucht die Begründung einer Person (Pflichtfeld, Korrekturverlauf): eine bewusste Handlung in der Oberfläche, kein Weg für Integrationen. Stempeln und Nachtragen gibt es über die API.",
   "time.void": "Stornieren nimmt einen Arbeitszeitnachweis aus der Zählung und braucht die Begründung einer Person: nur in der Oberfläche (der Eintrag bleibt mit Begründung im Verlauf).",

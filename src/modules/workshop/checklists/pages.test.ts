@@ -16,7 +16,7 @@ let env: TestEnv;
 let view: MountedView | null = null;
 let ids: { free: string; open: string; completed: string; discarded: string; order: string; vehicle: string; template: string };
 
-const ALL = ["checklists.view", "checklists.fill", "checklists.manage", "vehicles.view", "vehicles.edit", "orders.view"];
+const ALL = ["checklists.view", "checklists.fill", "checklists.manage", "checklists.reopen", "vehicles.view", "vehicles.edit", "orders.view"];
 
 async function login(permissions: readonly string[]) {
   const role = await env.role({ permissions });
@@ -132,7 +132,7 @@ describe("Seiten", () => {
 
     await login(["checklists.view", "checklists.fill", "vehicles.view", "orders.view"]);
     root = await render(await Page({ params: Promise.resolve({ id: ids.free }) }));
-    assert.doesNotMatch(plain(root.textContent), /Wieder öffnen/, "nur mit checklists.manage");
+    assert.doesNotMatch(plain(root.textContent), /Wieder öffnen/, "nur mit checklists.reopen");
     await view!.unmount();
     root = await render(await Page({ params: Promise.resolve({ id: ids.discarded }) }));
     assert.match(plain(root.textContent), /verworfen/);
@@ -214,6 +214,71 @@ describe("Punkte speichern (echte Aktion)", () => {
     await wait(120);
     assert.equal((await env.db.checklistItem.findUniqueOrThrow({ where: { id: choice.id } })).textValue, "voll");
     void act;
+  });
+
+  /** Seite neu rendern, wie es `router.refresh()` tut: neue Props, derselbe React-Baum */
+  async function rerender(Page: (props: { params: Promise<{ id: string }> }) => Promise<ReactNode>, id: string) {
+    const { I18nProvider } = await import("@/i18n/client");
+    const { ToastProvider } = await import("@/components/ui/toast");
+    const { de } = await import("@/i18n/messages/de");
+    const resolved = await resolveServerTree(await Page({ params: Promise.resolve({ id }) }));
+    await view!.render(createElement(I18nProvider, { locale: "de", messages: de } as never, createElement(ToastProvider, null, resolved)));
+  }
+  const checkboxOf = (root: HTMLElement, label: string) => (Array.from(root.querySelectorAll("label")).find((l) => plain(l.textContent).includes(label.slice(0, 20)))!.querySelector("input[type=\"checkbox\"]") as HTMLInputElement);
+
+  it("Neu laden wirkt: hakt ein anderes Gerät einen Punkt ab, übernimmt die Zeile nach dem Neurendern mit neuen Daten Haken und Version – ein Klick danach ist kein Konflikt", async () => {
+    await login(ALL);
+    const { default: Page } = await import("@/app/(app)/(workshop)/checklists/[id]/page");
+    const root = await render(await Page({ params: Promise.resolve({ id: ids.open }) }));
+    const rows = await env.db.checklistItem.findMany({ where: { checklistId: ids.open }, orderBy: { position: "asc" } });
+    const target = rows.find((r) => r.type === "check" && !r.done)!;
+    // ein anderes Gerät hakt den Punkt ab (neue Version in der Datenbank)
+    await env.db.checklistItem.update({ where: { id: target.id }, data: { done: true, doneByName: "Lena", doneAt: new Date() } });
+    await rerender(Page, ids.open);
+    assert.equal(checkboxOf(root, target.label).checked, true, "Stand des Servers sichtbar");
+    // Abhaken zurücknehmen geht ohne Konflikt (Version war nachgeführt)
+    await click(checkboxOf(root, target.label));
+    await wait(150);
+    assert.doesNotMatch(plain(root.textContent), /Nicht gespeichert|inzwischen von jemand anderem/);
+    assert.equal((await env.db.checklistItem.findUniqueOrThrow({ where: { id: target.id } })).done, false);
+  });
+
+  it("Messwert tippen und gleich den Haken antippen: die Speichervorgänge laufen nacheinander (kein Selbstkonflikt), beides ist gespeichert", async () => {
+    await login(ALL);
+    const { default: Page } = await import("@/app/(app)/(workshop)/checklists/[id]/page");
+    const km = await env.db.checklistItem.findFirstOrThrow({ where: { checklistId: ids.open, label: "Kilometerstand abgelesen" } });
+    await env.db.checklistItem.update({ where: { id: km.id }, data: { done: false, numberValue: null, doneByName: null, doneAt: null } });
+    const root = await render(await Page({ params: Promise.resolve({ id: ids.open }) }));
+    const input = root.querySelector(`input[aria-label='${km.label}: Wert']`) as HTMLInputElement;
+    await type(input, "51000");
+    // Verlassen des Feldes und Antippen des Hakens im selben Augenblick (ein act: überlappende act-Aufrufe verwirren den Test-Renderer)
+    const box = checkboxOf(root, km.label);
+    await act(() => {
+      input.focus();
+      input.blur();
+      box.click();
+    });
+    await wait(500);
+    assert.doesNotMatch(plain(root.textContent), /Nicht gespeichert|inzwischen von jemand anderem/);
+    const saved = await env.db.checklistItem.findUniqueOrThrow({ where: { id: km.id } });
+    assert.deepEqual([saved.done, saved.numberValue], [true, 51000]);
+    // Haken zurücknehmen löscht den Wert beim Server – die Eingabe zeigt dasselbe
+    await click(checkboxOf(root, km.label));
+    await wait(500);
+    assert.equal((await env.db.checklistItem.findUniqueOrThrow({ where: { id: km.id } })).numberValue, null);
+    assert.equal((root.querySelector(`input[aria-label='${km.label}: Wert']`) as HTMLInputElement).value, "");
+  });
+});
+
+describe("Vorlageneditor", () => {
+  it("Zahlen gehen als getippt an den Server (kein stilles NaN → null): „120 Nm“ und Dezimalkomma kommen unverändert an", async () => {
+    await login(ALL);
+    const { TemplateEditor } = await import("./template-editor");
+    const root = await render(
+      createElement(TemplateEditor, { initial: { name: "Test", description: "", signatureMode: "none", items: [{ label: "Radschrauben", type: "torque", required: true, unit: "Nm", minValue: "120 Nm", maxValue: "1.234,5", targetValue: "120,5", options: "", hint: "" }] } }),
+    );
+    const items = JSON.parse((root.querySelector("input[name='items']") as HTMLInputElement).value) as Array<{ minValue: string | null; maxValue: string | null; targetValue: string | null }>;
+    assert.deepEqual([items[0].minValue, items[0].maxValue, items[0].targetValue], ["120 Nm", "1.234,5", "120,5"]);
   });
 });
 

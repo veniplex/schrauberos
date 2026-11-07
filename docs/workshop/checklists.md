@@ -34,7 +34,7 @@ Unten auf der Checkliste: **Checkliste abschließen**. Je nach Vorlage ist die *
 (das Feld scrollt dabei nicht mit) – oder, wenn er das nicht kann, über **Namen tippen** mit Bestätigung. Dann muss der getippte Name mit dem eingetragenen **Namen des Kunden** übereinstimmen. Eine gezeichnete
 Unterschrift gilt für **genau eine** Checkliste; dasselbe Bild nochmals wird abgelehnt.
 
-**Danach ist die Checkliste unveränderlich.** Nur die Leitung (Recht **Vorlagen pflegen und abgeschlossene Checklisten wieder öffnen**) kann sie mit **Begründung** wieder öffnen; das steht im Verlauf und im Audit-Log, die
+**Danach ist die Checkliste unveränderlich.** Nur wer das eigene Recht **Abgeschlossene Checklisten wieder öffnen** hat (gehört in keine Standardrolle, die Administration vergibt es bewusst) kann sie mit **Begründung** wieder öffnen; das steht im Verlauf und im Audit-Log, die
 bisherige Unterschrift gilt dann nicht mehr (die Datei bleibt zur Nachvollziehbarkeit liegen). Eine Checkliste an einem **abgeschlossenen Auftrag** lässt sich nicht mehr ändern oder wieder öffnen (der Auftrag ändert
 sich nur über „Wieder öffnen“).
 
@@ -58,7 +58,7 @@ Verarbeitung** (Art. 18 DSGVO) sind Checklisten ihrer Fahrzeuge und Aufträge ni
 ## Datenschutz
 
 Die **Auskunft** für einen Kunden nennt seine Checklisten (Vorlage, Datum, Name zur Unterschrift, Hinweis auf die gespeicherte Unterschrift, Freitexte). Bei der **Anonymisierung** werden Kundenname, getippter Name,
-Anmerkung und die Freitexte gelöscht; **die Unterschrift als Bilddatei bleibt** (sie belegt den Vorgang und lässt sich nicht in einem Schritt zurückholen). Haken, Messwerte und Vorlage bleiben.
+Anmerkung, die Freitexte und die Begründungen beim Wiederöffnen gelöscht; **die Unterschrift als Bilddatei bleibt** (sie belegt den Vorgang und lässt sich nicht in einem Schritt zurückholen). Haken, Messwerte und Vorlage bleiben.
 
 ## Druck
 

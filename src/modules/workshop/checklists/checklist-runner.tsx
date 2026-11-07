@@ -42,9 +42,10 @@ type Patch = { done?: boolean; number?: string; text?: string };
 /**
  * Ein Punkt der Checkliste: **speichert für sich** (Haken, Messwert beim Verlassen des Feldes, Auswahl, Text) – kein „Speichern“ am Ende. Die Zeile ist mindestens 44 px hoch (`ChecklistItem`); scheitert
  * das Speichern, bleibt der Stand sichtbar als „Nicht gespeichert“ mit „Erneut versuchen“. Jeder Punkt trägt seine eigene Version: Hat jemand anderes ihn inzwischen geändert, meldet der Server einen Konflikt
- * (die Zeile zeigt ihn und bietet „Neu laden“ an). Ein Messwert außerhalb von Mindest-/Höchstwert wird gespeichert und als Text markiert (kein Sperren).
+ * (die Zeile zeigt ihn und bietet „Neu laden“ an: die Seite wird neu gelesen, und die Zeile übernimmt den Stand des Servers, weil ihr `key` die Version des Punkts enthält). **Speichern ist je Punkt serialisiert:** Eine Eingabe, die beim Verlassen des Feldes
+ * gespeichert wird, und ein gleich darauf folgender Haken laufen nacheinander, die zweite Anfrage trägt die Version der ersten (kein Selbstkonflikt). Ein Messwert außerhalb von Mindest-/Höchstwert wird gespeichert und als Text markiert (kein Sperren).
  */
-function ItemRow({ item, editable, onDone }: { item: RunnerItem; editable: boolean; onDone: (id: string, done: boolean) => void }) {
+function ItemRow({ item, editable, onDone }: { item: RunnerItem; editable: boolean; onDone: (id: string, done: boolean, serverVersion: string) => void }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [done, setDone] = useState(item.done);
@@ -53,8 +54,16 @@ function ItemRow({ item, editable, onDone }: { item: RunnerItem; editable: boole
   const [problem, setProblem] = useState<string | null>(null);
   const version = useRef(item.version);
   const saved = useRef({ number: formatNumber(item.numberValue, locale), text: item.textValue ?? "" });
+  // Kette der laufenden Speichervorgänge dieses Punkts: der nächste beginnt erst, wenn der vorige die neue Version geliefert hat
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
 
-  async function save(patch: Patch): Promise<void> {
+  function save(patch: Patch): Promise<void> {
+    const run = queue.current.then(() => send(patch));
+    queue.current = run.catch(() => undefined);
+    return run;
+  }
+
+  async function send(patch: Patch): Promise<void> {
     const data = new FormData();
     data.set("id", item.id);
     data.set("version", version.current);
@@ -70,8 +79,13 @@ function ItemRow({ item, editable, onDone }: { item: RunnerItem; editable: boole
     if (state.version) version.current = state.version;
     const nowDone = state.done ?? patch.done ?? false;
     setDone(nowDone);
-    onDone(item.id, nowDone);
+    onDone(item.id, nowDone, item.version);
     saved.current = { number: patch.number ?? "", text: patch.text ?? "" };
+    // Nimmt man den Haken zurück (oder leert den Wert), löscht der Server den Wert: die Eingabe zeigt dasselbe
+    if (!nowDone) {
+      setNumber("");
+      setText("");
+    }
   }
 
   const numeric = Number(number.replace(",", "."));
@@ -147,7 +161,13 @@ function ItemRow({ item, editable, onDone }: { item: RunnerItem; editable: boole
         {problem ? (
           <p role="alert" className="mt-1 flex flex-wrap items-center gap-2 text-sm text-danger-ink">
             {problem}
-            <Button size="sm" onClick={() => router.refresh()}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setProblem(null);
+                router.refresh();
+              }}
+            >
               {t("checklists.detail.reload")}
             </Button>
           </p>
@@ -170,7 +190,7 @@ function CompleteForm({ id, version, mode, requiredOpen }: { id: string; version
         {mode !== "none" ? (
           <>
             <Field label={t("checklists.complete.customerName")} htmlFor="customerName" name="customerName" hint={t("checklists.complete.customerNameHint")} required={mode === "required"} className="max-w-sm">
-              <Input id="customerName" name="customerName" maxLength={80} autoComplete="off" />
+              <Input id="customerName" name="customerName" maxLength={80} autoComplete="off" data-no-draft />
             </Field>
             <Field label={mode === "required" ? t("checklists.complete.signature") : t("checklists.complete.signatureOptional")} name="signature" required={mode === "required"}>
               <Signature name="signature" />
@@ -230,9 +250,11 @@ export function ChecklistRunner({
   signatureMode: SignatureMode;
 }) {
   const { t } = useI18n();
-  const [doneById, setDoneById] = useState<Record<string, boolean>>(() => Object.fromEntries(items.map((i) => [i.id, i.done])));
-  const requiredOpen = items.filter((i) => i.required && !doneById[i.id]).length;
-  const done = items.filter((i) => doneById[i.id]).length;
+  // lokal gespeicherte Haken – gelten nur für die Version des Punkts, mit der sie gespeichert wurden: liefert „Neu laden“ einen neueren Stand, gilt der des Servers
+  const [local, setLocal] = useState<Record<string, { version: string; done: boolean }>>({});
+  const isDone = (item: RunnerItem) => (local[item.id]?.version === item.version ? local[item.id].done : item.done);
+  const requiredOpen = items.filter((i) => i.required && !isDone(i)).length;
+  const done = items.filter(isDone).length;
 
   return (
     <div className="flex flex-col gap-5">
@@ -242,7 +264,7 @@ export function ChecklistRunner({
         </p>
         <ul className="flex flex-col divide-y divide-line px-5 py-2">
           {items.map((item) => (
-            <ItemRow key={item.id} item={item} editable={editable} onDone={(itemId, value) => setDoneById((current) => ({ ...current, [itemId]: value }))} />
+            <ItemRow key={`${item.id}:${item.version}`} item={item} editable={editable} onDone={(itemId, value, serverVersion) => setLocal((current) => ({ ...current, [itemId]: { version: serverVersion, done: value } }))} />
           ))}
         </ul>
       </Card>

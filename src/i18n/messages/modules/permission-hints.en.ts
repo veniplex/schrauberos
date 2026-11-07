@@ -75,7 +75,8 @@ export const permissionHintsEn: typeof permissionHintsDe = {
   checklists: {
     view: "View checklists on vehicles and orders – only where the person may also see the vehicle or order.",
     fill: "Start checklists, tick items, record measurements, have the customer sign and complete them.",
-    manage: "Create and change templates (every change becomes a new version) and reopen completed checklists with a reason.",
+    manage: "Create and change templates (every change becomes a new version).",
+    reopen: "Reopen completed (possibly customer-signed) checklists with a reason. Lifts their immutability; never assigned automatically.",
   },
   files: {
     view: "View documents and photos on vehicles and orders – only where the person may also see the vehicle or order.",

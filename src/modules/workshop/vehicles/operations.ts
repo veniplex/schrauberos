@@ -215,12 +215,12 @@ export const deleteVehicleOperation = defineOperation({
   run: async ({ input, tx, audit }) => {
     const vehicle = await tx.vehicle.findUnique({
       where: { id: input.id },
-      select: { plate: true, ownerships: { select: { id: true, toDate: true } }, _count: { select: { appointments: true, tireSets: true, orders: true, files: true } } },
+      select: { plate: true, ownerships: { select: { id: true, toDate: true } }, _count: { select: { appointments: true, tireSets: true, orders: true, files: true, checklists: true } } },
     });
     if (!vehicle) fail("notFound");
     const transfers = ownershipTransfers(vehicle.ownerships);
-    if (!vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers, files: vehicle._count.files })) {
-      fail("inUse", "vehicles.errors.inUse", { appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers, files: vehicle._count.files });
+    if (!vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers, files: vehicle._count.files, checklists: vehicle._count.checklists })) {
+      fail("inUse", "vehicles.errors.inUse", { appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers, files: vehicle._count.files, checklists: vehicle._count.checklists });
     }
     await tx.vehicleOwnership.deleteMany({ where: { vehicleId: input.id } });
     await tx.vehicle.delete({ where: { id: input.id } });

@@ -26,6 +26,7 @@ const ROW = {
   vehicleId: true,
   orderId: true,
   createdByName: true,
+  createdById: true,
   createdAt: true,
   completedAt: true,
   signaturePath: true,
@@ -51,6 +52,8 @@ export type ChecklistRow = {
   orderId: string | null;
   orderNumber: string | null;
   createdByName: string;
+  /** Konto, das die Checkliste begonnen hat (null: ältere Zeilen) */
+  createdById: string | null;
   createdAt: Date;
   completedAt: Date | null;
   signed: boolean;
@@ -72,6 +75,7 @@ const toRow = (row: RowData): ChecklistRow => ({
   orderId: row.orderId,
   orderNumber: row.order?.number ?? null,
   createdByName: row.createdByName,
+  createdById: row.createdById,
   createdAt: row.createdAt,
   completedAt: row.completedAt,
   signed: row.signaturePath !== null || row.signedName !== null,

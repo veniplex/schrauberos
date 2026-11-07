@@ -225,7 +225,7 @@ export const de = {
     presets: {
       basic: { name: "Basis", description: "Termine, Reifenlager, Kunden, Fahrzeuge, Rechnungsarchiv, Mitarbeiter, Fuhrpark, Handbuch und IT-Dokumentation." },
       orders: { name: "Mit Aufträgen und Lager", description: "Zusätzlich Werkstattaufträge (Arbeitskarten) und Teile & Lager für den Werkstattalltag." },
-      daily: { name: "Werkstattalltag", description: "Aufträge, Teile & Lager und Zeiterfassung (Stempeln, Arbeitszeiten, Wochenübersicht)." },
+      daily: { name: "Werkstattalltag", description: "Aufträge, Teile & Lager, Zeiterfassung (Stempeln, Arbeitszeiten, Wochenübersicht), Dokumente & Fotos und Checklisten (Annahmeprotokoll, Ölwechsel, Reifenwechsel, HU-Vorbereitung)." },
       invoicing: { name: "Mit Angeboten und Rechnungen", description: "Zusätzlich Aufträge, Teile & Lager sowie Angebote & Rechnungen (Angebot, Rechnung, XRechnung, Versand per E-Mail)." },
     },
     demo: "Mit Beispieldaten starten",
@@ -434,7 +434,8 @@ export const de = {
     checklists: {
       view: "Checklisten ansehen (nach den Rechten für Fahrzeug bzw. Auftrag)",
       fill: "Checklisten beginnen, ausfüllen, abschließen und verwerfen",
-      manage: "Vorlagen pflegen und abgeschlossene Checklisten wieder öffnen",
+      manage: "Checklisten-Vorlagen pflegen",
+      reopen: "Abgeschlossene Checklisten wieder öffnen",
     },
     files: {
       view: "Dokumente und Fotos ansehen (nach den Rechten für Fahrzeug bzw. Auftrag)",
