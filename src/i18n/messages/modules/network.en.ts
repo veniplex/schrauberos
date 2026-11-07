@@ -1,6 +1,8 @@
 import type { networkDe } from "./network.de";
 
 export const networkEn: typeof networkDe = {
+  search: { devices: "Devices", ips: "IP addresses" },
+  quick: { newDevice: "New device" },
   feature: {
     name: "IT & network",
     description: "Device inventory, IP management, cabling and status overview.",

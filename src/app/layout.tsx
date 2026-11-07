@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
@@ -11,6 +11,9 @@ import { contrastInk, isHexColor } from "@/lib/color";
 import { startupState } from "@/server/startup-state";
 import { getWorkshop } from "@/server/workshop";
 import { ReinstallNotice } from "./reinstall-notice";
+
+/** `viewport-fit=cover`: Die Safe-Area (Notch, Home-Balken) ist nutzbar – Kopfzeile, Seitenfach, Toast und Aktionsleiste berücksichtigen sie über `env(safe-area-inset-*)`. */
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export async function generateMetadata(): Promise<Metadata> {
   if (startupState().status === "reinstall") return { title: "SchrauberOS", robots: { index: false, follow: false } };

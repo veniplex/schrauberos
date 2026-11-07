@@ -11,5 +11,6 @@ export const fleetFeature = defineFeature({
   nav: [
     { id: "fleet", href: "/fleet", labelKey: "nav.fleet", icon: "fleet", permission: "fleet.view", order: 50 },
   ],
+  quickActions: [{ id: "fleet.new", labelKey: "fleet.quick.new", href: "/fleet/new", icon: "fleet", permission: "fleet.edit", order: 60 }],
   routes: ["fleet"],
 });

@@ -1,149 +1,128 @@
 "use client";
 
-import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import {
-  BookOpen,
-  Blocks,
-  ScrollText,
-  Download,
-  FileText,
-  CircleHelp,
-  HardDriveDownload,
-  Activity,
-  Cable,
-  CalendarDays,
-  CalendarOff,
-  Car,
-  Contact,
-  Disc3,
-  Globe,
-  LayoutDashboard,
-  Menu as MenuIcon,
-  Network,
-  Receipt,
-  Server,
-  Settings,
-  Truck,
-  ShieldCheck,
-  UserCog,
-  Users,
-  Wrench,
-  X,
-  type LucideIcon,
-} from "lucide-react";
-import type { IconName } from "@/modules/define";
+import { useEffect, useState, type ReactNode } from "react";
+import { Menu as MenuIcon, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/buttons";
 import { Disclosure } from "@/components/ui/disclosure";
+import { Drawer } from "@/components/ui/drawer";
 import { NavLink } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
 import { activeHref } from "@/lib/nav-active";
+import { collapsedCookie } from "@/lib/nav-state";
 
-const ICONS: Record<IconName, LucideIcon> = {
-  dashboard: LayoutDashboard,
-  calendar: CalendarDays,
-  tires: Disc3,
-  customers: Users,
-  users: UserCog,
-  roles: ShieldCheck,
-  settings: Settings,
-  network: Network,
-  server: Server,
-  ip: Globe,
-  cabling: Cable,
-  vehicles: Car,
-  invoices: Receipt,
-  employees: Contact,
-  absences: CalendarOff,
-  fleet: Truck,
-  docs: FileText,
-  handbook: BookOpen,
-  modules: Blocks,
-  audit: ScrollText,
-  updates: Download,
-  backup: HardDriveDownload,
-  system: Activity,
-  help: CircleHelp,
-};
-
-export type SidebarItem = { href: string; label: string; icon: IconName };
-/** Eine Navigationsgruppe: ohne Titel immer sichtbar (Übersicht, Hilfe), sonst ein Modul – aufklappbar, außer es hat nur einen Eintrag. */
-export type SidebarGroup = { id: string; label: string | null; items: SidebarItem[] };
+/** Ein Navigationseintrag; das Symbol entsteht auf dem Server (siehe `nav-icons`). */
+export type SidebarItem = { href: string; label: string; icon: ReactNode };
+/** Eine Navigationsgruppe = ein Modul: Titel auch bei nur einem Eintrag, die Einträge stehen eingerückt darunter. */
+export type SidebarGroup = { id: string; label: string; items: SidebarItem[] };
 
 /** Der aktive Eintrag über alle Gruppen: der längste passende gewinnt (nie zwei gleichzeitig). */
-function activeItem(groups: SidebarGroup[], pathname: string): string | null {
-  return activeHref(pathname, groups.flatMap((g) => g.items.map((i) => i.href)));
+function activeItem(items: SidebarItem[], pathname: string): string | null {
+  return activeHref(pathname, items.map((i) => i.href));
 }
 
+function rememberCollapsed(ids: string[]) {
+  document.cookie = collapsedCookie(ids, window.location.protocol === "https:");
+}
+
+/**
+ * Anwendungsrahmen: Seitenleiste ab 1024 px, darunter Kopfzeile mit Menü-Knopf und Seitenfach (`Drawer`), Sprunglink, Schnellsuche und „Neu“ in der Kopfleiste.
+ *
+ * - **Gruppen** (Module) mit Titel, auch bei nur einem Eintrag; Zustand ein-/ausgeklappt merkt ein Cookie (der Server liest es mit, nichts springt). Die Gruppe der aktuellen
+ *   Seite ist immer offen und nicht einklappbar. „Übersicht“ steht oben, „Hilfe“ am Ende.
+ * - **Seitenfach** (< 1024 px): Schließen-Knopf, Escape, Fokus gefangen und zurückgegeben, Seite dahinter gesperrt, `100dvh`, Safe-Area; schließt bei Navigation und wenn das Fenster
+ *   auf Seitenleisten-Breite wächst. Konto und Abmelden liegen in der Kopfzeile.
+ */
 export function Sidebar({
   workshopName,
   logoDataUrl,
+  primary,
   groups,
-  footer,
+  trailing,
+  collapsed: initialCollapsed,
+  search,
+  quickNew,
+  account,
+  accountCompact,
   children,
 }: {
   workshopName: string;
   logoDataUrl: string | null;
+  /** Oben, ohne Gruppe (Übersicht) */
+  primary: SidebarItem[];
   groups: SidebarGroup[];
-  /** Benutzer-Menü am Fuß der Leiste */
-  footer: React.ReactNode;
-  /** Inhalt */
-  children: React.ReactNode;
+  /** Am Ende, ohne Gruppe (Hilfe) */
+  trailing: SidebarItem[];
+  /** Eingeklappte Gruppen (aus dem Cookie) */
+  collapsed: string[];
+  /** Schnellsuche (client) – in Kopfleiste (Desktop) und Kopfzeile (Handy/Tablet) */
+  search: ReactNode;
+  quickNew: ReactNode;
+  /** Benutzer-Menü am Fuß der Seitenleiste */
+  account: ReactNode;
+  /** Benutzer-Menü als Symbol in der Kopfzeile */
+  accountCompact: ReactNode;
+  children: ReactNode;
 }) {
   const pathname = usePathname();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(pathname);
-  // Aufgeklappte Gruppen: anfangs die der aktuellen Seite (auf Übersicht, Hilfe & Co. alle); wer weiter navigiert, bekommt die neue Gruppe aufgeklappt dazu
-  const groupOf = (path: string) => {
-    const href = activeItem(groups, path);
-    return href ? groups.find((g) => g.items.some((i) => i.href === href))?.id : undefined;
-  };
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(groupOf(pathname) ? [groupOf(pathname)!] : groups.map((g) => g.id)));
+  const [collapsed, setCollapsed] = useState(() => new Set(initialCollapsed));
 
-  // State-Anpassung während des Renderns statt im Effect: Drawer bei Navigation schließen, Gruppe der neuen Seite öffnen
+  // State-Anpassung während des Renderns statt im Effect: Seitenfach bei Navigation schließen
   if (pathname !== lastPath) {
     setLastPath(pathname);
     setOpen(false);
-    const current = groupOf(pathname);
-    if (current && !expanded.has(current)) setExpanded(new Set([...expanded, current]));
   }
 
-  const setGroupOpen = (id: string, value: boolean) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (value) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  // Wächst das Fenster auf Seitenleisten-Breite, gehört das Seitenfach nicht mehr in den Weg
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => {
+      if (query.matches) setOpen(false);
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
-  const active = activeItem(groups, pathname);
-  const link = (item: SidebarItem) => {
-    const Icon = ICONS[item.icon];
-    return (
-      <li key={item.href}>
-        <NavLink href={item.href} active={item.href === active} icon={<Icon className="size-[18px] shrink-0" aria-hidden />}>
-          {item.label}
-        </NavLink>
-      </li>
-    );
+  const all = [...primary, ...groups.flatMap((g) => g.items), ...trailing];
+  const active = activeItem(all, pathname);
+  const activeGroup = groups.find((g) => g.items.some((i) => i.href === active))?.id;
+
+  const toggleGroup = (id: string, isOpen: boolean) => {
+    const next = new Set(collapsed);
+    if (isOpen) next.delete(id);
+    else next.add(id);
+    setCollapsed(next);
+    rememberCollapsed([...next]);
   };
+
+  const link = (item: SidebarItem) => (
+    <li key={item.href}>
+      <NavLink href={item.href} active={item.href === active} icon={item.icon}>
+        {item.label}
+      </NavLink>
+    </li>
+  );
 
   const nav = (
     <nav aria-label={t("nav.main")} className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-4">
-      {groups.map((g) =>
-        g.label && g.items.length > 1 ? (
-          <Disclosure key={g.id} variant="section" title={g.label} open={expanded.has(g.id)} onOpenChange={(v) => setGroupOpen(g.id, v)}>
-            <ul className="mt-1 flex flex-col gap-0.5">{g.items.map(link)}</ul>
-          </Disclosure>
-        ) : (
-          <ul key={g.id} className="flex flex-col gap-0.5">
-            {g.items.map(link)}
-          </ul>
-        ),
-      )}
+      <ul className="flex flex-col gap-0.5">{primary.map(link)}</ul>
+      {groups.map((group) => (
+        <Disclosure
+          key={group.id}
+          variant="section"
+          title={group.label}
+          locked={group.id === activeGroup}
+          open={!collapsed.has(group.id)}
+          onOpenChange={(isOpen) => toggleGroup(group.id, isOpen)}
+        >
+          <ul className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-line pl-1.5">{group.items.map(link)}</ul>
+        </Disclosure>
+      ))}
+      <ul className="mt-auto flex flex-col gap-0.5 border-t border-line pt-3">{trailing.map(link)}</ul>
     </nav>
   );
 
@@ -161,7 +140,7 @@ export function Sidebar({
     </Link>
   );
 
-  const content = (
+  const content = (footer: ReactNode) => (
     <>
       {brand}
       {nav}
@@ -171,43 +150,37 @@ export function Sidebar({
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
-      {/* Desktop */}
-      <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface lg:flex">{content}</aside>
+      <a href="#main-content" className="skip-link no-print">
+        {t("common.skipToContent")}
+      </a>
 
-      {/* Mobil: Kopfzeile mit Menü-Knopf und Drawer */}
+      {/* Desktop: Seitenleiste */}
+      <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface lg:flex">{content(account)}</aside>
+
+      {/* Handy und Tablet (< 1024 px): Kopfzeile mit Menü-Knopf, Suche, „Neu“ und Konto; die Navigation liegt im Seitenfach */}
       <div className="no-print lg:hidden">
-        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
-          <Button
-            variant="secondary"
-            size="icon"
-            aria-label={open ? t("common.close") : t("nav.menu")}
-            aria-expanded={open}
-            aria-controls="mobile-nav"
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? <X className="size-4" aria-hidden /> : <MenuIcon className="size-4" aria-hidden />}
+        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b border-line bg-surface/90 px-3 pt-[env(safe-area-inset-top)] backdrop-blur">
+          <Button variant="secondary" size="icon" aria-label={t("nav.menu")} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}>
+            <MenuIcon className="size-4" aria-hidden />
           </Button>
-          <span className="truncate text-sm font-semibold">{workshopName}</span>
+          <span className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">{workshopName}</span>
+          {search}
+          {quickNew}
+          {accountCompact}
         </header>
-        <div
-          className={clsx("fixed inset-0 z-40 bg-[var(--overlay)] transition-opacity", open ? "opacity-100" : "pointer-events-none opacity-0")}
-          onClick={() => setOpen(false)}
-          aria-hidden
-        />
-        <aside
-          id="mobile-nav"
-          className={clsx(
-            "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-line bg-surface transition-transform",
-            open ? "translate-x-0" : "-translate-x-full",
-          )}
-          aria-hidden={!open}
-          inert={!open}
-        >
-          {content}
-        </aside>
+        <Drawer open={open} onClose={() => setOpen(false)} label={t("nav.main")} closeLabel={t("nav.menuClose")}>
+          {content(account)}
+        </Drawer>
       </div>
 
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0">
+        {/* Desktop: Kopfleiste mit Suche und „Neu“ */}
+        <div className="no-print sticky top-0 z-20 hidden h-14 items-center gap-3 border-b border-line bg-surface/90 px-6 backdrop-blur lg:flex">
+          {search}
+          <div className="ml-auto">{quickNew}</div>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

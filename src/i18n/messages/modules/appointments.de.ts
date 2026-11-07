@@ -1,4 +1,7 @@
 export const appointmentsDe = {
+  /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
+  search: { group: "Termine" },
+  quick: { new: "Neuer Termin" },
   feature: {
     name: "Termine",
     description: "Werkstattkalender mit Tages-, Wochen- und Listenansicht, Arbeitsplätzen und Terminarten.",

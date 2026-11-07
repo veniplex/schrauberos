@@ -1,6 +1,8 @@
 import type { fleetDe } from "./fleet.de";
 
 export const fleetEn: typeof fleetDe = {
+  search: { group: "Fleet" },
+  quick: { new: "Add fleet vehicle" },
   feature: {
     name: "Fleet",
     description: "Company vehicles with due dates (inspection, insurance, licence checks) and assignment.",

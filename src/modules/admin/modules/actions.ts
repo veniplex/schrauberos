@@ -23,5 +23,5 @@ export const setEnabled = defineAction(setEnabledOperation, {
   form: (fd) => ({ key: String(fd.get("key") ?? ""), enabled: fd.get("enabled") === "true" }),
   // Navigation, Dashboard, Rechte und Seiten hängen vom Aktivierungsstand ab
   revalidate: [["/", "layout"]],
-  message: "common.saved",
+  message: (_data, input) => (input.enabled ? "modules.switchedOn" : "modules.switchedOff"),
 });

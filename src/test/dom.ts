@@ -40,6 +40,7 @@ export function installDom(options: { width?: number; height?: number; coarsePoi
     Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
   };
   define("window", window);
+  define("self", window); // next/link und andere Bibliotheken lesen `self`
   define("document", window.document);
   define("navigator", window.navigator);
   define("getComputedStyle", window.getComputedStyle.bind(window));

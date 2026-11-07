@@ -1,6 +1,8 @@
 import type { employeesDe } from "./employees.de";
 
 export const employeesEn: typeof employeesDe = {
+  search: { group: "Employees" },
+  quick: { new: "New employee" },
   feature: {
     name: "Employees",
     description: "Master data, absences and qualifications – sensitive data needs a special permission.",

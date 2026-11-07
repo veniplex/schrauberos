@@ -3,13 +3,15 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type ReactNode } from "react";
 import { Button, type ButtonSize, type ButtonVariant } from "./buttons";
 import { LinkPending } from "./link-pending";
 
 /**
- * Aufklappmenü (Konto-Menü …). Schließt bei Klick daneben, Escape und Seitenwechsel.
- * `placement`: wohin das Menü aufgeht (nach unten oder – am unteren Rand der Seitenleiste – nach oben).
+ * Aufklappfläche am Knopf (Konto-Menü, „Neu“ …) als **Popover nach dem Offenlegungsmuster**, nicht als ARIA-Menü: Der Knopf trägt `aria-expanded`/`aria-controls`, die Fläche
+ * enthält gewöhnliche Links und Knöpfe, die man mit Tab erreicht – kein `role="menu"`, das Pfeiltasten und eine eigene Fokusverwaltung versprechen würde.
+ * Schließt bei Klick daneben, Escape (der **Fokus geht zurück an den Knopf**), beim Verlassen per Tab und bei Seitenwechsel.
+ * `placement`: wohin die Fläche aufgeht (nach unten oder – am unteren Rand der Seitenleiste – nach oben).
  */
 export function Menu({
   trigger,
@@ -29,7 +31,7 @@ export function Menu({
   label: string;
   children: ReactNode;
   placement?: "down" | "up";
-  /** Ausrichtung des Menüs am Knopf */
+  /** Ausrichtung der Fläche am Knopf */
   align?: "start" | "end";
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -41,28 +43,52 @@ export function Menu({
   const [openAt, setOpenAt] = useState<string | null>(null);
   const pathname = usePathname();
   const root = useRef<HTMLDivElement>(null);
-  const open = openAt === pathname; // ein Seitenwechsel schließt das Menü von selbst
+  const button = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  const open = openAt === pathname; // ein Seitenwechsel schließt die Fläche von selbst
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !root.current?.contains(e.target as Node)) setOpenAt(null);
+    const outside = (event: Event) => {
+      if (!root.current?.contains(event.target as Node)) setOpenAt(null);
     };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", close);
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpenAt(null);
+      button.current?.focus();
+    };
+    const leave = (event: FocusEvent) => {
+      // Der Fokus verlässt die Fläche (Tab, Klick in die Seite): schließen, ohne ihn zurückzuholen
+      if (event.relatedTarget && !root.current?.contains(event.relatedTarget as Node)) setOpenAt(null);
+    };
+    const element = root.current;
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    element?.addEventListener("focusout", leave);
     return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+      element?.removeEventListener("focusout", leave);
     };
   }, [open]);
 
   return (
     <div ref={root} className={clsx("relative", className)}>
-      <Button variant={variant} size={size} aria-haspopup="menu" aria-expanded={open} aria-label={label} className={clsx(block && "w-full justify-start")} onClick={() => setOpenAt(open ? null : pathname)}>
+      <Button
+        ref={button}
+        variant={variant}
+        size={size}
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        aria-label={label}
+        className={clsx(block && "w-full justify-start")}
+        onClick={() => setOpenAt(open ? null : pathname)}
+      >
         {trigger}
       </Button>
       {open ? (
-        <div role="menu" className={clsx("absolute z-30 w-60 rounded-lg border border-line bg-surface p-1 shadow-pop", align === "end" ? "right-0" : "left-0", placement === "up" ? "bottom-full mb-1" : "top-full mt-1", panelClassName)}>
+        <div id={panelId} className={clsx("absolute z-30 w-60 rounded-lg border border-line bg-surface p-1 shadow-pop", align === "end" ? "right-0" : "left-0", placement === "up" ? "bottom-full mb-1" : "top-full mt-1", panelClassName)}>
           {children}
         </div>
       ) : null}
@@ -78,14 +104,14 @@ export function MenuHeader({ children }: { children: ReactNode }) {
 
 export function MenuLink({ className, children, ...props }: ComponentProps<typeof Link>) {
   return (
-    <Link role="menuitem" {...props} className={clsx(itemClass, className)}>
+    <Link {...props} className={clsx(itemClass, className)}>
       {children}
       <LinkPending />
     </Link>
   );
 }
 
-/** Menüeintrag, der ein Formular absendet (z. B. Abmelden). */
+/** Eintrag, der ein Formular absendet (z. B. Abmelden). */
 export function MenuSubmit({ className, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type">) {
-  return <button role="menuitem" {...props} type="submit" className={clsx(itemClass, className)} />;
+  return <button {...props} type="submit" className={clsx(itemClass, className)} />;
 }

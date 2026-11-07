@@ -1,4 +1,7 @@
 export const fleetDe = {
+  /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
+  search: { group: "Fuhrpark" },
+  quick: { new: "Fahrzeug im Fuhrpark anlegen" },
   feature: {
     name: "Fuhrpark",
     description: "Firmenfahrzeuge mit Fälligkeiten (HU, Versicherung, Führerscheinkontrolle) und Zuordnung.",

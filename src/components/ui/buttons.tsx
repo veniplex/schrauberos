@@ -26,7 +26,7 @@ export function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSi
 }
 
 /** Der Button der Anwendung (Klick-Aktionen im Browser). Zum Absenden eines Formulars: SubmitButton. */
-export function Button({ variant = "secondary", size = "md", type = "button", className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook) {
+export function Button({ variant = "secondary", size = "md", type = "button", className, ...props }: ComponentProps<"button"> & ButtonLook) {
   return <button {...props} type={type} className={clsx(buttonClass(variant, size), className)} />;
 }
 

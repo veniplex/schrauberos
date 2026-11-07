@@ -9,5 +9,6 @@ export const manualFeature = defineFeature({
   docsArea: "handbook",
   permissions: { group: "handbook", keys: ["handbook.view", "handbook.edit"] },
   nav: [{ id: "handbook", href: "/docs/handbook", labelKey: "nav.handbook", icon: "handbook", permission: "handbook.view", order: 70 }],
+  quickActions: [{ id: "handbook.new", labelKey: "docs.quick.handbookNew", href: "/docs/handbook/new", icon: "handbook", permission: "handbook.edit", order: 80 }],
   routes: [],
 });

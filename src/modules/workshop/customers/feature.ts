@@ -11,5 +11,6 @@ export const customersFeature = defineFeature({
   nav: [
     { id: "customers", href: "/customers", labelKey: "nav.customers", icon: "customers", permission: "customers.view", order: 30 },
   ],
+  quickActions: [{ id: "customers.new", labelKey: "customers.quick.new", href: "/customers/new", icon: "customers", permission: "customers.edit", order: 30 }],
   routes: ["customers"],
 });

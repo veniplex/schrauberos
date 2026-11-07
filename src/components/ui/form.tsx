@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { Search } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import type { HTMLAttributes, ReactNode, Ref, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ComponentProps, HTMLAttributes, ReactNode, Ref, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useI18n } from "@/i18n/client";
 import { FieldContext, formErrorId, useField, useFormContext, type FieldContextValue } from "./form-context";
 
@@ -203,7 +203,7 @@ export function Input({ invalid, className, autoFocus, inputMode, ref, ...props 
 }
 
 /** Suchfeld mit Lupe (für Listen und Filter). */
-export function SearchInput({ className, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+export function SearchInput({ className, ...props }: Omit<ComponentProps<"input">, "type">) {
   return (
     <div className={clsx("relative", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />

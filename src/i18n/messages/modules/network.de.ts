@@ -1,4 +1,6 @@
 export const networkDe = {
+  search: { devices: "Geräte", ips: "IP-Adressen" },
+  quick: { newDevice: "Neues Gerät" },
   feature: {
     name: "IT & Netzwerk",
     description: "Geräteinventar, IP-Verwaltung, Verkabelung und Statusübersicht.",

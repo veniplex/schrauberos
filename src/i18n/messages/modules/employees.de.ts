@@ -1,4 +1,7 @@
 export const employeesDe = {
+  /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
+  search: { group: "Mitarbeiter" },
+  quick: { new: "Neuer Mitarbeiter" },
   feature: {
     name: "Mitarbeiter",
     description: "Stammdaten, Abwesenheiten und Qualifikationen – sensible Daten nur mit Sonderrecht.",

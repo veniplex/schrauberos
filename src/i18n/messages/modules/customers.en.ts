@@ -1,6 +1,8 @@
 import type { customersDe } from "./customers.de";
 
 export const customersEn: typeof customersDe = {
+  search: { group: "Customers" },
+  quick: { new: "New customer" },
   feature: {
     name: "Customers",
     description: "Customer master data: contact, address, vehicles and appointments.",

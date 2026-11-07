@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui/layout";
-import { SubmitButton } from "@/components/ui/buttons";
-import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
+import { SubmitSwitch } from "@/components/ui/switch";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { FEATURES, MODULES, featureById, featuresOfModule } from "@/modules/catalog";
@@ -27,20 +26,15 @@ export default async function ModulesPage() {
   };
   const names = (ids: readonly string[]) => ids.map(nameOf).join(", ");
 
-  /** Ein-/Ausschalter als Formular (funktioniert ohne JavaScript). */
+  /**
+   * Ein-/Ausschalter als Formular: Der Schalter trägt den neuen Zustand, das Ausschalten fragt vorher nach (Folgen für abhängige Funktionen), danach meldet ein Toast „Ein-/Ausgeschaltet“.
+   * `label` benennt Modul oder Funktion (für Titel der Rückfrage und zugänglichen Namen).
+   */
   const toggle = (key: string, on: boolean, label: string, confirm: string) => (
     <form action={setEnabled}>
       <input type="hidden" name="key" value={key} />
       <input type="hidden" name="enabled" value={String(!on)} />
-      {on ? (
-        <ConfirmSubmitButton message={confirm} variant="secondary" size="sm" aria-label={`${t("modules.turnOff")}: ${label}`}>
-          {t("modules.turnOff")}
-        </ConfirmSubmitButton>
-      ) : (
-        <SubmitButton variant="primary" size="sm" aria-label={`${t("modules.turnOn")}: ${label}`}>
-          {t("modules.turnOn")}
-        </SubmitButton>
-      )}
+      <SubmitSwitch checked={on} label={label} confirm={{ title: `${t("modules.turnOff")}: ${label}?`, message: confirm, confirmLabel: t("modules.turnOff") }} />
     </form>
   );
 
@@ -95,6 +89,7 @@ export default async function ModulesPage() {
                           {uses.length ? <p>{t("modules.uses", { names: names(uses) })}</p> : null}
                           {dependents.length && !required ? <p>{t("modules.dependents", { names: names(dependents) })}</p> : null}
                           {required ? <p>{t("modules.requiredHint")}</p> : null}
+                          {status.state === "off" && !required ? <p>{t("modules.rightsInactive")}</p> : null}
                         </div>
                       </div>
                       {required || status.state === "module-off" ? null : toggle(id, switchedOn, t("modules.featureSwitch", { name: t(f.nameKey) }), t("modules.confirmOffFeature", { name: t(f.nameKey) }))}

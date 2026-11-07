@@ -13,5 +13,6 @@ export const networkFeature = defineFeature({
     { id: "network-ip", href: "/network/ip", labelKey: "nav.ipam", icon: "ip", permission: "network.view", order: 62 },
     { id: "network-cabling", href: "/network/cabling", labelKey: "nav.cabling", icon: "cabling", permission: "network.view", order: 63 },
   ],
+  quickActions: [{ id: "network.newDevice", labelKey: "network.quick.newDevice", href: "/network/devices/new", icon: "server", permission: "network.edit", order: 70 }],
   routes: ["network"],
 });

@@ -1,5 +1,5 @@
 export const rolesDe = {
-  featureInactive: "Diese Funktion ist ausgeschaltet – die Rechte gelten erst nach dem Einschalten.",
+  featureInactive: "Funktion ausgeschaltet – diese Rechte sind wirkungslos, bis sie wieder eingeschaltet wird.",
   feature: {
     name: "Rollen & Rechte",
     description: "Rollen mit fein granularen Berechtigungen anlegen und zuweisen.",

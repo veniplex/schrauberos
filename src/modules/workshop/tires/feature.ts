@@ -12,5 +12,6 @@ export const tiresFeature = defineFeature({
   nav: [
     { id: "tires", href: "/tires", labelKey: "nav.tires", icon: "tires", permission: "tires.view", order: 20 },
   ],
+  quickActions: [{ id: "tires.new", labelKey: "tires.quick.new", href: "/tires/new", icon: "tires", permission: "tires.create", order: 20 }],
   routes: ["tires"],
 });

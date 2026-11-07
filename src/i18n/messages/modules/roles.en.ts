@@ -1,7 +1,7 @@
 import type { rolesDe } from "./roles.de";
 
 export const rolesEn: typeof rolesDe = {
-  featureInactive: "This feature is switched off – the permissions only apply once it is switched on.",
+  featureInactive: "Feature switched off – these permissions have no effect until it is switched on again.",
   feature: {
     name: "Roles & permissions",
     description: "Create roles with fine-grained permissions and assign them.",

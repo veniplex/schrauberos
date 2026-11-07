@@ -1,4 +1,7 @@
 export const customersDe = {
+  /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
+  search: { group: "Kunden" },
+  quick: { new: "Neuer Kunde" },
   feature: {
     name: "Kunden",
     description: "Kundenstammdaten: Kontakt, Adresse, Fahrzeuge und Termine.",

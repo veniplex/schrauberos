@@ -1,6 +1,8 @@
 import type { invoicesDe } from "./invoices.de";
 
 export const invoicesEn: typeof invoicesDe = {
+  search: { group: "Invoices" },
+  quick: { new: "Record invoice" },
   feature: {
     name: "Invoice archive",
     description: "File incoming and outgoing invoices with receipts and track payment status.",

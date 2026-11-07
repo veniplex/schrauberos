@@ -1,4 +1,5 @@
 export const docsDe = {
+  quick: { handbookNew: "Handbuch: neue Seite", itNew: "IT-Dokumentation: neue Seite" },
   new: "Neue Seite",
   edit: "Seite bearbeiten",
   delete: "Seite löschen",

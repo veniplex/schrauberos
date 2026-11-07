@@ -57,6 +57,20 @@ export type NavDef = {
   order: number;
 };
 
+/**
+ * Eintrag im globalen „Neu“-Menü: eine Funktion meldet hier ihre Anlegen-Aktionen an („Neuer Kunde“, „Neuer Termin“ …). Die Plattform kennt keine Funktion – sie sammelt nur die
+ * Einträge der **aktiven** Funktionen ein, für die die Person das Recht hat (`quickActionsFor` in `registry.ts`).
+ */
+export type QuickActionDef = {
+  id: string;
+  labelKey: MessageKey;
+  href: string;
+  icon: IconName;
+  /** Recht, mit dem der Eintrag erscheint (muss zur Rechte-Gruppe der Funktion gehören) */
+  permission: string;
+  order: number;
+};
+
 export type FeatureDef = {
   /** ID innerhalb des Moduls, z. B. "tires". Vollständige ID: "<modul>.<id>" */
   id: string;
@@ -83,6 +97,8 @@ export type FeatureDef = {
    */
   permissions: { group: string; keys: readonly string[]; adminOnly?: readonly string[] };
   nav: readonly NavDef[];
+  /** Anlegen-Aktionen für das globale „Neu“-Menü (optional). Die Schnellsuche kommt von `search.ts` der Funktion (`searchProviders`, siehe `registry.ts`). */
+  quickActions?: readonly QuickActionDef[];
   /** URL-Präfixe (ohne führenden Slash), die zu dieser Funktion gehören, z. B. "appointments", "admin/users" */
   routes: readonly string[];
   /** Querschnittsfunktion Dokumentation: Bereichs-ID, unter der die Doku dieser Funktion läuft */

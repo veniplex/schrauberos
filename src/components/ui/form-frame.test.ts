@@ -94,7 +94,7 @@ describe("Form", () => {
     assert.ok(summary, "Fehlerzusammenfassung");
     assert.match(summary.textContent ?? "", /Bitte prüfe diese Angabe/);
     assert.match(summary.textContent ?? "", /E-Mail: Bitte eine gültige E-Mail-Adresse/);
-    assert.equal(document.activeElement, summary, "Fokus auf der Zusammenfassung");
+    assert.ok(document.activeElement === summary, "Fokus auf der Zusammenfassung");
     const email = f.input("email");
     assert.equal(email.getAttribute("aria-invalid"), "true");
     const describedBy = email.getAttribute("aria-describedby") ?? "";
@@ -106,7 +106,7 @@ describe("Form", () => {
     const f = await mountForm(async () => ({ fieldErrors: { lastName: "Pflichtfeld." } }));
     await f.submit();
     await act(() => (f.root.querySelector("[data-form-errors] button") as HTMLButtonElement).click());
-    assert.equal(document.activeElement, f.input("lastName"));
+    assert.ok(document.activeElement === f.input("lastName"), "Fokus im Feld");
   });
 
   it("Erfolg mit Meldung: Toast statt Inline-Text; das Formular wird wie bei React üblich zurückgesetzt", async () => {

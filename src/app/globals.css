@@ -364,3 +364,52 @@ html[data-form-actions] .toast-viewport {
   background: var(--accent);
   animation: nav-progress 1.1s var(--ease-out) infinite;
 }
+
+/* Seitenfach (components/ui/drawer.tsx): Navigation auf Handy und Tablet; dvh, Safe-Area, kein Mitscrollen der Seite dahinter (html:has(dialog[open])) */
+dialog.drawer {
+  margin: 0;
+  padding: 0 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+  inset: 0 auto 0 0;
+  width: min(18rem, 86vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  overscroll-behavior: contain;
+  box-shadow: var(--sh-pop);
+}
+dialog.drawer::backdrop {
+  background: var(--overlay);
+}
+dialog.drawer[open] {
+  animation: drawer-in var(--dur-base) var(--ease-out);
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Sprunglink „Zum Inhalt“: nur bei Tastaturfokus sichtbar */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 80;
+  transform: translateY(-200%);
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--r-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}

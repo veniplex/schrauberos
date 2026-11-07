@@ -11,5 +11,6 @@ export const invoicesFeature = defineFeature({
   nav: [
     { id: "invoices", href: "/invoices", labelKey: "nav.invoices", icon: "invoices", permission: "invoices.view", order: 30 },
   ],
+  quickActions: [{ id: "invoices.new", labelKey: "invoices.quick.new", href: "/invoices/new", icon: "invoices", permission: "invoices.edit", order: 40 }],
   routes: ["invoices"],
 });

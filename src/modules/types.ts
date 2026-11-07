@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { MessageKey } from "@/i18n/translate";
+import type { AppSession } from "@/server/auth/session";
 import type { FeatureId, Permission } from "./catalog";
 
 type ServerComponent = () => ReactNode | Promise<ReactNode>;
@@ -27,6 +28,24 @@ export type HelpTopicDef = {
   /** Wer die Funktion nutzen darf, bekommt auch ihre Hilfe (Recht muss zur Funktion gehören) */
   permission: Permission;
   doc: string;
+};
+
+/** Ein Treffer der Schnellsuche. `href` ist die Seite, auf der der Treffer geöffnet wird. */
+export type SearchHit = { id: string; title: string; subtitle?: string; href: string };
+
+/**
+ * Suchanbieter einer Funktion für die Schnellsuche (`search.ts` der Funktion, eingesammelt in `registry.ts`). Erscheint nur, wenn die Funktion aktiv ist und das Recht vorliegt –
+ * wie ein Widget. Die Plattform (Suchfeld, `/api/search`) aggregiert nur und kennt keine Funktion. Textsuche immer über `contains()` aus `src/server/search.ts`; was der Anbieter
+ * liefert, muss auch die Seite hinter dem Link zeigen dürfen (Rechte und Sichtbarkeit selbst beachten, z. B. Kapitel der Dokumentation).
+ */
+export type SearchProviderDef = {
+  id: string;
+  feature: FeatureId;
+  permission: Permission;
+  /** Überschrift der Treffergruppe */
+  groupKey: MessageKey;
+  order: number;
+  search: (query: string, context: { session: AppSession; limit: number }) => Promise<SearchHit[]>;
 };
 
 /** Reiter auf der Einstellungsseite: jede Funktion bringt ihre eigenen Einstellungen selbst mit. */

@@ -34,5 +34,8 @@ export const modulesDe = {
   confirmOffModule: "Modul „{name}“ ausschalten? Alle seine Funktionen sind danach nicht mehr erreichbar; die Daten bleiben erhalten.",
   confirmOffFeature: "Funktion „{name}“ ausschalten? Abhängige Funktionen werden dadurch ebenfalls unbenutzbar; die Daten bleiben erhalten.",
   saved: "Gespeichert.",
+  switchedOn: "Eingeschaltet.",
+  switchedOff: "Ausgeschaltet.",
+  rightsInactive: "Funktion ausgeschaltet – ihre Rechte sind wirkungslos, bis sie wieder eingeschaltet wird (die Rechte der Rollen bleiben erhalten).",
   errors: { unknown: "Unbekanntes Modul oder unbekannte Funktion.", required: "Dieses Modul bzw. diese Funktion ist ein Pflichtbestandteil." },
 };

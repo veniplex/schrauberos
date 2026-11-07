@@ -1,4 +1,7 @@
 export const vehiclesDe = {
+  /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
+  search: { group: "Fahrzeuge" },
+  quick: { new: "Neues Fahrzeug" },
   feature: {
     name: "Fahrzeuge",
     description: "Fahrzeugstamm mit Halter-Historie – auch ohne Kunde nutzbar.",

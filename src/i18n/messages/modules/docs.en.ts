@@ -1,6 +1,7 @@
 import type { docsDe } from "./docs.de";
 
 export const docsEn: typeof docsDe = {
+  quick: { handbookNew: "Handbook: new page", itNew: "IT documentation: new page" },
   new: "New page",
   edit: "Edit page",
   delete: "Delete page",

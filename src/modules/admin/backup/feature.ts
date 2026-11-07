@@ -9,7 +9,7 @@ export const backupFeature = defineFeature({
   order: 137,
   permissions: { group: "backup", keys: ["backup.manage"], adminOnly: ["backup.manage"] },
   nav: [
-    { id: "backup", href: "/admin/backup", labelKey: "nav.backup", icon: "backup", permission: "backup.manage", order: 137 },
+    { id: "backup", href: "/admin/backup", labelKey: "nav.backup", icon: "backup", permission: "backup.manage", order: 135 },
   ],
   routes: ["admin/backup", "api/backups"],
 });

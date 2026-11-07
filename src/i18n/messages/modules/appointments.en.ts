@@ -1,6 +1,8 @@
 import type { appointmentsDe } from "./appointments.de";
 
 export const appointmentsEn: typeof appointmentsDe = {
+  search: { group: "Appointments" },
+  quick: { new: "New appointment" },
   feature: {
     name: "Appointments",
     description: "Workshop calendar with day, week and list views, bays and appointment types.",

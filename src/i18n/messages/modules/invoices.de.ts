@@ -1,4 +1,7 @@
 export const invoicesDe = {
+  /** Schnellsuche und „Neu“-Menü (Navigationspaket) */
+  search: { group: "Rechnungen" },
+  quick: { new: "Rechnung erfassen" },
   feature: {
     name: "Rechnungsarchiv",
     description: "Eingangs- und Ausgangsrechnungen mit Beleg ablegen, Zahlungsstatus verfolgen.",
