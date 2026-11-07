@@ -2,7 +2,7 @@
  * Dateisystem-Hilfen für installierte Versionen unter `<DATA_DIR>/app/versions/<v>`: Haltbarkeit (fsync), Schreibschutz und Löschen schreibgeschützter Bäume.
  * Ohne Abhängigkeiten außer Node (auch vom Launcher genutzt).
  *
- * Ein geprüfter Baum wird **schreibgeschützt** (`a-w`: Ordner 0555, Dateien 0444/0555). Das ist keine Sicherheitsgrenze (der Besitzer kann `chmod`), schützt aber vor
+ * Ein geprüfter Baum wird **schreibgeschützt** (`a-w`: Ordner 0555, Dateien 0444/0555) und von Setuid/Setgid/Sticky befreit (`makeReadOnly`). Das ist keine Sicherheitsgrenze (der Besitzer kann `chmod`), schützt aber vor
  * versehentlicher Ablage: Ein Schreibversuch der laufenden App in den Paketordner scheitert dann mit EACCES wie im root-eigenen `/app`, statt still eine Datei zu erzeugen,
  * die die Prüfung beim nächsten Start scheitern ließe. Wer löschen will, braucht `removeTreeSync` (macht die Ordner erst wieder schreibbar).
  */
@@ -73,10 +73,15 @@ export async function syncTree(root: string, concurrency = 32): Promise<void> {
   for (let i = 0; i < paths.length; i += concurrency) await Promise.all(paths.slice(i, i + concurrency).map((p) => syncPath(p.full, p.directory)));
 }
 
-/** Entzieht allen Dateien und Ordnern unter `root` (einschließlich) das Schreibrecht. Symlinks bleiben unberührt. */
+/**
+ * Entzieht allen Dateien und Ordnern unter `root` (einschließlich) das Schreibrecht und setzt Setuid, Setgid und Sticky zurück (ein explizites `chmod` mit nur den Zugriffsbits).
+ * Symlinks bleiben unberührt. Das Zurücksetzen ist nötig, weil Ordner das Setgid-Bit vom Elternordner erben (NAS-Freigaben mit „Gruppe vererben“): das Entpacken ergäbe sonst
+ * Ordner, die der Starter wegen Setgid (16, `setid`) ablehnt, obwohl niemand etwas Böses getan hat. Der Prüfer des Starters bleibt streng – dieses Zurücksetzen gehört in den
+ * Installer, vor die Prüfung, und nicht in die Regel.
+ */
 export async function makeReadOnly(root: string): Promise<void> {
   await walk(root, async (full, kind, mode) => {
-    if (kind !== "link") await chmod(full, (mode & 0o7777) & ~0o222);
+    if (kind !== "link") await chmod(full, (mode & 0o777) & ~0o222);
   });
-  await chmod(root, ((await lstat(root)).mode & 0o7777) & ~0o222);
+  await chmod(root, ((await lstat(root)).mode & 0o777) & ~0o222);
 }

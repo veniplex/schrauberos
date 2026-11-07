@@ -44,6 +44,19 @@ describe("installierte Bäume: Haltbarkeit, Schreibschutz, Löschen", () => {
     assert.equal(existsSync(root), false);
   });
 
+  it("makeReadOnly setzt Setuid, Setgid und Sticky zurück (Ordner erben Setgid von einem Elternordner mit „Gruppe vererben“; der Starter lehnte sie sonst ab)", async (t) => {
+    if (process.platform === "win32") return t.skip("keine POSIX-Modi");
+    const root = sampleTree("setid");
+    chmodSync(root, 0o3775);
+    chmodSync(path.join(root, "a"), 0o2775);
+    chmodSync(path.join(root, "a", "b"), 0o1777);
+    chmodSync(path.join(root, "run.sh"), 0o6755);
+    await makeReadOnly(root);
+    for (const p of [root, path.join(root, "a"), path.join(root, "a", "b"), path.join(root, "run.sh"), path.join(root, "a", "b", "x.txt")]) assert.equal(statSync(p).mode & 0o7000, 0, p);
+    assert.equal(statSync(path.join(root, "run.sh")).mode & 0o777, 0o555, "Ausführbit bleibt");
+    removeTreeSync(root);
+  });
+
   it("removeTreeSync verträgt Nichtvorhandenes", () => {
     removeTreeSync(path.join(work, "gibt-es-nicht"));
   });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { makeReadOnly, removeTreeSync } from "@/lib/updates/fs-tree";
 import { createEndorsement } from "@/lib/updates/keychain";
 import { createSeal, sealFieldsFor } from "@/lib/updates/seal";
@@ -340,6 +340,22 @@ describe("installRelease: Siegel und Prüfung vor der Aktivierung (Starter-Vertr
       assert.equal(statSync(path.join(dir, "server.js")).mode & 0o222, 0, "Dateien schreibgeschützt");
       assert.throws(() => writeFileSync(path.join(dir, "neu.txt"), "x"), /EACCES|EPERM/);
     }
+  });
+
+  it("erbt der Ordner versions/ das Setgid-Bit („Gruppe vererben“ einer NAS-Freigabe), wird trotzdem installiert – ohne Setgid im Ergebnis (der Starter lehnte es mit 16 setid ab)", async (t) => {
+    if (process.platform === "win32") return t.skip("keine POSIX-Modi");
+    mkdirSync(store.versionsDir(), { recursive: true });
+    chmodSync(store.versionsDir(), 0o2775);
+    const probe = path.join(store.versionsDir(), ".probe");
+    mkdirSync(probe);
+    const inherits = (statSync(probe).mode & 0o2000) !== 0; // nicht jedes Dateisystem vererbt
+    rmSync(probe, { recursive: true });
+    const bytes = await bundle("1.1.0");
+    fakeDownload(bytes);
+    await install.installRelease(release("1.1.0", bytes));
+    assert.equal(store.readState().current, "1.1.0", inherits ? "trotz vererbtem Setgid installiert" : "installiert");
+    const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? [path.join(dir, e.name), ...walk(path.join(dir, e.name))] : [path.join(dir, e.name)]));
+    for (const p of [store.versionDir("1.1.0"), ...walk(store.versionDir("1.1.0"))]) assert.equal(statSync(p).mode & 0o7000, 0, p);
   });
 
   it("eine zusätzliche Datei im Paket (nicht in der Liste) wird abgelehnt: nichts wird aktiviert", async () => {

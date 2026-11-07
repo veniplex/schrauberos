@@ -100,19 +100,20 @@ export async function installRelease(release: Release): Promise<void> {
       existsSync(path.join(staging, "prisma", "migrations"));
     if (!ok || !existsSync(path.join(staging, "SOS-TREE"))) throw new UpdateError("invalidBundle");
 
-    // Siegel ablegen (es kommt als eigenes Release-Asset, nicht im Paket) und mit derselben Prüfung wie beim Start prüfen – **vor** der Aktivierung: Was installiert wird,
+    // Siegel ablegen (es kommt als eigenes Release-Asset, nicht im Paket), dann Schreibschutz setzen und Setuid/Setgid/Sticky zurücksetzen (Ordner erben Setgid von einem
+    // Elternordner mit „Gruppe vererben“ – der Starter lehnte sie sonst ab) und **erst dann** mit derselben Prüfung wie beim Start prüfen, vor der Aktivierung: Was installiert wird,
     // besteht die Prüfung des Starters. Scheitert sie, wird nichts aktiviert und der Zustand bleibt unberührt.
     writeFileSync(path.join(staging, "SOS-SEAL"), release.seal);
+    await makeReadOnly(staging);
     const verdict = await verifyInstalledTree({ dir: staging, version, now: new Date() });
     if (!verdict.ok) {
       const code = verdict.code === 11 && verdict.reason === "endorsement-expired" ? "sealExpired" : verdict.code === 19 ? (verdict.reason === "floor" ? "notNewer" : "needsImage") : "badTree";
       throw new UpdateError(code, `Prüfung ${verdict.code} ${verdict.reason}${verdict.path ? ` ${verdict.path}` : ""}`);
     }
 
-    // Haltbar machen (tar ruft kein fsync; nach einem Stromausfall dürfen Zustand und Dateien nicht auseinanderlaufen) und schreibschützen: ein Schreibversuch der
-    // laufenden App in den Paketordner scheitert dann (EACCES) statt still eine Datei zu erzeugen, die die Prüfung beim nächsten Start scheitern ließe
+    // Haltbar machen (tar ruft kein fsync; nach einem Stromausfall dürfen Zustand und Dateien nicht auseinanderlaufen). Der Schreibschutz steht schon: ein Schreibversuch der
+    // laufenden App in den Paketordner scheitert (EACCES) statt still eine Datei zu erzeugen, die die Prüfung beim nächsten Start scheitern ließe
     await syncTree(staging);
-    await makeReadOnly(staging);
 
     const target = versionDir(version);
     removeTreeSync(target); // dieselbe Version erneut installieren (Reparatur) ersetzt die vorhandene, auch wenn sie schreibgeschützt ist
