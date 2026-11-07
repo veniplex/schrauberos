@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/layout";
 import { ABSENCE_TYPES, DEPARTMENTS } from "@/modules/office/employees/domain";
 import { useI18n } from "@/i18n/client";
 import { endAfterStartChange } from "./absence-dates";
+import { AbsenceHintList } from "./absence-hints";
 import { saveAbsence, saveEmployee, saveQualification } from "./actions";
 
 export type EmployeeFormInitial = {
@@ -163,6 +164,9 @@ export function AbsenceForm({
   const { t, td } = useI18n();
   const [start, setStart] = useState(initialDate);
   const [end, setEnd] = useState(initialDate);
+  // Person und Art steuern die Überschneidungshinweise (absence-hints.tsx)
+  const [employeeId, setEmployeeId] = useState(initialEmployeeId);
+  const [type, setType] = useState("vacation");
   // „Bis“ zieht „Von“ nach (absence-dates.ts)
   const moveStart = (value: string) => {
     setEnd((current) => endAfterStartChange(current, start, value));
@@ -173,7 +177,7 @@ export function AbsenceForm({
       <input type="hidden" name="returnTo" value={returnTo} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("employees.title")} htmlFor="employeeId" name="employeeId" required>
-          <Select id="employeeId" name="employeeId" defaultValue={initialEmployeeId} required>
+          <Select id="employeeId" name="employeeId" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
             <option value="" disabled>
               {t("employees.fields.choose")}
             </option>
@@ -185,7 +189,7 @@ export function AbsenceForm({
           </Select>
         </Field>
         <Field label={t("employees.fields.absenceType")} htmlFor="type" name="type" required>
-          <Select id="type" name="type" defaultValue="vacation">
+          <Select id="type" name="type" value={type} onChange={(e) => setType(e.target.value)}>
             {ABSENCE_TYPES.filter((x) => x !== "sick" || canSensitive).map((x) => (
               <option key={x} value={x}>
                 {td(`employees.absenceTypes.${x}`, x)}
@@ -200,6 +204,7 @@ export function AbsenceForm({
           <Input id="endDate" name="endDate" type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} required />
         </Field>
       </div>
+      <AbsenceHintList employeeId={employeeId} type={type} start={start} end={end} />
       <Field label={t("common.notes")} htmlFor="note">
         <Input id="note" name="note" maxLength={200} />
       </Field>

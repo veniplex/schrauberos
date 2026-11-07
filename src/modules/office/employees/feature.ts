@@ -12,7 +12,7 @@ export const employeesFeature = defineFeature({
     { id: "absences", href: "/employees/absences", labelKey: "nav.absences", icon: "absences", permission: "employees.view", order: 41 },
   ],
   quickActions: [{ id: "employees.new", labelKey: "employees.quick.new", href: "/employees/new", icon: "employees", permission: "employees.edit", order: 50 }],
-  routes: ["employees"],
+  routes: ["employees", "api/employees"],
   auditActions: [
     "employee.create",
     "employee.update",

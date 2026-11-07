@@ -262,6 +262,12 @@ Seiten, Dashboard-Bausteine, Suche, API und Austausch lesen Daten mit sensiblen 
 * **Neue Funktion mit sensiblen Daten:** `queries.ts` anlegen (Spaltenmengen als Konstanten, Funktion mit Betrachter, sensible Spalten in eigener Abfrage oder bedingtem `select`), Seiten/Bausteine/Suche/API darauf umstellen, Test mit SQL-Protokoll nach dem Muster oben, Modell in die Liste des Architekturtests aufnehmen.
   Noch nicht umgestellt (kein sensibles Feld, nur `include`s mit Fachdaten): Listen und Details von Rechnungen, Reifen, Termin-Modal; sie bekommen ihr `queries.ts` mit dem nächsten Eingriff.
 
+### Abwesenheit: Überschneidungswarnung (P2b-2)
+
+`office/employees/absence-overlap.ts` (rein, getestet): aus dem geplanten Zeitraum und den Abwesenheiten **derselben Person** folgen `overlaps` (Hinweise) und `duplicate` (gleiche Art, gleicher Zeitraum). Nur die Dublette blockiert – die Operation `employees.saveAbsence`
+lehnt sie mit `employees.errors.absenceDuplicate` ab; Überschneidungen zeigt das Formular als ruhige Liste (`AbsenceHintList`, holt `GET /api/employees/absence-hints` mit `employees.edit`, auch beim Öffnen aus einer Rasterzelle). Die Abfrage (`absenceHintsFor` in `queries.ts`) liest Krankheit ohne
+`employees.sensitive` maskiert (Zeitraum ohne Art und Anmerkung); die Route fragt Krankheit für Personen ohne das Recht gar nicht erst ab.
+
 ### Zeitzone
 
 Die **Werkstatt-Zone** (Einstellung `Workshop.timezone`, IANA-Name) bestimmt, was „heute“, „Montag“, „Oktober“ und „10:30 Uhr“ heißen – **nicht** `process.env.TZ`. Alles läuft durch `src/lib/zone.ts` (rein, auf `Intl`):

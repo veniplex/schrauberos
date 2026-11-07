@@ -3,6 +3,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { Viewer } from "@/modules/types";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
+import { endOfDayIn, startOfDayIn } from "@/lib/dates";
+import { absenceHints, type AbsenceHints, type PlannedAbsence } from "./absence-overlap";
 import { ABSENCE_TYPES, employeeName, type AbsenceType } from "./domain";
 
 /**
@@ -183,6 +185,16 @@ export async function absencesOverlapping(viewer: Viewer, from: Date, to: Date):
 export async function absencesAround(viewer: Viewer, from: Date, to: Date): Promise<AbsenceWithEmployee[]> {
   requireView(viewer);
   return readAbsences(viewer, { startDate: { lte: to }, endDate: { gte: from } }, { order: "endAsc" });
+}
+
+/**
+ * Hinweise zu einem geplanten Zeitraum (Überschneidungen derselben Person, exakte Dublette; `absence-overlap.ts`). Verlangt `employees.edit` (Formular „Abwesenheit eintragen“);
+ * Krankheitszeilen kommen ohne Recht `employees.sensitive` nur als `masked` (ohne Art und Anmerkung) an, der Hinweis nennt dann bloß den Zeitraum.
+ */
+export async function absenceHintsFor(viewer: Viewer, planned: PlannedAbsence & { employeeId: string }): Promise<AbsenceHints> {
+  if (!viewer.can("employees.edit")) throw new Error("employees.edit fehlt");
+  const rows = await readAbsences(viewer, { employeeId: planned.employeeId, startDate: { lte: endOfDayIn(planned.end) }, endDate: { gte: startOfDayIn(planned.start) } }, { order: "startAsc", take: 50 });
+  return absenceHints(planned, rows.map((r) => ({ type: r.type, startDate: r.startDate, endDate: r.endDate })));
 }
 
 /* ───────────── Qualifikationen ───────────── */

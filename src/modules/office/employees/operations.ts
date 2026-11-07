@@ -135,6 +135,8 @@ export const saveAbsenceOperation = defineOperation({
     if (d.type === "sick" && !principal.can("employees.sensitive")) failField("type", "employees.errors.sickRestricted");
     const employee = await tx.employee.findUnique({ where: { id: d.employeeId }, select: { firstName: true, lastName: true } });
     if (!employee) failField("employeeId", "validation.invalid");
+    // Exakte Dublette (dieselbe Art, derselbe Zeitraum): die einzige Überschneidung, die blockiert – alle anderen zeigt das Formular nur als Hinweis (`absence-overlap.ts`)
+    if (await tx.absence.findFirst({ where: { employeeId: d.employeeId, type: d.type, startDate: noon(d.startDate), endDate: noon(d.endDate) }, select: { id: true } })) failField("startDate", "employees.errors.absenceDuplicate");
     const absence = await tx.absence.create({
       data: { employeeId: d.employeeId, type: d.type, startDate: noon(d.startDate), endDate: noon(d.endDate), note: d.note ?? null },
     });

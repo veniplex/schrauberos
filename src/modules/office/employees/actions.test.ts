@@ -119,11 +119,20 @@ describe("Abwesenheiten und Qualifikationen", () => {
   });
   const absence = (fields: Record<string, string> = {}) => actions.saveAbsence({}, form({ employeeId: emp.id, type: "vacation", startDate: "2030-07-01", endDate: "2030-07-05", ...fields }));
 
+  it("Exakte Dublette (gleiche Art, gleicher Zeitraum) wird abgelehnt; Überschneidung anderer Art oder Dauer nicht (nur Hinweis im Formular)", async () => {
+    await login(["employees.edit"]);
+    await redirectOf(() => absence());
+    assert.ok((await absence()).fieldErrors?.startDate, "dieselbe Art, derselbe Zeitraum");
+    await redirectOf(() => absence({ type: "training" }));
+    await redirectOf(() => absence({ endDate: "2030-07-03" }));
+    assert.equal(await env.db.absence.count(), 3);
+  });
+
   it("Urlaub eintragen: Zeitraum wird geprüft, Rücksprungziel gesichert, Audit ohne Art und Zeitraum", async () => {
     await login(["employees.edit"]);
     assert.ok((await absence({ endDate: "2030-06-30" })).fieldErrors?.endDate);
     assert.equal(await redirectOf(() => absence()), "/employees/absences?month=2030-07");
-    assert.equal(await redirectOf(() => absence({ returnTo: "https://evil.example" })), "/employees/absences?month=2030-07");
+    assert.equal(await redirectOf(() => absence({ returnTo: "https://evil.example", endDate: "2030-07-06" })), "/employees/absences?month=2030-07");
     assert.equal(await env.db.absence.count(), 2);
     const [entry] = await entries("employee.absenceCreate");
     assert.equal(entry.target, "Erika Muster");
