@@ -21,8 +21,9 @@ export class QrTooLongError extends Error {
 
 export function qrMatrix(text: string): QrMatrix {
   if (new TextEncoder().encode(text).length > QR_MAX_BYTES) throw new QrTooLongError();
-  // die Bibliothek liest die Kodierung beim Hinzufügen der Daten aus dieser Stelle
-  qrcode.stringToBytes = qrcode.stringToBytesFuncs["UTF-8"];
+  // die Bibliothek liest die Kodierung beim Hinzufügen der Daten aus dieser Stelle. Eigene UTF-8-Umwandlung statt `stringToBytesFuncs`: Das gibt es nur im CommonJS-Paket der Bibliothek, nicht in
+  // der ES-Modul-Datei, die Next.js bündelt (dort ist es `undefined` – das PDF mit Girocode lieferte 500).
+  qrcode.stringToBytes = (text: string) => Array.from(new TextEncoder().encode(text));
   const qr = qrcode(0, "M");
   qr.addData(text, "Byte");
   try {
