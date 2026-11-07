@@ -1280,8 +1280,10 @@ model Webhook {
   allowPrivate        Boolean           @default(false)
   // bis dahin signiert die Anwendung zusätzlich mit dem vorherigen Geheimnis (Rotation mit Überlappung)
   previousSecretUntil DateTime?
-  // warum die Anwendung das Ziel selbst ausgeschaltet hat: "gone" (410) | "secret" (Geheimnis unlesbar)
+  // warum die Anwendung das Ziel selbst ausgeschaltet hat: "gone" (410) | "secret" (Geheimnis unlesbar) | "restore" (nach einer Wiederherstellung: eine Kopie darf nie an Produktivempfänger senden)
   disabledReason      String?
+  // Ereignisse, die verworfen wurden, weil die Warteschlange des Ziels voll war (zurückgestellt: 500, wartend: 5000); wird beim Einschalten nach dem Nachholen im Audit genannt und zurückgesetzt
+  droppedEvents       Int               @default(0)
   createdByName       String?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
@@ -1292,13 +1294,14 @@ model Webhook {
 model WebhookDelivery {
   id             String    @id @default(cuid())
   webhookId      String
+  // Cascade mit Absicht: das Zustellprotokoll ist ein Betriebsprotokoll (30 Tage, keine Nutzlast), kein Nachweis über Fachdaten – das Audit-Log hält das Löschen des Ziels mit Host fest; die Oberfläche kündigt „entfernt auch das Protokoll“ an
   webhook        Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
   // Ereignis-ID (Outbox-Ereignis; Test: "test_…") – der Empfänger erkennt Wiederholungen daran
   eventId        String
   type           String
   entityId       String?
   eventAt        DateTime
-  // pending | held (Ziel ausgeschaltet, bis zu 14 Tage zurückgestellt) | sent | failed (aufgegeben) | gone (Empfänger meldete 410)
+  // pending | held (Ziel ausgeschaltet, bis zu 14 Tage zurückgestellt) | sent | failed (aufgegeben) | gone (Empfänger meldete 410) | suppressed (Art. 18: nicht gesendet, keine Störung)
   status         String    @default("pending")
   attempts       Int       @default(0)
   nextAttemptAt  DateTime  @default(now())

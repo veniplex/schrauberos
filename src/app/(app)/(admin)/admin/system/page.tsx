@@ -10,6 +10,7 @@ import { requirePermission } from "@/server/auth/session";
 import { isBehindProxy } from "@/server/auth/network";
 import { connectionIsSecure } from "@/server/auth/connection";
 import { systemInfo } from "@/server/system-info";
+import { webhookHealth } from "@/server/webhooks/health";
 import { db } from "@/server/db";
 import { connectionNotices, evaluateSystem, problemTone, type SystemNotice, type SystemProblem } from "@/server/jobs/health";
 import { jobRunner } from "@/server/jobs";
@@ -27,7 +28,7 @@ const toneOf = (status: string | null) => JOB_STATUS_TONE[status as JobStatus] ?
 export default async function SystemPage() {
   await requirePermission("system.view");
   const { t, tp, td, date, number } = await getI18n();
-  const [jobs, runs, active, pending, failed, lastFailed, info, secure, behindProxy] = await Promise.all([
+  const [jobs, runs, active, pending, failed, lastFailed, info, secure, behindProxy, webhooks] = await Promise.all([
     jobStatusRows(),
     recentJobRuns(30),
     activeFeatureSet(),
@@ -37,6 +38,7 @@ export default async function SystemPage() {
     systemInfo(),
     connectionIsSecure(),
     isBehindProxy(),
+    webhookHealth(),
   ]);
   const when = (d: Date | string) => date(d, { dateStyle: "short", timeStyle: "medium" });
   const nameOf = (id: string) => td(`system.names.${id}`, id);
@@ -45,6 +47,8 @@ export default async function SystemPage() {
     now: new Date(),
     jobs: jobs.map((j) => ({ id: j.id, active: !j.feature || active.has(j.feature), failures: j.failures, lastStatus: j.lastStatus, nextRunAt: j.nextRunAt, lockedUntil: j.lockedUntil })),
     outboxFailed: failed,
+    webhookDeadLetters: webhooks.deadLetters,
+    webhooksDisabled: webhooks.disabledByApp,
     runner,
     disk: info.disk,
     newestBackupAt: info.newestBackup?.createdAt ?? null,
@@ -68,6 +72,10 @@ export default async function SystemPage() {
         return t("system.problem.interrupted", { job: nameOf(p.jobId) });
       case "outboxFailed":
         return tp("system.problem.outboxFailed", p.count);
+      case "webhookDeadLetters":
+        return tp("system.problem.webhookDeadLetters", p.count);
+      case "webhooksDisabled":
+        return tp("system.problem.webhooksDisabled", p.count);
       case "runnerStale":
         return t("system.problem.runnerStale", { date: when(p.lastTickAt) });
       case "runnerDown":

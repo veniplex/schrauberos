@@ -5,6 +5,7 @@ import { Alert, Card, DangerZone } from "@/components/ui/layout";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
+import { WEBHOOK_EVENTS } from "@/modules/catalog";
 import { versionOf } from "@/lib/concurrency";
 import { deleteWebhook } from "@/modules/admin/api/actions";
 import { DeliveryTable } from "@/modules/admin/api/deliveries";
@@ -37,13 +38,14 @@ export default async function WebhookPage({ params }: { params: Promise<{ id: st
   // Abonnierte Ereignisse, die nicht (mehr) angeboten werden (Funktion aus), bleiben sichtbar – sonst gingen sie beim Speichern still verloren
   const subscribed = parseEvents(row.events);
   const known = new Set(events.map((e) => e.type));
-  const extra = subscribed.filter((type) => !known.has(type)).map((type) => ({ type, feature: "admin.api" }));
+  const extra = subscribed.filter((type) => !known.has(type)).map((type) => ({ type, feature: WEBHOOK_EVENTS.find((e) => e.type === type)?.feature ?? "admin.api", off: true }));
 
   return (
     <>
       <PageHeader back={{ href: "/admin/api/webhooks", label: t("api.webhooks.title") }} title={row.name} help="admin.api" />
       <div className="flex max-w-3xl flex-col gap-5">
         {row.disabledReason ? <Alert tone="warning">{t("api.webhooks.disabledNote", { reason: td(`api.webhooks.disabledReason.${row.disabledReason}`, row.disabledReason) })}</Alert> : null}
+        {row.droppedEvents > 0 ? <Alert tone="warning">{t("api.webhooks.droppedNote", { count: row.droppedEvents })}</Alert> : null}
         <WebhookForm
           initial={{ id: row.id, version: versionOf(row), name: row.name, url: row.url, events: subscribed, enabled: row.enabled, allowPrivate: row.allowPrivate }}
           groups={eventGroups([...events, ...extra], { t, td })}

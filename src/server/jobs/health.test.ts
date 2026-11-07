@@ -81,3 +81,16 @@ describe("Systemstatus: Plattenplatz, Backup und Verbindung", () => {
     assert.deepEqual(connectionNotices({ secure: false, behindProxy: true }), [{ code: "insecure" }, { code: "proxyMismatch" }]);
   });
 });
+
+describe("Webhooks im Systemstatus", () => {
+  const withWebhooks = (webhookDeadLetters?: number, webhooksDisabled?: number) => evaluateSystem({ now, jobs: [], outboxFailed: 0, runner: runner(), webhookDeadLetters, webhooksDisabled });
+
+  it("aufgegebene Webhook-Zustellungen sind eine Störung; von der Anwendung ausgeschaltete Ziele nur ein Hinweis; ohne Angabe wird nichts bewertet", () => {
+    assert.deepEqual(withWebhooks(), []);
+    assert.deepEqual(withWebhooks(0, 0), []);
+    assert.deepEqual(withWebhooks(3), [{ code: "webhookDeadLetters", count: 3 }]);
+    assert.deepEqual(withWebhooks(0, 2), [{ code: "webhooksDisabled", count: 2 }]);
+    assert.equal(problemTone(withWebhooks(3)), "danger");
+    assert.equal(problemTone(withWebhooks(0, 2)), "warning");
+  });
+});

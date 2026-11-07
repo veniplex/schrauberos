@@ -33,6 +33,8 @@ export const saveWebhook = defineAction(saveWebhookOperation, {
     events: fd.getAll("events").map(String),
     enabled: flag(fd, "enabled"),
     allowPrivate: flag(fd, "allowPrivate"),
+    // Passwörter nie kürzen
+    password: String(fd.get("password") ?? ""),
   }),
   revalidate: ["/admin/api/webhooks", ["/admin/api/webhooks/[id]", "page"]],
   message: "api.webhooks.saved",
@@ -49,6 +51,7 @@ export const deleteWebhook = defineAction(deleteWebhookOperation, { revalidate: 
 
 /** Neues Geheimnis: einmalig im Zustand der Antwort. */
 export const rotateWebhookSecret = defineAction(rotateWebhookSecretOperation, {
+  form: (fd) => ({ id: String(fd.get("id") ?? ""), password: String(fd.get("password") ?? "") }),
   revalidate: [["/admin/api/webhooks/[id]", "page"]],
   state: (data) => ({ secret: data.secret, overlapHours: data.overlapHours }),
 });

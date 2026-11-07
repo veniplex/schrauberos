@@ -32,6 +32,10 @@ export type SystemProblem =
   | { code: "interrupted"; jobId: string }
   /** Aufgegebene Ereignisse in der Outbox */
   | { code: "outboxFailed"; count: number }
+  /** Aufgegebene Webhook-Zustellungen (Ziel lange nicht erreichbar) */
+  | { code: "webhookDeadLetters"; count: number }
+  /** Ziele, die die Anwendung selbst ausgeschaltet hat (410, Geheimnis unlesbar, Wiederherstellung) – Hinweis */
+  | { code: "webhooksDisabled"; count: number }
   /** Zeitgeber nicht gestartet oder seit längerem ohne Takt */
   | { code: "runnerDown" }
   | { code: "runnerStale"; lastTickAt: Date }
@@ -59,6 +63,10 @@ export function evaluateSystem(input: {
   now: Date;
   jobs: readonly JobHealthInput[];
   outboxFailed: number;
+  /** Aufgegebene Webhook-Zustellungen; weglassen = nicht bewerten */
+  webhookDeadLetters?: number;
+  /** Von der Anwendung selbst ausgeschaltete Webhook-Ziele; weglassen = nicht bewerten */
+  webhooksDisabled?: number;
   runner: RunnerHealthInput;
   /** Platz des Datenverzeichnisses; weglassen/`null` = nicht bewerten */
   disk?: DiskHealthInput | null;
@@ -78,6 +86,8 @@ export function evaluateSystem(input: {
     if (job.lastStatus === "interrupted" && job.failures === 0 && !lockExpired) problems.push({ code: "interrupted", jobId: job.id });
   }
   if (input.outboxFailed > 0) problems.push({ code: "outboxFailed", count: input.outboxFailed });
+  if ((input.webhookDeadLetters ?? 0) > 0) problems.push({ code: "webhookDeadLetters", count: input.webhookDeadLetters! });
+  if ((input.webhooksDisabled ?? 0) > 0) problems.push({ code: "webhooksDisabled", count: input.webhooksDisabled! });
   const { runner } = input;
   if (!runner.started) problems.push({ code: "runnerDown" });
   else if (runner.lastTickAt && now - runner.lastTickAt.getTime() > RUNNER_STALE_MS) problems.push({ code: "runnerStale", lastTickAt: runner.lastTickAt });
@@ -99,7 +109,7 @@ export function evaluateSystem(input: {
 }
 
 /** Hinweise, die den Betrieb noch nicht stören: ein Übergangszustand (Neustart) oder wenig Platz. Alles andere ist ein Fehler. */
-const WARNING_ONLY = new Set<SystemProblem["code"]>(["interrupted", "diskLow", "backupOld"]);
+const WARNING_ONLY = new Set<SystemProblem["code"]>(["interrupted", "diskLow", "backupOld", "webhooksDisabled"]);
 
 /** Schwere: `danger`, sobald etwas wirklich nicht läuft; `warning`, wenn es nur Hinweise sind (`WARNING_ONLY`). */
 export const problemTone = (problems: readonly SystemProblem[]): "success" | "warning" | "danger" =>

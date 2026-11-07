@@ -96,19 +96,19 @@ describe("Aktionen", () => {
 
   it("saveWebhook: Anlegen liefert das Geheimnis einmal im Zustand (ausgeschaltet); Ändern mit Version; Fehler als Feldfehler; löschen leitet zur Liste", async () => {
     await admin();
-    const bad = await actions.saveWebhook({}, form({ name: "Ziel", url: "http://127.0.0.1/x", events: ["order.closed"] }));
+    const bad = await actions.saveWebhook({}, form({ name: "Ziel", url: "http://127.0.0.1/x", events: ["order.closed"], password: PASSWORD }));
     assert.ok(bad && "fieldErrors" in bad && bad.fieldErrors?.url);
-    const noEvents = await actions.saveWebhook({}, form({ name: "Ziel", url: "https://hook.example.org/x" }));
+    const noEvents = await actions.saveWebhook({}, form({ name: "Ziel", url: "https://hook.example.org/x", password: PASSWORD }));
     assert.ok(noEvents && "fieldErrors" in noEvents);
     assert.equal(await env.db.webhook.count(), 0);
 
-    const created = (await actions.saveWebhook({}, form({ name: "Ziel", url: "https://hook.example.org/x", events: ["order.closed", "billing.paid"] }))) as { ok?: boolean; created?: { id: string; secret: string } };
+    const created = (await actions.saveWebhook({}, form({ name: "Ziel", url: "https://hook.example.org/x", events: ["order.closed", "billing.paid"], password: PASSWORD }))) as { ok?: boolean; created?: { id: string; secret: string } };
     assert.equal(created.ok, true);
     assert.match(created.created?.secret ?? "", /^whsec_/);
     const row = await env.db.webhook.findUniqueOrThrow({ where: { id: created.created?.id ?? "" } });
     assert.deepEqual([row.enabled, row.events], [false, "order.closed,billing.paid"]);
 
-    const changed = (await actions.saveWebhook({}, form({ id: row.id, version: String(row.updatedAt.getTime()), name: "Neu", url: "https://hook.example.org/y", events: ["order.closed"], enabled: "on", allowPrivate: "" }))) as { ok?: boolean; created?: unknown };
+    const changed = (await actions.saveWebhook({}, form({ id: row.id, version: String(row.updatedAt.getTime()), name: "Neu", url: "https://hook.example.org/y", events: ["order.closed"], enabled: "on", allowPrivate: "", password: PASSWORD }))) as { ok?: boolean; created?: unknown };
     assert.equal(changed.ok, true);
     assert.equal(changed.created, undefined, "beim Ändern kein Geheimnis in der Antwort");
     assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: row.id } })).enabled, true);
@@ -157,7 +157,7 @@ describe("Seiten", () => {
 
   it("Webhooks: Liste mit Zustand und Zustellprotokoll; Detailseite mit Geheimnis-Bereich, Test, Löschen; nie das Geheimnis; Rechte", async () => {
     await admin();
-    const created = (await actions.saveWebhook({}, form({ name: "Buchhaltung", url: "https://hook.example.org/x?token=GEHEIM", events: ["order.closed"] }))) as { created?: { id: string; secret: string } };
+    const created = (await actions.saveWebhook({}, form({ name: "Buchhaltung", url: "https://hook.example.org/x?token=GEHEIM", events: ["order.closed"], password: PASSWORD }))) as { created?: { id: string; secret: string } };
     const id = created.created?.id ?? "";
     await env.db.webhookDelivery.create({ data: { webhookId: id, eventId: "evt_page", type: "order.closed", eventAt: new Date(), status: "failed", attempts: 12, lastStatus: 503, lastDurationMs: 40, completedAt: new Date() } });
     const { default: List } = await import("@/app/(app)/(admin)/admin/api/webhooks/page");
@@ -207,7 +207,7 @@ describe("Seiten", () => {
     const { default: Page } = await import("@/app/(app)/(admin)/admin/api/docs/page");
     const overview = await render(await Page({ searchParams: Promise.resolve({}) }));
     const text = plain(overview.textContent);
-    for (const part of [/Versionierung/, /Kompatibel und ohne Ankündigung/, /\/v2/, /Idempotency-Key/, /If-Match/, /RateLimit-Remaining/, /X-Webhook-Signature/, /HMAC-SHA256/, /export function verifyWebhook/, /def verify_webhook/, /function verify_webhook/, /Upload \(multipart\/form-data\)/, /Download: die Antwort ist die Datei selbst/, /Endpunkte der aktiven Funktionen \(\d+\)/]) assert.match(text, part);
+    for (const part of [/Versionierung/, /Kompatibel und ohne Ankündigung/, /\/v2/, /Idempotency-Key/, /If-Match/, /RateLimit-Remaining/, /X-Webhook-Signature/, /HMAC-SHA256/, /export function verifyWebhook/, /def verify_webhook/, /function verify_webhook/, /Upload \(multipart\/form-data\)/, /Download: the response is the file itself/, /Endpunkte der aktiven Funktionen \(\d+\)/]) assert.match(text, part);
     assert.ok(overview.querySelector('a[href="/admin/api/docs?tag=Customers"]'), "Karte je Ressource");
     assert.ok(!overview.innerHTML.includes(token), "kein echtes Token");
     await view?.unmount();

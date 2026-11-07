@@ -5,8 +5,11 @@
  *    **aufgegeben** (Zustand `failed`, im Zustellprotokoll sichtbar, mit „Erneut zustellen“ wieder aufnehmbar) – insgesamt rund 29 Stunden.
  *  - **410 Gone** beendet die Zustellung sofort (`gone`) und schaltet das Ziel aus: Der Empfänger hat gesagt, dass es die Adresse nicht mehr gibt.
  *  - **Aufbewahrung:** Zustellprotokoll 30 Tage; Zustellungen an ein ausgeschaltetes Ziel werden bis zu 14 Tage zurückgestellt (`held`), danach verworfen.
+ *  - **Unterdrückt** (`suppressed`): Die Sache gehört zu einem Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) – es wurde nichts gesendet. Das ist **keine Störung** und zählt nicht als „aufgegeben“.
+ *  - **Fairness:** Ein Lauf bedient jedes Ziel mit höchstens `PER_TARGET_PER_RUN` Zustellungen, nach dem ersten Fehlversuch eines Ziels ruht es bis zum nächsten Lauf, und der Lauf hat ein Zeitbudget (`RUN_BUDGET_MS`) –
+ *    ein langsames oder totes Ziel hält die anderen nicht auf.
  */
-export const DELIVERY_STATUSES = ["pending", "held", "sent", "failed", "gone"] as const;
+export const DELIVERY_STATUSES = ["pending", "held", "sent", "failed", "gone", "suppressed"] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 export const MAX_ATTEMPTS = 12;
@@ -19,6 +22,12 @@ export const KEEP_LOG_DAYS = 30;
 export const HOLD_DAYS = 14;
 /** Mehr zurückgestellte Zustellungen je Ziel gibt es nicht (Ziel lange ausgeschaltet, viele Ereignisse). */
 export const MAX_HELD_PER_WEBHOOK = 500;
+/** Mehr wartende Zustellungen je Ziel nimmt die Warteschlange nicht an (Massenimport, totes Ziel); überzählige Ereignisse werden verworfen und im Zähler des Ziels (`droppedEvents`) gezählt. */
+export const MAX_PENDING_PER_WEBHOOK = 5000;
+/** Zustellungen je Ziel und Lauf (der Job läuft alle 15 s). */
+export const PER_TARGET_PER_RUN = 5;
+/** Nach dieser Zeit beginnt ein Lauf keine weitere Zustellung mehr (die laufenden Versuche enden mit ihrem eigenen Zeitlimit). */
+export const RUN_BUDGET_MS = 45_000;
 export const MAX_WEBHOOKS = 20;
 /** Zeitlimit eines Versuchs und Obergrenzen der Verbindung. */
 export const ATTEMPT_TIMEOUT_MS = 10_000;

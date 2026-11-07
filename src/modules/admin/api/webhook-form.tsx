@@ -86,6 +86,12 @@ export function WebhookForm({ initial, groups, hasSecret }: { initial: WebhookVa
         </div>
       </Card>
 
+      <Card title={t("api.webhooks.form.confirm")}>
+        <Field label={t("api.webhooks.form.password")} htmlFor="webhook-password" name="password" required={!editing} hint={t("api.webhooks.form.passwordHint")}>
+          <Input id="webhook-password" name="password" type="password" maxLength={128} autoComplete="current-password" required={!editing} />
+        </Field>
+      </Card>
+
       {editing ? (
         <Card title={t("api.webhooks.form.state")}>
           <Checkbox name="enabled" defaultChecked={initial.enabled} disabled={!hasSecret && !initial.enabled} label={t("api.webhooks.form.enabled")} hint={hasSecret ? t("api.webhooks.form.enabledHint") : t("api.webhooks.form.enabledNoSecret")} />
@@ -124,6 +130,9 @@ export function RotateSecret({ id, hasSecret }: { id: string; hasSecret: boolean
       <Form<SecretState> action={rotate} className="flex flex-col gap-2">
         <input type="hidden" name="id" value={id} />
         <p className="text-xs text-ink-muted">{hasSecret ? t("api.webhooks.secret.rotateHint", { hours: 24 }) : t("api.webhooks.secret.issueHint")}</p>
+        <Field label={t("api.webhooks.secret.password")} htmlFor="webhook-secret-password" name="password" required>
+          <Input id="webhook-secret-password" name="password" type="password" maxLength={128} autoComplete="current-password" required />
+        </Field>
         <FormMessage />
         <div>
           {hasSecret ? (

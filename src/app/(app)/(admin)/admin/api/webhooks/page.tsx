@@ -78,6 +78,7 @@ export default async function WebhooksPage() {
                       {w.failed > 0 ? <span className="text-danger-ink"> {t("api.webhooks.list.failed", { count: w.failed })}</span> : null}
                     </span>
                   ) : null}
+                  {w.dropped > 0 ? <span className="text-warning-ink">{t("api.webhooks.list.dropped", { count: w.dropped })}</span> : null}
                 </span>
               ),
             },

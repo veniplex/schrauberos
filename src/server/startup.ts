@@ -38,6 +38,10 @@ export function applyTimezone(timezone: string): boolean {
  * Nach einer Wiederherstellung (der Launcher hat die Datenbank getauscht und noch nicht bestätigt: `restore/applied.json`) gelten **keine API-Tokens** mehr: Die
  * Sicherung kennt keine Widerrufe, die seitdem geschehen sind – ein inzwischen widerrufenes (etwa gestohlenes) Token wäre sonst wieder gültig. Alle Tokens werden beim ersten
  * Start widerrufen (und im Audit-Log festgehalten); neue Tokens sind schnell erzeugt. Ebenso entfallen die Abo-Adressen des Kalenders (`CalendarFeedToken`). Läuft bei jedem Start bis zur Bestätigung (idempotent). Liefert die Anzahl.
+ *
+ * **Webhooks werden nach jeder Wiederherstellung ausgeschaltet** (Grund `restore`, mit oder ohne Wiederherstellungsschlüssel): Eine Kopie – etwa eine Testinstanz, die mit einer Sicherung der Produktivinstanz aufgesetzt wird –
+ * darf nie an die Empfänger der Produktivinstanz senden, und gesicherte wartende Zustellungen sollen nicht ungeprüft nachgeholt werden (sie werden zurückgestellt, `held`). Die Verwaltung zeigt den Hinweis im
+ * Systemstatus, Audit `webhook.disabled`; wer geprüft hat, schaltet die Ziele wieder ein.
  */
 export async function revokeApiTokensAfterRestore(dataRoot?: string): Promise<number> {
   const applied = readApplied(dataRoot);
@@ -48,6 +52,13 @@ export async function revokeApiTokensAfterRestore(dataRoot?: string): Promise<nu
     // Dasselbe gilt für die Abo-Adressen des Kalenders (F10): Ein inzwischen widerrufenes oder ersetztes Token (etwa nach einem Diebstahl) wäre mit der Sicherung wieder gültig
     const feeds = await tx.calendarFeedToken.deleteMany({});
     if (feeds.count > 0) await writeAudit(tx, "calendarFeed.restoreRevoked", { target: `${feeds.count} (Sicherung ${applied.from})`, actor: { id: null, name: "System" } });
+    // Webhooks: ausschalten (nur die eingeschalteten – ein bewusst ausgeschaltetes Ziel behält seinen Grund) und wartende Zustellungen zurückstellen
+    const hooks = await tx.webhook.findMany({ where: { enabled: true }, select: { id: true, name: true } });
+    for (const hook of hooks) {
+      await tx.webhook.update({ where: { id: hook.id }, data: { enabled: false, disabledReason: "restore" } });
+      await writeAudit(tx, "webhook.disabled", { target: `${hook.name}: restore (Sicherung ${applied.from})`, entityId: hook.id, actor: { id: null, name: "System" } });
+    }
+    await tx.webhookDelivery.updateMany({ where: { status: "pending" }, data: { status: "held" } });
     return count;
   });
 }

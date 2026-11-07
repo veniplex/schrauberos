@@ -29,9 +29,12 @@ export const jobs: JobDef[] = [
     retry: { baseDelayMs: 15_000, maxDelayMs: 5 * 60_000 },
     timeoutMs: 5 * 60_000,
     shouldRun: ({ now }) => hasDueDeliveries(now),
-    run: async ({ now, signal }) => {
-      const s = await deliverDue({ now, signal, isRestricted: isRestrictedEntity });
-      const parts = [s.sent && `${s.sent} zugestellt`, s.retried && `${s.retried} wiederholt`, s.failed && `${s.failed} aufgegeben`, s.gone && `${s.gone} Ziel meldet 410`].filter(Boolean);
+    run: async ({ signal }) => {
+      // Ohne `now` des Läufers: jeder Versuch nimmt die aktuelle Zeit (Zeitstempel der Signatur, Lease, Wiederholung)
+      const s = await deliverDue({ signal, isRestricted: isRestrictedEntity });
+      // Ein Fehler außerhalb des Empfängers (Datenbank …) wird nicht verschluckt: Der Lauf endet als Fehler (Runner wiederholt, Systemstatus zeigt es)
+      if (s.errors > 0) throw new Error("webhooks_deliver_failed");
+      const parts = [s.sent && `${s.sent} zugestellt`, s.retried && `${s.retried} wiederholt`, s.failed && `${s.failed} aufgegeben`, s.gone && `${s.gone} Ziel meldet 410`, s.suppressed && `${s.suppressed} unterdrückt`].filter(Boolean);
       return parts.length ? parts.join(", ") : undefined;
     },
   },

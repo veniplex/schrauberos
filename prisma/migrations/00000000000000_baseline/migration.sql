@@ -897,6 +897,7 @@ CREATE TABLE "Webhook" (
     "allowPrivate" BOOLEAN NOT NULL DEFAULT false,
     "previousSecretUntil" DATETIME,
     "disabledReason" TEXT,
+    "droppedEvents" INTEGER NOT NULL DEFAULT 0,
     "createdByName" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL

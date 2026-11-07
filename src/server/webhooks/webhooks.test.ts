@@ -480,7 +480,7 @@ return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h:
   });
 
   describe("Operationen der Verwaltung", () => {
-    const save = (input: Record<string, unknown>, who = admin) => ops.saveWebhookOperation.execute(who, { name: "Buchhaltung", url: "https://hook.example.org/x?token=GEHEIM", events: ["billing.paid"], ...input });
+    const save = (input: Record<string, unknown>, who = admin) => ops.saveWebhookOperation.execute(who, { name: "Buchhaltung", url: "https://hook.example.org/x?token=GEHEIM", events: ["billing.paid"], password: PASSWORD, ...input });
 
     it("Anlegen: ausgeschaltet, Geheimnis einmalig im Ergebnis (verschlüsselt gespeichert), Audit mit Name und Host – nie Geheimnis oder Parameter der Adresse", async () => {
       const created = await save({});
@@ -550,7 +550,7 @@ return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h:
       assert.ok(!noSecret.ok && noSecret.failure.code === "conflict");
 
       const plain = await sessionOfUser(["customers.view"]);
-      for (const outcome of [await save({}, plain), await ops.setWebhookEnabledOperation.execute(plain, { id, enabled: false }), await ops.deleteWebhookOperation.execute(plain, { id }), await ops.rotateWebhookSecretOperation.execute(plain, { id }), await ops.testWebhookOperation.execute(plain, { id }), await ops.redeliverOperation.execute(plain, { id: "x" })]) {
+      for (const outcome of [await save({}, plain), await ops.setWebhookEnabledOperation.execute(plain, { id, enabled: false }), await ops.deleteWebhookOperation.execute(plain, { id }), await ops.rotateWebhookSecretOperation.execute(plain, { id, password: PASSWORD }), await ops.testWebhookOperation.execute(plain, { id }), await ops.redeliverOperation.execute(plain, { id: "x" })]) {
         assert.ok(!outcome.ok && outcome.failure.code === "forbidden");
       }
       // Token als Principal: nie (ein API-Principal trägt kein adminOnly-Recht)
@@ -580,7 +580,7 @@ return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h:
       assert.ok(created.ok);
       const id = created.ok ? created.data.id : "";
       const first = created.ok ? created.data.secret! : "";
-      const rotated = await ops.rotateWebhookSecretOperation.execute(admin, { id });
+      const rotated = await ops.rotateWebhookSecretOperation.execute(admin, { id, password: PASSWORD });
       assert.ok(rotated.ok);
       const second = rotated.ok ? rotated.data.secret : "";
       assert.notEqual(second, first);
@@ -627,6 +627,158 @@ return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h:
     });
   });
 
+  describe("Fairness, Zeit je Versuch und Warteschlange (A-04, A-06, A-11, A-12, A-17)", () => {
+    /** Ein Ziel (eigener Pfad auf dem Test-Empfänger): Webhook samt Geheimnis, `n` fällige Zustellungen (älteste zuerst). */
+    async function target(name: string, path: string, deliveries: number, firstEventAt: number) {
+      const row = await env.db.webhook.create({ data: { name, url: server.url.replace("/hook", path), events: "order.closed", enabled: true, allowPrivate: true } });
+      await secrets.issueWebhookSecret(row.id);
+      for (let i = 0; i < deliveries; i++) await env.db.webhookDelivery.create({ data: { webhookId: row.id, eventId: `${name}_${i}`, type: "order.closed", entityId: "o", eventAt: new Date(), nextAttemptAt: new Date(firstEventAt + i) } });
+      return row;
+    }
+    const hits = (path: string) => server.requests.filter((r) => r.path === path);
+    const byPath: Parameters<typeof startFakeWebhook>[0] = { respond: (request) => (request.path === "/slow" ? { status: 204, delayMs: 600 } : request.path === "/dead" ? { status: 503 } : { status: 204 }) };
+
+    it("langsames Ziel A (viele fällige Zustellungen) hält das gesunde Ziel B nicht auf: je Ziel höchstens 5 je Lauf, B kommt im selben Lauf dran; der Zeitstempel jedes Versuchs ist frisch", async () => {
+      await setup(byPath);
+      await env.db.webhook.deleteMany();
+      const t0 = Date.now() - 60_000;
+      const a = await target("A", "/slow", 8, t0);
+      await target("B", "/fast", 1, t0 + 10_000);
+      const started = Date.now();
+      const summary = await deliver.deliverDue({ perTarget: 3 });
+      assert.equal(summary.sent, 4, "A: höchstens 3 je Lauf, B: 1");
+      assert.equal(hits("/fast").length, 1, "B wurde im selben Lauf bedient");
+      assert.equal(hits("/slow").length, 3);
+      assert.ok(Date.now() - started < 5_000);
+      const stamps = hits("/slow").map((r) => Number(r.headers["x-webhook-timestamp"]));
+      assert.ok(stamps[2] - stamps[0] >= 1, `Zeitstempel je Versuch neu (nicht der des Laufbeginns): ${stamps.join(",")}`);
+      assert.equal(await env.db.webhookDelivery.count({ where: { webhookId: a.id, status: "pending" } }), 5, "der Rest bleibt fällig für den nächsten Lauf");
+      assert.equal((await deliver.deliverDue({ perTarget: 3 })).sent, 3);
+    });
+
+    it("ein totes Ziel wird nach dem ersten Fehlversuch im Lauf in Ruhe gelassen (der Rest bleibt fällig), die Wiederholung beginnt mit der aktuellen Zeit; ein Zeitbudget beendet den Lauf", async () => {
+      await setup(byPath);
+      await env.db.webhook.deleteMany();
+      const t0 = Date.now() - 60_000;
+      const dead = await target("Tot", "/dead", 4, t0);
+      await target("Gut", "/good", 1, t0 + 5);
+      const before = Date.now();
+      const summary = await deliver.deliverDue({});
+      assert.equal(hits("/dead").length, 1, "nur ein Versuch beim toten Ziel");
+      assert.deepEqual([summary.retried, summary.sent], [1, 1]);
+      const row = await env.db.webhookDelivery.findFirstOrThrow({ where: { webhookId: dead.id, attempts: 1 } });
+      assert.ok(row.nextAttemptAt.getTime() >= before + 59_000, "Backoff von jetzt an, nicht vom Beginn des Laufs");
+      // Zeitbudget abgelaufen: nichts wird mehr begonnen
+      const none = await deliver.deliverDue({ budgetMs: -1 });
+      assert.equal(none.sent + none.retried, 0);
+    });
+
+    it("Test-Ereignis: höchstens 5 je Minute auch bei 25 parallelen Aufrufen; der Läufer fasst Test-Zeilen nie an", async () => {
+      const { row } = await setup();
+      const results = await Promise.all(Array.from({ length: 25 }, () => ops.testWebhookOperation.execute(admin, { id: row.id })));
+      assert.equal(results.filter((r) => r.ok).length, 5);
+      assert.equal(server.requests.length, 5);
+      // ein liegengebliebenes Test-Ereignis (Absturz zwischen Anlegen und Versuch) wird vom Läufer nie gesendet
+      await env.db.webhookDelivery.deleteMany();
+      await env.db.webhookDelivery.create({ data: { webhookId: row.id, eventId: "test_orphan", type: "webhook.test", eventAt: new Date(), nextAttemptAt: new Date(Date.now() - 1000) } });
+      assert.equal(await deliver.hasDueDeliveries(), false);
+      assert.equal((await deliver.deliverDue({})).sent, 0);
+      assert.equal(server.requests.length, 5);
+    });
+
+    it("Aufräumen: eine erneut zugestellte alte Zustellung (Anlage > 14 Tage, aber in Bewegung) bleibt, Liegengebliebenes und altes Zurückgestelltes geht, ein abgelaufenes vorheriges Geheimnis wird gelöscht", async () => {
+      const { row } = await setup({}, { enabled: true });
+      const day = 86_400_000;
+      const now = new Date();
+      const make = (eventId: string, data: Record<string, unknown>) => env.db.webhookDelivery.create({ data: { webhookId: row.id, eventId, type: "order.closed", eventAt: new Date(), ...data } as never });
+      await make("moving", { status: "pending", createdAt: new Date(now.getTime() - 20 * day), nextAttemptAt: new Date(now.getTime() + 60_000) });
+      await make("stuck", { status: "pending", createdAt: new Date(now.getTime() - 20 * day), nextAttemptAt: new Date(now.getTime() - 15 * day) });
+      await make("held-old", { status: "held", createdAt: new Date(now.getTime() - 15 * day) });
+      await make("held-new", { status: "held", createdAt: new Date(now.getTime() - 2 * day) });
+      await make("log-suppressed", { status: "suppressed", completedAt: new Date(now.getTime() - 31 * day) });
+      await secrets.rotateWebhookSecret(row.id);
+      await env.db.webhook.update({ where: { id: row.id }, data: { previousSecretUntil: new Date(now.getTime() - 1000) } });
+      assert.equal(await env.db.appSetting.count({ where: { key: `webhook.secretPrevious.${row.id}` } }), 1);
+      assert.equal(await deliver.pruneWebhookDeliveries(now), 3);
+      const left = (await env.db.webhookDelivery.findMany({ select: { eventId: true } })).map((d) => d.eventId).sort();
+      assert.deepEqual(left, ["held-new", "moving"]);
+      assert.equal(await env.db.appSetting.count({ where: { key: `webhook.secretPrevious.${row.id}` } }), 0, "das abgelaufene vorherige Geheimnis ist gelöscht");
+      assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: row.id } })).previousSecretUntil, null);
+      assert.equal(await secrets.hasWebhookSecret(row.id), true, "das aktuelle bleibt");
+    });
+
+    it("Warteschlange voll: zurückgestellte (500) und wartende (5000) Ereignisse darüber werden gezählt (droppedEvents), nicht still verschluckt; Einschalten nennt die Zahl im Audit und setzt den Zähler zurück", async () => {
+      const { MAX_HELD_PER_WEBHOOK, MAX_PENDING_PER_WEBHOOK } = await import("@/lib/webhooks/schedule");
+      const { row } = await setup({}, { enabled: false });
+      const rows = (status: string, n: number) => Array.from({ length: n }, (_, i) => ({ webhookId: row.id, eventId: `${status}-${i}`, type: "order.closed", eventAt: new Date(), status }));
+      await env.db.webhookDelivery.createMany({ data: rows("held", MAX_HELD_PER_WEBHOOK) });
+      assert.equal(await deliver.fanOutEvent(event("evt_over1")), 0);
+      assert.equal(await deliver.fanOutEvent(event("evt_over2")), 0);
+      assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: row.id } })).droppedEvents, 2);
+      const on = await ops.setWebhookEnabledOperation.execute(admin, { id: row.id, enabled: true });
+      assert.ok(on.ok);
+      const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "webhook.update" }, orderBy: { createdAt: "desc" } });
+      assert.match(entry.target ?? "", /2 Ereignisse verworfen/);
+      assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: row.id } })).droppedEvents, 0);
+      // wartende: 500 jetzt wartend; mit Deckel 5000 wird weiter verworfen
+      await env.db.webhookDelivery.createMany({ data: rows("pending", MAX_PENDING_PER_WEBHOOK - MAX_HELD_PER_WEBHOOK) });
+      assert.equal(await env.db.webhookDelivery.count({ where: { webhookId: row.id, status: "pending" } }), MAX_PENDING_PER_WEBHOOK);
+      assert.equal(await deliver.fanOutEvent(event("evt_over3")), 0);
+      assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: row.id } })).droppedEvents, 1);
+    });
+
+    it("Art. 18: eine unterdrückte Zustellung ist „unterdrückt“ (nicht „aufgegeben“), zählt nicht als Ausfall und lässt sich nicht erneut zustellen", async () => {
+      const { row } = await setup();
+      const { webhookHealth } = await import("./health");
+      await env.db.webhookDelivery.create({ data: { webhookId: row.id, eventId: "evt_sup", type: "order.closed", entityId: "order_1", eventAt: new Date() } });
+      await env.db.webhookDelivery.create({ data: { webhookId: row.id, eventId: "evt_dead2", type: "order.closed", entityId: "order_2", eventAt: new Date(), status: "failed", attempts: 12, completedAt: new Date() } });
+      const summary = await deliver.deliverDue({ isRestricted: async (_r, id) => id === "order_1" });
+      assert.deepEqual([summary.suppressed, summary.failed, server.requests.length], [1, 0, 0]);
+      const sup = await env.db.webhookDelivery.findFirstOrThrow({ where: { eventId: "evt_sup" } });
+      assert.deepEqual([sup.status, sup.lastError, sup.attempts], ["suppressed", "restricted", 1]);
+      assert.deepEqual(await webhookHealth(), { deadLetters: 1, disabledByApp: 0 }, "nur die echte aufgegebene Zustellung zählt");
+      const again = await ops.redeliverOperation.execute(admin, { id: sup.id });
+      assert.ok(!again.ok && again.failure.key === "api.webhooks.errors.redeliverSuppressed");
+      await env.db.webhook.update({ where: { id: row.id }, data: { enabled: false, disabledReason: "restore" } });
+      assert.equal((await webhookHealth()).disabledByApp, 1, "von der Anwendung ausgeschaltete Ziele werden gemeldet");
+    });
+
+    it("Ziel gelöscht, während ein Versuch läuft: der Lauf endet sauber (kein Fehler, kein Eintrag im Fehlerprotokoll)", async () => {
+      const { row } = await setup({ respond: () => ({ status: 410, delayMs: 400 }) });
+      await deliver.fanOutEvent(event("evt_del"));
+      const run = deliver.deliverDue({});
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await env.db.webhook.delete({ where: { id: row.id } });
+      const summary = await run;
+      assert.equal(summary.errors, 0);
+      assert.equal(await env.db.webhookDelivery.count(), 0, "das Protokoll geht mit dem Ziel");
+    });
+
+    it("Passwortabfrage der Verwaltung: Anlegen, neue Adresse, neue Freigabe fürs eigene Netz und neues Geheimnis verlangen das Passwort; Namen, Ereignisse und Ein-/Ausschalten nicht", async () => {
+      const wrong = await ops.saveWebhookOperation.execute(admin, { name: "X", url: "https://hook.example.org/x", events: ["billing.paid"], password: "falsch" });
+      assert.ok(!wrong.ok && wrong.failure.fields?.password, "falsches Passwort wird als Feld bemängelt");
+      const none = await ops.saveWebhookOperation.execute(admin, { name: "X", url: "https://hook.example.org/x", events: ["billing.paid"] });
+      assert.ok(!none.ok && none.failure.fields?.password);
+      assert.equal(await env.db.webhook.count(), 0);
+      const created = await ops.saveWebhookOperation.execute(admin, { name: "X", url: "https://hook.example.org/x", events: ["billing.paid"], password: PASSWORD });
+      assert.ok(created.ok);
+      const id = created.ok ? created.data.id : "";
+      const version = () => env.db.webhook.findUniqueOrThrow({ where: { id } }).then((w) => String(w.updatedAt.getTime()));
+      const edit = async (changes: Record<string, unknown>) => ops.saveWebhookOperation.execute(admin, { id, version: await version(), name: "X", url: "https://hook.example.org/x", events: ["billing.paid"], ...changes });
+      assert.ok((await edit({ name: "Neuer Name", events: ["billing.paid", "order.closed"] })).ok, "Name und Ereignisse ohne Passwort");
+      const newUrl = await edit({ url: "https://hook.example.org/y" });
+      assert.ok(!newUrl.ok && newUrl.failure.fields?.password, "neue Adresse braucht das Passwort");
+      assert.ok((await edit({ url: "https://hook.example.org/y", password: PASSWORD })).ok);
+      const allow = await edit({ url: "https://hook.example.org/y", allowPrivate: true });
+      assert.ok(!allow.ok && allow.failure.fields?.password, "Freigabe fürs eigene Netz braucht das Passwort");
+      assert.ok((await ops.setWebhookEnabledOperation.execute(admin, { id, enabled: true })).ok, "Einschalten ohne Passwort");
+      assert.ok((await ops.setWebhookEnabledOperation.execute(admin, { id, enabled: false })).ok);
+      const rotate = await ops.rotateWebhookSecretOperation.execute(admin, { id, password: "falsch" });
+      assert.ok(!rotate.ok && rotate.failure.fields?.password);
+      assert.ok((await ops.rotateWebhookSecretOperation.execute(admin, { id, password: PASSWORD })).ok);
+    });
+  });
+
   it("Geheimnis-Verbraucher: nach einem Restore ohne Schlüssel sind die Geheimnisse unlesbar – sie werden entfernt, das Ziel wird ausgeschaltet (Audit)", async () => {
     const { resetUnreadableSecrets, allSecretConsumers } = await import("@/server/secret-reset");
     const { row } = await setup();
@@ -656,6 +808,8 @@ return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h:
     await deliver.deliverDue({});
     assert.equal(server.requests.length, 0);
     const delivery = await env.db.webhookDelivery.findFirstOrThrow();
-    assert.deepEqual([delivery.status, delivery.lastError], ["pending", "secret"]);
+    assert.deepEqual([delivery.status, delivery.lastError], ["held", "secret"], "zurückgestellt statt zwölfmal versucht");
+    const hook = await env.db.webhook.findUniqueOrThrow({ where: { id: row.id } });
+    assert.deepEqual([hook.enabled, hook.disabledReason], [false, "secret"], "das Ziel wird ausgeschaltet (Verwaltung sieht den Grund)");
   });
 });

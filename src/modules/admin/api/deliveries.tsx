@@ -46,7 +46,7 @@ export async function DeliveryTable({ rows, showWebhook }: { rows: DeliveryRow[]
           hideHeader: true,
           align: "end",
           cell: (r) =>
-            r.type !== "webhook.test" && r.status !== "pending" && r.status !== "held" ? (
+            r.type !== "webhook.test" && r.status !== "pending" && r.status !== "held" && r.status !== "suppressed" ? (
               <form action={redeliver}>
                 <input type="hidden" name="id" value={r.id} />
                 <ConfirmSubmitButton variant="secondary" message={t("api.webhooks.log.redeliverConfirm")} label={t("api.webhooks.log.redeliver")} target={r.type}>

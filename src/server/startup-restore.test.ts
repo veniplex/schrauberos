@@ -82,3 +82,34 @@ describe("Abo-Adressen des Kalenders nach einer Wiederherstellung (F10)", () => 
     assert.equal(await env.db.auditLog.count({ where: { action: "calendarFeed.restoreRevoked" } }), 1, "ein zweiter Start schreibt nichts mehr");
   });
 });
+
+describe("Webhooks nach einer Wiederherstellung (F11, auch mit Wiederherstellungsschlüssel)", () => {
+  it("mit Merker: eingeschaltete Webhooks gehen aus (Grund „restore“), wartende Zustellungen werden zurückgestellt, Audit je Ziel; ohne Merker und bei bewusst ausgeschalteten Zielen ändert sich nichts", async () => {
+    await env.db.webhookDelivery.deleteMany();
+    await env.db.webhook.deleteMany();
+    const on = await env.db.webhook.create({ data: { name: "Produktiv", url: "https://hook.example.org/p", events: "order.closed", enabled: true } });
+    const off = await env.db.webhook.create({ data: { name: "Bewusst aus", url: "https://hook.example.org/o", events: "order.closed", enabled: false, disabledReason: "gone" } });
+    const delivery = (webhookId: string, eventId: string, status: string) => env.db.webhookDelivery.create({ data: { webhookId, eventId, type: "order.closed", eventAt: new Date(), status } });
+    await delivery(on.id, "e1", "pending");
+    await delivery(on.id, "e2", "sent");
+
+    assert.equal(await startup.revokeApiTokensAfterRestore(), 0);
+    assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: on.id } })).enabled, true, "ohne Merker (normaler Neustart) bleibt es an");
+
+    markApplied();
+    await startup.revokeApiTokensAfterRestore();
+    const after = await env.db.webhook.findUniqueOrThrow({ where: { id: on.id } });
+    assert.deepEqual([after.enabled, after.disabledReason], [false, "restore"]);
+    assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: off.id } })).disabledReason, "gone", "ein anderes Ausschalten behält seinen Grund");
+    assert.equal((await env.db.webhookDelivery.findFirstOrThrow({ where: { eventId: "e1" } })).status, "held", "nichts wird ungeprüft nachgeholt");
+    assert.equal((await env.db.webhookDelivery.findFirstOrThrow({ where: { eventId: "e2" } })).status, "sent");
+    const audits = await env.db.auditLog.findMany({ where: { action: "webhook.disabled" } });
+    assert.equal(audits.length, 1);
+    assert.match(audits[0].target ?? "", /^Produktiv: restore \(Sicherung /);
+
+    // deliverDue sendet nichts mehr (Ziel aus, Zustellung zurückgestellt)
+    const { deliverDue } = await import("@/server/webhooks/deliver");
+    const summary = await deliverDue({});
+    assert.equal(summary.sent + summary.retried + summary.failed, 0);
+  });
+});

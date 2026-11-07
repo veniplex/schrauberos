@@ -134,6 +134,8 @@ export function isAllowedAddress(ip: string): boolean {
     if ((g[0] & 0xffc0) === 0xfec0) return false; // fec0::/10 (Site-Local, veraltet)
     if ((g[0] & 0xff00) === 0xff00) return false; // Multicast
     if (g[0] === 0xfd00 && g[1] === 0x0ec2) return false; // fd00:ec2::/32 (AWS)
+    if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 1) return false; // 64:ff9b:1::/48 lokal genutztes NAT64 (RFC 8215): die eingebettete IPv4-Adresse sitzt je nach Präfixlänge an anderer Stelle – ganz gesperrt
+    if (g[0] === 0x100 && g[1] === 0 && g[2] === 0 && g[3] === 0) return false; // 100::/64 (Discard-Präfix)
   } else {
     return false;
   }

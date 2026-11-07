@@ -15,7 +15,7 @@ afterEach(() => {
 const FORBIDDEN = [
   // Metadaten-Dienst, auch in den Schreibweisen, die vorher durchgingen
   "169.254.169.254", "2852039166", "0xa9fea9fe", "0251.0376.0251.0376", "0xA9.0xFE.0xA9.0xFE", "169.254.0.5", "169.254.169.254.",
-  "::ffff:a9fe:a9fe", "0:0:0:0:0:ffff:a9fe:a9fe", "[::ffff:169.254.169.254]", "::ffff:169.254.169.254", "64:ff9b::a9fe:a9fe", "2002:a9fe:a9fe::1", "2001:0:1:2:3:4:5601:5601",
+  "::ffff:a9fe:a9fe", "0:0:0:0:0:ffff:a9fe:a9fe", "[::ffff:169.254.169.254]", "::ffff:169.254.169.254", "64:ff9b::a9fe:a9fe", "64:ff9b:1::7f00:1", "64:ff9b:1::a9fe:a9fe", "[64:ff9b:1:ffff::1]", "100::1", "2002:a9fe:a9fe::1", "2001:0:1:2:3:4:5601:5601",
   "fd00:ec2::254", "[fd00:ec2::254]", "FD00:EC2:0:0:0:0:0:254", "100.100.100.200", "168.63.129.16", "metadata.google.internal", "METADATA.GOOGLE.INTERNAL.", "instance-data",
   // nicht angebbare oder eigene Ziele
   "0", "0.0.0.0", "0.1.2.3", "::", "[::]", "0:0:0:0:0:0:0:0", "255.255.255.255", "224.0.0.1", "239.255.255.250", "240.0.0.1", "ff02::1", "[ff02::1]", "fe80::1", "[fe80::1]", "fe80::1%eth0", "febf::1",

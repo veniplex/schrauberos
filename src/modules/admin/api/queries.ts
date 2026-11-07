@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/server/db";
 import { parseEvents } from "@/server/webhooks/deliver";
+import { webhookHealth } from "@/server/webhooks/health";
 import { hasWebhookSecret } from "@/server/webhooks/secrets";
 
 /**
@@ -21,6 +22,8 @@ export type WebhookRow = {
   pending: number;
   held: number;
   failed: number;
+  /** Ereignisse, die verworfen wurden, weil die Warteschlange voll war (seit dem letzten Einschalten) */
+  dropped: number;
   lastSentAt: Date | null;
 };
 
@@ -54,6 +57,7 @@ export async function webhookRows(): Promise<WebhookRow[]> {
         pending: count("pending"),
         held: count("held"),
         failed: count("failed"),
+        dropped: row.droppedEvents,
         lastSentAt: lastSent.find((l) => l.webhookId === row.id)?._max.completedAt ?? null,
       };
     }),
@@ -100,5 +104,5 @@ export async function deliveryRows(options: { webhookId?: string; take?: number 
   return rows.map(({ webhook, ...row }) => ({ ...row, webhookName: webhook.name }));
 }
 
-/** Aufgegebene Zustellungen (Dead-Letter) insgesamt. */
-export const deadLetterCount = (): Promise<number> => db.webhookDelivery.count({ where: { status: "failed" } });
+/** Aufgegebene Zustellungen (Dead-Letter) insgesamt – ohne Test-Ereignisse und ohne die Unterdrückung nach Art. 18 (`suppressed`, keine Störung). */
+export const deadLetterCount = async (): Promise<number> => (await webhookHealth()).deadLetters;
