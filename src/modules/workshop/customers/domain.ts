@@ -18,10 +18,10 @@ export function customerSearchKeys(c: { firstName?: string | null; lastName: str
   return { nameKey: searchKey(c.firstName, c.lastName, c.company), cityKey: searchKey(c.city), phoneKey: phoneKey(c.phone) };
 }
 
-/** Womit ein Kunde noch verknüpft ist: Wer Fahrzeuge (auch früher gehalten) oder Rechnungen hat, ist nicht löschbar. */
-export type CustomerLinks = { vehicles: number; ownerships: number; invoices: number };
+/** Womit ein Kunde noch verknüpft ist: Wer Fahrzeuge (auch früher gehalten), Rechnungen oder Aufträge hat, ist nicht löschbar. */
+export type CustomerLinks = { vehicles: number; ownerships: number; invoices: number; /** Aufträge direkt am Kunden (ohne Halterfahrzeug) – Aufträge werden nie gelöscht */ orders: number };
 
 /** Frühere Halterschaften: Halter-Einträge ohne die der Fahrzeuge, die der Kunde jetzt hält (jedes hat einen offenen Eintrag). */
 export const formerOwnerships = (links: Pick<CustomerLinks, "vehicles" | "ownerships">): number => Math.max(links.ownerships - links.vehicles, 0);
 
-export const customerHasLinks = (links: CustomerLinks): boolean => links.vehicles > 0 || links.ownerships > 0 || links.invoices > 0;
+export const customerHasLinks = (links: CustomerLinks): boolean => links.vehicles > 0 || links.ownerships > 0 || links.invoices > 0 || links.orders > 0;

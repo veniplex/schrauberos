@@ -62,7 +62,7 @@ export const customersEn: typeof customersDe = {
   errors: {
     numberExists: "This customer number already belongs to {name}.",
     nameRequired: "Enter a last name or a company.",
-    inUse: "This customer cannot be deleted: {vehicles} vehicles, {former} former keeperships (the keeper history stays even after a change of keeper), {invoices} invoices. Archive instead: the customer is kept but no longer appears in selection fields and search.",
+    inUse: "This customer cannot be deleted: {vehicles} vehicles, {former} former keeperships (the keeper history stays even after a change of keeper), {invoices} invoices, {orders} orders (orders are never deleted). Archive instead: the customer is kept but no longer appears in selection fields and search.",
   },
   duplicate: {
     title: "This customer number already exists",

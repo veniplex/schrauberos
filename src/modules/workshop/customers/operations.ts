@@ -115,11 +115,11 @@ export const deleteCustomerOperation = defineOperation({
   input: z.object({ id: z.string().min(1) }),
   audit: "customer.delete",
   run: async ({ input, tx, audit }) => {
-    const customer = await tx.customer.findUnique({ where: { id: input.id }, include: { _count: { select: { vehicles: true, ownerships: true, invoices: true } } } });
+    const customer = await tx.customer.findUnique({ where: { id: input.id }, include: { _count: { select: { vehicles: true, ownerships: true, invoices: true, orders: true } } } });
     if (!customer) fail("notFound");
     // Kunden mit Fahrzeugen, Halter-Historie oder Rechnungen bleiben erhalten (Nachvollziehbarkeit); im Schema zusätzlich per Restrict gesichert
     const links = customer._count;
-    if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles, former: formerOwnerships(links), invoices: links.invoices });
+    if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles, former: formerOwnerships(links), invoices: links.invoices, orders: links.orders });
     await tx.customer.delete({ where: { id: input.id } });
     audit({ target: customerDisplayName(customer), entityId: input.id });
     return { id: input.id };

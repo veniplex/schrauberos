@@ -21,6 +21,8 @@ export const archiveDe = {
     appointments_other: "{count} Termine",
     tireSets_one: "{count} Reifensatz",
     tireSets_other: "{count} Reifensätze",
+    orders_one: "{count} Auftrag (Aufträge werden nie gelöscht)",
+    orders_other: "{count} Aufträge (Aufträge werden nie gelöscht)",
     transfers_one: "{count} Halterwechsel",
     transfers_other: "{count} Halterwechsel",
   },

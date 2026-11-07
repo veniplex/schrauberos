@@ -141,7 +141,7 @@ export const vehiclesDe = {
     planFor: "Termin planen für {plate}",
   },
   errors: {
-    inUse: "Dieses Fahrzeug kann nicht gelöscht werden: {appointments} Termine, {tireSets} Reifensätze, {transfers} Halterwechsel. Stattdessen archivieren: Das Fahrzeug bleibt mit seiner Geschichte erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
+    inUse: "Dieses Fahrzeug kann nicht gelöscht werden: {appointments} Termine, {tireSets} Reifensätze, {orders} Aufträge (Aufträge werden nie gelöscht), {transfers} Halterwechsel. Stattdessen archivieren: Das Fahrzeug bleibt mit seiner Geschichte erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
     plateExists: "Es gibt schon ein Fahrzeug mit diesem Kennzeichen (Halter: {customer}).",
     plateExistsNoOwner: "Es gibt schon ein Fahrzeug mit diesem Kennzeichen (ohne Halter).",
     sameOwner: "Das ist bereits der aktuelle Halter.",

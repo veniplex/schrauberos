@@ -106,7 +106,7 @@ export async function getCustomerDetail(viewer: Viewer, id: string) {
   requireView(viewer);
   const customer = await db.customer.findUnique({
     where: { id },
-    select: { ...CUSTOMER, _count: { select: { appointments: true, ownerships: true, invoices: true, vehicles: true } } },
+    select: { ...CUSTOMER, _count: { select: { appointments: true, ownerships: true, invoices: true, vehicles: true, orders: true } } },
   });
   if (!customer) return null;
   const [vehicles, appointments] = await Promise.all([

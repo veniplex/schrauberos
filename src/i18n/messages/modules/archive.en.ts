@@ -22,6 +22,8 @@ export const archiveEn: typeof archiveDe = {
     appointments_other: "{count} appointments",
     tireSets_one: "{count} tyre set",
     tireSets_other: "{count} tyre sets",
+    orders_one: "{count} order (orders are never deleted)",
+    orders_other: "{count} orders (orders are never deleted)",
     transfers_one: "{count} change of keeper",
     transfers_other: "{count} changes of keeper",
   },

@@ -142,7 +142,7 @@ export const vehiclesEn: typeof vehiclesDe = {
     planFor: "Plan appointment for {plate}",
   },
   errors: {
-    inUse: "This vehicle cannot be deleted: {appointments} appointments, {tireSets} tyre sets, {transfers} changes of keeper. Archive it instead: the vehicle is kept with its history but no longer appears in selection fields and search.",
+    inUse: "This vehicle cannot be deleted: {appointments} appointments, {tireSets} tyre sets, {orders} orders (orders are never deleted), {transfers} changes of keeper. Archive it instead: the vehicle is kept with its history but no longer appears in selection fields and search.",
     plateExists: "There is already a vehicle with this plate (owner: {customer}).",
     plateExistsNoOwner: "There is already a vehicle with this plate (no owner).",
     sameOwner: "This is already the current owner.",

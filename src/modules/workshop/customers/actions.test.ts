@@ -20,6 +20,7 @@ const lastFlash = () => {
 };
 
 beforeEach(async () => {
+  await env.db.order.deleteMany();
   await env.db.invoice.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
   await env.db.vehicle.deleteMany();
@@ -93,12 +94,16 @@ describe("deleteCustomer", () => {
     await env.db.invoice.create({ data: { direction: "outgoing", number: "1", outgoingKey: "1", partyName: "Rechnung", customerId: billed.id, issueDate: new Date(), grossCents: 100 } });
 
     // die Zahlen sind getrennt: aktuelle Fahrzeuge, frühere Halterschaften, Rechnungen – nicht addiert
+    const ordered = await env.db.customer.create({ data: { lastName: "Auftrag" } });
+    const plain = await env.db.vehicle.create({ data: { plate: "B-AB 3", plateNorm: "BAB3" } });
+    await env.db.order.create({ data: { number: "A-2099-0001", vehicleId: plain.id, customerId: ordered.id } });
     const expected = new Map([
-      [withVehicle.id, { vehicles: 1, former: 0, invoices: 0 }],
-      [history.id, { vehicles: 0, former: 1, invoices: 0 }],
-      [billed.id, { vehicles: 0, former: 0, invoices: 1 }],
+      [withVehicle.id, { vehicles: 1, former: 0, invoices: 0, orders: 0 }],
+      [history.id, { vehicles: 0, former: 1, invoices: 0, orders: 0 }],
+      [billed.id, { vehicles: 0, former: 0, invoices: 1, orders: 0 }],
+      [ordered.id, { vehicles: 0, former: 0, invoices: 0, orders: 1 }],
     ]);
-    for (const c of [withVehicle, history, billed]) {
+    for (const c of [withVehicle, history, billed, ordered]) {
       assert.equal(await redirectOf(() => actions.deleteCustomer(form({ id: c.id }))), null, "bleibt auf der Seite");
       assert.equal(lastFlash()?.key, "customers.errors.inUse");
       assert.deepEqual(lastFlash()?.params, expected.get(c.id));

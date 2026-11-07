@@ -61,7 +61,7 @@ export async function getVehicleDetail(viewer: Viewer, id: string) {
     include: {
       customer: { select: customerNameSelect },
       ownerships: { include: { customer: { select: customerNameSelect } }, orderBy: { fromDate: "desc" } },
-      _count: { select: { appointments: true, tireSets: true } },
+      _count: { select: { appointments: true, tireSets: true, orders: true } },
     },
   });
   if (!vehicle) return null;

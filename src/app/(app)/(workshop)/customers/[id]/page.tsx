@@ -172,6 +172,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               { kind: "vehicles", count: customer._count.vehicles },
               { kind: "formerOwnerships", count: formerOwnerships(customer._count) },
               { kind: "invoices", count: customer._count.invoices },
+              { kind: "orders", count: customer._count.orders },
               { kind: "appointments", count: customer._count.appointments },
             ]}
             canArchive={canEdit}

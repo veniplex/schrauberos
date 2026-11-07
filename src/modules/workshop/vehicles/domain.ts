@@ -18,10 +18,11 @@ export type ExtraInspectionKind = (typeof EXTRA_INSPECTION_KINDS)[number];
 export const ownershipTransfers = (ownerships: ReadonlyArray<{ toDate: Date | null }>): number => ownerships.filter((o) => o.toDate !== null).length + Math.max(ownerships.filter((o) => o.toDate === null).length - 1, 0);
 
 /**
- * Darf ein Fahrzeug gelöscht werden? Nur ohne Geschichte: keine Termine, keine Reifensätze und kein Halterwechsel (`transfers`, siehe `ownershipTransfers`). Sonst wird es
+ * Darf ein Fahrzeug gelöscht werden? Nur ohne Geschichte: keine Termine, keine Reifensätze, keine Aufträge (Aufträge werden nie gelöscht) und kein Halterwechsel (`transfers`, siehe `ownershipTransfers`). Sonst wird es
  * archiviert. Der erste Halter-Eintrag allein zählt nicht (er fällt mit dem Fahrzeug weg).
  */
-export const vehicleDeletable = (links: { appointments: number; tireSets: number; transfers: number }): boolean => links.appointments === 0 && links.tireSets === 0 && links.transfers === 0;
+export const vehicleDeletable = (links: { appointments: number; tireSets: number; orders: number; transfers: number }): boolean =>
+  links.appointments === 0 && links.tireSets === 0 && links.orders === 0 && links.transfers === 0;
 
 export const INSPECTION_SOON_MONTHS = 2;
 
