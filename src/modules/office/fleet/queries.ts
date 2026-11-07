@@ -1,4 +1,6 @@
 import "server-only";
+import { endOfDayIn, startOfDayIn } from "@/lib/dates";
+import { dayKey } from "@/lib/zone";
 import { db } from "@/server/db";
 import { currentMileage, fleetDues } from "@/modules/office/fleet/domain";
 
@@ -53,4 +55,30 @@ export async function listDrivers(checks: number) {
 /** Ein Firmenfahrzeug nur zum Titel. */
 export async function fleetPlate(id: string): Promise<string | null> {
   return (await db.fleetVehicle.findUnique({ where: { id }, select: { plate: true } }))?.plate ?? null;
+}
+
+export type FleetDeadline = { id: string; kind: "hu" | "service"; plate: string; /** Kalendertag der Frist (`JJJJ-MM-TT`) */ day: string };
+
+/**
+ * Fristen der Firmenfahrzeuge für den Kalender-Abo (F10): Hauptuntersuchung (`huDue`) und Service (`serviceDue`) im Zeitraum `from`…`to` (Kalendertage, einschließlich), ohne verkaufte Fahrzeuge.
+ * Verlangt `fleet.view`; nur Kennzeichen und Tag (kein Fahrer, keine Versicherung, kein Leasing).
+ */
+export async function fleetDeadlines(viewer: { can: (permission: "fleet.view") => boolean }, from: string, to: string, take = 2000): Promise<FleetDeadline[]> {
+  if (!viewer.can("fleet.view")) return [];
+  const range = { gte: startOfDayIn(from), lte: endOfDayIn(to) };
+  const rows = await db.fleetVehicle.findMany({
+    where: { status: { not: "sold" }, OR: [{ huDue: range }, { serviceDue: range }] },
+    orderBy: [{ plate: "asc" }, { id: "asc" }],
+    take,
+    select: { id: true, plate: true, huDue: true, serviceDue: true },
+  });
+  const out: FleetDeadline[] = [];
+  for (const v of rows) {
+    for (const [kind, due] of [["hu", v.huDue], ["service", v.serviceDue]] as const) {
+      if (!due) continue;
+      const day = dayKey(due);
+      if (day >= from && day <= to) out.push({ id: v.id, kind, plate: v.plate, day });
+    }
+  }
+  return out;
 }

@@ -45,6 +45,8 @@ model User {
   recoveryAcks    RecoveryNoticeAck[]
   knownDevices    KnownDevice[]
   apiTokens       ApiToken[]
+  // Kalender-Abo (F10): höchstens ein Token je Benutzer
+  calendarFeed    CalendarFeedToken?
   // Zweiter Faktor (TOTP) und Sicherungscodes – bewusst eigene Tabellen: Änderungen daran sollen die Version (updatedAt) des Benutzerformulars nicht berühren
   twoFactor       TwoFactor?
   backupCodes     TwoFactorBackupCode[]
@@ -469,6 +471,24 @@ model Appointment {
   @@index([bayId])
   @@index([typeId])
   @@index([assigneeId])
+}
+
+// ───────────── Kalender-Abo (F10, workshop.appointments) ─────────────
+
+// Abonnierbarer Kalender (.ics) je Benutzer: Die Adresse enthält ein langes Zufalls-Token, gespeichert wird nur sein SHA-256-Hash (der Klartext steht einmal in der Antwort der Erzeugung). Höchstens ein Token je Benutzer
+// (`userId` ist eindeutig): Erneuern ersetzt die Zeile, Widerrufen löscht sie. Ablauf optional. `lastUsedAt` wird auf die Stunde gerundet und höchstens einmal je Stunde geschrieben (keine Schreibflut).
+// Passwortwechsel, Deaktivierung und Notzugang löschen das Token (`revokeAccess`); wirksam sind bei jedem Abruf die aktuellen Rechte des Besitzers.
+model CalendarFeedToken {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  tokenHash  String    @unique
+  // erste Zeichen des Tokens (nicht geheim, nur zum Wiedererkennen)
+  hint       String
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ───────────── Digitale Reifenliste ─────────────

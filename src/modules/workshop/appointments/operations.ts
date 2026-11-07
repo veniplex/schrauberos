@@ -3,7 +3,9 @@ import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { isHexColor } from "@/lib/color";
 import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, QUICK_STATUSES } from "@/modules/workshop/appointments/constants";
+import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { defineOperation, fail, failField, type RunContext } from "@/server/operations";
+import { FEED_EXPIRY_CHOICES, feedExpiry, feedTokenHint, generateFeedToken, hashFeedToken } from "./feed-token";
 import { appointmentWindow, findBayClash, quickStatusOptions } from "./domain";
 
 const appointmentInput = z.object({
@@ -275,5 +277,53 @@ export const archiveTypeOperation = defineOperation({
     await tx.appointmentType.update({ where: { id: input.id }, data: { active: !input.archived } });
     audit({ target: `Type ${input.archived ? "archived" : "reactivated"}: ${type.name}`, entityId: input.id });
     return { id: input.id };
+  },
+});
+
+/* ───────────── Kalender-Abo (F10) ───────────── */
+
+const feedPasswordInput = z.object({ password: z.string().max(1024) });
+
+/**
+ * Abo-Adresse erzeugen oder **erneuern** (ein Token je Benutzer: das neue ersetzt das alte, das damit ungültig ist). Verlangt die **erneute Passwortabfrage** der handelnden Person – ein Kalender-Abo
+ * ist ein weiterer Zugang zu Daten außerhalb der Anwendung, eine gestohlene Sitzung soll ihn nicht anlegen können (mit dem Limit des Passwortwechsels, `confirmOwnPassword`). Der **Klartext** steht
+ * ausschließlich in der Antwort (nie in Log, Audit oder Datenbank; gespeichert wird der SHA-256-Hash). Eigene Rechte: nur wer Termine sehen darf, bekommt ein Abo – und nur für das eigene Konto.
+ * Kein API-Ressourcen-Pendant (Konto-/Sicherheitsvorgang, `api-exceptions.ts`).
+ */
+export const createFeedOperation = defineOperation({
+  name: "appointments.createFeed",
+  permission: "appointments.view",
+  input: feedPasswordInput.extend({ expires: z.enum(FEED_EXPIRY_CHOICES).default("never") }),
+  audit: "appointment.feedCreate",
+  prepare: async ({ input, principal }) => {
+    await confirmOwnPassword(principal.user.id, input.password);
+    return undefined;
+  },
+  run: async ({ input, principal, tx, audit }) => {
+    const token = generateFeedToken();
+    const expiresAt = feedExpiry(input.expires, new Date());
+    const replaced = await tx.calendarFeedToken.deleteMany({ where: { userId: principal.user.id } });
+    await tx.calendarFeedToken.create({ data: { userId: principal.user.id, tokenHash: hashFeedToken(token), hint: feedTokenHint(token), expiresAt } });
+    audit({ target: `${principal.user.username}: ${feedTokenHint(token)}${replaced.count > 0 ? " (ersetzt)" : ""}` });
+    return { token, expiresAt };
+  },
+});
+
+/** Abo widerrufen (die Zeile wird gelöscht; die Adresse liefert danach 401). Ebenfalls mit Passwortabfrage. */
+export const revokeFeedOperation = defineOperation({
+  name: "appointments.revokeFeed",
+  permission: "appointments.view",
+  input: feedPasswordInput,
+  audit: "appointment.feedRevoke",
+  prepare: async ({ input, principal }) => {
+    await confirmOwnPassword(principal.user.id, input.password);
+    return undefined;
+  },
+  run: async ({ principal, tx, audit }) => {
+    const row = await tx.calendarFeedToken.findUnique({ where: { userId: principal.user.id }, select: { hint: true } });
+    if (!row) fail("notFound", "appointments.feedPage.status.none");
+    await tx.calendarFeedToken.delete({ where: { userId: principal.user.id } });
+    audit({ target: `${principal.user.username}: ${row.hint}` });
+    return { revoked: true };
   },
 });

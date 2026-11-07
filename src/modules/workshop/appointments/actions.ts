@@ -2,7 +2,7 @@
 
 import { formObject, safeReturn } from "@/lib/forms";
 import { defineAction } from "@/server/operations";
-import { type AppointmentInput, archiveBayOperation, archiveTypeOperation, createAppointmentOperation, deleteAppointmentOperation, deleteBayOperation, deleteTypeOperation, saveBayOperation, saveSettingsOperation, saveTypeOperation, setAppointmentStatusOperation, updateAppointmentOperation } from "./operations";
+import { type AppointmentInput, archiveBayOperation, createFeedOperation, revokeFeedOperation, archiveTypeOperation, createAppointmentOperation, deleteAppointmentOperation, deleteBayOperation, deleteTypeOperation, saveBayOperation, saveSettingsOperation, saveTypeOperation, setAppointmentStatusOperation, updateAppointmentOperation } from "./operations";
 
 const refresh = ["/appointments", "/", "/tires"] as const;
 
@@ -59,3 +59,16 @@ const archivedForm = (fd: FormData) => ({ id: String(fd.get("id") ?? ""), archiv
 export const archiveBay = defineAction(archiveBayOperation, { form: archivedForm, revalidate: ["/appointments"], message: "common.saved" });
 
 export const archiveAppointmentType = defineAction(archiveTypeOperation, { form: archivedForm, revalidate: ["/appointments"], message: "common.saved" });
+
+/**
+ * Kalender-Abo erzeugen/erneuern: Die Antwort trägt den **Klartext der Abo-Adresse** (`feed.token`, einmalig – nur im Zustand der Seite, nie in URL, Log oder Audit); die Adresse selbst setzt die Seite aus
+ * der Einstellung „Adresse der Anwendung“ (oder der geöffneten Adresse) und diesem Token zusammen.
+ */
+export const createFeed = defineAction(createFeedOperation, {
+  form: formObject,
+  revalidate: ["/appointments/feed"],
+  message: "appointments.feedPage.created",
+  state: (data) => ({ feed: { token: data.token } }),
+});
+
+export const revokeFeed = defineAction(revokeFeedOperation, { form: formObject, revalidate: ["/appointments/feed"], message: "appointments.feedPage.revoke.done" });

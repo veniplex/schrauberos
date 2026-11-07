@@ -1,8 +1,10 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { archivedWhere, type ArchiveFilter } from "@/lib/archive-filter";
+import { endOfDayIn, startOfDayIn } from "@/lib/dates";
 import { addMonths } from "@/lib/month";
 import { normalizePlate } from "@/lib/plate";
+import { dayKey } from "@/lib/zone";
 import type { Permission } from "@/modules/catalog";
 import type { Viewer } from "@/modules/types";
 import { customerContacts, customerNameSelect } from "@/modules/workshop/customers/public";
@@ -92,4 +94,41 @@ export async function getVehicleDetail(viewer: Viewer, id: string) {
     customerContacts(viewer, vehicle.customerId ? [vehicle.customerId] : []),
   ]);
   return { ...vehicle, tireSets, appointments, ownerPhone: contacts.get(vehicle.customerId ?? "")?.phone ?? null };
+}
+
+export type VehicleDeadline = { id: string; kind: "inspection" | "extra"; /** nur bei `extra`: sp | gas | other */ extraKind: string | null; plate: string; vehicleName: string; /** Kalendertag der Frist (`JJJJ-MM-TT`) */ day: string };
+
+/**
+ * Prüffristen der Kundenfahrzeuge für den Kalender-Abo (F10): die nächste Hauptuntersuchung (`inspectionDue` ist ein Monat – die Frist ist der **letzte Tag** dieses Monats) und die weitere Prüfung
+ * (`extraInspectionDue`, ein Tag) im Zeitraum `from`…`to` (Kalendertage, einschließlich). Verlangt `vehicles.view`. Ohne archivierte Fahrzeuge und **ohne Fahrzeuge von Kunden mit eingeschränkter
+ * Verarbeitung (Art. 18 DSGVO)**. Kein Halter, kein Kunde: nur Kennzeichen, Marke und Modell.
+ */
+export async function vehicleDeadlines(viewer: Viewer, from: string, to: string, take = 2000): Promise<VehicleDeadline[]> {
+  if (!viewer.can("vehicles.view")) return [];
+  const unrestricted = { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+  const fromMonth = from.slice(0, 7);
+  const toMonth = to.slice(0, 7);
+  const rows = await db.vehicle.findMany({
+    where: {
+      archivedAt: null,
+      AND: [unrestricted, { OR: [{ inspectionDue: { gte: fromMonth, lte: toMonth } }, { extraInspectionDue: { gte: startOfDayIn(from), lte: endOfDayIn(to) } }] }],
+    },
+    orderBy: [{ plateNorm: "asc" }, { id: "asc" }],
+    take,
+    select: { id: true, plate: true, make: true, model: true, inspectionDue: true, extraInspectionKind: true, extraInspectionDue: true },
+  });
+  const out: VehicleDeadline[] = [];
+  for (const v of rows) {
+    const vehicleName = [v.make, v.model].filter(Boolean).join(" ");
+    if (v.inspectionDue && v.inspectionDue >= fromMonth && v.inspectionDue <= toMonth) {
+      const [y, m] = v.inspectionDue.split("-").map(Number);
+      const day = `${v.inspectionDue}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+      if (day >= from && day <= to) out.push({ id: v.id, kind: "inspection", extraKind: null, plate: v.plate, vehicleName, day });
+    }
+    if (v.extraInspectionDue) {
+      const day = dayKey(v.extraInspectionDue);
+      if (day >= from && day <= to) out.push({ id: v.id, kind: "extra", extraKind: v.extraInspectionKind, plate: v.plate, vehicleName, day });
+    }
+  }
+  return out;
 }

@@ -14,6 +14,7 @@ export const auditDe = {
   page: "Seite {page} von {pages}",
   groups: {
     apiToken: "API-Tokens",
+    calendarFeed: "Kalender-Abo",
     backup: "Backups",
     mail: "E-Mail",
     setup: "Einrichtung",
@@ -46,6 +47,9 @@ export const auditDe = {
       create: "API-Token erzeugt",
       revoke: "API-Token widerrufen",
       restoreRevoked: "API-Tokens nach Wiederherstellung widerrufen",
+    },
+    calendarFeed: {
+      restoreRevoked: "Kalender-Abo-Adressen nach Wiederherstellung gelöscht",
     },
     backup: {
       create: "Backup erstellt",
@@ -145,6 +149,8 @@ export const auditDe = {
       update: "Termin geändert",
       status: "Terminstatus geändert",
       delete: "Termin gelöscht",
+      feedCreate: "Kalender-Abo erzeugt oder erneuert",
+      feedRevoke: "Kalender-Abo widerrufen",
     },
     customer: {
       create: "Kunde angelegt",

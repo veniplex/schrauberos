@@ -137,3 +137,65 @@ export async function appointmentSlipData(viewer: Viewer, id: string, options: {
 }
 
 export type AppointmentSlipData = NonNullable<Awaited<ReturnType<typeof appointmentSlipData>>>;
+
+export type FeedAppointment = {
+  id: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date;
+  status: string;
+  modified: Date;
+  typeName: string | null;
+  plate: string | null;
+  vehicleName: string;
+  /** Anzeigename des Kunden – nur mit `customers.view`, sonst `null` (und dann gar nicht gelesen) */
+  customerName: string | null;
+};
+
+/**
+ * Termine für das Kalender-Abo (F10), die den Zeitraum `from`…`to` (Zeitpunkte, `to` ausgeschlossen) berühren, nach Beginn sortiert, höchstens `take`. Verlangt `appointments.view`. **Nur, was ein
+ * Kalender außerhalb der Anwendung zeigen darf:** Bezeichnung, Zeit, Status, Terminart, Kennzeichen und Fahrzeug; der **Anzeigename** des Kunden nur mit `customers.view` (sonst werden Kundenspalten gar nicht
+ * gelesen); **nie Notizen, Telefon, Arbeitsplatz oder Zuständige**. Termine, deren Kunde oder Fahrzeughalter eingeschränkt verarbeitet wird (Art. 18 DSGVO), gibt es nicht.
+ */
+export async function appointmentsForFeed(viewer: Viewer, from: Date, to: Date, take: number): Promise<FeedAppointment[]> {
+  if (!viewer.can("appointments.view")) return [];
+  const withCustomer = viewer.can("customers.view");
+  const unrestricted = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
+  const rows = await db.appointment.findMany({
+    where: { startsAt: { lt: to }, endsAt: { gt: from }, AND: [unrestricted, { OR: [{ vehicleId: null }, { vehicle: { is: unrestricted } }] }] },
+    orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    take,
+    select: {
+      id: true,
+      title: true,
+      startsAt: true,
+      endsAt: true,
+      status: true,
+      updatedAt: true,
+      type: { select: { name: true } },
+      vehicle: { select: { plate: true, make: true, model: true, ...(withCustomer ? { customer: { select: customerNameSelect } } : {}) } },
+      ...(withCustomer ? { customer: { select: customerNameSelect } } : {}),
+    },
+  });
+  return rows.map((a) => {
+    const row = a as typeof a & { customer?: Parameters<typeof customerDisplayName>[0] | null; vehicle: ((typeof a)["vehicle"] & { customer?: Parameters<typeof customerDisplayName>[0] | null }) | null };
+    const owner = row.vehicle?.customer ?? row.customer ?? null;
+    return {
+      id: a.id,
+      title: a.title,
+      startsAt: a.startsAt,
+      endsAt: a.endsAt,
+      status: a.status,
+      modified: a.updatedAt,
+      typeName: a.type?.name ?? null,
+      plate: a.vehicle?.plate ?? null,
+      vehicleName: a.vehicle ? [a.vehicle.make, a.vehicle.model].filter(Boolean).join(" ") : "",
+      customerName: owner ? customerDisplayName(owner) : null,
+    };
+  });
+}
+
+/** Stand des Kalender-Abos des Benutzers (nie das Token – gespeichert ist nur der Hash): Kennung, Anlage, Ablauf, letzter Abruf. `null`: kein Abo. */
+export async function feedStatusOf(userId: string) {
+  return db.calendarFeedToken.findUnique({ where: { userId }, select: { hint: true, createdAt: true, expiresAt: true, lastUsedAt: true } });
+}

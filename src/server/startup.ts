@@ -37,7 +37,7 @@ export function applyTimezone(timezone: string): boolean {
 /**
  * Nach einer Wiederherstellung (der Launcher hat die Datenbank getauscht und noch nicht bestätigt: `restore/applied.json`) gelten **keine API-Tokens** mehr: Die
  * Sicherung kennt keine Widerrufe, die seitdem geschehen sind – ein inzwischen widerrufenes (etwa gestohlenes) Token wäre sonst wieder gültig. Alle Tokens werden beim ersten
- * Start widerrufen (und im Audit-Log festgehalten); neue Tokens sind schnell erzeugt. Läuft bei jedem Start bis zur Bestätigung (idempotent). Liefert die Anzahl.
+ * Start widerrufen (und im Audit-Log festgehalten); neue Tokens sind schnell erzeugt. Ebenso entfallen die Abo-Adressen des Kalenders (`CalendarFeedToken`). Läuft bei jedem Start bis zur Bestätigung (idempotent). Liefert die Anzahl.
  */
 export async function revokeApiTokensAfterRestore(dataRoot?: string): Promise<number> {
   const applied = readApplied(dataRoot);
@@ -45,6 +45,9 @@ export async function revokeApiTokensAfterRestore(dataRoot?: string): Promise<nu
   return db.$transaction(async (tx) => {
     const { count } = await tx.apiToken.updateMany({ where: { revokedAt: null }, data: { revokedAt: new Date() } });
     if (count > 0) await writeAudit(tx, "apiToken.restoreRevoked", { target: `${count} (Sicherung ${applied.from})`, actor: { id: null, name: "System" } });
+    // Dasselbe gilt für die Abo-Adressen des Kalenders (F10): Ein inzwischen widerrufenes oder ersetztes Token (etwa nach einem Diebstahl) wäre mit der Sicherung wieder gültig
+    const feeds = await tx.calendarFeedToken.deleteMany({});
+    if (feeds.count > 0) await writeAudit(tx, "calendarFeed.restoreRevoked", { target: `${feeds.count} (Sicherung ${applied.from})`, actor: { id: null, name: "System" } });
     return count;
   });
 }

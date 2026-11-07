@@ -83,9 +83,9 @@ describe("Etiketten-PDF", () => {
   });
 
   it("Umlaute und Euro-Zeichen kommen an; Steuerzeichen und Umkehrzeichen werden entfernt", async () => {
-    const read = inspectPdf(await buildLabelsPdf({ title: "Ö", format: "100x50", labels: [label(1, { lines: ["Größe: 205/55 R16 – Ölwechsel", "bad‮text\u0000"] , qr: null })], creationDate: FIXED }));
+    const read = inspectPdf(await buildLabelsPdf({ title: "Ö", format: "100x50", labels: [label(1, { lines: ["Größe: 205/55 R16 – Ölwechsel", "bad\u202Etext\u0000"] , qr: null })], creationDate: FIXED }));
     assert.ok(read.pages[0].includes("Größe: 205/55 R16 – Ölwechsel"));
-    assert.ok(!read.pages[0].includes("‮"));
+    assert.ok(!read.pages[0].includes("\u202E"));
   });
 
   it("Grenzen: keine Etiketten oder zu viele ergeben einen PdfError; ein zu langer QR-Inhalt ebenfalls", async () => {

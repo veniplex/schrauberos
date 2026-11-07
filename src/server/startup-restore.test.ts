@@ -65,3 +65,20 @@ describe("API-Tokens nach einer Wiederherstellung", () => {
     assert.equal(await env.db.apiToken.count({ where: { revokedAt: null } }), 1);
   });
 });
+
+describe("Abo-Adressen des Kalenders nach einer Wiederherstellung (F10)", () => {
+  it("mit Merker werden alle Abo-Adressen gelöscht (ein inzwischen widerrufenes Token wäre mit der Sicherung wieder gültig) und im Audit-Log festgehalten; ohne Merker bleiben sie", async () => {
+    const user = await env.user({ username: `feed-${Math.random().toString(36).slice(2)}` });
+    await env.db.calendarFeedToken.create({ data: { userId: user.id, tokenHash: "a".repeat(64), hint: "cal_abcd…" } });
+    assert.equal(await startup.revokeApiTokensAfterRestore(), 0);
+    assert.equal(await env.db.calendarFeedToken.count(), 1, "normaler Neustart: alles bleibt");
+
+    markApplied();
+    await startup.revokeApiTokensAfterRestore();
+    assert.equal(await env.db.calendarFeedToken.count(), 0);
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "calendarFeed.restoreRevoked" } });
+    assert.match(entry.target ?? "", /^1 \(Sicherung schrauberos-20260101T020000Z-manual\)$/);
+    assert.equal(entry.actorName, "System");
+    assert.equal(await env.db.auditLog.count({ where: { action: "calendarFeed.restoreRevoked" } }), 1, "ein zweiter Start schreibt nichts mehr");
+  });
+});

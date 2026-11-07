@@ -323,6 +323,18 @@ CREATE TABLE "Appointment" (
 );
 
 -- CreateTable
+CREATE TABLE "CalendarFeedToken" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "hint" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" DATETIME,
+    "lastUsedAt" DATETIME,
+    CONSTRAINT "CalendarFeedToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "TireSet" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "vehicleId" TEXT NOT NULL,
@@ -1290,6 +1302,12 @@ CREATE INDEX "Appointment_typeId_idx" ON "Appointment"("typeId");
 
 -- CreateIndex
 CREATE INDEX "Appointment_assigneeId_idx" ON "Appointment"("assigneeId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CalendarFeedToken_userId_key" ON "CalendarFeedToken"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CalendarFeedToken_tokenHash_key" ON "CalendarFeedToken"("tokenHash");
 
 -- CreateIndex
 CREATE INDEX "TireSet_vehicleId_idx" ON "TireSet"("vehicleId");

@@ -7,7 +7,7 @@ export const appointmentsFeature = defineFeature({
   descriptionKey: "appointments.feature.description",
   order: 10,
   requires: ["workshop.vehicles"],
-  uses: ["workshop.tires", "workshop.customers", "office.employees", "workshop.orders"],
+  uses: ["workshop.tires", "workshop.customers", "office.employees", "workshop.orders", "office.fleet"],
   permissions: { group: "appointments", keys: ["appointments.view", "appointments.create", "appointments.edit", "appointments.delete", "appointments.configure"] },
   nav: [
     { id: "appointments", href: "/appointments", labelKey: "nav.appointments", icon: "calendar", permission: "appointments.view", order: 10 },
@@ -16,6 +16,6 @@ export const appointmentsFeature = defineFeature({
     // Ansicht statt Anlegen: erscheint nur als Schnellaktion der Übersicht (füllt bei Rollen ohne Anlegen-Rechte auf), nicht im „Neu“-Menü
     { id: "appointments.today", kind: "open", labelKey: "appointments.quick.today", href: "/appointments?view=day", icon: "calendar", permission: "appointments.view", order: 200 },
   ],
-  routes: ["appointments", "api/appointments"],
-  auditActions: ["appointment.create", "appointment.update", "appointment.status", "appointment.delete", "settings.appointments"],
+  routes: ["appointments", "api/appointments", "api/ical"],
+  auditActions: ["appointment.create", "appointment.update", "appointment.status", "appointment.delete", "appointment.feedCreate", "appointment.feedRevoke", "settings.appointments"],
 });

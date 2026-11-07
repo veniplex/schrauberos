@@ -39,6 +39,7 @@ export const PLATFORM_AUDIT_ACTIONS = [
   "apiToken.create",
   "apiToken.revoke",
   "apiToken.restoreRevoked",
+  "calendarFeed.restoreRevoked",
   "setup.complete",
   "setup.restore",
   "setup.checklistHide",

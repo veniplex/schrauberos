@@ -16,6 +16,7 @@ export const auditEn: typeof auditDe = {
   page: "Page {page} of {pages}",
   groups: {
     apiToken: "API tokens",
+    calendarFeed: "Calendar subscription",
     backup: "Backups",
     mail: "Email",
     setup: "Setup",
@@ -48,6 +49,9 @@ export const auditEn: typeof auditDe = {
       create: "API token created",
       revoke: "API token revoked",
       restoreRevoked: "API tokens revoked after restore",
+    },
+    calendarFeed: {
+      restoreRevoked: "Calendar subscription addresses deleted after restore",
     },
     backup: {
       create: "Backup created",
@@ -147,6 +151,8 @@ export const auditEn: typeof auditDe = {
       update: "Appointment changed",
       status: "Appointment status changed",
       delete: "Appointment deleted",
+      feedCreate: "Calendar subscription created or renewed",
+      feedRevoke: "Calendar subscription revoked",
     },
     customer: {
       create: "Customer created",

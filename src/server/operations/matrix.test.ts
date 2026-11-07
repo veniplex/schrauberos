@@ -215,9 +215,10 @@ describe("Berechtigungs-Matrix: Route Handler", () => {
   // Wiederherstellung in der Einrichtung: eigene Prüfung (Einrichtungs-Token, nur ohne Benutzer) – siehe der Test darunter und `src/app/api/setup/restore/route.test.ts`
   const PUBLIC = new Set(["app/api/health/route.ts", "app/api/setup/restore/route.ts", "app/api/logo/route.ts"]);
   // Programmierschnittstelle: authentifiziert nur über Bearer-Token und ignoriert das Sitzungs-Cookie vollständig (eigene Matrix: server/api/matrix.test.ts)
-  const TOKEN_ONLY = new Set(["app/api/v1/[...path]/route.ts"]);
+  // Kalender-Abo: nur das Token in der Adresse zählt, kein Cookie (Lebenszyklus, 401-Gleichheit, Rechte: appointments/feed.test.ts)
+  const TOKEN_ONLY = new Set(["app/api/v1/[...path]/route.ts", "app/api/ical/[file]/route.ts"]);
   const call = (route: (typeof routes)[number], method: string, handler: (typeof routes)[number]["methods"][number][1]) =>
-    handler(new NextRequest(`http://localhost${route.url}`, { method }), { params: Promise.resolve({ id: "x", name: "x" }) });
+    handler(new NextRequest(`http://localhost${route.url}`, { method }), { params: Promise.resolve({ id: "x", name: "x", file: "x" }) });
 
   it("findet die Route Handler (kein leerer Lauf)", () => {
     assert.ok(routes.length >= 8, `nur ${routes.length} Routen gefunden`);
@@ -244,11 +245,11 @@ describe("Berechtigungs-Matrix: Route Handler", () => {
     assert.deepEqual(await snapshot(), before);
   });
 
-  it("die Programmierschnittstelle lässt sich mit einer Cookie-Sitzung nicht benutzen (auch nicht als Administrator): 401", async () => {
+  it("die Programmierschnittstelle und das Kalender-Abo lassen sich mit einer Cookie-Sitzung nicht benutzen (auch nicht als Administrator): 401", async () => {
     await signInAs({ admin: true });
-    const route = routes.find((r) => TOKEN_ONLY.has(r.file));
-    assert.ok(route, "API-Route nicht gefunden");
-    for (const [method, handler] of route.methods) assert.equal((await call(route, method, handler)).status, 401, `${method} ${route.url}`);
+    const tokenRoutes = routes.filter((r) => TOKEN_ONLY.has(r.file));
+    assert.equal(tokenRoutes.length, TOKEN_ONLY.size, "Token-Routen nicht gefunden");
+    for (const route of tokenRoutes) for (const [method, handler] of route.methods) assert.equal((await call(route, method, handler)).status, 401, `${method} ${route.url}`);
   });
 
   it("mit falschem Recht (ohne jedes Recht): abgelehnt, nie 2xx", async () => {

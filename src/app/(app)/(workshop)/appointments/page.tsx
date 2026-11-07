@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Settings } from "lucide-react";
+import { CalendarPlus, Settings } from "lucide-react";
 import { LinkButton } from "@/components/ui/buttons";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
@@ -84,11 +84,16 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
         title={i18n.t("appointments.title")}
         description={i18n.t("appointments.description")}
         actions={
-          session.can("appointments.configure") ? (
-            <LinkButton href="/settings?tab=appointments" variant="ghost">
-              <Settings className="size-4" aria-hidden /> {i18n.t("appointments.settings.open")}
+          <>
+            <LinkButton href="/appointments/feed" variant="secondary">
+              <CalendarPlus className="size-4" aria-hidden /> {i18n.t("appointments.feedPage.button")}
             </LinkButton>
-          ) : null
+            {session.can("appointments.configure") ? (
+              <LinkButton href="/settings?tab=appointments" variant="ghost">
+                <Settings className="size-4" aria-hidden /> {i18n.t("appointments.settings.open")}
+              </LinkButton>
+            ) : null}
+          </>
         }
       />
       <CalendarToolbar i18n={i18n} view={view} date={date} canCreate={canCreate} />
