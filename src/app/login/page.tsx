@@ -5,6 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
 import { safeNext } from "@/lib/safe-next";
+import { logoSrc } from "@/lib/logo";
 import { getWorkshop } from "@/server/workshop";
 import { secretKeyIssue } from "@/server/secret-key-issue";
 import { LoginForm } from "./login-form";
@@ -20,15 +21,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if ((await db.user.count()) === 0) redirect("/setup");
   const [{ t }, workshop, params, keyIssue] = await Promise.all([getI18n(), getWorkshop(), searchParams, secretKeyIssue()]);
   const { next, expired, notice } = params;
+  const logo = logoSrc(workshop);
   // Die Anmeldeseite prüft die Sitzung selbst (der Proxy sieht nur, ob ein Cookie da ist): Ein totes Cookie führt hierher, nicht im Kreis.
   if (await getSession()) redirect(safeNext(next));
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          {workshop.logoDataUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- Data-URL aus dem Werkstatt-Profil
-            <img src={workshop.logoDataUrl} alt="" className="size-14 object-contain" />
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Logo aus dem Werkstatt-Profil (/api/logo)
+            <img src={logo} alt="" className="size-14 object-contain" />
           ) : (
             <span className="grid size-12 place-items-center rounded-lg bg-accent text-accent-ink">
               <Wrench className="size-6" aria-hidden />

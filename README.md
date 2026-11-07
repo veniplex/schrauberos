@@ -1094,7 +1094,7 @@ Persistenter Zeitgeber für alles, was die App im Hintergrund erledigt. Zustand 
 
 ## Uploads und Archive
 
-* **Inhalt statt Behauptung** (`src/lib/upload-sniff.ts`): Rechnungsbelege (PDF, PNG, JPEG, WebP, XML/XRechnung), Doku-Bilder (PNG, JPEG, WebP, GIF) und das Logo (zusätzlich SVG) werden an den ersten Bytes erkannt;
+* **Inhalt statt Behauptung** (`src/lib/upload-sniff.ts`): Rechnungsbelege (PDF, PNG, JPEG, WebP, XML/XRechnung), Doku-Bilder (PNG, JPEG, WebP, GIF) und das Logo (nur PNG, JPEG, WebP – **kein SVG**, Auslieferung über `/api/logo`, siehe „Installierbare App (PWA)“) werden an den ersten Bytes erkannt;
   der gemeldete Typ muss passen, **gespeichert wird der erkannte Typ**. HTML als `.png` wird abgelehnt. **XML nur als elektronische Rechnung:** `<?xml`-Deklaration, Wurzel aus der Positivliste (UBL `Invoice`/`CreditNote`, CII `CrossIndustryInvoice`, `XML_INVOICE_ROOTS`), kein `<!DOCTYPE`, `<!ENTITY`, `<?xml-stylesheet`.
   **Pflicht für den späteren XRechnung-Import:** Der Parser schaltet DTDs und externe Entitäten aus (kein XXE, kein Entity-Expansion) und löst nie Adressen aus der Datei auf.
 * **Fotos verkleinern vor dem Hochladen** (`FileInput variant="photo"`, Logik in `src/lib/image-resize.ts`, getestet in `image-resize.test.ts` und `photo-input.test.ts`): Handyfotos (4–8 MB) werden im Browser auf höchstens 1600 px (längste Kante) und als JPEG mit Qualität 0,8

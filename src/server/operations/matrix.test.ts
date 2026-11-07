@@ -200,9 +200,9 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
 });
 
 describe("Berechtigungs-Matrix: Route Handler", () => {
-  // Ohne Anmeldung erreichbar (Liveness für Docker/Launcher); alles andere verlangt Sitzung und Recht
+  // Ohne Anmeldung erreichbar (Liveness für Docker/Launcher; das Logo für die Anmeldeseite); alles andere verlangt Sitzung und Recht
   // Wiederherstellung in der Einrichtung: eigene Prüfung (Einrichtungs-Token, nur ohne Benutzer) – siehe der Test darunter und `src/app/api/setup/restore/route.test.ts`
-  const PUBLIC = new Set(["app/api/health/route.ts", "app/api/setup/restore/route.ts"]);
+  const PUBLIC = new Set(["app/api/health/route.ts", "app/api/setup/restore/route.ts", "app/api/logo/route.ts"]);
   // Programmierschnittstelle: authentifiziert nur über Bearer-Token und ignoriert das Sitzungs-Cookie vollständig (eigene Matrix: server/api/matrix.test.ts)
   const TOKEN_ONLY = new Set(["app/api/v1/[...path]/route.ts"]);
   const call = (route: (typeof routes)[number], method: string, handler: (typeof routes)[number]["methods"][number][1]) =>

@@ -36,7 +36,7 @@ function rememberCollapsed(ids: string[]) {
  */
 export function Sidebar({
   workshopName,
-  logoDataUrl,
+  logoSrc,
   primary,
   groups,
   trailing,
@@ -48,7 +48,8 @@ export function Sidebar({
   children,
 }: {
   workshopName: string;
-  logoDataUrl: string | null;
+  /** Adresse des Logos (`/api/logo?v=…`) oder null */
+  logoSrc: string | null;
   /** Oben, ohne Gruppe (Übersicht) */
   primary: SidebarItem[];
   groups: SidebarGroup[];
@@ -128,9 +129,9 @@ export function Sidebar({
 
   const brand = (
     <Link href="/" className="flex min-h-14 items-center gap-3 border-b border-line px-5">
-      {logoDataUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- Data-URL aus dem Werkstatt-Profil
-        <img src={logoDataUrl} alt="" className="size-8 shrink-0 rounded-sm object-contain" />
+      {logoSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Logo aus dem Werkstatt-Profil (/api/logo)
+        <img src={logoSrc} alt="" className="size-8 shrink-0 rounded-sm object-contain" />
       ) : (
         <span className="grid size-8 shrink-0 place-items-center rounded-md bg-accent text-accent-ink">
           <Wrench className="size-4" aria-hidden />

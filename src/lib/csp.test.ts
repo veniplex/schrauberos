@@ -144,7 +144,7 @@ describe("Zuständigkeit für die CSP (ZP3-S-F9)", () => {
   const PATHS = [
     "/", "/login", "/login/recover", "/setup", "/appointments", "/appointments/abc123/edit", "/admin/users", "/forbidden", "/does-not-exist",
     "/api/health", "/api/v1/customers", "/api/ical/abc.ics", "/api/search", "/api/backups/status", "/api/backups/schrauberos-20260101T000000Z-manual", "/api/backups/upload", "/api/setup/restore",
-    "/api/invoices/xyz/file", "/api/docs/images/abc",
+    "/api/invoices/xyz/file", "/api/docs/images/abc", "/api/logo",
     "/_next/static/chunks/a.js", "/_next/image", "/sw.js", "/manifest.webmanifest", "/favicon.ico", "/icons/192.png", "/icon.png", "/apple-icon.png",
   ];
   const proxyMatcher = new RegExp(`^${proxyConfig.matcher[0]}$`);

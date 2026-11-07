@@ -4,7 +4,7 @@
  * **Wer setzt welchen Header?** Genau eine Stelle je Antwort – zwei CSP-Köpfe würden sich im Browser überlagern (die strengere gewinnt) und Next
  * verwirft den Kopf einer Route still, wenn der Server den Namen schon gesetzt hat (`sendResponse` hängt Kopfzeilen nur an, wenn sie fehlen):
  *   - **Seiten, Server Actions, JSON-Routen** (alles, was durch `src/proxy.ts` läuft): der Proxy, je Anfrage mit eigenem Nonce.
- *   - **Dateirouten** (Rechnungsbeleg, Doku-Bilder; `ROUTE_OWNED_PATHS`): die Route selbst (`lib/file-delivery.ts`: Bilder `sandbox; default-src 'none'`, PDF nur
+ *   - **Dateirouten** (Rechnungsbeleg, Doku-Bilder, Logo; `ROUTE_OWNED_PATHS`): die Route selbst (`lib/file-delivery.ts`: Bilder `sandbox; default-src 'none'`, PDF nur
  *     `frame-ancestors 'self'`). Der Proxy fasst den Kopf dort nicht an, `next.config` auch nicht.
  *   - **Alles außerhalb des Proxys** (Statik, Icons, Manifest, Service Worker, Health, Backup-Upload): `next.config.ts` mit der Richtlinie ohne Nonce (`script-src 'self'`).
  *   Dass sich die Zuständigkeiten nicht überschneiden, prüft `csp.test.ts` gegen den Matcher des Proxys und die Regeln der Konfiguration.
@@ -70,7 +70,7 @@ export const PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=(),
 export const HSTS_VALUE = "max-age=15552000";
 
 /** Pfade, deren Antwort den CSP-Kopf selbst setzt (Dateirouten, `lib/file-delivery.ts`). Der Proxy lässt sie unangetastet. */
-export const ROUTE_OWNED_PATHS: readonly RegExp[] = [/^\/api\/invoices\/[^/]+\/file$/, /^\/api\/docs\/images\/[^/]+$/];
+export const ROUTE_OWNED_PATHS: readonly RegExp[] = [/^\/api\/invoices\/[^/]+\/file$/, /^\/api\/docs\/images\/[^/]+$/, /^\/api\/logo$/];
 
 export type CspKind = "page" | "api" | "route";
 

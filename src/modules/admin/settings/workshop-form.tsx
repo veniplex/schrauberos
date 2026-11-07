@@ -21,7 +21,7 @@ export type WorkshopFormInitial = {
   email: string;
   website: string;
   accentColor: string;
-  logoDataUrl: string | null;
+  logoSrc: string | null;
   hours: OpeningHours;
   timezone: string;
 };
@@ -71,17 +71,17 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <Field label={t("settings.workshop.logo")} name="logo" hint={t("settings.workshop.logoHint")}>
             <div className="flex items-center gap-4">
-              {initial.logoDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- Data-URL
-                <img src={initial.logoDataUrl} alt="" className="size-14 rounded-md border border-line object-contain p-1" />
+              {initial.logoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element -- Logo aus dem Werkstatt-Profil (/api/logo)
+                <img src={initial.logoSrc} alt="" className="size-14 rounded-md border border-line object-contain p-1" />
               ) : (
                 <span className="grid size-14 place-items-center rounded-md border border-dashed border-line-strong text-xs text-ink-muted">–</span>
               )}
               <div className="min-w-0 flex-1">
-                <FileInput name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" maxBytes={MAX_LOGO_BYTES} />
+                <FileInput name="logo" accept="image/png,image/jpeg,image/webp" maxBytes={MAX_LOGO_BYTES} />
               </div>
             </div>
-            {initial.logoDataUrl ? (
+            {initial.logoSrc ? (
               <Checkbox name="removeLogo" label={t("settings.workshop.removeLogo")} className="mt-3" />
             ) : null}
           </Field>

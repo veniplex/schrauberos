@@ -40,7 +40,7 @@ afterEach(async () => {
 const item = (href: string, label: string) => ({ href, label, icon: createElement("span", { "data-icon": href }) });
 const props = {
   workshopName: "Werkstatt Müller",
-  logoDataUrl: null,
+  logoSrc: null,
   primary: [item("/", "Übersicht")],
   groups: [
     { id: "workshop", label: "Werkstatt", items: [item("/appointments", "Termine"), item("/customers", "Kunden"), item("/vehicles", "Fahrzeuge")] },

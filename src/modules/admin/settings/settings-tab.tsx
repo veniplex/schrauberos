@@ -3,6 +3,7 @@ import type { SettingsTabDef } from "@/modules/types";
 import { getAuditRetentionDays } from "@/server/audit-retention";
 import { isBehindProxy } from "@/server/auth/network";
 import { cspMode } from "@/lib/csp-mode";
+import { logoSrc } from "@/lib/logo";
 import { connectionIsSecure } from "@/server/auth/connection";
 import { authPolicy } from "@/server/auth/policy";
 import { CspModeForm, HttpsNotice, SecurityForm } from "./security-form";
@@ -24,7 +25,7 @@ async function WorkshopSettingsTab() {
         email: w.email ?? "",
         website: w.website ?? "",
         accentColor: w.accentColor,
-        logoDataUrl: w.logoDataUrl,
+        logoSrc: logoSrc(w),
         hours: w.hours,
         timezone: w.timezone,
       }}

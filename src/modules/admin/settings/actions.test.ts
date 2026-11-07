@@ -62,12 +62,12 @@ describe("saveWorkshop: Logo (SEC-12: der Inhalt entscheidet)", () => {
     assert.equal(await logoOf(), before);
   });
 
-  it("speichert ein echtes PNG und ein echtes SVG mit dem erkannten Typ in der Daten-URL", async () => {
+  it("speichert ein echtes PNG mit dem erkannten Typ in der Daten-URL; ein echtes SVG wird abgelehnt (P3-5: kein Dokument mit Skriptmöglichkeit unter der Herkunft der App)", async () => {
     assert.equal((await actions.saveWorkshop({}, withLogo(new File([PNG], "logo.png", { type: "image/png" })))).ok, true);
     assert.ok((await logoOf())?.startsWith("data:image/png;base64,"));
     const svg = new File(['<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'], "logo.svg", { type: "image/svg+xml" });
-    assert.equal((await actions.saveWorkshop({}, withLogo(svg))).ok, true);
-    assert.ok((await logoOf())?.startsWith("data:image/svg+xml;base64,"));
+    assert.ok((await actions.saveWorkshop({}, withLogo(svg))).fieldErrors?.logo);
+    assert.ok((await logoOf())?.startsWith("data:image/png;base64,"), "das PNG bleibt");
   });
 });
 

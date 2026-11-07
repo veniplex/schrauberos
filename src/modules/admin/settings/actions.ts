@@ -6,6 +6,7 @@ import { isHexColor } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/constants";
 import { formObject } from "@/lib/forms";
 import { isValidTime } from "@/lib/opening-hours";
+import { LOGO_TYPES } from "@/lib/logo";
 import { checkUpload } from "@/lib/upload-sniff";
 import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
 import { CSP_MODE_KEY, parseCspMode, setCspModeInProcess } from "@/lib/csp-mode";
@@ -15,8 +16,6 @@ import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
-
-const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 
 const dayHours = z.object({ closed: z.boolean(), from: z.string(), to: z.string() });
 

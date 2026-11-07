@@ -448,7 +448,7 @@ export const de = {
     },
     errors: {
       hoursInvalid: "Bitte gültige Zeiten angeben (Ende nach Beginn).",
-      logoType: "Erlaubt sind PNG, JPEG, WebP oder SVG.",
+      logoType: "Erlaubt sind PNG, JPEG oder WebP.",
       logoSize: "Das Logo darf höchstens 200 KB groß sein.",
       auditRetentionMin: "Mindestens {min} Tage (oder 0 für unbegrenzt).",
       requireTwoFactorOwn: "Die Pflicht lässt sich erst einschalten, wenn die eigene Zwei-Faktor-Anmeldung eingerichtet ist (Mein Konto → Sicherheit). Sonst sperrt sie das eigene Konto aus.",
@@ -463,7 +463,7 @@ export const de = {
       timezoneHint: "Termine werden in dieser Zeitzone angezeigt und eingegeben. Die Änderung gilt sofort.",
       branding: "Erscheinungsbild",
       logo: "Logo",
-      logoHint: "PNG, JPEG, WebP oder SVG, max. 200 KB.",
+      logoHint: "PNG, JPEG oder WebP, max. 200 KB.",
       removeLogo: "Logo entfernen",
       accent: "Akzentfarbe",
       accentCustom: "Eigene Farbe wählen",

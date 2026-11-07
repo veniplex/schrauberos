@@ -54,6 +54,13 @@ describe("Proxy: Anmeldeseite und Weiterleitungen", () => {
   it("/setup bleibt ohne Cookie erreichbar", () => {
     assert.ok(passes(proxy(request("/setup"))));
   });
+
+  it("die Offline-Seite des Service Workers und das Logo sind ohne Cookie erreichbar (P3-5); ähnliche Pfade nicht", () => {
+    assert.ok(passes(proxy(request("/offline"))));
+    assert.ok(passes(proxy(request("/api/logo"))));
+    assert.equal(proxy(request("/offline/x")).status, 307);
+    assert.equal(proxy(request("/api/logo/x")).status, 401);
+  });
 });
 
 describe("Proxy: Matcher", () => {

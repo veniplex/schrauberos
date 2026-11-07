@@ -448,7 +448,7 @@ export const en: Messages = {
     },
     errors: {
       hoursInvalid: "Please enter valid times (end after start).",
-      logoType: "Allowed: PNG, JPEG, WebP or SVG.",
+      logoType: "Allowed: PNG, JPEG or WebP.",
       logoSize: "The logo may be at most 200 KB.",
       auditRetentionMin: "At least {min} days (or 0 for unlimited).",
       requireTwoFactorOwn: "You can only make this mandatory after you have set up two-factor sign-in yourself (My account → Security). Otherwise you would lock yourself out.",
@@ -463,7 +463,7 @@ export const en: Messages = {
       timezoneHint: "Appointments are shown and entered in this time zone. The change applies immediately.",
       branding: "Appearance",
       logo: "Logo",
-      logoHint: "PNG, JPEG, WebP or SVG, max. 200 KB.",
+      logoHint: "PNG, JPEG or WebP, max. 200 KB.",
       removeLogo: "Remove logo",
       accent: "Accent colour",
       accentCustom: "Pick a custom colour",

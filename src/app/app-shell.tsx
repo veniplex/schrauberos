@@ -17,6 +17,7 @@ import { SecurityBanner } from "@/platform/account/security-banner";
 import { deviceCookieName } from "@/lib/session-cookie";
 import { FlashNotice } from "@/components/shell/flash-notice";
 import { DraftScope } from "@/components/ui/draft-scope";
+import { logoSrc } from "@/lib/logo";
 import { getWorkshop } from "@/server/workshop";
 
 const ICON_CLASS = "size-[18px] shrink-0";
@@ -59,7 +60,7 @@ export async function AppShell({ session, children }: { session: AppSession; chi
     <DraftScope userId={session.user.id}>
     <Sidebar
       workshopName={workshop.name}
-      logoDataUrl={workshop.logoDataUrl}
+      logoSrc={logoSrc(workshop)}
       primary={primary}
       groups={groups}
       trailing={trailing}
