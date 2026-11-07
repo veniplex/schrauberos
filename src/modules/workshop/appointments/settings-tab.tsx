@@ -41,7 +41,7 @@ async function BaysCards() {
               </form>
               <form action={deleteBay}>
                 <input type="hidden" name="id" value={b.id} />
-                <ConfirmSubmitButton message={t("appointments.settings.bays.confirmDelete")} label={t("common.delete")}>
+                <ConfirmSubmitButton message={t("appointments.settings.bays.confirmDelete")} target={b.name} label={t("common.delete")}>
                   <Trash2 className="size-3.5" aria-hidden />
                 </ConfirmSubmitButton>
               </form>
@@ -94,7 +94,7 @@ async function TypesCards() {
               </form>
               <form action={deleteAppointmentType}>
                 <input type="hidden" name="id" value={v.id} />
-                <ConfirmSubmitButton message={t("appointments.settings.types.confirmDelete")} label={t("common.delete")}>
+                <ConfirmSubmitButton message={t("appointments.settings.types.confirmDelete")} target={v.name} label={t("common.delete")}>
                   <Trash2 className="size-3.5" aria-hidden />
                 </ConfirmSubmitButton>
               </form>

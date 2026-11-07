@@ -108,7 +108,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                         <form action={deleteAbsence}>
                           <input type="hidden" name="id" value={a.id} />
                           <input type="hidden" name="returnTo" value={returnTo} />
-                          <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} label={t("common.delete")}>
+                          <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} target={date(a.startDate)} label={t("common.delete")}>
                             <Trash2 className="size-3.5" aria-hidden />
                           </ConfirmSubmitButton>
                         </form>
@@ -141,7 +141,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                         {canEdit ? (
                           <form action={deleteQualification}>
                             <input type="hidden" name="id" value={q.id} />
-                            <ConfirmSubmitButton message={t("employees.qualificationDeleteConfirm")} label={t("common.delete")}>
+                            <ConfirmSubmitButton message={t("employees.qualificationDeleteConfirm")} target={q.name} label={t("common.delete")}>
                               <Trash2 className="size-3.5" aria-hidden />
                             </ConfirmSubmitButton>
                           </form>

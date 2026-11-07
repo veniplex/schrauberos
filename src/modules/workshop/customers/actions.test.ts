@@ -40,6 +40,19 @@ describe("saveCustomer", () => {
     assert.equal(entry.entityId, c.id);
   });
 
+  it("„Speichern und Fahrzeug anlegen“ (_next) führt nur mit dem Recht zum Anlegen von Fahrzeugen zum Fahrzeugformular; sonst zur Kundenseite statt auf eine Fehlerseite", async () => {
+    // ohne vehicles.edit (die Rolle aus beforeEach hat nur Kundenrechte): normaler Weg
+    const plain = await redirectOf(() => actions.saveCustomer({}, form({ lastName: "Ohne", _next: "1" })));
+    const without = await env.db.customer.findFirstOrThrow({ where: { lastName: "Ohne" } });
+    assert.equal(plain, `/customers/${without.id}`);
+
+    const role = await env.role({ key: `r-v-${Math.random()}`, permissions: ["customers.view", "customers.edit", "vehicles.view", "vehicles.edit"] });
+    await env.signIn(await env.user({ username: "mitfahrzeug", roles: [role] }));
+    const next = await redirectOf(() => actions.saveCustomer({}, form({ lastName: "Mit", _next: "1" })));
+    const withRight = await env.db.customer.findFirstOrThrow({ where: { lastName: "Mit" } });
+    assert.equal(next, `/vehicles/new?customer=${withRight.id}`);
+  });
+
   it("Firmenkunden: Firmenname dient als Nachname; ohne Name oder Firma gibt es einen Feldfehler", async () => {
     await redirectOf(() => actions.saveCustomer({}, form({ company: "Auto GmbH" })));
     assert.equal((await env.db.customer.findFirstOrThrow()).lastName, "Auto GmbH");

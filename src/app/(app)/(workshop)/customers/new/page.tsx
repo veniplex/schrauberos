@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function NewCustomerPage() {
-  await requirePermission("customers.edit");
+  const session = await requirePermission("customers.edit");
   const { t } = await getI18n();
   return (
     <>
@@ -18,6 +18,7 @@ export default async function NewCustomerPage() {
       <div className="max-w-3xl">
         <CustomerForm
           cancelHref="/customers"
+          canAddVehicle={session.can("vehicles.edit")}
           initial={{ customerNumber: "", firstName: "", lastName: "", company: "", email: "", phone: "", street: "", zip: "", city: "", notes: "" }}
         />
       </div>

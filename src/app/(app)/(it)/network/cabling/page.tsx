@@ -102,10 +102,10 @@ async function ConnectionsTab({ canEdit, canDelete, pageParam }: { canEdit: bool
                     header: t("common.actions"),
                     hideHeader: true,
                     align: "end" as const,
-                    cell: (c: { id: string }) => (
+                    cell: (c: { id: string; from: { name: string }; to: { name: string } }) => (
                       <form action={deleteConnection}>
                         <input type="hidden" name="id" value={c.id} />
-                        <ConfirmSubmitButton message={t("network.connectionDeleteConfirm")} label={t("common.delete")}>
+                        <ConfirmSubmitButton message={t("network.connectionDeleteConfirm")} target={`${c.from.name} → ${c.to.name}`} label={t("common.delete")}>
                           <Trash2 className="size-3.5" aria-hidden />
                         </ConfirmSubmitButton>
                       </form>
@@ -156,7 +156,7 @@ async function LocationsTab({ canEdit, canDelete, tp }: { canEdit: boolean; canD
                 {canDelete ? (
                   <form action={deleteLocation}>
                     <input type="hidden" name="id" value={l.id} />
-                    <ConfirmSubmitButton message={t("network.locationDeleteConfirm")} label={t("common.delete")}>
+                    <ConfirmSubmitButton message={t("network.locationDeleteConfirm")} target={l.name} label={t("common.delete")}>
                       <Trash2 className="size-3.5" aria-hidden />
                     </ConfirmSubmitButton>
                   </form>

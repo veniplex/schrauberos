@@ -103,7 +103,7 @@ export default async function IpamPage() {
                   {canDelete ? (
                     <form action={deleteVlan}>
                       <input type="hidden" name="id" value={v.id} />
-                      <ConfirmSubmitButton message={t("network.vlanDeleteConfirm")} label={t("common.delete")}>
+                      <ConfirmSubmitButton message={t("network.vlanDeleteConfirm")} target={`VLAN ${v.vlanId} ${v.name}`} label={t("common.delete")}>
                         <Trash2 className="size-3.5" aria-hidden />
                       </ConfirmSubmitButton>
                     </form>

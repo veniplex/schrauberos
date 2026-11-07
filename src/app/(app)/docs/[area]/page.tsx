@@ -95,7 +95,7 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
                       <form action={deleteDocCategory}>
                         <input type="hidden" name="area" value={area} />
                         <input type="hidden" name="id" value={c.id} />
-                        <ConfirmSubmitButton message={t("docs.categoryDeleteConfirm")} label={t("common.delete")}>
+                        <ConfirmSubmitButton message={t("docs.categoryDeleteConfirm")} target={c.name} label={t("common.delete")}>
                           <Trash2 className="size-3.5" aria-hidden />
                         </ConfirmSubmitButton>
                       </form>

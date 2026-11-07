@@ -20,7 +20,8 @@ export type CustomerFormValues = {
   notes: string;
 };
 
-export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormValues; cancelHref: string }) {
+/** `canAddVehicle`: „Speichern und Fahrzeug anlegen“ nur anbieten, wenn die Person Fahrzeuge anlegen darf (Recht `vehicles.edit`, Funktion „Fahrzeuge“ aktiv) */
+export function CustomerForm({ initial, cancelHref, canAddVehicle = false }: { initial: CustomerFormValues; cancelHref: string; canAddVehicle?: boolean }) {
   const { t } = useI18n();
   return (
     <FormCard action={saveCustomer} draftKey={`customer:${initial.id ?? "new"}`}>
@@ -64,7 +65,7 @@ export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormVal
       <Field label={t("common.notes")} htmlFor="notes">
         <Textarea id="notes" name="notes" defaultValue={initial.notes} maxLength={2000} />
       </Field>
-      <FormActions cancelHref={cancelHref} secondaryLabel={initial.id ? undefined : t("customers.saveAndAddVehicle")} />
+      <FormActions cancelHref={cancelHref} secondaryLabel={!initial.id && canAddVehicle ? t("customers.saveAndAddVehicle") : undefined} />
     </FormCard>
   );
 }

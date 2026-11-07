@@ -27,7 +27,8 @@ export type ActionFunction = {
   (formData: FormData): Promise<void>;
 };
 
-type Of<T, I, R> = T | ((data: R, input: I) => T);
+/** Wert oder Funktion aus Ergebnis und Eingabe der Operation – und der angemeldeten Person (z. B. Weiterleitung nur dorthin, wo sie hinein darf) */
+type Of<T, I, R> = T | ((data: R, input: I, principal: Principal) => T);
 
 export type ActionOptions<I, R> = {
   /** FormData → rohe Eingabe der Operation (Standard: `formObject`, leere Felder entfallen). Hier kommen Mehrfachfelder, Häkchen und Dateien dazu. */
@@ -62,7 +63,8 @@ export function stateOf(failure: OperationFailure, t: Translator["t"]): ActionSt
   return state;
 }
 
-const resolve = <T, I, R>(value: Of<T, I, R> | undefined, data: R, input: I): T | undefined => (typeof value === "function" ? (value as (d: R, i: I) => T)(data, input) : value);
+const resolve = <T, I, R>(value: Of<T, I, R> | undefined, data: R, input: I, principal: Principal): T | undefined =>
+  typeof value === "function" ? (value as (d: R, i: I, p: Principal) => T)(data, input, principal) : value;
 
 /** Eine Operation als Server Action anbieten (Datei mit `"use server"`; jede Aktion wird mit `export const x = defineAction(...)` exportiert). */
 export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOptions<I, R> = {}): ActionFunction & { operation: Operation<I, R> } {
@@ -102,13 +104,13 @@ export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOp
     }
 
     const { data, input } = outcome;
-    for (const entry of resolve(options.revalidate, data, input) ?? []) {
+    for (const entry of resolve(options.revalidate, data, input, principal) ?? []) {
       if (typeof entry === "string") revalidatePath(entry);
       else revalidatePath(entry[0], entry[1]);
     }
     if (options.onSuccess) await options.onSuccess(data, input);
-    const message = resolve(options.message, data, input);
-    const target = (wantsNext ? resolve(options.redirectNext, data, input) : undefined) ?? resolve(options.redirect, data, input);
+    const message = resolve(options.message, data, input, principal);
+    const target = (wantsNext ? resolve(options.redirectNext, data, input, principal) : undefined) ?? resolve(options.redirect, data, input, principal);
     if (message && (formMode || target)) await setFlash({ tone: "success", key: message });
     if (target) redirect(target);
     if (formMode) return undefined;

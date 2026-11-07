@@ -209,7 +209,7 @@ export default async function AbsencesPage({
                       <form action={deleteAbsence}>
                         <input type="hidden" name="id" value={a.id} />
                         <input type="hidden" name="returnTo" value={base} />
-                        <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} label={t("common.delete")}>
+                        <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} target={`${employeeName(a.employee)}, ${date(a.startDate)}`} label={t("common.delete")}>
                           <Trash2 className="size-3.5" aria-hidden />
                         </ConfirmSubmitButton>
                       </form>

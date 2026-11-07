@@ -113,7 +113,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                           <td className="w-12">
                             <form action={deleteMileage}>
                               <input type="hidden" name="id" value={m.id} />
-                              <ConfirmSubmitButton message={t("fleet.deleteConfirm")} label={t("common.delete")}>
+                              <ConfirmSubmitButton message={t("fleet.deleteConfirm")} target={`${date(m.date)}, ${number(m.km)} km`} label={t("common.delete")}>
                                 <Trash2 className="size-3.5" aria-hidden />
                               </ConfirmSubmitButton>
                             </form>
@@ -165,7 +165,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                             <td className="w-12">
                               <form action={deleteCost}>
                                 <input type="hidden" name="id" value={c.id} />
-                                <ConfirmSubmitButton message={t("fleet.deleteConfirm")} label={t("common.delete")}>
+                                <ConfirmSubmitButton message={t("fleet.deleteConfirm")} target={`${date(c.date)}, ${eur(c.amountCents)}`} label={t("common.delete")}>
                                   <Trash2 className="size-3.5" aria-hidden />
                                 </ConfirmSubmitButton>
                               </form>
