@@ -364,6 +364,8 @@ describe("Auslastung", () => {
     const none = report.rows.find((r) => r.id === null)!;
     assert.deepEqual([none.appointments, none.bookedMinutes, none.utilization], [1, 60, null], "ohne Arbeitsplatz: keine Prozent");
     assert.equal(report.truncated, false);
+    // Kennzahlen (eine Rechenregel): Kapazität je Arbeitsplatz ≠ Kapazität gesamt; gebucht gesamt enthält die Zeit ohne Arbeitsplatz
+    assert.deepEqual(queries.utilizationTotals(report), { bays: 3, capacityPerBay: 2_790, capacityTotal: 8_370, bookedTotal: 810, bookedUnassigned: 60, bookedAssigned: 750 }, "3 aufgeführte Arbeitsplätze, 150 + 540 + 60 mit Platz, 60 ohne");
   });
 
   it("ein Feiertag ohne Öffnung nimmt die Kapazität weg und die Termine darauf zählen nicht", async () => {

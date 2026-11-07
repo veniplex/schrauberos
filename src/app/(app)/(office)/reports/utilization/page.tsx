@@ -10,7 +10,7 @@ import { noon, todayInput } from "@/lib/dates";
 import { canOpenReport } from "@/modules/office/reports/access";
 import { MAX_UTILIZATION_DAYS, parsePeriod, thisMonthUntil } from "@/modules/office/reports/domain";
 import { PeriodForm } from "@/modules/office/reports/period-form";
-import { utilizationReport, type UtilizationReport } from "@/modules/office/reports/queries";
+import { utilizationReport, utilizationTotals, type UtilizationReport } from "@/modules/office/reports/queries";
 import { ReportChart } from "@/modules/office/reports/report-chart";
 import { UTILIZATION_MAX_BOOKINGS } from "@/modules/workshop/appointments/public";
 import { requirePermission } from "@/server/auth/session";
@@ -31,7 +31,7 @@ export default async function UtilizationReportPage({ searchParams }: { searchPa
   const session = await requirePermission("reports.view");
   if (!canOpenReport(session, "utilization")) redirect("/forbidden");
   const [i18n, sp] = await Promise.all([getI18n(), searchParams]);
-  const { t, number, date } = i18n;
+  const { t, tp, number, date } = i18n;
   const today = todayInput();
   const asked = sp.from !== undefined || sp.to !== undefined;
   const parsed = parsePeriod(sp.from ?? thisMonthUntil(today).from, sp.to ?? thisMonthUntil(today).to, { maxDays: MAX_UTILIZATION_DAYS });
@@ -42,8 +42,8 @@ export default async function UtilizationReportPage({ searchParams }: { searchPa
   const hours = (minutes: number) => t("reports.common.hours", { hours: number(minutes / 60, { maximumFractionDigits: 1 }) });
   const percent = (value: number | null) => (value === null ? "–" : `${number(value, { maximumFractionDigits: 1 })} %`);
   const withBay = report.rows.filter((r) => r.id !== null);
-  const bookedTotal = report.rows.reduce((sum, r) => sum + r.bookedMinutes, 0);
-  const rules = ["capacity", "booked", "people"] as const;
+  const totals = utilizationTotals(report);
+  const rules = ["capacity", "booked", "totals", "people"] as const;
 
   return (
     <>
@@ -67,10 +67,11 @@ export default async function UtilizationReportPage({ searchParams }: { searchPa
         </Alert>
       ) : null}
 
-      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <StatCard label={t("reports.utilization.cols.capacity")} value={hours(report.capacityMinutes)} />
-        <StatCard label={t("reports.utilization.cols.booked")} value={hours(bookedTotal)} />
-        <StatCard label={t("reports.utilization.cols.bay")} value={withBay.length} />
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label={t("reports.utilization.stats.capacityPerBay")} value={hours(totals.capacityPerBay)} sub={t("reports.utilization.stats.capacityPerBaySub")} />
+        <StatCard label={t("reports.utilization.stats.capacityTotal")} value={hours(totals.capacityTotal)} sub={tp("reports.utilization.stats.bays", totals.bays)} />
+        <StatCard label={t("reports.utilization.stats.bookedTotal")} value={hours(totals.bookedTotal)} sub={t("reports.utilization.stats.bookedTotalSub")} />
+        <StatCard label={t("reports.utilization.stats.unassigned")} value={hours(totals.bookedUnassigned)} sub={t("reports.utilization.stats.unassignedSub")} />
       </div>
 
       {withBay.length > 0 && report.capacityMinutes > 0 ? (
@@ -88,7 +89,7 @@ export default async function UtilizationReportPage({ searchParams }: { searchPa
             { id: "bay", header: t("reports.utilization.cols.bay"), priority: "primary", cell: (row) => (row.id === null ? t("reports.utilization.noBay") : `${row.name}${row.active ? "" : ` ${t("reports.utilization.inactive")}`}`) },
             { id: "appointments", header: t("reports.utilization.cols.appointments"), align: "end", cell: (row) => row.appointments },
             { id: "booked", header: t("reports.utilization.cols.booked"), align: "end", cell: (row) => hours(row.bookedMinutes) },
-            { id: "capacity", header: t("reports.utilization.cols.capacity"), align: "end", cell: (row) => (row.id === null ? "–" : hours(report.capacityMinutes)) },
+            { id: "capacity", header: t("reports.utilization.cols.capacityPerBay"), align: "end", cell: (row) => (row.id === null ? "–" : hours(report.capacityMinutes)) },
             { id: "utilization", header: t("reports.utilization.cols.utilization"), align: "end", cell: (row) => <strong>{percent(row.utilization)}</strong> },
           ]}
           rows={report.rows}

@@ -30,6 +30,7 @@ Der Anteil der **Öffnungszeit**, in dem ein **Arbeitsplatz mit Terminen belegt*
 * Die Öffnungszeit kommt aus dem **Werkstattprofil** (Einstellungen → Werkstatt) je Wochentag; **geschlossene Tage und ganze Feiertage** zählen nicht, ein **halber Feiertag** zählt zur Hälfte (Region der Feiertage: Einstellungen → Feiertage).
 * **Gebucht** ist die Zeit der Termine **innerhalb** der Öffnungszeit; was davor, danach oder an geschlossenen Tagen liegt, zählt nicht. **Abgesagte** Termine und **nicht erschienene** Kunden belegen keinen Platz.
 * Termine **ohne Arbeitsplatz** stehen in einer eigenen Zeile ohne Prozent.
+* **Die Kennzahlen oben:** *Kapazität je Arbeitsplatz* ist die Öffnungszeit **eines** Arbeitsplatzes, *Kapazität gesamt* ist sie mal der Zahl der aufgeführten Arbeitsplätze. *Gebucht gesamt* zählt **alle** Termine, auch die ohne Arbeitsplatz – deren Zeit steht zusätzlich getrennt unter *davon ohne Arbeitsplatz*. Vergleichen Sie *Gebucht gesamt* also mit der Kapazität gesamt, nicht mit der Kapazität je Arbeitsplatz.
 * Der Bericht zeigt **keine Namen, Kunden oder Fahrzeuge**, nur Zeiten und Anzahlen. Bei mehr als 50.000 Terminen im Zeitraum ist er unvollständig (Hinweis): dann den Zeitraum verkürzen.
 
 ## Einlagerungsbestand

@@ -121,6 +121,10 @@ describe("Offene Posten, Auslastung, Einlagerung, Fälligkeiten", () => {
     let root = await render(await (await page("utilization/page"))({ searchParams: Promise.resolve({}) } as never));
     assert.match(plain(root.textContent), /Hebebühne 1/);
     assert.match(plain(root.textContent), /So wird gerechnet/);
+    // eindeutige Kennzahlen: Kapazität je Arbeitsplatz / gesamt, gebucht gesamt, davon ohne Arbeitsplatz (kein mehrdeutiges „Öffnungszeit“ neben „Gebucht“)
+    const util = plain(root.textContent);
+    for (const label of ["Kapazität je Arbeitsplatz", "Kapazität gesamt", "Gebucht gesamt", "davon ohne Arbeitsplatz"]) assert.ok(util.includes(label), label);
+    assert.match(util, /1 Arbeitsplatz/, "Zahl der Arbeitsplätze unter der Gesamtkapazität");
     root = await render(await (await page("storage/page"))({} as never));
     const storage = plain(root.textContent);
     assert.match(storage, /Halle A/);

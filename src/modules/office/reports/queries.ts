@@ -72,6 +72,18 @@ export async function utilizationReport(viewer: Viewer, period: { from: string; 
   return { from: period.from, to: period.to, capacityMinutes, rows, truncated: source.truncated };
 }
 
+/**
+ * Die Kennzahlen über der Tabelle, in **einer** Rechenregel (die Seite zeigt sie, der Test prüft sie): **Kapazität je Arbeitsplatz** = Öffnungszeit im Zeitraum (`capacityMinutes`); **Kapazität gesamt** = Kapazität je
+ * Arbeitsplatz × Zahl der aufgeführten Arbeitsplätze (Zeilen mit Arbeitsplatz, auch archivierte mit Terminen – sie haben gebuchte Zeit); **gebucht gesamt** = alle Termine inklusive derer ohne Arbeitsplatz,
+ * **davon ohne Arbeitsplatz** = nur diese. Die Gesamtauslastung (Zeit mit Arbeitsplatz / Kapazität gesamt) fehlt bewusst: Termine ohne Arbeitsplatz haben keine Kapazität, an der man sie messen könnte.
+ */
+export function utilizationTotals(report: Pick<UtilizationReport, "capacityMinutes" | "rows">) {
+  const withBay = report.rows.filter((r) => r.id !== null);
+  const bookedTotal = report.rows.reduce((sum, r) => sum + r.bookedMinutes, 0);
+  const unassigned = report.rows.find((r) => r.id === null)?.bookedMinutes ?? 0;
+  return { bays: withBay.length, capacityPerBay: report.capacityMinutes, capacityTotal: report.capacityMinutes * withBay.length, bookedTotal, bookedUnassigned: unassigned, bookedAssigned: bookedTotal - unassigned };
+}
+
 /* ───────────── Einlagerungsbestand ───────────── */
 
 export const storageReport = (viewer: Viewer): Promise<StorageOverview | null> => storageOverview(viewer);
