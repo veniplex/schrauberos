@@ -72,6 +72,10 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     accept: "Mark quotes as accepted or rejected and create a workshop order from them.",
     send: "Send quotes and invoices to customers by e-mail (the permission “Send e-mails” is needed as well). Never assigned automatically.",
   },
+  reports: {
+    view: "Open reports: revenue, open items, utilization, tire storage, deadlines. Every report shows only what the person may also read at the source (invoices, appointments, tires, vehicles, fleet).",
+    export: "Download reports as a CSV file (revenue, open items with business partners). Never granted automatically.",
+  },
   checklists: {
     view: "View checklists on vehicles and orders – only where the person may also see the vehicle or order.",
     fill: "Start checklists, tick items, record measurements, have the customer sign and complete them.",

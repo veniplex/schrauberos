@@ -35,6 +35,7 @@ export const auditDe = {
     files: "Dokumente & Fotos",
     checklists: "Checklisten",
     billing: "Angebote & Rechnungen",
+    reports: "Berichte",
     invoice: "Rechnungen",
     employee: "Mitarbeiter",
     time: "Zeiterfassung",
@@ -251,6 +252,9 @@ export const auditDe = {
       void: "Zeiteintrag storniert",
       manual: "Zeit nachgetragen",
       transfer: "Zeiten als Positionen in einen Auftrag übernommen",
+    },
+    reports: {
+      export: "Bericht als CSV exportiert",
     },
     employee: {
       create: "Mitarbeiter angelegt",

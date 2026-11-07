@@ -27,6 +27,7 @@ export type IconName =
   | "ip"
   | "cabling"
   | "invoices"
+  | "reports"
   | "employees"
   | "absences"
   | "fleet"

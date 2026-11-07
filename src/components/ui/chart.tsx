@@ -65,6 +65,7 @@ export function Chart({
   formatValue,
   height = 240,
   categoryLabel,
+  integer,
   className,
 }: {
   type: ChartType;
@@ -76,6 +77,8 @@ export function Chart({
   height?: number;
   /** Beschriftung der ersten Tabellenspalte (Standard „Zeitraum“) */
   categoryLabel?: string;
+  /** Anzahlen: die Achse teilt nur bei ganzen Zahlen */
+  integer?: boolean;
   className?: string;
 }) {
   const { t, number } = useI18n();
@@ -83,7 +86,7 @@ export function Chart({
   const [asTable, setAsTable] = useState(false);
   const format = formatValue ?? ((value: number) => number(value));
   const empty = categories.length === 0 || series.length === 0 || series.every((s) => s.values.every((v) => v === null));
-  const layout = layoutChart({ type, categories, series, height, formatTick: format });
+  const layout = layoutChart({ type, categories, series, height, formatTick: format, integer });
   const showValues = type === "bar" && layout.bars.length <= 12;
   const description = t("ui.chart.summary", { type: t(type === "bar" ? "ui.chart.bar" : "ui.chart.line"), series: series.length, categories: categories.length });
 

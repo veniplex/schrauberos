@@ -101,3 +101,13 @@ describe("Farben", () => {
     assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 9].map(seriesColorIndex), [1, 2, 3, 4, 5, 6, 6, 6]);
   });
 });
+
+describe("niceScale für Anzahlen (integer)", () => {
+  it("teilt nur bei ganzen Zahlen: 0 bis 1 ergibt 0 und 1, nie 0,2 oder 0,5", () => {
+    assert.deepEqual(niceScale(0, 1, 5, true, true).ticks, [0, 1]);
+    assert.deepEqual(niceScale(0, 3, 5, true, true).ticks, [0, 1, 2, 3]);
+    assert.ok(niceScale(0, 1, 5, true, false).ticks.some((tick) => !Number.isInteger(tick)), "ohne integer teilt die Achse fein");
+    const big = niceScale(0, 47, 5, true, true);
+    assert.ok(big.ticks.every(Number.isInteger) && big.step >= 1);
+  });
+});

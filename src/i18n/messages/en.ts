@@ -12,6 +12,7 @@ import { timeEn } from "./modules/time.en";
 import { filesEn } from "./modules/files.en";
 import { checklistsEn } from "./modules/checklists.en";
 import { billingEn } from "./modules/billing.en";
+import { reportsEn } from "./modules/reports.en";
 import { customersEn } from "./modules/customers.en";
 import { exchangeEn } from "./modules/exchange.en";
 import { usersEn } from "./modules/users.en";
@@ -170,6 +171,7 @@ export const en: Messages = {
     files: "Documents & photos",
     checklists: "Checklists",
     billing: "Quotes & invoicing",
+    reports: "Reports",
     tires: "Tyre storage",
     customers: "Customers",
     users: "Users",
@@ -325,6 +327,7 @@ export const en: Messages = {
   files: filesEn,
   checklists: checklistsEn,
   billing: billingEn,
+  reports: reportsEn,
   customers: customersEn,
   exchange: exchangeEn,
   users: usersEn,
@@ -346,6 +349,7 @@ export const en: Messages = {
     network: "IT & network",
     invoices: "Invoice archive",
     billing: "Quotes & invoicing",
+    reports: "Reports",
     employees: "Employees",
     time: "Time tracking",
     fleet: "Fleet",
@@ -424,6 +428,10 @@ export const en: Messages = {
       edit: "Create and edit quotes, order confirmations and invoice drafts",
       accept: "Mark quotes as accepted or rejected and create orders from them",
       send: "Send documents to customers by e-mail",
+    },
+    reports: {
+      view: "View reports (with the read permission of the respective source)",
+      export: "Download reports as a CSV file",
     },
     employees: {
       view: "View employees",

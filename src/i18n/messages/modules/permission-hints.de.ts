@@ -71,6 +71,10 @@ export const permissionHintsDe = {
     accept: "Angebote als angenommen oder abgelehnt vermerken und daraus einen Werkstattauftrag anlegen.",
     send: "Angebote und Rechnungen per E-Mail an Kunden senden (zusätzlich ist das Recht „E-Mails senden“ nötig). Wird nie automatisch vergeben.",
   },
+  reports: {
+    view: "Berichte öffnen: Umsatz, offene Posten, Auslastung, Einlagerungsbestand, Fälligkeiten. Jeder Bericht zeigt nur, wofür die Person auch an der Quelle das Leserecht hat (Rechnungen, Termine, Reifen, Fahrzeuge, Fuhrpark).",
+    export: "Berichte als CSV-Datei herunterladen (Umsätze, offene Posten mit Geschäftspartnern). Wird nie automatisch vergeben.",
+  },
   checklists: {
     view: "Checklisten an Fahrzeugen und Aufträgen ansehen – nur dort, wo die Person auch das Fahrzeug bzw. den Auftrag sehen darf.",
     fill: "Checklisten beginnen, Punkte abhaken, Messwerte erfassen, den Kunden unterschreiben lassen und abschließen.",

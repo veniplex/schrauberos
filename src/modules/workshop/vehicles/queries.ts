@@ -132,3 +132,39 @@ export async function vehicleDeadlines(viewer: Viewer, from: string, to: string,
   }
   return out;
 }
+
+export type InspectionMonth = { month: string; count: number };
+export type VehicleInspectionOverview = {
+  /** Fahrzeuge mit Frist vor dem laufenden Monat (überfällig) */
+  overdue: number;
+  /** Fristen vom laufenden Monat bis `untilMonth`, je Monat */
+  months: InspectionMonth[];
+  /** Die ältesten Fristen (Kennzeichen, Fahrzeug, Monat) – ohne Fahrzeuge von Kunden mit eingeschränkter Verarbeitung */
+  items: Array<{ id: string; plate: string; vehicleName: string; month: string }>;
+};
+
+/**
+ * **Prüffristen** der Kundenfahrzeuge für den Bericht (F9): überfällige und die Fristen bis `untilMonth` (`JJJJ-MM`), gezählt von der Datenbank (`groupBy` auf dem Monat). Ohne archivierte Fahrzeuge und **ohne Fahrzeuge von
+ * Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO)** – weder in den Zahlen noch in der Liste (so passen sie zusammen). Kein Halter, kein Kunde: Kennzeichen, Marke, Modell. Verlangt `vehicles.view`.
+ */
+export async function vehicleInspectionOverview(viewer: Viewer, options: { currentMonth: string; untilMonth: string; limit: number }): Promise<VehicleInspectionOverview | null> {
+  if (!viewer.can("vehicles.view")) return null;
+  const unrestricted = { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+  const where: Prisma.VehicleWhereInput = { archivedAt: null, AND: [unrestricted, { inspectionDue: { not: null, lte: options.untilMonth } }] };
+  const [groups, rows] = await Promise.all([
+    db.vehicle.groupBy({ by: ["inspectionDue"], where, _count: { _all: true } }),
+    db.vehicle.findMany({ where, orderBy: [{ inspectionDue: "asc" }, { plateNorm: "asc" }, { id: "asc" }], take: options.limit, select: { id: true, plate: true, make: true, model: true, inspectionDue: true } }),
+  ]);
+  let overdue = 0;
+  const months = new Map<string, number>();
+  for (const g of groups) {
+    if (!g.inspectionDue) continue;
+    if (g.inspectionDue < options.currentMonth) overdue += g._count._all;
+    else months.set(g.inspectionDue, (months.get(g.inspectionDue) ?? 0) + g._count._all);
+  }
+  return {
+    overdue,
+    months: [...months.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([month, count]) => ({ month, count })),
+    items: rows.flatMap((v) => (v.inspectionDue ? [{ id: v.id, plate: v.plate, vehicleName: [v.make, v.model].filter(Boolean).join(" "), month: v.inspectionDue }] : [])),
+  };
+}

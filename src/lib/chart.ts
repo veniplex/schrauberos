@@ -24,9 +24,9 @@ function niceNumber(value: number, round: boolean): number {
 
 /**
  * Achsenteilung für Werte von `min` bis `max` mit etwa `target` Teilstrichen. `includeZero` (Balken) zieht die Null immer in den Bereich. Gleiche Werte (oder keine) ergeben
- * einen sinnvollen Bereich, nie eine Teilung durch null.
+ * einen sinnvollen Bereich, nie eine Teilung durch null. `integer` (Anzahlen): Die Teilstriche sind ganze Zahlen (Schritt mindestens 1) – keine „0,2 Fahrzeuge“.
  */
-export function niceScale(min: number, max: number, target = 5, includeZero = true): NiceScale {
+export function niceScale(min: number, max: number, target = 5, includeZero = true, integer = false): NiceScale {
   let lo = Number.isFinite(min) ? min : 0;
   let hi = Number.isFinite(max) ? max : 0;
   if (includeZero) {
@@ -37,7 +37,8 @@ export function niceScale(min: number, max: number, target = 5, includeZero = tr
     hi = lo + 1;
     if (!includeZero) lo -= 1;
   }
-  const step = niceNumber(niceNumber(hi - lo, false) / Math.max(1, target - 1), true);
+  const rawStep = niceNumber(niceNumber(hi - lo, false) / Math.max(1, target - 1), true);
+  const step = integer ? Math.max(1, Math.round(rawStep)) : rawStep;
   const start = Math.floor(lo / step) * step;
   const end = Math.ceil(hi / step) * step;
   const ticks: number[] = [];
@@ -53,6 +54,8 @@ export type ChartLayoutInput = {
   height?: number;
   /** Beschriftung der Teilstriche – bestimmt den Platz links */
   formatTick?: (value: number) => string;
+  /** Anzahlen: Teilstriche nur bei ganzen Zahlen */
+  integer?: boolean;
 };
 
 export type ChartLayout = {
@@ -73,7 +76,7 @@ export function layoutChart(input: ChartLayoutInput): ChartLayout {
   const width = input.width ?? 640;
   const height = input.height ?? 240;
   const values = input.series.flatMap((s) => s.values.filter((v): v is number => v !== null && Number.isFinite(v)));
-  const scale = niceScale(values.length ? Math.min(...values) : 0, values.length ? Math.max(...values) : 0, 5, input.type === "bar");
+  const scale = niceScale(values.length ? Math.min(...values) : 0, values.length ? Math.max(...values) : 0, 5, input.type === "bar", input.integer);
   const format = input.formatTick ?? ((v: number) => String(v));
   const tickWidth = Math.max(...scale.ticks.map((t) => format(t).length), 1) * CHAR_WIDTH;
   const plot = { left: Math.ceil(tickWidth) + 14, top: 14, right: width - 10, bottom: height - 28 };

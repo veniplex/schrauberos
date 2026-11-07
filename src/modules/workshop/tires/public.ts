@@ -4,5 +4,6 @@
  */
 export { formatTireSize, setHealth, suggestedStockStatus, tireHealth, type TireRules } from "./domain";
 export { getTireRules } from "./settings";
+export { storageOverview, type StorageOverview, type StorageRow } from "./queries";
 export { TireStockPrompt } from "./stock-prompt";
 export { HealthBadge, SeasonBadge } from "./ui";

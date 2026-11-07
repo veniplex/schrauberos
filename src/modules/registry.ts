@@ -20,9 +20,11 @@ import { settingsTabs as employeesSettings } from "./office/employees/settings-t
 import { settingsTabs as customersSettings } from "./workshop/customers/settings-tab";
 import { widgets as invoicesWidgets } from "./office/invoices/widgets";
 import { widgets as billingWidgets } from "./office/billing/widgets";
+import { widgets as reportsWidgets } from "./office/reports/widgets";
 import { sections as billingSections } from "./office/billing/sections";
 import { setupChecks as billingChecks } from "./office/billing/setup-checks";
 import { searchProviders as billingSearch } from "./office/billing/search";
+import { searchProviders as reportsSearch } from "./office/reports/search";
 import { widgets as employeesWidgets } from "./office/employees/widgets";
 import { widgets as timeWidgets } from "./office/time/widgets";
 import { sections as timeSections } from "./office/time/sections";
@@ -76,6 +78,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   ...vehiclesWidgets,
   ...invoicesWidgets,
   ...billingWidgets,
+  ...reportsWidgets,
   ...employeesWidgets,
   ...timeWidgets,
   ...fleetWidgets,
@@ -94,6 +97,7 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...partsSearch,
   ...tiresSearch,
   ...billingSearch,
+  ...reportsSearch,
   ...customersSearch,
   ...vehiclesSearch,
   ...invoicesSearch,

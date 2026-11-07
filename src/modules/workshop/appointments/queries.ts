@@ -199,3 +199,28 @@ export async function appointmentsForFeed(viewer: Viewer, from: Date, to: Date, 
 export async function feedStatusOf(userId: string) {
   return db.calendarFeedToken.findUnique({ where: { userId }, select: { hint: true, createdAt: true, expiresAt: true, lastUsedAt: true } });
 }
+
+/** So viele Termine liest die Auslastung höchstens (ein Jahr bei mehreren Plätzen bleibt darunter); darüber steht `truncated`. */
+export const UTILIZATION_MAX_BOOKINGS = 50_000;
+
+export type UtilizationBooking = { bayId: string | null; startsAt: Date; endsAt: Date };
+export type UtilizationSource = { bays: Array<{ id: string; name: string; active: boolean }>; bookings: UtilizationBooking[]; truncated: boolean };
+
+/**
+ * Termine für den **Auslastungsbericht** (F9): je Termin nur Arbeitsplatz, Beginn und Ende – kein Titel, kein Kunde, kein Fahrzeug, keine Notiz. Alle Termine, die den Zeitraum `from`…`to` (Zeitpunkte, `to` ausgeschlossen)
+ * berühren und nicht abgesagt oder nicht erschienen sind (diese belegen keinen Platz), dazu die Arbeitsplätze (aktive und solche mit Terminen im Zeitraum). Verlangt `appointments.view`.
+ */
+export async function utilizationSource(viewer: Viewer, from: Date, to: Date): Promise<UtilizationSource | null> {
+  if (!viewer.can("appointments.view")) return null;
+  const rows = await db.appointment.findMany({
+    where: { startsAt: { lt: to }, endsAt: { gt: from }, status: { notIn: ["cancelled", "no_show"] } },
+    orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    take: UTILIZATION_MAX_BOOKINGS + 1,
+    select: { bayId: true, startsAt: true, endsAt: true },
+  });
+  const truncated = rows.length > UTILIZATION_MAX_BOOKINGS;
+  const bookings = truncated ? rows.slice(0, UTILIZATION_MAX_BOOKINGS) : rows;
+  const used = new Set(bookings.flatMap((b) => (b.bayId ? [b.bayId] : [])));
+  const bays = await db.bay.findMany({ where: { OR: [{ active: true }, { id: { in: [...used] } }] }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, active: true } });
+  return { bays, bookings, truncated };
+}

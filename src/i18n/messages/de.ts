@@ -11,6 +11,7 @@ import { timeDe } from "./modules/time.de";
 import { filesDe } from "./modules/files.de";
 import { checklistsDe } from "./modules/checklists.de";
 import { billingDe } from "./modules/billing.de";
+import { reportsDe } from "./modules/reports.de";
 import { customersDe } from "./modules/customers.de";
 import { exchangeDe } from "./modules/exchange.de";
 import { usersDe } from "./modules/users.de";
@@ -171,6 +172,7 @@ export const de = {
     files: "Dokumente & Fotos",
     checklists: "Checklisten",
     billing: "Angebote & Rechnungen",
+    reports: "Berichte",
     tires: "Reifenlager",
     customers: "Kunden",
     users: "Benutzer",
@@ -326,6 +328,7 @@ export const de = {
   files: filesDe,
   checklists: checklistsDe,
   billing: billingDe,
+  reports: reportsDe,
   customers: customersDe,
   exchange: exchangeDe,
   users: usersDe,
@@ -346,6 +349,7 @@ export const de = {
     network: "IT & Netzwerk",
     invoices: "Rechnungsarchiv",
     billing: "Angebote & Rechnungen",
+    reports: "Berichte",
     employees: "Mitarbeiter",
     time: "Zeiterfassung",
     fleet: "Fuhrpark",
@@ -424,6 +428,10 @@ export const de = {
       edit: "Angebote, Auftragsbestätigungen und Rechnungsentwürfe anlegen und bearbeiten",
       accept: "Angebote als angenommen oder abgelehnt vermerken und daraus Aufträge anlegen",
       send: "Belege per E-Mail an Kunden senden",
+    },
+    reports: {
+      view: "Berichte ansehen (mit dem Leserecht der jeweiligen Quelle)",
+      export: "Berichte als CSV-Datei herunterladen",
     },
     employees: {
       view: "Mitarbeiter ansehen",

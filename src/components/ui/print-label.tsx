@@ -26,7 +26,7 @@ export function PrintQr({ matrix, label, className }: { matrix: QrMatrix; label:
 }
 
 const SIZES: Record<LabelFormat, { title: string; body: string }> = {
-  "62x29": { title: "13pt", body: "7pt" },
+  "62x29": { title: "12pt", body: "6pt" },
   "100x50": { title: "20pt", body: "10pt" },
   "sheet-3x8": { title: "12pt", body: "7.5pt" },
 };

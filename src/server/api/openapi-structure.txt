@@ -138,6 +138,11 @@ POST /orders/{id}/close orders.close orders.close
 POST /orders/{id}/findings orders.findings orders.edit body=text
 POST /orders/{id}/items orders.items orders.prices body=items
 POST /orders/{id}/status orders.status orders.edit body=status
+GET /reports/due reports.due reports.view query=months
+GET /reports/open-items reports.open-items reports.view query=direction
+GET /reports/revenue reports.revenue reports.view query=from,to
+GET /reports/storage reports.storage reports.view
+GET /reports/utilization reports.utilization reports.view query=from,to
 GET /stock-movements stock-movements.list parts.view query=articleId,kind,orderId sort=createdAt
 POST /stock-movements stock-movements.create parts.stock body=articleId,quantityMilli,reference,note
 GET /stock-movements/{id} stock-movements.get parts.view

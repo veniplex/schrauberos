@@ -1,4 +1,5 @@
 import "server-only";
+import { dayKey } from "@/lib/zone";
 import { db } from "@/server/db";
 import { getTireRules } from "./settings";
 import { isWrongSeason, minTread, setHealth, wantedSeason, type Health, type TireHealth } from "@/modules/workshop/tires/domain";
@@ -87,3 +88,33 @@ export async function tireLabelData(viewer: Viewer, id: string) {
 }
 
 export type TireLabelData = NonNullable<Awaited<ReturnType<typeof tireLabelData>>>;
+
+export type StorageRow = { location: string | null; summer: number; winter: number; allseason: number; total: number; /** Einlagerung des ältesten Satzes (Kalendertag der Werkstatt-Zone) */ oldestDay: string };
+export type StorageOverview = { total: number; bySeason: { summer: number; winter: number; allseason: number }; rows: StorageRow[]; /** Lagerplätze über der Anzeigegrenze (die Summen zählen alle) */ moreLocations: number };
+
+/** So viele Lagerplätze zeigt der Bericht höchstens. */
+export const STORAGE_LOCATION_LIMIT = 200;
+
+/**
+ * **Einlagerungsbestand** für den Bericht (F9): die eingelagerten Reifensätze (Status „eingelagert“) nach Lagerplatz und Saison, von der Datenbank gezählt (`groupBy`). Es stehen **keine Namen und keine
+ * Kennzeichen** darin – nur Anzahlen je Lagerplatz (auch Sätze von Kunden mit eingeschränkter Verarbeitung zählen mit: eine Zahl ist keine personenbezogene Angabe). Verlangt `tires.view`.
+ */
+export async function storageOverview(viewer: Viewer): Promise<StorageOverview | null> {
+  if (!viewer.can("tires.view")) return null;
+  const groups = await db.tireSet.groupBy({ by: ["storageLocation", "season"], where: { status: "stored" }, _count: { _all: true }, _min: { storedAt: true } });
+  const bySeason = { summer: 0, winter: 0, allseason: 0 };
+  const byLocation = new Map<string, StorageRow>();
+  for (const g of groups) {
+    const key = g.storageLocation?.trim() ? g.storageLocation.trim() : "";
+    const row = byLocation.get(key) ?? { location: key === "" ? null : key, summer: 0, winter: 0, allseason: 0, total: 0, oldestDay: "9999-12-31" };
+    const season = g.season === "summer" || g.season === "winter" ? g.season : "allseason";
+    row[season] += g._count._all;
+    row.total += g._count._all;
+    bySeason[season] += g._count._all;
+    const day = g._min.storedAt ? dayKey(g._min.storedAt) : row.oldestDay;
+    if (day < row.oldestDay) row.oldestDay = day;
+    byLocation.set(key, row);
+  }
+  const all = [...byLocation.values()].sort((a, b) => (a.location === null ? 1 : b.location === null ? -1 : a.location.localeCompare(b.location, "de", { numeric: true })));
+  return { total: bySeason.summer + bySeason.winter + bySeason.allseason, bySeason, rows: all.slice(0, STORAGE_LOCATION_LIMIT), moreLocations: Math.max(0, all.length - STORAGE_LOCATION_LIMIT) };
+}

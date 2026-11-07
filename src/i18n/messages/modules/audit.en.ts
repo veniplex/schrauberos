@@ -34,6 +34,7 @@ export const auditEn: typeof auditDe = {
     tires: "Tyre storage",
     orders: "Orders",
     parts: "Parts & stock",
+    reports: "Reports",
     invoice: "Invoices",
     employee: "Employees",
     time: "Time tracking",
@@ -253,6 +254,9 @@ export const auditEn: typeof auditDe = {
       void: "Time entry voided",
       manual: "Time added later",
       transfer: "Times moved into an order as positions",
+    },
+    reports: {
+      export: "Report exported as CSV",
     },
     employee: {
       create: "Employee created",

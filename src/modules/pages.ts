@@ -10,6 +10,7 @@ import { pages as customers } from "./workshop/customers/pages";
 import { pages as vehicles } from "./workshop/vehicles/pages";
 import { pages as invoices } from "./office/invoices/pages";
 import { pages as billing } from "./office/billing/pages";
+import { pages as reports } from "./office/reports/pages";
 import { pages as employees } from "./office/employees/pages";
 import { pages as time } from "./office/time/pages";
 import { pages as fleet } from "./office/fleet/pages";
@@ -42,6 +43,7 @@ export const ALL_PAGES: readonly PageDef[] = [
   ...vehicles,
   ...invoices,
   ...billing,
+  ...reports,
   ...employees,
   ...time,
   ...fleet,

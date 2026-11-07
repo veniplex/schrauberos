@@ -467,7 +467,7 @@ html[data-form-actions] {
 }
 .print-label-body {
   margin: 0.5mm 0 0;
-  line-height: 1.25;
+  line-height: 1.15;
   white-space: pre-line;
   overflow-wrap: anywhere;
 }

@@ -4,4 +4,4 @@
  * Client-Komponenten importieren stattdessen aus `client.ts` (nur client-sichere Teile; `public.ts` bringt Abfragen mit).
  */
 export { VehiclePicker, toVehicleOption, type VehicleOption } from "./client";
-export { vehicleDeadlines, vehicleLabels, vehicleRef, vehicleTextWhere, type VehicleDeadline } from "./queries";
+export { vehicleDeadlines, vehicleInspectionOverview, vehicleLabels, vehicleRef, vehicleTextWhere, type InspectionMonth, type VehicleDeadline, type VehicleInspectionOverview } from "./queries";

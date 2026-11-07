@@ -26,6 +26,8 @@ export const DEFAULT_ROLES: Array<{
       "invoices.view", "invoices.edit", "invoices.delete",
       // Angebote & Rechnungen: ansehen, Entwürfe bearbeiten, Angebote annehmen; Festschreiben (invoices.finalize) und Versand (billing.send) sind gekennzeichnet (Regel 9) und in keiner Standardrolle
       "billing.view", "billing.edit", "billing.accept",
+      // Berichte ansehen (jeder Bericht zeigt nur, was die Rolle auch an der Quelle sehen darf); der CSV-Export (reports.export) ist gekennzeichnet (Regel 9) und in keiner Standardrolle
+      "reports.view",
       "employees.view", "employees.edit", "employees.delete", "employees.sensitive",
       "fleet.view", "fleet.edit", "fleet.delete",
       "handbook.view", "handbook.edit",
@@ -46,6 +48,7 @@ export const DEFAULT_ROLES: Array<{
     permissions: [
       "invoices.view", "invoices.edit",
       "billing.view", "billing.edit", "billing.accept",
+      "reports.view",
       "employees.view",
       "fleet.view", "fleet.edit",
       "handbook.view", "handbook.edit",

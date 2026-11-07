@@ -1,4 +1,4 @@
-import { dayKey, startOfDay } from "@/lib/zone";
+import { addDaysToKey, daysBetweenKeys, dayKey, startOfDay } from "@/lib/zone";
 import { safeName } from "@/lib/filename";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -132,3 +132,39 @@ export function invoiceFileLocation(inv: { direction: string; issueDate: Date; n
 }
 
 export { normalizeInvoiceNumber, outgoingKeyOf } from "@/lib/invoice-number";
+
+/* ───────────── Offene Posten: Altersstufen (Berichte, F9) ───────────── */
+
+/** Altersstufen offener Posten nach Tagen **über** der Fälligkeit; „nicht fällig“ enthält auch Posten ohne Fälligkeit. */
+export const AGE_BUCKETS = ["notDue", "d1_30", "d31_60", "d61_90", "d91plus"] as const;
+export type AgeBucket = (typeof AGE_BUCKETS)[number];
+
+/** In welche Stufe fällt ein Posten mit dieser Fälligkeit (Kalendertag oder `null`) am Stichtag `today`? */
+export function ageBucketOf(dueDay: string | null, today: string): AgeBucket {
+  if (!dueDay) return "notDue";
+  const overdue = daysBetweenKeys(dueDay, today);
+  if (overdue <= 0) return "notDue";
+  if (overdue <= 30) return "d1_30";
+  if (overdue <= 60) return "d31_60";
+  if (overdue <= 90) return "d61_90";
+  return "d91plus";
+}
+
+/**
+ * Die Grenzen der Stufen als Kalendertage für die Datenbankabfrage: `gte`/`lt` auf dem **Tag der Fälligkeit** (ein Tag `d` gehört zur Stufe, wenn `gte ≤ d < lt`; `null` = nach oben/unten offen).
+ * „nicht fällig“ ist `d ≥ today` (und kein Tag); die Stufen darunter ziehen 1–30, 31–60, 61–90 und mehr als 90 Tage ab.
+ */
+export function ageBucketRange(bucket: AgeBucket, today: string): { gte: string | null; lt: string | null } {
+  switch (bucket) {
+    case "notDue":
+      return { gte: today, lt: null };
+    case "d1_30":
+      return { gte: addDaysToKey(today, -30), lt: today };
+    case "d31_60":
+      return { gte: addDaysToKey(today, -60), lt: addDaysToKey(today, -30) };
+    case "d61_90":
+      return { gte: addDaysToKey(today, -90), lt: addDaysToKey(today, -60) };
+    case "d91plus":
+      return { gte: null, lt: addDaysToKey(today, -90) };
+  }
+}
