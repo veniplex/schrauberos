@@ -252,7 +252,7 @@ export const apiDe = {
       etagTitle: "Versionen (ETag)",
       etag: "Jedes Element trägt einen ETag. PATCH und Aktionen, die das Element ändern, verlangen ihn im Kopf If-Match (428 ohne, 412 bei veralteter Version). Mit If-None-Match antwortet ein unverändertes Element mit 304.",
       idempotencyTitle: "Wiederholungen (Idempotency-Key)",
-      idempotency: "Schreibende Aufrufe nehmen den Kopf Idempotency-Key (1–128 Zeichen). Derselbe Schlüssel mit demselben Körper liefert die gespeicherte Antwort (Kopf Idempotent-Replayed: true), mit anderem Körper 422. Gespeichert werden nur Erfolge, 24 Stunden lang; Uploads verlangen den Schlüssel.",
+      idempotency: "Schreibende Aufrufe nehmen den Kopf Idempotency-Key (1–128 Zeichen). Derselbe Schlüssel mit demselben Körper liefert die gespeicherte Antwort (Kopf Idempotent-Replayed: true), mit anderem Körper 422. Gespeichert werden nur Erfolge, 24 Stunden lang; bei Uploads verhindert der Schlüssel Dubletten (dringend empfohlen).",
       rateTitle: "Begrenzung",
       rate: "Je Token gilt ein Limit pro Minute (am Token eingestellt). Jede Antwort trägt RateLimit-Limit, RateLimit-Remaining und RateLimit-Reset; darüber folgt 429 mit Retry-After. Eine Flut ungültiger Tokens bremst gültige nie.",
       errorTitle: "Fehler",

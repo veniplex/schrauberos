@@ -254,7 +254,7 @@ export const apiEn: typeof apiDe = {
       etagTitle: "Versions (ETag)",
       etag: "Every item carries an ETag. PATCH and actions that change the item require it in the If-Match header (428 without, 412 for a stale version). With If-None-Match an unchanged item answers 304.",
       idempotencyTitle: "Retries (Idempotency-Key)",
-      idempotency: "Writing calls accept the Idempotency-Key header (1–128 characters). The same key with the same body returns the stored response (header Idempotent-Replayed: true), with another body 422. Only successes are stored, for 24 hours; uploads require the key.",
+      idempotency: "Writing calls accept the Idempotency-Key header (1–128 characters). The same key with the same body returns the stored response (header Idempotent-Replayed: true), with another body 422. Only successes are stored, for 24 hours; for uploads the key prevents duplicates (strongly recommended).",
       rateTitle: "Limits",
       rate: "Each token has a per-minute limit (set on the token). Every response carries RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset; beyond it 429 follows with Retry-After. A flood of invalid tokens never slows valid ones.",
       errorTitle: "Errors",
