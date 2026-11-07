@@ -176,6 +176,22 @@ describe("Festschreiben", () => {
     assert.ok(!JSON.stringify(events[0]).includes("Mustermann"), "das Ereignis trägt nur Typ und Kennung");
   });
 
+  it("das Audit-Log nennt Belegart und Nummer, nie den Namen des Empfängers (es überlebt die Anonymisierung); jede Operation schreibt ihren Eintrag", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session);
+    assert.ok((await ops.addPaymentOperation.execute(session, { id, amount: "10,00" })).ok);
+    const offer = await ops.saveDraftOperation.execute(session, { docType: "offer", customerId, items: items() });
+    assert.ok(offer.ok);
+    assert.ok((await ops.deleteDraftOperation.execute(session, { id: offer.data.id })).ok);
+    const entries = await env.db.auditLog.findMany({ where: { action: { startsWith: "billing." } } });
+    assert.deepEqual(
+      entries.map((e) => e.action).sort(),
+      ["billing.create", "billing.create", "billing.delete", "billing.finalize", "billing.payment"],
+    );
+    for (const entry of entries) assert.ok(!/Mustermann|Max/.test(entry.target ?? ""), `${entry.action}: ${entry.target}`);
+    assert.ok(entries.some((e) => e.target === `Rechnung ${YEAR}-0001`));
+  });
+
   it("braucht das Recht invoices.finalize und die aktuelle Version", async () => {
     const editor = await sessionFor(EDIT);
     const id = await draft(editor);

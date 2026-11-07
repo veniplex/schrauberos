@@ -18,6 +18,10 @@ Das Rechnungsarchiv sammelt **Eingangsrechnungen** (von Lieferanten) und **Ausga
 * **Rückmeldung:** „Als bezahlt markieren“, „Wieder öffnen“ und „Löschen“ melden ihr Ergebnis oben auf der Seite.
 * **Summen:** Je Richtung und Jahr, dazu die offenen Beträge auf der Übersicht.
 
+## Belege aus „Angebote & Rechnungen“
+
+Ist die Funktion *Angebote & Rechnungen* eingeschaltet, stehen die dort **festgeschriebenen** Rechnungen (auch Abschlags-, Schluss- und Stornorechnungen) in der Ausgangsliste – zusammen mit den von Hand erfassten. Angebote, Auftragsbestätigungen und Entwürfe gehören nicht dazu. Solche Belege bearbeiten Sie nicht hier: Die Rechnungsseite zeigt sie an und führt mit „Im Rechnungsarchiv“/„Beleg in der Rechnungserstellung öffnen“ dorthin (Positionen, Zahlungen, XRechnung, Versand). Eine **Stornorechnung** legen Sie auch hier an; bei diesen Belegen vergibt die Anwendung die Nummer selbst.
+
 ## Festschreiben und Stornorechnung (Ausgangsrechnungen)
 
 Das Rechnungsarchiv ist eine Ablage, kein Rechnungsprogramm. Damit eine ausgestellte Rechnung nicht versehentlich verändert oder gelöscht wird, lässt sich eine **Ausgangsrechnung festschreiben** – freiwillig, mit dem Recht *Ausgangsrechnungen festschreiben*. Dieses Recht steht in keiner mitgelieferten Rolle; ein Administrator vergibt es bewusst.

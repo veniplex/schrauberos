@@ -17,7 +17,7 @@ import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { getWorkshop } from "@/server/workshop";
 import { CREATABLE_TYPES, OFFER_VALIDITY_DAYS, PAYMENT_METHODS, SENT_FILES_DIR, isInvoiceType, isQuoteType } from "./constants";
 import { amountColumns, checkInputOf, findLinkableCustomer, itemInputOf, loadWorkshop, normalizeItems, replaceItems, snapshotColumns, totalsOf } from "./core";
-import { dueDayKey, finalizeProblems, isDraft, mailContent, documentFileName, remainingCents, statusAfterPayments } from "./domain";
+import { dueDayKey, finalizeProblems, isDraft, mailContent, documentFileName, docTitle, remainingCents, statusAfterPayments } from "./domain";
 import { loadDocView } from "./queries";
 import { viewPayable } from "./view";
 
@@ -34,7 +34,8 @@ const text = (max: number) => z.string().trim().max(max).optional();
 const idInput = z.object({ id: z.string().min(1) });
 
 const who = (principal: { user: { name: string } }) => principal.user.name.slice(0, 120);
-const labelOf = (docType: string, number: string, party: string) => `${docType}${number ? ` ${number}` : ""} · ${party}`.slice(0, 190);
+/** Bezeichnung im Audit-Log: Belegart und Nummer – **nie der Name des Empfängers** (das Audit-Log überlebt die Anonymisierung des Kunden). */
+const labelOf = (docType: string, number: string) => `${docTitle(docType)} ${number || "(Entwurf)"}`;
 
 /** Der Beleg einer Operation: muss aus der Rechnungserstellung stammen. */
 async function billingDoc(tx: Tx, id: string) {
@@ -178,7 +179,7 @@ export const saveDraftOperation = defineOperation({
       const ids = [...new Set(d.deductPartialIds ?? [])];
       if (ids.length > 0) await tx.invoiceDeduction.createMany({ data: ids.map((partialId) => ({ finalId: id, partialId })) });
     }
-    audit({ target: labelOf(docType, "", partyName), entityId: id });
+    audit({ target: labelOf(docType, ""), entityId: id });
     return { id };
   },
 });
@@ -193,7 +194,7 @@ export const deleteDraftOperation = defineOperation({
     const doc = await billingDoc(tx, input.id);
     if (!isDraft(doc)) fail("inUse", "billing.errors.notDraft");
     await tx.invoice.delete({ where: { id: doc.id } });
-    audit({ target: labelOf(doc.docType, "", doc.partyName), entityId: doc.id });
+    audit({ target: labelOf(doc.docType, ""), entityId: doc.id });
     return { id: doc.id };
   },
 });
@@ -294,7 +295,7 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
       throw error;
     }
   }
-  return { id: doc.id, number: allocated.number, docType: doc.docType, party: doc.partyName };
+  return { id: doc.id, number: allocated.number, docType: doc.docType };
 }
 
 /** Rechnung, Abschlags- oder Schlussrechnung festschreiben (`invoices.finalize`). Nicht umkehrbar; korrigiert wird mit der Stornorechnung. */
@@ -306,7 +307,7 @@ export const finalizeDocumentOperation = defineOperation({
   run: async ({ input, principal, tx, audit, emit }) => {
     const result = await commit(tx, input, principal, "invoice");
     await emit("billing.finalized", { type: result.docType }, result.id);
-    audit({ target: labelOf(result.docType, result.number, result.party), entityId: result.id });
+    audit({ target: labelOf(result.docType, result.number), entityId: result.id });
     return { id: result.id, number: result.number };
   },
 });
@@ -320,7 +321,7 @@ export const issueDocumentOperation = defineOperation({
   run: async ({ input, principal, tx, audit, emit }) => {
     const result = await commit(tx, input, principal, "quote");
     await emit("billing.finalized", { type: result.docType }, result.id);
-    audit({ target: labelOf(result.docType, result.number, result.party), entityId: result.id });
+    audit({ target: labelOf(result.docType, result.number), entityId: result.id });
     return { id: result.id, number: result.number };
   },
 });
@@ -347,7 +348,7 @@ export const acceptOfferOperation = defineOperation({
   run: async ({ input, principal, tx, audit, emit }) => {
     const doc = await decide(tx, input, principal, "accepted");
     await emit("billing.accepted", { type: "offer" }, doc.id);
-    audit({ target: labelOf("Angebot", doc.number, doc.partyName), entityId: doc.id });
+    audit({ target: labelOf("offer", doc.number), entityId: doc.id });
     return { id: doc.id };
   },
 });
@@ -360,7 +361,7 @@ export const rejectOfferOperation = defineOperation({
   audit: "billing.reject",
   run: async ({ input, principal, tx, audit }) => {
     const doc = await decide(tx, input, principal, "rejected");
-    audit({ target: labelOf("Angebot", doc.number, doc.partyName), entityId: doc.id });
+    audit({ target: labelOf("offer", doc.number), entityId: doc.id });
     return { id: doc.id };
   },
 });
@@ -623,7 +624,9 @@ export const sendDocumentOperation = defineOperation({
   permission: "billing.send",
   input: sendInput,
   audit: "billing.send",
-  prepare: async ({ input }): Promise<Prepared> => {
+  prepare: async ({ input, principal }): Promise<Prepared> => {
+    // `queueMail` verlangt `mail.send` ebenfalls – hier vorab, damit für Unberechtigte kein PDF entsteht
+    if (!principal.can("mail.send")) fail("forbidden");
     if (!(await mailConfigured())) fail("invalid", "mail.errors.notConfigured");
     // PDF-Bibliothek erst jetzt laden: die Operationen werden von jeder Seite und jeder Aktion der Funktion geladen, das PDF braucht nur der Versand
     const { buildDocumentPdf, logoForPdf } = await import("./documents");
@@ -687,7 +690,7 @@ export const sendDocumentOperation = defineOperation({
     await queueMail({ tx, emit, principal }, { to: [prepared.to], subject: prepared.subject, text: prepared.text, attachments: prepared.files, purpose: "billing", entityId: doc.id });
     await tx.invoice.update({ where: { id: doc.id }, data: { sentAt: new Date(), sentCount: { increment: 1 } } });
     await emit("billing.sent", { type: doc.docType }, doc.id);
-    audit({ target: labelOf(doc.docType, doc.number, doc.partyName), entityId: doc.id });
+    audit({ target: labelOf(doc.docType, doc.number), entityId: doc.id });
     return { id: doc.id };
   },
 });

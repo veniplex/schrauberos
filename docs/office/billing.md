@@ -58,7 +58,7 @@ Ist der E-Mail-Versand eingerichtet und hat der Kunde eine E-Mail-Adresse, biete
 
 ## Aufbewahrung
 
-Rechnungen und Buchungsbelege sind aufzubewahren; die Fristen (hier als Platzhalter 8 bzw. 10 Jahre) legen Sie unter *Einstellungen › Datenschutz* fest und lassen sie von Ihrer Steuerberatung bestätigen. Die Anwendung nennt das Festschreiben nicht „revisionssicher“ oder „GoBD-konform“ – sie schützt Belege vor versehentlichen Änderungen, ersetzt aber kein Verfahren zur Aufbewahrung. Eine Sicherung (Backup) der Daten ist Teil Ihrer Aufbewahrung; beim Zurückspielen eines Backups entspricht der Stand dem Zeitpunkt der Sicherung.
+Rechnungen und Buchungsbelege sind aufzubewahren; die Fristen (hier als Platzhalter 8 bzw. 10 Jahre) legen Sie unter *Einstellungen › Datenschutz* fest und lassen sie von Ihrer Steuerberatung bestätigen. Das Festschreiben schützt Belege vor versehentlichen Änderungen. Eine Zusage, dass damit bestimmte Anforderungen an die Buchführung erfüllt sind, gibt die Anwendung nicht – ein Verfahren zur Aufbewahrung ersetzt sie nicht; das klärt die Steuerberatung. Eine Sicherung (Backup) der Daten ist Teil Ihrer Aufbewahrung; beim Zurückspielen eines Backups entspricht der Stand dem Zeitpunkt der Sicherung.
 
 ## Rechte
 

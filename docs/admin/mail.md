@@ -36,7 +36,7 @@ Jede vorgemerkte Nachricht steht mit Empfänger und Betreff im **Audit-Log**.
 
 ## Sendeprotokoll und Fehler
 
-Unter den Einstellungen steht das **Sendeprotokoll**: Zeitpunkt, Absender, Empfänger, Betreff, Status – **ohne Inhalt**. Nachrichten werden im Hintergrund zugestellt: Klappt es nicht (Netz, Server nicht erreichbar, Anmeldung), versucht die Anwendung es mit
+Unter den Einstellungen steht das **Sendeprotokoll**: Zeitpunkt, Absender, Empfänger, Betreff, Status – **ohne Inhalt**. Es gehört zu den personenbezogenen Daten der Kunden: Bei einer Anonymisierung des Kunden werden Empfänger und Betreff der Zeilen zu seinen Belegen unkenntlich gemacht. Nachrichten werden im Hintergrund zugestellt: Klappt es nicht (Netz, Server nicht erreichbar, Anmeldung), versucht die Anwendung es mit
 wachsenden Pausen bis zu zehnmal (rund drei Stunden); eine **endgültige** Absage des Servers (Empfänger unbekannt, Nachricht zu groß) wird nicht wiederholt. Danach steht die Nachricht als **Fehlgeschlagen** mit dem Grund im Protokoll, und im Systemstatus erscheint ein aufgegebenes
 Ereignis. Nach der Behebung lässt sie sich dort mit **Erneut senden** noch einmal vormerken – solange ihr Inhalt noch da ist (30 Tage). Nimmt der Server nur einen Teil der Empfänger an, steht im Protokoll „n von m Empfängern zugestellt“; wiederholt wird (auch bei **Erneut senden**) nur für die übrigen, wer die Nachricht schon hat, bekommt sie nicht noch einmal. Gesendete Nachrichten behalten keinen Inhalt; Protokolleinträge werden nach einem Jahr gelöscht.
 

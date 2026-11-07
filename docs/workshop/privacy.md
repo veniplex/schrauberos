@@ -31,7 +31,7 @@ Rechnungen müssen aufbewahrt werden. Ein Kunde mit Rechnungen lässt sich desha
 
 * Name, Firma, Kundennummer, Anschrift, Telefon, E-Mail und Notizen werden gelöscht; der Kunde heißt danach „Anonymisiert“ und ist archiviert.
 * **Fahrzeuge** verlieren den Halter und ihre Notiz (Kennzeichen und FIN bleiben), die Halterhistorie bleibt ohne Namen; **Termine** verlieren den Kunden, ihre Notizen werden gelöscht und der Titel wird neutral; die **Notizen der Reifensätze und Reifen** werden gelöscht.
-* **Rechnungen** behalten ihren Empfänger (das Feld *Rechnungsempfänger*) und ihre Beträge – sie sind Buchungsbelege.
+* **Rechnungen** behalten ihren Empfänger (das Feld *Rechnungsempfänger*) und ihre Beträge – sie sind Buchungsbelege. Bei Belegen aus *Angebote & Rechnungen* bleiben Name und Anschrift ebenfalls stehen; **Entwürfe** werden gelöscht, die **E-Mail-Adresse des Empfängers** auf Beleg und Schnappschuss entfällt, und im **Sendeprotokoll** werden Empfängeradresse und Betreff der versendeten Belege unkenntlich gemacht (die als Anhang versendeten PDF-Dateien bleiben im Dateispeicher). Das Audit-Log nennt bei diesen Belegen nur Belegart und Nummer, nie den Namen.
 * **Dokumentation:** Texte in Handbuch und IT-Dokumentation werden nicht angefasst. Die Fundstellen der Auskunft zeigen, wo der Kunde erwähnt ist – bitte vorher prüfen und die Seiten (auch ihre früheren Versionen) bereinigen.
 * **Backups** enthalten die Daten weiterhin, bis sie nach ihrer Aufbewahrung gelöscht werden; wird ein älteres Backup wiederhergestellt, ist der Kunde dort noch nicht anonymisiert – die Anonymisierung dann wiederholen. Auch Dateien, die Sie außerhalb der Anwendung aufbewahren (Exporte, versendete Rechnungen), gehören dazu.
 
