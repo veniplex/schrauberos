@@ -77,7 +77,7 @@ describe("DocEditor", () => {
     await act(() => void cancel.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 })));
     assert.ok(e.root.querySelector("dialog")?.open, "Rückfrage");
     assert.deepEqual(env.browser.navigations, []);
-    await act(() => void [...e.root.querySelectorAll("dialog button")].find((b) => b.textContent === "Verwerfen")!.click());
+    await act(() => void ([...e.root.querySelectorAll("dialog button")].find((b) => b.textContent === "Verwerfen") as HTMLButtonElement).click());
     assert.deepEqual(env.browser.navigations, ["/docs/it"]);
   });
 });
