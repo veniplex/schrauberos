@@ -76,7 +76,7 @@ const counting = (result?: string) => {
 };
 
 describe("Registry: alle Jobs sind sauber angemeldet", () => {
-  it("IDs eindeutig, Zeitpläne gültig, Funktionen im Katalog, Abnehmer eindeutig", () => {
+  it("IDs eindeutig, Zeitpläne gültig, Funktionen im Katalog, Abnehmer eindeutig", async () => {
     const jobs = registry.allJobs();
     assert.ok(jobs.length >= 6, "Plattform- und Funktions-Jobs sind da");
     assert.equal(new Set(jobs.map((j) => j.id)).size, jobs.length, "doppelte Job-ID");
@@ -86,6 +86,11 @@ describe("Registry: alle Jobs sind sauber angemeldet", () => {
       assert.doesNotThrow(() => validateSchedule(job.schedule), job.id);
       if (job.feature) assert.ok(known.has(job.feature), `${job.id}: unbekannte Funktion ${job.feature}`);
     }
+    // Per Import (nicht per Quelltext-Suche): Jeder Job und jeder Abnehmer einer Funktion nennt seine Funktion – sonst liefe er auch bei ausgeschalteter Funktion
+    const { featureJobs, featureOutboxHandlers } = await import("@/modules/jobs");
+    assert.ok(featureJobs.length > 0);
+    assert.deepEqual(featureJobs.filter((j) => !j.feature).map((j) => j.id), []);
+    assert.deepEqual(featureOutboxHandlers.filter((h) => !h.feature).map((h) => h.id), []);
     const handlers = registry.allOutboxHandlers();
     assert.equal(new Set(handlers.map((h) => h.id)).size, handlers.length);
     for (const h of handlers) if (h.feature) assert.ok(known.has(h.feature));
@@ -898,5 +903,51 @@ describe("Automatisches Backup: Reihenfolge und Teilfehler (ZP3-A-12)", () => {
     } finally {
       console.error = originalError;
     }
+  });
+});
+
+describe("Zeitzone: Backup-Uhrzeit und Neuberechnung", () => {
+  it("runAutoBackup rechnet in der aktuellen Prozess-Zeitzone: nach einem Wechsel der Werkstatt-Zeitzone gilt die neue Ortszeit", async () => {
+    const { runAutoBackup } = await import("@/server/backup/auto");
+    const core = await import("@/server/backup/core");
+    await env.db.appSetting.upsert({ where: { key: "backup.hour" }, update: { value: "21" }, create: { key: "backup.hour", value: "21" } });
+    const previous = process.env.TZ;
+    const at = new Date("2026-06-01T10:00:00Z"); // UTC 10:00, Auckland 22:00
+    try {
+      process.env.TZ = "UTC";
+      assert.equal(await runAutoBackup(at), null, "10 Uhr UTC: die Uhrzeit 21 ist noch nicht erreicht");
+      process.env.TZ = "Pacific/Auckland";
+      const result = await runAutoBackup(at);
+      assert.ok(result?.name, "22 Uhr in Auckland: die Uhrzeit ist erreicht");
+      // „heute schon eins“ gilt je Kalendertag der Ortszeit (das Backup trägt die echte Uhrzeit, deshalb mit der echten Uhr prüfen)
+      await env.db.appSetting.update({ where: { key: "backup.hour" }, data: { value: "0" } });
+      assert.equal(await runAutoBackup(new Date()), null, "heute (Ortszeit) ist schon eins da");
+    } finally {
+      process.env.TZ = previous;
+      for (const b of await core.listBackups()) await core.deleteBackup(b.name);
+    }
+  });
+
+  it("reschedule: rechnet Cron-Termine in der neuen Zone neu (auch über die Sommerzeit-Lücke), lässt Intervalle, Fehlerserien und laufende Jobs unberührt", async () => {
+    const zone = { current: "Europe/Berlin" };
+    const { runner, c } = rig(
+      [
+        { id: "test.cron", schedule: { cron: "30 2 * * *" }, run: counting() },
+        { id: "test.failing", schedule: { cron: "30 2 * * *" }, run: counting() },
+        { id: "test.every", schedule: { every: 10 * MIN }, run: counting() },
+      ],
+      "2026-03-28T12:00:00Z",
+      { timeZone: () => zone.current },
+    );
+    await runner.sync();
+    const nextOf = async (id: string) => (await env.db.jobState.findUniqueOrThrow({ where: { id } })).nextRunAt!.toISOString();
+    assert.equal(await nextOf("test.cron"), "2026-03-29T01:30:00.000Z", "29.3. in Berlin: 02:30 gibt es nicht – unmittelbar nach der Lücke (03:30 Sommerzeit)");
+    await env.db.jobState.update({ where: { id: "test.failing" }, data: { failures: 2, nextRunAt: new Date(c.now().getTime() + 90 * MIN) } });
+    const everyBefore = await nextOf("test.every");
+    zone.current = "America/New_York";
+    await runner.reschedule();
+    assert.equal(await nextOf("test.cron"), "2026-03-29T06:30:00.000Z", "02:30 New York (Sommerzeit seit 8.3.) = 06:30 UTC");
+    assert.equal(await nextOf("test.failing"), new Date(c.now().getTime() + 90 * MIN).toISOString(), "Fehlerserie: Wiederholungstermin bleibt");
+    assert.equal(await nextOf("test.every"), everyBefore, "Intervalle sind zeitzonenunabhängig");
   });
 });

@@ -33,7 +33,9 @@ before(async () => {
   evil = createServer(record("evil"));
   apiPort = await listen(api, "127.0.0.1");
   cdnPort = await listen(cdn, "127.0.0.1"); // erreichbar unter localhost UND 127.0.0.1
-  evilPort = await listen(evil, "127.0.0.2");
+  // 127.0.0.2 ist nicht überall verfügbar (macOS bindet nur 127.0.0.1): dann lauscht der „Fremdhost“ auf 127.0.0.1 – er darf ohnehin nie eine Anfrage bekommen,
+  // die Tests prüfen nur, dass der Host in der Adresse nicht angefragt wird
+  evilPort = await listen(evil, "127.0.0.2").catch(() => listen(evil, "127.0.0.1"));
 });
 after(async () => {
   for (const s of [api, cdn, evil]) await new Promise((r) => s.close(r));

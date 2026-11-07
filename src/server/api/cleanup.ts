@@ -6,7 +6,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const globalForCleanup = globalThis as unknown as { __lastApiTokenPrune?: number };
 
 /**
- * Aufräumen der API-Daten (Scheduler, siehe `backup/scheduler.ts`): abgelaufene Idempotenz-Schlüssel bei jedem Lauf (indizierte Abfrage), Tokens, die seit
+ * Aufräumen der API-Daten (Job `platform.api-cleanup` des Job-Runners, siehe `server/jobs/platform.ts`): abgelaufene Idempotenz-Schlüssel bei jedem Lauf (indizierte Abfrage), Tokens, die seit
  * mehr als 90 Tagen abgelaufen oder widerrufen sind, höchstens einmal am Tag. Liefert die Anzahl gelöschter Zeilen.
  */
 export async function runApiCleanup(now = Date.now()): Promise<number> {

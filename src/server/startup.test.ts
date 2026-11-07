@@ -40,6 +40,9 @@ describe("Start mit fremdem (altem) Volume", () => {
       assert.equal(startupState().status, "reinstall");
       assert.match(startupState().error ?? "", /Neuinstallation nötig/);
       assert.ok(errors.some((e) => e.includes("Neuinstallation nötig")), "klare Meldung im Log");
+      // Eine fremde Datenbank wird nie angefasst – auch kein Job-Runner (er würde Zustandstabellen anlegen und schreiben)
+      const { jobRunner } = await import("@/server/jobs");
+      assert.equal(jobRunner().status().started, false, "kein Job-Runner bei „Neuinstallation nötig“");
 
       // Health-Endpoint: 503 mit Status „reinstall“ (der Launcher wertet das als endgültig)
       const { GET } = await import("@/app/api/health/route");

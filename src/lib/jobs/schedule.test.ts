@@ -88,6 +88,20 @@ describe("Nächster Lauf (Zeitzone)", () => {
     assert.deepEqual(runs, ["2026-03-29T01:00:00.000Z", "2026-03-29T02:00:00.000Z", "2026-03-29T03:00:00.000Z", "2026-03-29T04:00:00.000Z", "2026-03-29T05:00:00.000Z"]);
   });
 
+  it("bekannte Grenze: stündlich/unterstündlich per Cron lässt beim Zurückstellen eine Stunde aus (die zweite 02-Uhr-Stunde); ein Intervall (every) nicht", () => {
+    // Berlin, 25.10.2026: 03:00 Sommerzeit wird 02:00 Winterzeit – die Wandzeiten 02:xx gibt es zweimal, der Cron nimmt nur das erste Mal
+    const spec = parseCron("0 * * * *");
+    const runs: string[] = [];
+    let at = new Date("2026-10-24T23:30:00Z");
+    for (let i = 0; i < 4; i++) {
+      at = nextCronRun(spec, at, BERLIN);
+      runs.push(iso(at));
+    }
+    assert.deepEqual(runs, ["2026-10-25T00:00:00.000Z", "2026-10-25T02:00:00.000Z", "2026-10-25T03:00:00.000Z", "2026-10-25T04:00:00.000Z"], "01:00 UTC (= zweites 02:00 Uhr) fehlt");
+    // Wer in jeder Stunde laufen muss, nimmt ein Intervall: keine Lücke
+    assert.equal(iso(nextRun({ every: 3_600_000 }, new Date("2026-10-25T00:00:00Z"), BERLIN)), "2026-10-25T01:00:00.000Z");
+  });
+
   it("nextRun: Intervall = Zeitpunkt + Intervall, Cron wie oben", () => {
     assert.equal(iso(nextRun({ every: 600_000 }, new Date("2026-01-01T00:00:00Z"), BERLIN)), "2026-01-01T00:10:00.000Z");
     assert.equal(iso(nextRun({ cron: "0 2 * * *" }, new Date("2026-01-10T12:00:00Z"), BERLIN)), "2026-01-11T01:00:00.000Z");

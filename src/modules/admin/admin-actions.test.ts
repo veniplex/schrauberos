@@ -95,6 +95,9 @@ describe("Backup-Plan und Backups", () => {
     assert.ok((await backup.saveBackupPlan({}, fields({ hour: 25 }))).fieldErrors?.hour);
     assert.ok((await backup.saveBackupPlan({}, fields({ hour: "" }))).fieldErrors?.hour, "leeres Feld = Pflichtfeld");
     assert.ok((await backup.saveBackupPlan({}, fields({ keep_manual: -1 }))).fieldErrors?.keep_manual, "negative Anzahl");
+    // Leere Aufbewahrungsfelder sind ein Fehler, nie „0 = unbegrenzt“ (Datenschutz: Speicherbegrenzung)
+    assert.ok((await backup.saveBackupPlan({}, fields({ keep_auto: "" }))).fieldErrors?.keep_auto, "leere Anzahl");
+    assert.ok((await backup.saveBackupPlan({}, fields({ days_auto: "  " }))).fieldErrors?.days_auto, "leere Frist");
     assert.ok((await backup.saveBackupPlan({}, fields({ days_auto: 99999 }))).fieldErrors?.days_auto, "Frist über dem Höchstwert");
     assert.deepEqual(await getBackupSettings(), saved, "fehlerhafte Eingaben ändern nichts");
   });
@@ -110,6 +113,17 @@ describe("Backup-Plan und Backups", () => {
     assert.equal(await env.db.auditLog.count({ where: { action: "backup.delete" } }), 1);
     await backup.removeBackup(form({ name: "../../etc" }));
     assert.equal(lastFlash()?.key, "backup.errors.notFound");
+  });
+
+  it("„Jetzt erneut versuchen“ führt das automatische Backup sofort aus, mit Audit; ohne backup.manage verboten", async () => {
+    const before = await env.db.auditLog.count({ where: { action: "backup.runNow" } });
+    const state = await backup.runAutoBackupNow({}, form({}));
+    assert.equal(state.ok, true);
+    assert.equal(await env.db.auditLog.count({ where: { action: "backup.runNow" } }), before + 1);
+    const created = await env.db.auditLog.findFirstOrThrow({ where: { action: "backup.create", actorName: "System" }, orderBy: { createdAt: "desc" } });
+    assert.match(created.target ?? "", /-auto$/);
+    await signInWith("settings.manage");
+    assert.equal(await redirectOf(() => backup.runAutoBackupNow({}, form({}))), "/forbidden");
   });
 
   it("eine fehlgeschlagene Wiederherstellung wird gemeldet und im Audit festgehalten", async () => {

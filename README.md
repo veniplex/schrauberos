@@ -488,6 +488,12 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
   vorherige zurück). Eine installierte Version verwirft sich selbst, wenn die eingebaute neuer ist (neues Image gezogen).
 * **Die App migriert sich selbst:** `src/instrumentation.ts` → `src/server/startup.ts`: Sicherung vor Migrationen, Migrationen,
   Basisdaten, Zeitzone, Job-Runner. `/api/health` meldet erst danach „ok“; scheitert etwas, beendet sich der Prozess.
+  **Der Start läuft im Hintergrund** (`register()` wartet nicht darauf, `src/server/startup-launch.ts`). Grund (Next-16-Quellen: `next-server.js` `prepareImpl` → `runInstrumentationHookIfAvailable`,
+  `start-server.js` `requestListener` wartet auf `handlersPromise`): Wartete `register()` auf die Migration, nähme der Server Verbindungen an, beantwortete aber **keine** Anfrage – auch `/api/health` nicht, der Launcher sähe nur
+  Zeitüberschreitungen. So antwortet `/api/health` schon während der Migration mit `503 { "status": "starting" }`, und `proxy.ts` beantwortet **jede andere Anfrage** (Seiten, Server Actions, Route Handler, `/api/v1`) mit
+  `503` (`Retry-After`, Browser: kurze Seite mit Neuladen), bis der Zustand `ready` ist – **keine Anfrage erreicht eine noch nicht migrierte Datenbank**. Außerhalb des Proxys liegen nur Statik (fasst keine Datenbank an) und
+  `/api/backups/upload` (prüft den Zustand selbst). Die Migration selbst (`better-sqlite3`) arbeitet **synchron**: Während eines einzelnen langen Schritts antwortet auch der Health-Endpoint nicht (siehe Update-Ablauf, Launcher).
+  Der Job-Runner startet erst nach erfolgreichem Start und nie bei „Neuinstallation nötig“.
 * **Keine Fremdprogramme:** Archive bearbeitet die npm-Bibliothek `tar` – es gibt kein System-`tar`.
 * **Die eingebaute App ist `root:root` und für den Betriebsbenutzer (1000) nicht schreibbar** (`COPY` ohne `--chown`): Geschrieben wird nur nach `/data`
   (Datenbank, Dateien, Backups, installierte Versionen) und `/tmp`. Wer die laufende Anwendung kompromittiert, kann den eingebauten Code nicht
@@ -503,9 +509,11 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
 2. Neuestes GitHub-Release holen, **Ed25519-Signatur** des `manifest.json` prüfen (gegen den eingebauten öffentlichen Schlüssel),
    Paket laden und **SHA-256/Größe** gegen das Manifest prüfen.
 3. Nach `<DATA_DIR>/app/versions/<version>` entpacken, `state.json`/`active` schreiben, Neustart (Exit-Code 42).
-4. Starter → Launcher der neuen Version → Gesundheitsprüfung oder Rückfall. Die Frist ist 90 s (`LAUNCHER_HEALTH_TIMEOUT_MS`) und **verlängert sich jedes Mal um ihre volle Länge,
-   solange `/api/health` mit `503 { "status": "starting" }` antwortet** (die App lebt und migriert noch – eine große Datenbank braucht länger), höchstens bis zur **harten Obergrenze**
-   von 15 Minuten ab Start (`LAUNCHER_HEALTH_MAX_MS`). Wer nicht antwortet oder 503 `error` meldet, hält die Grundfrist ein.
+4. Starter → Launcher der neuen Version → Gesundheitsprüfung oder Rückfall. Die Frist ist 90 s (`LAUNCHER_HEALTH_TIMEOUT_MS`) und **verlängert sich jedes Mal um ihre volle Länge**, wenn die App lebt und migriert:
+   entweder `/api/health` antwortet mit `503 { "status": "starting" }` (das tut es dank Start im Hintergrund auch während der Sicherung vor der Migration), **oder die Verbindung wird angenommen, aber es kommt innerhalb von 2 s
+   keine HTTP-Antwort** (Event-Loop in einem synchronen Migrationsschritt blockiert – das erkennt der Kernel-Backlog, nicht die App; `probeHealth` in `src/lib/updates/health.ts`). Obergrenze: **harte** 15 Minuten ab Start
+   (`LAUNCHER_HEALTH_MAX_MS`). Wer die Verbindung verweigert oder 503 `error` meldet, hält die Grundfrist ein. Ein hängender Prozess, der den Port offen hält, wird so erst nach der Obergrenze verworfen (bewusster Kompromiss).
+   Beide Variablen werden validiert (leer, keine Zahl, ≤ 0 → Standardwert; ein `NaN` setzte die Frist sonst auf 0).
 
 **Sicherheit des Downloads** (`src/lib/updates/safe-fetch.ts`, Test mit echten lokalen Servern): Das Update-Token (`Authorization`) geht **nur an die API-Herkunft** (Schema, Host und Port von `UPDATE_API_URL`,
 Standard `https://api.github.com`); eine Asset-Adresse auf anderem Host wird gar nicht angefragt. GitHub antwortet auf den Asset-Abruf mit einer Weiterleitung auf einen Content-Server
@@ -525,10 +533,19 @@ Launcher tauscht Datenbank samt WAL und Dateien, bestätigt nach gesundem Start 
 
 * **Zeitplan:** Job `backup.auto` (alle 10 Minuten geprüft: Uhrzeit erreicht, heute noch keins – `src/server/backup/auto.ts`; Einstellung in `AppSetting`). **Scheitert** das Anlegen, wirft der Job:
   Der Runner wiederholt nach 15 min, 30 min, 1 h … höchstens alle 4 h, der Fehlerstatus (`JobState.failures`, Meldung nur Art und Code) steht auf der Backup-Seite, im Dashboard-Baustein und im Systemstatus;
-  im Audit-Log nur der erste Fehlschlag der Serie (`backup.createFailed`).
+  im Audit-Log nur der erste Fehlschlag der Serie (`backup.createFailed`; `JobDef.onFailure`, **auch bei Zeitüberschreitung**). Reihenfolge im Lauf: Backup anlegen → Audit `backup.create` → Aufbewahrung; scheitert nur die Aufbewahrung,
+  bleibt der Lauf ein Erfolg (Hinweis in der Meldung, `backup.retention` versucht es täglich erneut). Die Warnung (Backup-Seite, Dashboard) erscheint nur, solange **kein neueres Backup irgendeiner Art** existiert (`src/server/backup/status.ts`);
+  `Jetzt erneut versuchen` führt `backup.auto` sofort aus (`runNow`, `ctx.manual`: Uhrzeit und „heute schon“ gelten nicht; Operation `admin.backup.runAuto`, Recht `backup.manage`, Audit `backup.runNow`).
 * **Aufbewahrung je Art** (`src/server/backup/settings.ts`, `pruneBackups` in `core.ts`): Je Art `keep` (neueste N) und `days` (höchstens so alt), 0 = unbegrenzt; Standard `auto` 14, `pre-*` 5, `manual`/`upload` unbegrenzt.
-  Das **neueste Backup überhaupt bleibt immer**. Angewendet nach jedem automatischen Backup und täglich (Job `backup.retention`, räumt auch liegengebliebene `.tmp-`/`.import-`-Ordner). Hilfe: DSGVO-Hinweis zur Speicherbegrenzung.
-* **`linkTree`/`countTree`/`assertPlainTree` sind asynchron** (`fs/promises`, Stapel von 64): Auch bei Hunderttausenden Dateien in `/data/files` bleibt der Event-Loop frei (Test misst, dass der Loop währenddessen läuft).
+  Das **neueste Backup überhaupt bleibt immer**. Angewendet nach jedem automatischen Backup und täglich (Job `backup.retention`, räumt auch liegengebliebene `.tmp-`/`.import-`/`.upload-`/`.trash-`-Einträge). Hilfe: DSGVO-Hinweis zur Speicherbegrenzung.
+  Im Formular sind alle Felder Pflicht: ein **leeres Feld ist ein Fehler, nie „0 = unbegrenzt“** (`Number("")` ist 0).
+* **Event-Loop bleibt frei:** `linkTree`/`countTree`/`assertPlainTree`, **Löschen** (`deleteBackup`: erst atomar nach `.trash-…` umbenennen, dann asynchron abbauen), `pruneBackups`, `listBackups` und `cleanupBackupTemp` sind asynchron
+  (`fs/promises`, Stapel von 64, über alle Verzeichnisebenen zusammen höchstens 64 gleichzeitige Dateizugriffe – kein `EMFILE`). Tests messen, dass der Loop währenddessen läuft. `linkTree` überspringt Dateien, die zwischen Auflisten und Verlinken verschwinden
+  (ENOENT), und wartet nach einem Fehler auf alle laufenden Aufgaben, bevor aufgeräumt wird (kein verwaistes `.tmp-…`). `removeTree` setzt vor dem Löschen `u+rwx` auf die Ordner (ein entpacktes Archiv kann wegen `noChmod` Modus 000 mitbringen). Ein Backup, das sich nicht
+  löschen lässt, bricht die übrigen nicht ab (`PruneError`). Das Aufräumen von `.tmp-`/`.import-`-Ordnern fasst nie an, woran dieser Prozess gerade arbeitet (`markTempActive`), und nur Einträge, die mindestens 6 Stunden unverändert sind (die mtime eines
+  Ordners ändert sich nur, wenn direkt darin etwas angelegt wird – ein langer Import schreibt tiefer).
+* **Entpacken der Datenbank hat eine Obergrenze** (Gzip-Bombe, `gunzipDatabase` in `restore.ts`, `src/lib/limit-stream.ts`): zwischen Entkomprimierer und Schreibstrom zählt ein Strom mit `min(64 GiB, freier Platz − 512 MiB)`, der freie Platz wird alle 64 MiB nachgeprüft
+  → `tooLarge`/`diskFull`, die halbe Datei wird gelöscht. Gilt für Wiederherstellung (`stageRestore`), Import und die Prüfung des Imports.
 * **Upload** (`/api/backups/upload`): Länge vorab gegen freien Platz (2 × Länge + 512 MiB Reserve → 507) und Obergrenze (100 GiB → 413); während des Empfangs werden die Bytes gezählt (Obergrenze auch ohne Längenangabe)
   und alle 64 MiB der freie Platz geprüft; beim Entpacken zusätzlich Grenze für Einträge/Größe und freier Platz (`diskFull`/`tooLarge`). Abbruch löscht die halbe Datei.
 
@@ -536,31 +553,45 @@ Launcher tauscht Datenbank samt WAL und Dateien, bestätigt nach gesundem Start 
 
 Persistenter Zeitgeber für alles, was die App im Hintergrund erledigt. Zustand in der Datenbank (`JobState`: nächster Lauf, Fehlerserie, Sperre; `JobRun`: Ergebnis jedes Laufs), Definitionen im Code.
 
-* **Anmelden:** Jede Funktion legt eine `jobs.ts` an (`export const jobs: JobDef[]` mit `id` `<bereich>.<name>`, `feature`, `schedule`, `run`; optional `retry`, `timeoutMs`) und trägt sie in `src/modules/jobs.ts` ein;
+* **Anmelden:** Jede Funktion legt eine `jobs.ts` an (`export const jobs: JobDef[]` mit `id` `<bereich>.<name>`, `feature`, `schedule`, `run`; optional `retry`, `timeoutMs`, `shouldRun`, `onFailure`) und trägt sie in `src/modules/jobs.ts` ein;
   Abnehmer für die Outbox (`OutboxHandlerDef`) stehen im selben Wurzelmodul (`featureOutboxHandlers`). Jobs der Plattform: `src/server/jobs/platform.ts`. Die Plattform importiert keine Funktion (Architekturtest;
-  `feature` in einer `jobs.ts` muss die eigene Funktion sein). Ein Job läuft **nur, solange seine Funktion aktiv ist** (kein Lauf, kein Eintrag; beim Wiedereinschalten wird nachgeholt).
+  `feature` in einer `jobs.ts` muss die eigene Funktion sein; `jobs.test.ts` prüft per Import, dass jeder Job und jeder Abnehmer eine `feature` nennt). Ein Job läuft **nur, solange seine Funktion aktiv ist** (kein Lauf, kein Eintrag; beim Wiedereinschalten wird nachgeholt).
 * **Zeitplan** (`src/lib/jobs/schedule.ts`): `{ every: ms }` oder `{ cron: "m h dom mon dow" }` in der **Zeitzone der Werkstatt** (Prozess-`TZ`; ein Wechsel stellt die Cron-Termine um). Sommerzeit: eine ausgefallene Uhrzeit
   läuft direkt nach der Lücke, eine doppelte nur einmal – ein Tagesjob läuft jeden Kalendertag genau einmal (getestet über ein Jahr). Verpasste Läufe (App war aus) werden einmal nachgeholt.
+  **Grenze:** Ein stündlicher oder unterstündlicher **Cron** (`0 * * * *`, `*/15 * * * *`) lässt beim Zurückstellen der Uhr die zweite Stunde aus (die Wandzeiten 02:xx gibt es zweimal, genommen wird das erste Mal; `schedule.test.ts` dokumentiert es).
+  Wer in **jeder** Stunde laufen muss, nimmt `{ every: ms }`.
 * **Fehler:** `failures` zählt in Folge; nächster Versuch nach `Basis · 2^(n−1)`, höchstens `maxDelayMs` (Standard 1 min … 1 h). Ein Job gibt nie still auf – der Fehler bleibt sichtbar, bis ein Lauf gelingt.
 * **Sperre gegen Doppelläufe:** bedingtes Update von `JobState.lockedUntil` (Zeitlimit + 60 s) plus Merkliste im Prozess, bis die Funktion wirklich zurückkehrt (auch nach Zeitüberschreitung).
-  **Neustart mitten im Lauf:** `recover()` beim Start markiert laufende Läufe als `interrupted`, löst die Sperren und stellt die Jobs sofort fällig. Das gilt, weil es **einen Prozess** gibt (ein Container, eine SQLite-Datei);
-  Jobs müssen daher **wiederholbar** sein.
+  **Neustart mitten im Lauf:** `recover()` beim Start hält jeden belegten Job als `interrupted` fest (ein `JobRun`), löst die Sperren und stellt die Jobs sofort fällig. Das gilt, weil es **einen Prozess** gibt (ein Container, eine SQLite-Datei);
+  Jobs müssen daher **wiederholbar** sein. Scheitert das Belegen nach dem Update (Datenbankfehler), wird die Sperre sofort freigegeben (nur wenn sie dieser Prozess hält), sonst verfiele sie erst nach Zeitlimit + 1 min. Ein Job, der `ctx.signal` ignoriert und über sein Zeitlimit hinaus
+  hängt, blockiert nur sich selbst: Jeder fällige Termin bekommt einen sichtbaren Vermerk (`lastMessage` „Hängt …“), die Fehlerserie wächst, der nächste Termin rückt nach der Wartezeit weiter. **`ctx.signal` sollten Jobs auswerten** (der Backup-Job prüft es vor der Aufbewahrung, die Outbox zwischen den Ereignissen).
+* **Start mit Wiederholung, Herzschlag:** `start()` setzt die Timer **immer**; `recover()`/`sync()` laufen sofort und – scheitern sie (Datenbank kurz weg) – bei jedem Takt erneut, bis es gelingt; vorher läuft kein Job. `status()` (im Prozessspeicher: gestartet, vorbereitet, letzter Takt, letzter Fehler)
+  speist den Systemstatus („Zeitgeber zuletzt aktiv“). `runNow(jobId)` führt einen Job sofort aus (Aktivierung der Funktion gilt, `ctx.manual = true`, `shouldRun` wird umgangen); verdrahtet ist es bisher nur für `backup.auto` („Jetzt erneut versuchen“).
+* **Nur Auffälliges wird festgehalten:** Ein Lauf ohne Fehler **und ohne Ergebnismeldung** schreibt keinen `JobRun` (nur `JobState`) – sonst Zehntausende Zeilen am Tag allein für den 15-Sekunden-Takt der Outbox. Jobs sollten bei „nichts zu tun“ `undefined` zurückgeben. `JobDef.shouldRun` ist eine billige Vorabprüfung
+  **nur mit Lesezugriffen** vor Sperre und Lauf (Outbox: ein `count`); `false` → keinerlei Schreibzugriff, der Job bleibt fällig. Ein laufender Job hat keinen Lauf-Eintrag (sichtbar über `JobState.lockedUntil`).
 * **Outbox-Zustellung** (`outbox.ts`, Job `platform.outbox` alle 15 s): mindestens einmal, je Abnehmer idempotent über `OutboxDelivery`; Wiederholung nach 30 s · 2^n (höchstens 1 h), nach `maxAttempts` (8) `failedAt`;
   zugestellte Ereignisse 14 Tage, aufgegebene 60 Tage aufbewahrt (`platform.outbox-prune`). Abnehmer bekommen `message.id` als Idempotenzschlüssel.
-* **Ergebnisse:** 30 Tage bzw. 200 je Job (`platform.jobs-prune`, entfernt auch den Zustand nicht mehr bekannter Jobs). Ansicht für Administratoren: **Verwaltung → Systemstatus** (`admin.system`, Recht `system.view`, `adminOnly`).
+  **Zeitlimit je Abnehmer** (`OutboxHandlerDef.timeoutMs`, Standard 30 s, `ctx.signal` wird ausgelöst): Ein hängender Abnehmer gilt als gescheitert (Wiederholung mit Wartezeit) und blockiert weder die anderen Abnehmer noch den Job; kommt er später doch noch zum Ende, kann das Ereignis zugestellt, aber nicht vermerkt
+  sein → Abnehmer müssen idempotent sein (Webhooks: `message.id` mitsenden). **Ausgeschaltete Abnehmer-Funktion (Entscheidung zu ZP3-A-11):** Das Ereignis bleibt für diesen Abnehmer **offen (geparkt**, Wartezeit 15 min, damit es neue Ereignisse nicht verdrängt), wird beim Einschalten nachgeholt und
+  verfällt sonst mit der Aufbewahrung (14 Tage ab Anlage). Ein Ereignis ohne **irgendeinen** angemeldeten Abnehmer gilt weiter sofort als erledigt.
+* **Ergebnisse:** 30 Tage bzw. 200 je Job (`platform.jobs-prune`, entfernt auch den Zustand nicht mehr bekannter Jobs). Ansicht für Administratoren: **Verwaltung → Systemstatus** (`admin.system`, Recht `system.view`, `adminOnly`). Die Meldung „alles in Ordnung“ kommt aus der reinen Funktion `evaluateSystem` (`src/server/jobs/health.ts`, getestet): Fehlerserie, überfällig (> 5 min), hängende Sperre, unterbrochen,
+  aufgegebene Ereignisse, Zeitgeber ohne Takt (> 3 min) bzw. mit Fehler; Jobs ausgeschalteter Funktionen zählen nie.
 * **Testbar:** `createJobRunner({ jobs, now, timeZone, activeFeatures })` mit Fake-Uhr; `tick()` führt Fälliges aus. Tests: `src/server/jobs/jobs.test.ts`, `src/lib/jobs/schedule.test.ts`.
 
 ## Uploads und Archive
 
 * **Inhalt statt Behauptung** (`src/lib/upload-sniff.ts`): Rechnungsbelege (PDF, PNG, JPEG, WebP, XML/XRechnung), Doku-Bilder (PNG, JPEG, WebP, GIF) und das Logo (zusätzlich SVG) werden an den ersten Bytes erkannt;
-  der gemeldete Typ muss passen, **gespeichert wird der erkannte Typ**. HTML als `.png` wird abgelehnt. XML nur mit `<?xml`-Deklaration und ohne HTML-/Formatvorlagen-Wurzel.
+  der gemeldete Typ muss passen, **gespeichert wird der erkannte Typ**. HTML als `.png` wird abgelehnt. **XML nur als elektronische Rechnung:** `<?xml`-Deklaration, Wurzel aus der Positivliste (UBL `Invoice`/`CreditNote`, CII `CrossIndustryInvoice`, `XML_INVOICE_ROOTS`), kein `<!DOCTYPE`, `<!ENTITY`, `<?xml-stylesheet`.
+  **Pflicht für den späteren XRechnung-Import:** Der Parser schaltet DTDs und externe Entitäten aus (kein XXE, kein Entity-Expansion) und löst nie Adressen aus der Datei auf.
 * **Auslieferung** (`src/lib/file-delivery.ts`): `X-Content-Type-Options: nosniff` immer; PDF inline (ohne `sandbox`, der PDF-Betrachter verträgt sie nicht); Bilder und alles andere mit
-  `Content-Security-Policy: sandbox; default-src 'none'`; XML und unbekannte Typen nur als `attachment`; `Content-Disposition` mit ASCII-Name und UTF-8-Variante (kein Einschleusen von Kopfzeilen).
+  `Content-Security-Policy: sandbox; default-src 'none'`; XML und unbekannte Typen nur als `attachment`; `Content-Disposition` mit ASCII-Name und UTF-8-Variante (kein Einschleusen von Kopfzeilen). Dateinamen werden nach **Zeichen** gekürzt (`truncateName`, wohlgeformt): `slice` schnitte ein Emoji durch, und `encodeURIComponent` wirft bei einem einzelnen Ersatzzeichen – der Beleg wäre dauerhaft nicht auslieferbar.
 * **Herkunft** (`src/server/request-guard.ts`): Upload-Routen verlangen `X-Requested-With: schrauberos`, gleiche `Origin` und kein fremdes `Sec-Fetch-Site`. Server Actions (Belege) prüft Next selbst (Origin gegen Host);
-  sie bleiben im 12-MB-Limit. Neue Upload-Wege gehören durch `checkUpload`, `deliveryHeaders` und `isSameOriginUpload`.
+  sie bleiben im 12-MB-Limit. Neue Upload-Wege gehören durch `checkUpload`, `deliveryHeaders` und `isSameOriginUpload`. Mit der Einstellung „Hinter Reverse-Proxy“ gilt für den Herkunftsvergleich `X-Forwarded-Host` (erster Eintrag) statt `Host` – der Proxy schreibt `Host` oft um, sonst wäre jeder Upload 403;
+  der Proxy muss den öffentlichen Namen dort mitgeben. Das Doku-Bild verlangt **Content-Length** (411; `formData()` puffert alles) und prüft das Bearbeiten-Recht (mindestens ein Bereich) **vor** dem Lesen des Bodys.
 * **Archive** (`src/lib/archive.ts`, `extractArchive`): nur Ordner und normale Dateien; Symlinks, Hardlinks, Geräte-Dateien, `..`, absolute Pfade, Laufwerke, Rückwärtsstriche, NUL werden abgelehnt;
   Grenzen für Einträge und Gesamtgröße (aus den Köpfen, bevor etwas geschrieben wird). Backups: höchstens 500 000 Einträge/200 GiB und der freie Platz. Update-Pakete: 200 000 Einträge/3 GiB; **relative Symlinks innerhalb
-  des Pakets** sind dort erlaubt (`symlinks: "inside"`), falls Bibliotheken welche enthalten. Tests mit von Hand gebauten bösartigen Archiven (`src/test/tar.ts`).
+  des Pakets** sind dort erlaubt (`symlinks: "inside"`), falls Bibliotheken welche enthalten – dann nur mit `..` **am Anfang** des Ziels (ein `..` hinter einem Namen verändert seine Bedeutung, sobald ein Zwischenglied selbst ein Symlink ist) und mit einer **Prüfung auf dem Dateisystem
+  nach dem Entpacken** (`assertSymlinksInside`: jeder Link muss per `realpath` im Ziel bleiben, Schleifen werden abgelehnt). Tests mit von Hand gebauten bösartigen Archiven (`src/test/tar.ts`).
 
 ## Eine neue Funktion anlegen
 
@@ -874,7 +905,10 @@ Startet die Anwendung gar nicht, liegen die Backups trotzdem im Volume. Von Hand
 * Dateien wachsen mit dem Archiv; Backups verweisen per Hardlink darauf (kaum Zusatzplatz), schützen aber nicht vor dem Ausfall des
   Datenträgers – Kopien außerhalb des Servers über „Herunterladen“.
 * Backups sind unverschlüsselt.
+* **Für die Browser-CI / Block 13 vorgemerkt (CSP und Dateirouten, ZP3-S-F9):** Die globale CSP aus `next.config` und die route-eigene `Content-Security-Policy` der Dateirouten (`sandbox; default-src 'none'`) zusammen im Browser prüfen; **Chrome-PDF-Viewer unter `object-src 'none'`**
+  (zeigt er das PDF inline? sonst Option „PDF nur als Download“); Bilder mit `sandbox` inline; Doku-Bild-Upload mit `Content-Length` über die gebaute App und einen üblichen Reverse-Proxy (nginx/Traefik; fehlt die Länge, antwortet die Route 411).
 * Der Job-Runner setzt genau einen Prozess voraus (ein Container, eine SQLite-Datei): Nach einem Neustart gelten laufende Läufe als unterbrochen. Jobs sind deshalb wiederholbar auszulegen.
+* **Tests mit Symlinks** (`archive.test.ts`: Prüfung auf dem Dateisystem, Verzeichnis-Symlink) laufen nur unter Linux/macOS (unter Windows ohne Entwicklermodus fehlt das Recht, sie werden übersprungen) – die Linux-Pipeline muss sie ausführen; `safe-fetch.test.ts` bindet `127.0.0.2` (sonst Ausweichen auf `127.0.0.1`).
 * API: noch ohne Oberfläche zur Token-Verwaltung, ohne Webhooks, ohne Datei-Upload (Rechnungsbelege) und ohne Doku-Seite der Ressourcen (F11); Tokens entstehen bis dahin nur über die Server-Funktion `createApiTokenOperation`. Rate-Limit und Drosselung liegen im Speicher des Prozesses (ein Prozess, eine Datenbank).
 * Die Suche unterscheidet bei Umlauten Groß-/Kleinschreibung (SQLite).
 * Urlaubstage zählen Mo–Fr ohne Feiertage; kein Genehmigungs-Workflow.

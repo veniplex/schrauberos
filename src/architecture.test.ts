@@ -183,6 +183,10 @@ describe("Job-Runner", () => {
       const source = readFileSync(file, "utf8");
       for (const f of source.matchAll(/\bfeature:\s*"([^"]+)"/g)) if (f[1] !== `${m[1]}.${m[2]}`) wrong.push(`${rel}: feature "${f[1]}" statt "${m[1]}.${m[2]}"`);
       if (!/\bfeature:\s*"/.test(source)) wrong.push(`${rel}: kein Job nennt eine Funktion`);
+      // Jeder Job und jeder Abnehmer (id: "…") braucht sein feature: "…" – sonst liefe er auch bei ausgeschalteter Funktion (die Prüfung per Import steht in jobs.test.ts)
+      const ids = [...source.matchAll(/^\s*id:\s*"/gm)].length;
+      const features = [...source.matchAll(/^\s*feature:\s*"/gm)].length;
+      if (ids !== features) wrong.push(`${rel}: ${ids} Einträge mit id, aber ${features} mit feature`);
     }
     assert.ok(found >= 2, "jobs.ts der Funktionen gefunden");
     assert.deepEqual(wrong, []);

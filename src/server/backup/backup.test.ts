@@ -83,12 +83,16 @@ describe("Backups", () => {
     assert.ok((await listBackups()).some((b) => b.kind === "manual"));
   });
 
-  it("Aufbewahrung je Art: Anzahl und Alter gelten getrennt; 0 = unbegrenzt; das neueste Backup überhaupt bleibt immer", async () => {
-    // eigenes Datenverzeichnis: die übrigen Tests dieser Datei brauchen ihre Sicherungen
+  it("Aufbewahrung je Art: Anzahl und Alter gelten getrennt; 0 = unbegrenzt; das neueste Backup überhaupt bleibt immer", async (t) => {
+    // eigenes Datenverzeichnis: die übrigen Tests dieser Datei brauchen ihre Sicherungen; t.after stellt es auch nach einem fehlgeschlagenen Test wieder her
     const isolated = mkdtempSync(path.join(tmpdir(), "so-retention-"));
     const previous = process.env.DATA_DIR;
     process.env.DATA_DIR = isolated;
-    after(() => rmSync(isolated, { recursive: true, force: true }));
+    t.after(() => {
+      if (previous === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = previous;
+      rmSync(isolated, { recursive: true, force: true });
+    });
     const at = (day: number) => new Date(Date.UTC(2026, 2, day, 2, 0, 0));
     for (const day of [1, 2, 3]) await createBackup("pre-update", dbFile, at(day));
     for (const day of [1, 2]) await createBackup("manual", dbFile, at(day));
@@ -106,7 +110,6 @@ describe("Backups", () => {
     const doomed = await pruneBackups({ ...Object.fromEntries(BACKUP_KINDS.map((k) => [k, { keep: 0, days: 1 }])) } as typeof UNLIMITED, now);
     assert.equal(doomed.length, 3);
     assert.deepEqual(await kept(), ["pre-update:3"]);
-    process.env.DATA_DIR = previous;
   });
 
   it("linkTree ist asynchron: der Event-Loop läuft während des Verlinkens weiter, auch bei vielen Dateien", async () => {
@@ -477,7 +480,8 @@ describe("Backups: Dateibäume, Löschen, Aufräumen (ZP3-A-4/A-5, S-F7)", () =>
       assert.deepEqual(left, [2, 3], "das neueste bleibt, das gesperrte auch, das dritte wurde gelöscht");
     } finally {
       restoreStubs();
-      process.env.DATA_DIR = previous;
+      if (previous === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = previous;
       rmSync(isolated, { recursive: true, force: true });
     }
   });
