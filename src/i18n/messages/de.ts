@@ -8,6 +8,7 @@ import { tiresDe } from "./modules/tires.de";
 import { ordersDe } from "./modules/orders.de";
 import { partsDe } from "./modules/parts.de";
 import { timeDe } from "./modules/time.de";
+import { filesDe } from "./modules/files.de";
 import { customersDe } from "./modules/customers.de";
 import { exchangeDe } from "./modules/exchange.de";
 import { usersDe } from "./modules/users.de";
@@ -165,6 +166,7 @@ export const de = {
     appointments: "Termine",
     orders: "Aufträge",
     parts: "Teile & Lager",
+    files: "Dokumente & Fotos",
     tires: "Reifenlager",
     customers: "Kunden",
     users: "Benutzer",
@@ -316,6 +318,7 @@ export const de = {
   orders: ordersDe,
   parts: partsDe,
   time: timeDe,
+  files: filesDe,
   customers: customersDe,
   exchange: exchangeDe,
   users: usersDe,
@@ -325,6 +328,7 @@ export const de = {
     appointments: "Termine",
     orders: "Aufträge",
     parts: "Teile & Lager",
+    files: "Dokumente & Fotos",
     tires: "Reifenlager",
     customers: "Kunden",
     vehicles: "Fahrzeuge",
@@ -411,6 +415,11 @@ export const de = {
       edit: "Mitarbeiter und Abwesenheiten bearbeiten",
       delete: "Mitarbeiter löschen",
       sensitive: "Sensible Mitarbeiterdaten (Notfallkontakt, Krankheit)",
+    },
+    files: {
+      view: "Dokumente und Fotos ansehen (nach den Rechten für Fahrzeug bzw. Auftrag)",
+      upload: "Fotos und Dokumente hochladen und beschriften",
+      delete: "Dokumente und Fotos aller entfernen (eigene entfernt, wer hochladen darf)",
     },
     time: {
       view: "Eigene Zeiten ansehen",

@@ -167,9 +167,10 @@ export type PrivacyProviderDef = {
  * Ort, an dem eine Seite Beiträge anderer Funktionen einhängt („Erweiterungspunkt“): Der Gastgeber kennt seine Gäste nicht, er fragt nur `sectionsFor(session, host)` (`registry.ts`).
  *  - `orders/detail`: Abschnitt (Karte) auf der Auftragsseite (Teile & Lager: „Verbrauchte Teile“),
  *  - `orders/items`: Werkzeug über dem Positionen-Editor eines Auftrags (Teile & Lager: Artikel einfügen),
- *  - `appointments/detail`: Knopf im Termin (Aufträge: „Auftrag aus Termin“).
+ *  - `appointments/detail`: Knopf im Termin (Aufträge: „Auftrag aus Termin“),
+ *  - `vehicles/detail`: Abschnitt (Karte) auf der Fahrzeugseite (Dokumente & Fotos, Checklisten).
  */
-export type SectionHost = "orders/detail" | "orders/items" | "appointments/detail";
+export type SectionHost = "orders/detail" | "orders/items" | "appointments/detail" | "vehicles/detail";
 
 /** Was ein Abschnitt vom Gastgeber bekommt: die Kennung der Sache (Auftrag, Termin) und die Sitzung. */
 export type SectionProps = { entityId: string; session: AppSession };

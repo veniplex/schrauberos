@@ -65,6 +65,11 @@ export const permissionHintsDe = {
     delete: "Mitarbeiter endgültig löschen.",
     sensitive: "Notfallkontakt und die Art von Abwesenheiten (Krankheit) sehen und ändern.",
   },
+  files: {
+    view: "Dokumente und Fotos an Fahrzeugen und Aufträgen ansehen – nur dort, wo die Person auch das Fahrzeug bzw. den Auftrag sehen darf.",
+    upload: "Fotos (JPEG, PNG) und PDF-Dokumente hochladen und beschriften. Standortdaten werden aus Fotos entfernt.",
+    delete: "Dateien aller Personen entfernen (Leitung). Wer hochladen darf, entfernt auch seine eigenen Dateien.",
+  },
   time: {
     view: "Die eigenen Zeiten ansehen: Stempel, Einträge, Wochenübersicht mit Ist, Soll und Saldo.",
     stamp: "Kommen und Gehen stempeln, einen Auftrag starten und beenden.",

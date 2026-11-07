@@ -12,6 +12,7 @@ import { privacyProviders as customers } from "./workshop/customers/privacy";
 import { customerDisplayName } from "./workshop/customers/domain";
 import { privacyProviders as tires } from "./workshop/tires/privacy";
 import { privacyProviders as orders } from "./workshop/orders/privacy";
+import { privacyProviders as files } from "./workshop/files/privacy";
 import { privacyProviders as vehicles } from "./workshop/vehicles/privacy";
 
 /**
@@ -20,7 +21,7 @@ import { privacyProviders as vehicles } from "./workshop/vehicles/privacy";
  * transaktionale Hooks (`operation-hooks.ts`) auf der Operation `customers.anonymize`, nicht über diese Anbieter.
  * Neue Funktion mit personenbezogenen Daten zum Kunden: `privacy.ts` anlegen, hier eintragen, bei Freitext/Verknüpfungen einen Hook für `customers.anonymize` ergänzen.
  */
-export const PRIVACY_PROVIDERS: readonly PrivacyProviderDef[] = [...customers, ...vehicles, ...appointments, ...tires, ...orders, ...invoices, ...handbook, ...itDocs].sort((a, b) => a.order - b.order);
+export const PRIVACY_PROVIDERS: readonly PrivacyProviderDef[] = [...customers, ...vehicles, ...appointments, ...tires, ...orders, ...files, ...invoices, ...handbook, ...itDocs].sort((a, b) => a.order - b.order);
 
 /** Begriffe, unter denen ein Kunde in Freitexten vorkommen kann: mindestens vier Zeichen (kürzere würden zu viel finden). */
 function termsOf(c: { firstName: string | null; lastName: string; company: string | null; customerNumber: string | null; email: string | null }): string[] {

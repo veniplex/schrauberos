@@ -43,6 +43,9 @@ before(async () => {
       }
     }
   }
+  // Operationen, die nicht über eine Server Action laufen, sondern über einen Route Handler (Datei-Upload der Oberfläche: POST /api/files) – ihr Pendant ist `POST /api/v1/files`
+  const upload = (await import("@/modules/workshop/files/operations")).uploadFileOperation;
+  operations.set(upload.name, upload);
 });
 after(() => env.cleanup());
 

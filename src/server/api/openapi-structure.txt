@@ -38,6 +38,12 @@ POST /employees employees.create employees.edit body=firstName,lastName,personne
 GET /employees/{id} employees.get employees.view
 PATCH /employees/{id} employees.update employees.edit body=firstName,lastName,personnelNumber,jobTitle,department,email,phone,mobile,hireDate,leaveDate,active,vacationDaysPerYear,workWeekdays,vacationCarryYear,vacationCarryDays,notes
 DELETE /employees/{id} employees.delete employees.delete
+GET /files files.list files.view query=ownerType,ownerId,category,q sort=createdAt
+POST /files files.upload files.upload body=ownerType,ownerId,category,caption,file
+GET /files/{id} files.get files.view
+PATCH /files/{id} files.update files.view body=category,caption
+DELETE /files/{id} files.delete files.view
+GET /files/{id}/content files.content files.view
 GET /fleet-costs fleet-costs.list fleet.view query=fleetVehicleId,category sort=date,amountCents
 POST /fleet-costs fleet-costs.create fleet.edit body=fleetVehicleId,date,category,amountCents,km,note
 GET /fleet-costs/{id} fleet-costs.get fleet.view

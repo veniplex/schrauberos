@@ -184,3 +184,21 @@ describe("PhotoGallery", () => {
     assert.ok(byText(rows()[0], "button", /Erneut versuchen/));
   });
 });
+
+describe("PhotoGallery: Dateien (PDF) und nur ansehen", () => {
+  it("`readOnly` zeigt die Fotos ohne Auswahlfeld; `variant=\"file\"` mit eigener Annahme und Beschriftung lädt PDFs unverändert hoch und lässt den Hinweis „Noch keine Fotos“ weg", async () => {
+    const { PhotoGallery } = await import("./photo-gallery");
+    view = await mountI18n(createElement(PhotoGallery, { uploader: manualUploader().uploader, readOnly: true, photos: [{ id: "a", src: "/api/files/a", name: "Front" }] } as never));
+    assert.equal(view.container.querySelector("input[type='file']"), null);
+    assert.ok(view.container.querySelector("img[src='/api/files/a']"));
+    await view.unmount();
+
+    const upload = manualUploader();
+    view = await mountI18n(createElement(PhotoGallery, { uploader: upload.uploader, variant: "file", accept: "application/pdf", acceptFile: (f: File) => f.type === "application/pdf", addLabel: "PDF-Dokument hinzufügen", hideEmpty: true } as never));
+    const input = view.container.querySelector("input[type='file']") as HTMLInputElement;
+    assert.equal(input.getAttribute("accept"), "application/pdf");
+    assert.equal(input.getAttribute("aria-label"), "PDF-Dokument hinzufügen");
+    assert.equal(input.hasAttribute("capture"), false, "keine Kamera für Dokumente");
+    assert.doesNotMatch(plain(view.container.textContent), /Noch keine Fotos/);
+  });
+});

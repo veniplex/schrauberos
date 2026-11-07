@@ -21,6 +21,7 @@ import { widgets as invoicesWidgets } from "./office/invoices/widgets";
 import { widgets as employeesWidgets } from "./office/employees/widgets";
 import { widgets as timeWidgets } from "./office/time/widgets";
 import { sections as timeSections } from "./office/time/sections";
+import { sections as filesSections } from "./workshop/files/sections";
 import { settingsTabs as timeSettings } from "./office/time/settings-tab";
 import { widgets as fleetWidgets } from "./office/fleet/widgets";
 import { widgets as networkWidgets } from "./it/network/widgets";
@@ -41,6 +42,7 @@ import { settingsTabs as updatesSettings } from "./admin/updates/settings-tab";
 import { searchProviders as appointmentsSearch } from "./workshop/appointments/search";
 import { searchProviders as tiresSearch } from "./workshop/tires/search";
 import { searchProviders as ordersSearch } from "./workshop/orders/search";
+import { searchProviders as filesSearch } from "./workshop/files/search";
 import { searchProviders as partsSearch } from "./workshop/parts/search";
 import { searchProviders as customersSearch } from "./workshop/customers/search";
 import { searchProviders as vehiclesSearch } from "./workshop/vehicles/search";
@@ -76,6 +78,7 @@ const ALL_WIDGETS: WidgetDef[] = [
 export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...appointmentsSearch,
   ...ordersSearch,
+  ...filesSearch,
   ...partsSearch,
   ...tiresSearch,
   ...customersSearch,
@@ -93,7 +96,7 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
  * Beiträge von Funktionen zu Seiten anderer Funktionen („Erweiterungspunkte“): Der Gastgeber (Auftragsseite, Termin) fragt `sectionsFor(session, host)` und kennt seine Gäste nicht.
  * Neue Funktion mit Abschnitten: `sections.tsx` anlegen und hier eintragen.
  */
-const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections];
+const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections, ...filesSections];
 
 const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...timeSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
 

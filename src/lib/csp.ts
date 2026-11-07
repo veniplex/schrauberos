@@ -70,7 +70,7 @@ export const PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=(),
 export const HSTS_VALUE = "max-age=15552000";
 
 /** Pfade, deren Antwort den CSP-Kopf selbst setzt (Dateirouten, `lib/file-delivery.ts`). Der Proxy lässt sie unangetastet. */
-export const ROUTE_OWNED_PATHS: readonly RegExp[] = [/^\/api\/invoices\/[^/]+\/file$/, /^\/api\/docs\/images\/[^/]+$/, /^\/api\/logo$/, /^\/api\/orders\/approvals\/[^/]+\/signature$/];
+export const ROUTE_OWNED_PATHS: readonly RegExp[] = [/^\/api\/invoices\/[^/]+\/file$/, /^\/api\/docs\/images\/[^/]+$/, /^\/api\/logo$/, /^\/api\/orders\/approvals\/[^/]+\/signature$/, /^\/api\/files\/[^/]+$/];
 
 export type CspKind = "page" | "api" | "route";
 

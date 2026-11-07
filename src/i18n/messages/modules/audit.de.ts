@@ -31,6 +31,7 @@ export const auditDe = {
     tires: "Reifenlager",
     orders: "Aufträge",
     parts: "Teile & Lager",
+    files: "Dokumente & Fotos",
     invoice: "Rechnungen",
     employee: "Mitarbeiter",
     time: "Zeiterfassung",
@@ -204,6 +205,11 @@ export const auditDe = {
       export: "Rechnungen exportiert (CSV)",
       import: "Rechnungen importiert (CSV)",
       accountantExport: "Rechnungen für den Steuerberater exportiert (CSV)",
+    },
+    files: {
+      upload: "Datei hochgeladen",
+      update: "Beschriftung einer Datei geändert",
+      archive: "Datei entfernt",
     },
     time: {
       start: "Zeit gestempelt (Beginn)",

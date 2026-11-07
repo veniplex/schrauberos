@@ -1,5 +1,6 @@
 import "server-only";
-import type { z } from "zod";
+import { createHash } from "node:crypto";
+import { z } from "zod";
 import { problemOf, type ProblemFields } from "@/lib/api/problem";
 import { logError } from "@/lib/log-safe";
 import { apiEndpoints } from "@/modules/api";
@@ -90,10 +91,11 @@ export function zodProblemFields(error: z.ZodError): { fields?: ProblemFields; r
   return { ...(Object.keys(fields).length ? { fields } : {}), ...(reason ? { reason } : {}) };
 }
 
-async function readBodyText(request: Request): Promise<string> {
+/** Liest den Körper höchstens bis `limit` Bytes (sonst 413; die Angabe `Content-Length` wird vorab geprüft, der Datenstrom zusätzlich beim Lesen). */
+async function readBodyBytes(request: Request, limit: number): Promise<Buffer> {
   const declared = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) throw apiProblem("payload_too_large");
-  if (!request.body) return "";
+  if (Number.isFinite(declared) && declared > limit) throw apiProblem("payload_too_large");
+  if (!request.body) return Buffer.alloc(0);
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -101,18 +103,27 @@ async function readBodyText(request: Request): Promise<string> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_BODY_BYTES) {
+    if (size > limit) {
       await reader.cancel().catch(() => undefined);
       throw apiProblem("payload_too_large");
     }
     chunks.push(value);
   }
+  return Buffer.concat(chunks);
+}
+
+async function readBodyText(request: Request): Promise<string> {
+  const bytes = await readBodyBytes(request, MAX_BODY_BYTES);
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
     throw apiProblem("bad_request");
   }
 }
+
+/** Zusatz zur Dateigröße für Formularfelder und Grenzen eines Uploads. */
+const MULTIPART_OVERHEAD = 64 * 1024;
+const MULTIPART = /^multipart\/form-data\s*;/i;
 
 const rateHeaders = (r: { limit: number; remaining: number; resetSeconds: number }) => ({
   "ratelimit-limit": String(r.limit),
@@ -120,21 +131,22 @@ const rateHeaders = (r: { limit: number; remaining: number; resetSeconds: number
   "ratelimit-reset": String(r.resetSeconds),
 });
 
-type Rendered = { status: number; body: string; headers: Record<string, string> };
+type Rendered = { status: number; body: string; headers: Record<string, string>; stream?: ReadableStream<Uint8Array> };
 
 function render(result: ApiResult): Rendered {
+  if (result.file) return { status: result.status, body: "", headers: { ...result.headers, ...result.file.headers }, stream: result.file.stream };
   const base = { "cache-control": "no-store", "x-content-type-options": "nosniff", ...result.headers };
   if (result.status === 204 || result.status === 304 || result.body === undefined) return { status: result.status, body: "", headers: base };
   return { status: result.status, body: JSON.stringify(result.body), headers: { ...base, "content-type": "application/json; charset=utf-8" } };
 }
 
 const toResponse = (rendered: Rendered, extra: Record<string, string> = {}): Response =>
-  new Response(rendered.body === "" ? null : rendered.body, { status: rendered.status, headers: { ...rendered.headers, ...extra } });
+  new Response(rendered.stream ?? (rendered.body === "" ? null : rendered.body), { status: rendered.status, headers: { ...rendered.headers, ...extra } });
 
 /** Zu speichernde Header einer Antwort (nur, was zur Wiederholung gehört). */
 const keepHeaders = (headers: Record<string, string>) => Object.fromEntries(Object.entries(headers).filter(([k]) => ["content-type", "etag", "location", "cache-control", "x-content-type-options"].includes(k)));
 
-async function parseInput(endpoint: ApiEndpoint, request: Request, searchParams: URLSearchParams): Promise<{ query: Record<string, unknown>; body: unknown; text: string }> {
+async function parseInput(endpoint: ApiEndpoint, request: Request, searchParams: URLSearchParams): Promise<{ query: Record<string, unknown>; body: unknown; text: string; file: ApiCall["file"] }> {
   let query: Record<string, unknown> = {};
   if (endpoint.query) {
     const raw: Record<string, string | string[]> = {};
@@ -149,6 +161,31 @@ async function parseInput(endpoint: ApiEndpoint, request: Request, searchParams:
 
   let text = "";
   let body: unknown;
+  let file: ApiCall["file"] = null;
+  if (endpoint.upload && endpoint.method === "POST") {
+    const contentType = request.headers.get("content-type") ?? "";
+    if (!MULTIPART.test(contentType)) throw apiProblem("unsupported_media_type");
+    const bytes = await readBodyBytes(request, endpoint.upload.maxBytes + MULTIPART_OVERHEAD);
+    let form: FormData;
+    try {
+      form = await new Response(new Uint8Array(bytes), { headers: { "content-type": contentType } }).formData();
+    } catch {
+      throw apiProblem("bad_request");
+    }
+    const fields: Record<string, string> = {};
+    for (const [name, value] of form) {
+      if (typeof value === "string") fields[name] = value;
+      else if (name === "file" && !file) file = { name: value.name, type: value.type, bytes: new Uint8Array(await value.arrayBuffer()) };
+      else throw apiProblem("validation_failed", { fields: { [name]: { code: "validation.invalid" } } });
+    }
+    if (file && file.bytes.length > endpoint.upload.maxBytes) throw apiProblem("payload_too_large");
+    const parsed = (endpoint.body ?? z.strictObject({})).safeParse(fields);
+    if (!parsed.success) throw apiProblem("validation_failed", zodProblemFields(parsed.error));
+    body = parsed.data;
+    // Fingerabdruck für den Idempotency-Key: Felder und Inhalt der Datei – die Formulargrenze ist bei jedem Versuch eine andere
+    text = JSON.stringify({ fields, file: file ? { name: file.name, sha256: createHash("sha256").update(file.bytes).digest("hex") } : null });
+    return { query, body, text, file };
+  }
   if (endpoint.method === "POST" || endpoint.method === "PATCH") {
     text = await readBodyText(request);
     if (endpoint.body) {
@@ -166,7 +203,7 @@ async function parseInput(endpoint: ApiEndpoint, request: Request, searchParams:
       body = parsed.data;
     }
   }
-  return { query, body, text };
+  return { query, body, text, file };
 }
 
 export async function handleApiRequest(request: Request, endpoints: readonly ApiEndpoint[] = apiEndpoints): Promise<Response> {
@@ -212,7 +249,7 @@ async function dispatch(request: Request, principal: Principal, tokenId: string,
   const endpoint = match.compiled.endpoint;
   if (!principal.can(endpoint.permission)) throw apiProblem("forbidden");
 
-  const { query, body, text } = await parseInput(endpoint, request, url.searchParams);
+  const { query, body, text, file } = await parseInput(endpoint, request, url.searchParams);
   const call: ApiCall = {
     request,
     principal,
@@ -223,6 +260,7 @@ async function dispatch(request: Request, principal: Principal, tokenId: string,
     ifMatch: request.headers.get("if-match"),
     ifNoneMatch: request.headers.get("if-none-match"),
     committed: () => undefined,
+    file,
   };
 
   const key = endpoint.method === "GET" ? null : request.headers.get("idempotency-key");

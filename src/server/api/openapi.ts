@@ -83,7 +83,7 @@ function operationOf(endpoint: ApiEndpoint): Json {
   }
   if (endpoint.method !== "GET") parameters.push({ name: "Idempotency-Key", in: "header", description: "Makes retries safe: the same key with the same body returns the stored response.", schema: { type: "string", maxLength: 128 } });
 
-  const data = endpoint.response ? schemaOf(endpoint.response, "output") : undefined;
+  const data = endpoint.response && !endpoint.download ? schemaOf(endpoint.response, "output") : undefined;
   const ok = endpoint.status ?? 200;
   const success: Json = { description: ok === 204 ? "No content" : "Success" };
   const successHeaders: Json = { ...RATE_HEADERS };
@@ -99,9 +99,11 @@ function operationOf(endpoint: ApiEndpoint): Json {
   }
   // 201 nennt den Ort des neuen Elements
   if (ok === 201) successHeaders.Location = { $ref: "#/components/headers/Location" };
+  // Dateien: Antwort mit dem Inhalt der Datei (ihr Typ steht im Header Content-Type), kein JSON
+  if (endpoint.download) success.content = { "application/octet-stream": { schema: { type: "string", format: "binary" } } };
   success.headers = successHeaders;
 
-  const hasBody = !!endpoint.body;
+  const hasBody = !!endpoint.body && !endpoint.upload;
   const writes = endpoint.method !== "GET";
   const responses: Record<string, Json> = {
     [String(ok)]: success,
@@ -114,10 +116,10 @@ function operationOf(endpoint: ApiEndpoint): Json {
   // 304: nur Elemente mit ETag
   if (endpoint.etag && endpoint.method === "GET") responses["304"] = { description: "Not modified: the client's ETag is current.", headers: { ...RATE_HEADERS, ETag: { $ref: "#/components/headers/ETag" } } };
   // 400 bei unlesbarem Körper/If-Match, 413/415 bei Körpern
-  if (hasBody || endpoint.ifMatch) responses["400"] = problemRef("The request could not be understood (malformed JSON, invalid If-Match).");
-  if (hasBody) {
-    responses["413"] = problemRef("The request body is larger than 1 MiB.");
-    responses["415"] = problemRef("The body is not application/json.");
+  if (hasBody || endpoint.upload || endpoint.ifMatch) responses["400"] = problemRef("The request could not be understood (malformed JSON, invalid If-Match).");
+  if (hasBody || endpoint.upload) {
+    responses["413"] = problemRef(endpoint.upload ? `The upload is larger than ${Math.round(endpoint.upload.maxBytes / 1_048_576)} MiB.` : "The request body is larger than 1 MiB.");
+    responses["415"] = problemRef(endpoint.upload ? "The body is not multipart/form-data." : "The body is not application/json.");
   }
   // 422: ungültige Eingabe/Filter; bei schreibenden Aufrufen auch Idempotency-Key ungültig oder wiederverwendet
   if (hasBody || endpoint.query || endpoint.list || writes) responses["422"] = { $ref: "#/components/responses/Validation" };
@@ -137,7 +139,15 @@ function operationOf(endpoint: ApiEndpoint): Json {
     parameters,
     responses,
   };
-  if (endpoint.body) operation.requestBody = { required: true, content: { "application/json": { schema: schemaOf(endpoint.body, "input") } } };
+  if (endpoint.upload) {
+    const fields = endpoint.body ? schemaOf(endpoint.body, "input") : { type: "object", properties: {} };
+    const required = [...(((fields.required as string[] | undefined) ?? [])), "file"];
+    operation.requestBody = {
+      required: true,
+      content: { "multipart/form-data": { schema: { ...fields, type: "object", required, properties: { ...((fields.properties as Json | undefined) ?? {}), file: { type: "string", format: "binary" } } } } },
+    };
+  } else if (endpoint.body) operation.requestBody = { required: true, content: { "application/json": { schema: schemaOf(endpoint.body, "input") } } };
+  if (endpoint.download) operation.description = endpoint.download.description;
   return operation;
 }
 

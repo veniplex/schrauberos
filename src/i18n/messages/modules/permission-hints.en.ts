@@ -66,6 +66,11 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     delete: "Delete employees permanently.",
     sensitive: "See and change the emergency contact and the type of absences (sickness).",
   },
+  files: {
+    view: "View documents and photos on vehicles and orders – only where the person may also see the vehicle or order.",
+    upload: "Upload and caption photos (JPEG, PNG) and PDF documents. Location data is removed from photos.",
+    delete: "Remove the files of everyone (management). Whoever may upload also removes their own files.",
+  },
   time: {
     view: "View your own times: clock, entries, weekly overview with actual, target and balance.",
     stamp: "Clock in and out, start and stop an order.",

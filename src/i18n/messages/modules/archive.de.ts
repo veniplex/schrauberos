@@ -23,6 +23,8 @@ export const archiveDe = {
     tireSets_other: "{count} Reifensätze",
     orders_one: "{count} Auftrag (Aufträge werden nie gelöscht)",
     orders_other: "{count} Aufträge (Aufträge werden nie gelöscht)",
+    files_one: "{count} Datei oder Foto",
+    files_other: "{count} Dateien und Fotos",
     transfers_one: "{count} Halterwechsel",
     transfers_other: "{count} Halterwechsel",
   },

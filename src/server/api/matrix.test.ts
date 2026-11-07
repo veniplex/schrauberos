@@ -38,8 +38,12 @@ after(() => env.cleanup());
 
 const concrete = (e: ApiEndpoint) => e.path.replace(/\{\w+\}/g, "someid");
 const label = (e: ApiEndpoint) => `${e.method} ${e.path}`;
+/** Ein leeres Formular für Upload-Endpunkte (multipart statt JSON). */
+const EMPTY_FORM = { raw: ["--matrix", 'Content-Disposition: form-data; name="x"', "", "y", "--matrix--", ""].join("\r\n"), contentType: "multipart/form-data; boundary=matrix" };
 const request = (e: ApiEndpoint, token?: string | null, extra: Record<string, string> = {}) =>
-  apiRequest(e.method, concrete(e), { token, body: e.method === "POST" || e.method === "PATCH" ? {} : undefined, headers: { ...(e.ifMatch ? { "if-match": '"1"' } : {}), ...extra } });
+  e.upload
+    ? apiRequest(e.method, concrete(e), { token, raw: EMPTY_FORM.raw, contentType: EMPTY_FORM.contentType, headers: extra })
+    : apiRequest(e.method, concrete(e), { token, body: e.method === "POST" || e.method === "PATCH" ? {} : undefined, headers: { ...(e.ifMatch ? { "if-match": '"1"' } : {}), ...extra } });
 const call = (e: ApiEndpoint, token?: string | null, extra?: Record<string, string>) => router.handleApiRequest(request(e, token, extra));
 
 const snapshot = async () => ({

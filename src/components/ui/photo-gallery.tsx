@@ -51,6 +51,12 @@ export function PhotoGallery({
   onUploaded,
   renderActions,
   imageEngine,
+  accept = "image/*",
+  acceptFile,
+  variant = "photo",
+  addLabel,
+  hideEmpty = false,
+  readOnly = false,
   className,
 }: {
   photos?: readonly GalleryPhoto[];
@@ -61,10 +67,22 @@ export function PhotoGallery({
   renderActions?: (photo: GalleryPhoto) => ReactNode;
   /** nur für Tests */
   imageEngine?: ImageEngine;
+  /** Auswahl des Dateidialogs (Standard Bilder); mit `variant="file"` lassen sich andere Dateien (PDF) auf demselben Weg hochladen */
+  accept?: string;
+  /** Welche Dateien die Warteschlange annimmt (Standard: Bilder) */
+  acceptFile?: (file: File) => boolean;
+  /** `photo`: Fotos werden vor dem Hochladen verkleinert (Standard); `file`: unverändert */
+  variant?: "photo" | "file";
+  /** Beschriftung des Auswahlfelds (Standard „Fotos hinzufügen“) */
+  addLabel?: string;
+  /** Den Hinweis „Noch keine Fotos“ weglassen (die Liste steht an anderer Stelle) */
+  hideEmpty?: boolean;
+  /** Nur ansehen: kein Auswahlfeld, keine Warteschlange (wer nicht hochladen darf) */
+  readOnly?: boolean;
   className?: string;
 }) {
   const { t } = useI18n();
-  const [queue] = useState(() => createUploadQueue({ uploader, maxBytes, concurrency: 2, accept: (file) => file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name) }));
+  const [queue] = useState(() => createUploadQueue({ uploader, maxBytes, concurrency: 2, accept: acceptFile ?? ((file) => file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) }));
   const items = useSyncExternalStore(queue.subscribe, queue.items, queue.items);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -107,16 +125,18 @@ export function PhotoGallery({
 
   return (
     <div className={clsx("flex flex-col gap-4", className)}>
-      <div>
-        <FileInput variant="photo" multiple accept="image/*" maxBytes={maxBytes} imageEngine={imageEngine} aria-label={t("ui.gallery.add")} onChange={onFiles} />
-        {notice ? (
-          <p role="alert" className="field-error">
-            {notice}
-          </p>
-        ) : null}
-      </div>
+      {readOnly ? null : (
+        <div>
+          <FileInput variant={variant} multiple accept={accept} maxBytes={maxBytes} imageEngine={imageEngine} aria-label={addLabel ?? t("ui.gallery.add")} onChange={onFiles} />
+          {notice ? (
+            <p role="alert" className="field-error">
+              {notice}
+            </p>
+          ) : null}
+        </div>
+      )}
 
-      {photos.length === 0 && items.length === 0 ? <p className="text-sm text-ink-muted">{t("ui.gallery.empty")}</p> : null}
+      {!hideEmpty && photos.length === 0 && items.length === 0 ? <p className="text-sm text-ink-muted">{t("ui.gallery.empty")}</p> : null}
 
       {photos.length > 0 ? (
         <ul aria-label={t("ui.gallery.list")} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

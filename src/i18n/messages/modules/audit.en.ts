@@ -36,6 +36,7 @@ export const auditEn: typeof auditDe = {
     invoice: "Invoices",
     employee: "Employees",
     time: "Time tracking",
+    files: "Documents & photos",
     fleet: "Fleet",
     network: "Network",
     docs: "Documentation",
@@ -206,6 +207,11 @@ export const auditEn: typeof auditDe = {
       export: "Invoices exported (CSV)",
       import: "Invoices imported (CSV)",
       accountantExport: "Invoices exported for the accountant (CSV)",
+    },
+    files: {
+      upload: "File uploaded",
+      update: "File caption changed",
+      archive: "File removed",
     },
     time: {
       start: "Time clocked (start)",

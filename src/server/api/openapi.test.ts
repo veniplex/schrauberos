@@ -58,7 +58,8 @@ describe("OpenAPI-Erzeugung", () => {
         assert.deepEqual(declared, placeholders, `${method} ${route}`);
         for (const code of ["401", "403", "429"]) assert.ok(op.responses[code], `${method} ${route}: ${code}`);
         if (method === "post" || method === "patch") {
-          const schema = op.requestBody?.content?.["application/json"]?.schema as Json | undefined;
+          // JSON-Körper oder (Datei-Upload) multipart/form-data: das einzige Medium des Körpers
+          const schema = (Object.values(op.requestBody?.content ?? {})[0] as Json | undefined)?.schema as Json | undefined;
           if (op.requestBody) assert.equal(schema?.additionalProperties, false, `${method} ${route}: unbekannte Felder müssen abgelehnt werden`);
         }
         if (method === "patch") assert.equal((op.parameters as Json[]).some((p) => p.name === "If-Match"), !!op.responses["412"], `${route}: If-Match genau bei versionierten Ressourcen`);
@@ -88,7 +89,7 @@ describe("OpenAPI-Erzeugung", () => {
       for (const [method, op] of Object.entries(methods)) {
         const query = (op.parameters as Json[]).filter((p) => p.in === "query" && !["page", "limit", "sort"].includes(p.name)).map((p) => p.name);
         const sort = ((op.parameters as Json[]).find((p) => p.name === "sort")?.description as string | undefined)?.replace(/^.*Allowed: /, "").replace(/\.$/, "");
-        const body = op.requestBody ? Object.keys(op.requestBody.content["application/json"].schema.properties ?? {}).join(",") : "";
+        const body = op.requestBody ? Object.keys((Object.values(op.requestBody.content)[0] as Json).schema.properties ?? {}).join(",") : "";
         lines.push(`${method.toUpperCase()} ${route} ${op.operationId} ${op["x-required-permission"]}${query.length ? ` query=${query.join(",")}` : ""}${sort ? ` sort=${sort.replace(/, /g, ",")}` : ""}${body ? ` body=${body}` : ""}`);
       }
     }

@@ -10,6 +10,7 @@ import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { nowDate, toDateInput, todayInput } from "@/lib/dates";
 import { monthStart } from "@/lib/month";
+import { PageSections } from "@/modules/page-sections";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { getVehicleDetail } from "@/modules/workshop/vehicles/queries";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
@@ -143,6 +144,8 @@ export default async function VehiclePage({
               )}
             </Card>
           ) : null}
+
+          <PageSections session={session} host="vehicles/detail" entityId={vehicle.id} />
         </div>
 
         <div className="min-w-0 flex flex-col gap-5">
@@ -223,11 +226,12 @@ export default async function VehiclePage({
               { kind: "appointments", count: vehicle._count.appointments },
               { kind: "tireSets", count: vehicle._count.tireSets },
               { kind: "orders", count: vehicle._count.orders },
+              { kind: "files", count: vehicle._count.files },
               { kind: "transfers", count: transfers },
             ]}
             canArchive={canEdit}
             canDelete={session.can("vehicles.delete")}
-            deletable={vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers })}
+            deletable={vehicleDeletable({ appointments: vehicle._count.appointments, tireSets: vehicle._count.tireSets, orders: vehicle._count.orders, transfers, files: vehicle._count.files })}
             archive={archiveVehicle}
             unarchive={unarchiveVehicle}
             remove={deleteVehicle}

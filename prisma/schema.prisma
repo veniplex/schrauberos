@@ -379,6 +379,8 @@ model Vehicle {
   tireSets     TireSet[]
   appointments Appointment[]
   orders       Order[]
+  // Dokumente & Fotos (F6): Fahrzeuge mit Dateien sind nicht löschbar (archivieren)
+  files        FileAttachment[]
 
   // Kein Unique auf dem Kennzeichen: Dubletten sind erlaubt (Warnung mit Bestätigung in der Anwendung), etwa bei Halterwechsel oder wiederverwendeten Kennzeichen
   @@index([plateNorm])
@@ -1172,6 +1174,8 @@ model Order {
   events      OrderEvent[]
   // Zeiterfassung (F5): Zeiten auf diesen Auftrag (Aufträge werden nie gelöscht)
   timeEntries TimeEntry[]
+  // Dokumente & Fotos (F6)
+  files       FileAttachment[]
 
   @@index([status, acceptedAt])
   @@index([vehicleId])
@@ -1373,4 +1377,46 @@ model TimeCorrection {
   entry TimeEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
 
   @@index([entryId, at])
+}
+
+// ───────────── Dokumente & Fotos (F6, workshop.files) ─────────────
+
+// Datei an einem Fahrzeug ODER einem Auftrag (genau eines von vehicleId/orderId, von der Operation erzwungen). Die Datei selbst liegt unter /data/files (relativer Pfad, nie überschrieben, nie verändert –
+// Backups nutzen Hardlinks); die Zeile hält Metadaten. Entfernt wird per archivedAt, nie durch Löschen; Fahrzeug und Auftrag sind Restrict (kein stilles Cascade auf Historie).
+model FileAttachment {
+  id             String    @id @default(cuid())
+  vehicleId      String?
+  orderId        String?
+  // photo | document | damage | intake | work | other (Konstanten im Code)
+  category       String    @default("photo")
+  caption        String?
+  // Anzeigename (aus dem hochgeladenen Namen, gekürzt) und ERKANNTER Typ (Magic Bytes), Größe nach der Bereinigung
+  name           String
+  mime           String
+  size           Int
+  width          Int?
+  height         Int?
+  // relativer Pfad unter /data/files
+  path           String
+  // SHA-256 des hochgeladenen Originals (Idempotenz: derselbe Schlüssel mit anderem Inhalt wird abgelehnt)
+  sha256         String
+  // Idempotenzschlüssel des Uploads (Header Idempotency-Key): dieselbe Datei zweimal ergibt keine Dublette
+  uploadKey      String?
+  // hochladende Person (ohne Fremdschlüssel: Konten werden gelöscht, die Datei bleibt) und Name zum Zeitpunkt
+  uploadedById   String
+  uploadedByName String
+  // Metadaten (Exif/GPS, Kommentare, Anhängsel) wurden entfernt; Anzahl entfernter Bytes
+  strippedBytes  Int       @default(0)
+  archivedAt     DateTime?
+  archivedByName String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  order   Order?   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([uploadedById, uploadKey])
+  @@index([vehicleId, archivedAt, createdAt])
+  @@index([orderId, archivedAt, createdAt])
+  @@index([createdAt])
 }

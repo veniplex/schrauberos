@@ -960,6 +960,32 @@ CREATE TABLE "TimeCorrection" (
     CONSTRAINT "TimeCorrection_entryId_fkey" FOREIGN KEY ("entryId") REFERENCES "TimeEntry" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "FileAttachment" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "vehicleId" TEXT,
+    "orderId" TEXT,
+    "category" TEXT NOT NULL DEFAULT 'photo',
+    "caption" TEXT,
+    "name" TEXT NOT NULL,
+    "mime" TEXT NOT NULL,
+    "size" INTEGER NOT NULL,
+    "width" INTEGER,
+    "height" INTEGER,
+    "path" TEXT NOT NULL,
+    "sha256" TEXT NOT NULL,
+    "uploadKey" TEXT,
+    "uploadedById" TEXT NOT NULL,
+    "uploadedByName" TEXT NOT NULL,
+    "strippedBytes" INTEGER NOT NULL DEFAULT 0,
+    "archivedAt" DATETIME,
+    "archivedByName" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "FileAttachment_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "FileAttachment_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
@@ -1283,3 +1309,15 @@ CREATE INDEX "TimeEntry_startedAt_idx" ON "TimeEntry"("startedAt");
 
 -- CreateIndex
 CREATE INDEX "TimeCorrection_entryId_at_idx" ON "TimeCorrection"("entryId", "at");
+
+-- CreateIndex
+CREATE INDEX "FileAttachment_vehicleId_archivedAt_createdAt_idx" ON "FileAttachment"("vehicleId", "archivedAt", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "FileAttachment_orderId_archivedAt_createdAt_idx" ON "FileAttachment"("orderId", "archivedAt", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "FileAttachment_createdAt_idx" ON "FileAttachment"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "FileAttachment_uploadedById_uploadKey_key" ON "FileAttachment"("uploadedById", "uploadKey");

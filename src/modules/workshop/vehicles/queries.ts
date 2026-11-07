@@ -48,6 +48,25 @@ export function vehicleListWhere(filters: VehicleListFilters, can: (permission: 
   };
 }
 
+/**
+ * Kurzbeschreibung eines Fahrzeugs für Funktionen, die sich an es hängen (Dokumente & Fotos): Kennzeichen, ob es archiviert ist und ob sein Halter eingeschränkt verarbeitet wird (Art. 18 DSGVO).
+ * Keine Kontaktdaten, kein Name des Halters. `client` darf die Transaktion einer Operation sein.
+ */
+export async function vehicleRef(vehicleId: string, client: Pick<Prisma.TransactionClient, "vehicle"> = db): Promise<{ id: string; plate: string; description: string; archived: boolean; restricted: boolean } | null> {
+  const vehicle = await client.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: { id: true, plate: true, make: true, model: true, archivedAt: true, customer: { select: { processingRestrictedAt: true } } },
+  });
+  return vehicle ? { id: vehicle.id, plate: vehicle.plate, description: [vehicle.make, vehicle.model].filter(Boolean).join(" "), archived: vehicle.archivedAt !== null, restricted: Boolean(vehicle.customer?.processingRestrictedAt) } : null;
+}
+
+/** Kennzeichen zu Fahrzeug-Kennungen (Anzeige von Dateien). */
+export async function vehicleLabels(ids: readonly string[]): Promise<Map<string, { plate: string; description: string }>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db.vehicle.findMany({ where: { id: { in: [...ids] } }, select: { id: true, plate: true, make: true, model: true } });
+  return new Map(rows.map((v) => [v.id, { plate: v.plate, description: [v.make, v.model].filter(Boolean).join(" ") }]));
+}
+
 /** Bald fällige Prüfungen (überfällig, laufender Monat, nächste Monate) – Grundlage des Dashboard-Bausteins. Nach Frist sortiert, älteste zuerst. */
 export const attentionWhere = (currentMonth: string): Prisma.VehicleWhereInput => ({ archivedAt: null, inspectionDue: { not: null, lte: addMonths(currentMonth, INSPECTION_SOON_MONTHS) } });
 
@@ -61,7 +80,7 @@ export async function getVehicleDetail(viewer: Viewer, id: string) {
     include: {
       customer: { select: customerNameSelect },
       ownerships: { include: { customer: { select: customerNameSelect } }, orderBy: { fromDate: "desc" } },
-      _count: { select: { appointments: true, tireSets: true, orders: true } },
+      _count: { select: { appointments: true, tireSets: true, orders: true, files: true } },
     },
   });
   if (!vehicle) return null;

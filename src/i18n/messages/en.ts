@@ -9,6 +9,7 @@ import { tiresEn } from "./modules/tires.en";
 import { ordersEn } from "./modules/orders.en";
 import { partsEn } from "./modules/parts.en";
 import { timeEn } from "./modules/time.en";
+import { filesEn } from "./modules/files.en";
 import { customersEn } from "./modules/customers.en";
 import { exchangeEn } from "./modules/exchange.en";
 import { usersEn } from "./modules/users.en";
@@ -164,6 +165,7 @@ export const en: Messages = {
     appointments: "Appointments",
     orders: "Orders",
     parts: "Parts & stock",
+    files: "Documents & photos",
     tires: "Tyre storage",
     customers: "Customers",
     users: "Users",
@@ -315,6 +317,7 @@ export const en: Messages = {
   orders: ordersEn,
   parts: partsEn,
   time: timeEn,
+  files: filesEn,
   customers: customersEn,
   exchange: exchangeEn,
   users: usersEn,
@@ -325,6 +328,7 @@ export const en: Messages = {
     appointments: "Appointments",
     orders: "Orders",
     parts: "Parts & stock",
+    files: "Documents & photos",
     tires: "Tyre storage",
     customers: "Customers",
     vehicles: "Vehicles",
@@ -411,6 +415,11 @@ export const en: Messages = {
       edit: "Edit employees and absences",
       delete: "Delete employees",
       sensitive: "Sensitive employee data (emergency contact, sickness)",
+    },
+    files: {
+      view: "View documents and photos (following the rights for vehicle or order)",
+      upload: "Upload and caption photos and documents",
+      delete: "Remove documents and photos of anyone (you remove your own if you may upload)",
     },
     time: {
       view: "View your own times",

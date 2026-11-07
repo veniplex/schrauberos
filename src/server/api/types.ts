@@ -29,9 +29,14 @@ export type ApiCall = {
    * darf nichts ein zweites Mal anlegen. Wer eine Operation mit Wirkung aufruft, ruft das direkt nach ihrem Erfolg auf.
    */
   committed: (result: ApiResult) => void;
+  /** Nur Endpunkte mit `upload`: die hochgeladene Datei (Formularfeld `file`); `null`, wenn keine mitgeschickt wurde. */
+  file: { name: string; type: string; bytes: Uint8Array } | null;
 };
 
-export type ApiResult = { status: number; body?: unknown; headers?: Record<string, string> };
+/**
+ * Antwort eines Endpunkts. `file` liefert statt JSON eine Datei (Endpunkte mit `download`): Datenstrom und die vollständigen Kopfzeilen (Content-Type, Content-Disposition, CSP …, siehe `lib/file-delivery.ts`).
+ */
+export type ApiResult = { status: number; body?: unknown; headers?: Record<string, string>; file?: { stream: ReadableStream<Uint8Array>; headers: Record<string, string> } };
 
 export type ApiEndpoint = {
   /** Gehört zu dieser Funktion: ausgeschaltet = 404 */
@@ -52,8 +57,15 @@ export type ApiEndpoint = {
   query?: z.ZodObject;
   /** Sortierbare Schlüssel einer Liste */
   sorts?: readonly string[];
-  /** Eingabekörper */
+  /** Eingabekörper (bei `upload`: die Textfelder des Formulars) */
   body?: z.ZodObject;
+  /**
+   * Datei-Upload: `multipart/form-data` mit den Feldern von `body` und einer Datei im Feld `file` (statt JSON). `maxBytes` begrenzt die Datei; der Körper wird begrenzt gelesen (nie unbegrenzt gepuffert).
+   * Der `Idempotency-Key` gilt über Felder und Inhalt der Datei (nicht über die zufällige Formulargrenze).
+   */
+  upload?: { maxBytes: number };
+  /** Die Antwort ist eine Datei (`ApiResult.file`), kein JSON: Beschreibung nennt `content` als Binärdaten. */
+  download?: { description: string };
   /** Schema des Ergebnisses (`data`); bei Listen das eines Elements */
   response?: z.ZodType;
   list?: boolean;
