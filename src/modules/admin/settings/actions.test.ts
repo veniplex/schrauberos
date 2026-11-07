@@ -22,7 +22,7 @@ beforeEach(async () => {
   process.env.TZ = "Europe/Berlin";
 });
 
-const workshopForm = (extra: Record<string, string | boolean> = {}) =>
+const workshopForm = (extra: Record<string, string | number | boolean> = {}) =>
   form({ name: "Werkstatt", accentColor: "#2459c9", timezone: "America/New_York", ...Object.fromEntries(["mon", "tue", "wed", "thu", "fri", "sat", "sun"].map((d) => [`hours.${d}.closed`, true])), ...extra });
 
 describe("saveWorkshop", () => {
@@ -42,6 +42,74 @@ describe("saveWorkshop", () => {
     const state = await actions.saveWorkshop({}, workshopForm({ timezone: "Mars/Olympus" }));
     assert.ok(state.fieldErrors?.timezone);
     assert.equal(process.env.TZ, "Europe/Berlin");
+  });
+});
+
+describe("saveWorkshop: Rechnungsangaben (P4b-7)", () => {
+  const workshopRow = () => env.db.workshop.findUniqueOrThrow({ where: { id: "default" } });
+  const profile = {
+    taxNumber: "21/815/08150",
+    vatId: "de 123 456 789",
+    bankName: "Demo-Bank",
+    iban: "de89 3704 0044 0532 0130 00",
+    bic: "cobadeffxxx",
+    paymentTermDays: 30,
+    managingDirector: "Erika Muster",
+    registerCourt: "Amtsgericht Beispielstadt",
+    registerNumber: "HRB 4711",
+    hourlyRate: "95,50",
+    workUnitMinutes: 6,
+    invoiceNumberFormat: "RE-{YY}{MM}-{NNN}",
+  };
+
+  it("speichert und normalisiert die Angaben (IBAN ohne Leerzeichen, USt-IdNr. und BIC groß, Satz in Cent)", async () => {
+    const state = await actions.saveWorkshop({}, workshopForm({ ...profile, smallBusiness: true }));
+    assert.equal(state.ok, true, JSON.stringify(state.fieldErrors));
+    const row = await workshopRow();
+    assert.deepEqual(
+      [row.taxNumber, row.vatId, row.smallBusiness, row.iban, row.bic, row.paymentTermDays, row.hourlyRateCents, row.workUnitMinutes, row.invoiceNumberFormat],
+      ["21/815/08150", "DE123456789", true, "DE89370400440532013000", "COBADEFFXXX", 30, 9550, 6, "RE-{YY}{MM}-{NNN}"],
+    );
+  });
+
+  it("ohne Angaben gelten die Standardwerte (Zahlungsziel 14 Tage, 1 AW = 5 Minuten, Muster {YYYY}-{NNNN}) und alles andere ist leer", async () => {
+    assert.equal((await actions.saveWorkshop({}, workshopForm())).ok, true);
+    const row = await workshopRow();
+    assert.deepEqual([row.taxNumber, row.vatId, row.iban, row.hourlyRateCents, row.smallBusiness, row.paymentTermDays, row.workUnitMinutes, row.invoiceNumberFormat], [null, null, null, null, false, 14, 5, "{YYYY}-{NNNN}"]);
+  });
+
+  it("lehnt ungültige IBAN, BIC, USt-IdNr., Steuernummer, Stundensatz und Muster ab – nichts wird gespeichert", async () => {
+    await actions.saveWorkshop({}, workshopForm());
+    const bad: Array<[string, Record<string, string | number>]> = [
+      ["iban", { iban: "DE89 3704 0044 0532 0130 01" }],
+      ["bic", { bic: "XY" }],
+      ["vatId", { vatId: "DE12345" }],
+      ["taxNumber", { taxNumber: "abc" }],
+      ["hourlyRate", { hourlyRate: "viel" }],
+      ["hourlyRate", { hourlyRate: "-5" }],
+      ["paymentTermDays", { paymentTermDays: 9999 }],
+      ["workUnitMinutes", { workUnitMinutes: 0 }],
+      ["invoiceNumberFormat", { invoiceNumberFormat: "{YYYY}" }],
+      ["invoiceNumberFormat", { invoiceNumberFormat: "{MM}-{NNNN}" }],
+    ];
+    for (const [field, values] of bad) {
+      const state = await actions.saveWorkshop({}, workshopForm({ ...profile, ...values }));
+      assert.ok(state.fieldErrors?.[field], `${field} ${JSON.stringify(values)}`);
+    }
+    assert.equal((await workshopRow()).iban, null);
+  });
+
+  it("das Audit-Log nennt die geänderten Felder der Rechnungsangaben, nie ihre Werte", async () => {
+    await env.db.auditLog.deleteMany();
+    await actions.saveWorkshop({}, workshopForm(profile));
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "settings.workshop" } });
+    assert.match(entry.target ?? "", /iban/);
+    assert.match(entry.target ?? "", /vatId/);
+    assert.ok(!(entry.target ?? "").includes("3704"), "keine IBAN im Audit-Log");
+    assert.ok(!(entry.target ?? "").includes("123456789"), "keine USt-IdNr. im Audit-Log");
+    await env.db.auditLog.deleteMany();
+    await actions.saveWorkshop({}, workshopForm(profile));
+    assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { action: "settings.workshop" } })).target, "Werkstatt", "unverändert: kein Zusatz");
   });
 });
 

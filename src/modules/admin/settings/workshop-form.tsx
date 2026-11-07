@@ -6,6 +6,7 @@ import { Alert, Card } from "@/components/ui/layout";
 import { ACCENT_PRESETS, ACCENT_PRESET_NAMES, isHexColor } from "@/lib/color";
 import { accentTextContrast } from "@/lib/color-contrast";
 import { WEEKDAYS } from "@/lib/constants";
+import { previewInvoiceNumbers } from "@/lib/invoice-number-format";
 import type { OpeningHours } from "@/lib/opening-hours";
 import { useI18n } from "@/i18n/client";
 import { saveWorkshop } from "./actions";
@@ -24,10 +25,36 @@ export type WorkshopFormInitial = {
   logoSrc: string | null;
   hours: OpeningHours;
   timezone: string;
+  // Rechnungsangaben (P4b-7)
+  taxNumber: string;
+  vatId: string;
+  smallBusiness: boolean;
+  bankName: string;
+  iban: string;
+  bic: string;
+  paymentTermDays: number;
+  managingDirector: string;
+  registerCourt: string;
+  registerNumber: string;
+  /** Stundenverrechnungssatz als Eingabetext ("95,00") */
+  hourlyRate: string;
+  workUnitMinutes: number;
+  invoiceNumberFormat: string;
 };
 
-export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInitial; timezones: string[] }) {
+export function WorkshopForm({
+  initial,
+  timezones,
+  previewWhen,
+}: {
+  initial: WorkshopFormInitial;
+  timezones: string[];
+  /** Jahr und Monat für die Vorschau der Rechnungsnummer (vom Server, ohne Uhr im Bauteil) */
+  previewWhen: { year: number; month: number };
+}) {
   const { t } = useI18n();
+  const [numberFormat, setNumberFormat] = useState(initial.invoiceNumberFormat);
+  const numberPreview = previewInvoiceNumbers(numberFormat, previewWhen);
   const [accent, setAccent] = useState(initial.accentColor);
   // Eine frei gewählte Farbe kann als Textfarbe (Links, Reiter) zu blass sein: warnen, wenn der Kontrast unter 4,5 : 1 fällt
   const contrast = isHexColor(accent) ? accentTextContrast(accent) : null;
@@ -64,6 +91,61 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
           <Field label={t("settings.workshop.website")} htmlFor="website" className="sm:col-span-2">
             <Input id="website" name="website" defaultValue={initial.website} placeholder="https://" />
           </Field>
+        </div>
+      </Card>
+
+      <Card title={t("settings.workshop.billing.title")}>
+        <p className="mb-4 text-sm text-ink-muted">{t("settings.workshop.billing.hint")}</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label={t("settings.workshop.billing.taxNumber")} htmlFor="taxNumber" name="taxNumber" hint={t("settings.workshop.billing.taxNumberHint")}>
+            <Input id="taxNumber" name="taxNumber" defaultValue={initial.taxNumber} maxLength={30} autoComplete="off" />
+          </Field>
+          <Field label={t("settings.workshop.billing.vatId")} htmlFor="vatId" name="vatId" hint={t("settings.workshop.billing.vatIdHint")}>
+            <Input id="vatId" name="vatId" defaultValue={initial.vatId} maxLength={30} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="DE123456789" />
+          </Field>
+          <Field label={t("settings.workshop.billing.smallBusiness")} name="smallBusiness" hint={t("settings.workshop.billing.smallBusinessHint")} group className="sm:col-span-2">
+            <Checkbox name="smallBusiness" defaultChecked={initial.smallBusiness} label={t("settings.workshop.billing.smallBusinessLabel")} />
+          </Field>
+          <Field label={t("settings.workshop.billing.managingDirector")} htmlFor="managingDirector">
+            <Input id="managingDirector" name="managingDirector" defaultValue={initial.managingDirector} maxLength={120} />
+          </Field>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label={t("settings.workshop.billing.registerCourt")} htmlFor="registerCourt">
+              <Input id="registerCourt" name="registerCourt" defaultValue={initial.registerCourt} maxLength={120} placeholder={t("settings.workshop.billing.registerCourtPlaceholder")} />
+            </Field>
+            <Field label={t("settings.workshop.billing.registerNumber")} htmlFor="registerNumber">
+              <Input id="registerNumber" name="registerNumber" defaultValue={initial.registerNumber} maxLength={60} placeholder="HRB 12345" />
+            </Field>
+          </div>
+          <Field label={t("settings.workshop.billing.bankName")} htmlFor="bankName">
+            <Input id="bankName" name="bankName" defaultValue={initial.bankName} maxLength={80} />
+          </Field>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Field label={t("settings.workshop.billing.iban")} htmlFor="iban" name="iban">
+              <Input id="iban" name="iban" defaultValue={initial.iban} maxLength={42} className="font-mono" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="DE89 3704 0044 0532 0130 00" />
+            </Field>
+            <Field label={t("settings.workshop.billing.bic")} htmlFor="bic" name="bic" hint={t("settings.workshop.billing.bicHint")}>
+              <Input id="bic" name="bic" defaultValue={initial.bic} maxLength={14} className="font-mono" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
+            </Field>
+          </div>
+          <Field label={t("settings.workshop.billing.paymentTermDays")} htmlFor="paymentTermDays" name="paymentTermDays" hint={t("settings.workshop.billing.paymentTermDaysHint")}>
+            <Input id="paymentTermDays" name="paymentTermDays" type="number" inputMode="numeric" min={0} max={365} defaultValue={initial.paymentTermDays} />
+          </Field>
+          <Field label={t("settings.workshop.billing.hourlyRate")} htmlFor="hourlyRate" name="hourlyRate" hint={t("settings.workshop.billing.hourlyRateHint")}>
+            <Input id="hourlyRate" name="hourlyRate" inputMode="decimal" defaultValue={initial.hourlyRate} autoComplete="off" placeholder="95,00" />
+          </Field>
+          <Field label={t("settings.workshop.billing.workUnitMinutes")} htmlFor="workUnitMinutes" name="workUnitMinutes" hint={t("settings.workshop.billing.workUnitMinutesHint")}>
+            <Input id="workUnitMinutes" name="workUnitMinutes" type="number" inputMode="numeric" min={1} max={60} defaultValue={initial.workUnitMinutes} />
+          </Field>
+          <Field
+            label={t("settings.workshop.billing.numberFormat")}
+            htmlFor="invoiceNumberFormat"
+            name="invoiceNumberFormat"
+            hint={numberPreview.length > 0 ? t("settings.workshop.billing.numberFormatPreview", { examples: numberPreview.join(", ") }) : t("settings.workshop.billing.numberFormatHint")}
+          >
+            <Input id="invoiceNumberFormat" name="invoiceNumberFormat" value={numberFormat} onChange={(e) => setNumberFormat(e.target.value)} maxLength={60} className="font-mono" autoComplete="off" autoCorrect="off" spellCheck={false} />
+          </Field>
+          <p className="text-sm text-ink-muted sm:col-span-2">{t("settings.workshop.billing.numberFormatHelp")}</p>
         </div>
       </Card>
 

@@ -4,9 +4,12 @@ import type { SetupCheckDef } from "@/modules/types";
 import { readHolidayConfig } from "@/server/holidays";
 import { getWorkshop } from "@/server/workshop";
 
-/** Ist das Werkstattprofil ausgefüllt? Anschrift (Straße, PLZ, Ort) und mindestens ein Kontaktweg (Telefon oder E-Mail) – der Name allein ist schon beim Einrichten da. */
-export function profileComplete(w: { street: string | null; zip: string | null; city: string | null; phone: string | null; email: string | null }): boolean {
-  return [w.street, w.zip, w.city].every((v) => !!v?.trim()) && !!(w.phone?.trim() || w.email?.trim());
+/**
+ * Ist das Werkstattprofil vollständig? Anschrift (Straße, PLZ, Ort), mindestens ein Kontaktweg (Telefon oder E-Mail), eine Steuernummer oder USt-IdNr. und die IBAN – die Angaben,
+ * die auf Rechnungen gehören (P4b-7). Der Name allein ist schon beim Einrichten da.
+ */
+export function profileComplete(w: { street: string | null; zip: string | null; city: string | null; phone: string | null; email: string | null; taxNumber?: string | null; vatId?: string | null; iban?: string | null }): boolean {
+  return [w.street, w.zip, w.city].every((v) => !!v?.trim()) && !!(w.phone?.trim() || w.email?.trim()) && !!(w.taxNumber?.trim() || w.vatId?.trim()) && !!w.iban?.trim();
 }
 
 /** Wurden Öffnungszeiten je festgelegt? Ein leeres Objekt heißt „nie konfiguriert“ (die Anwendung rechnet dann mit Standardzeiten, siehe `parseOpeningHours`). */

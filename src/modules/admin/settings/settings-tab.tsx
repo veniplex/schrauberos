@@ -3,7 +3,10 @@ import type { SettingsTabDef } from "@/modules/types";
 import { getAuditRetentionDays } from "@/server/audit-retention";
 import { isBehindProxy } from "@/server/auth/network";
 import { cspMode } from "@/lib/csp-mode";
+import { formatIban, formatVatId } from "@/lib/bank-tax";
 import { logoSrc } from "@/lib/logo";
+import { centsToInput } from "@/lib/money";
+import { getFullYear, getMonth } from "@/lib/zone";
 import { connectionIsSecure } from "@/server/auth/connection";
 import { authPolicy } from "@/server/auth/policy";
 import { CspModeForm, HttpsNotice, SecurityForm } from "./security-form";
@@ -14,6 +17,7 @@ async function WorkshopSettingsTab() {
   const w = await getWorkshop();
   const all = Intl.supportedValuesOf("timeZone");
   const timezones = all.includes(w.timezone) ? all : [w.timezone, ...all];
+  const now = new Date();
   return (
     <WorkshopForm
       initial={{
@@ -29,8 +33,22 @@ async function WorkshopSettingsTab() {
         logoSrc: logoSrc(w),
         hours: w.hours,
         timezone: w.timezone,
+        taxNumber: w.taxNumber ?? "",
+        vatId: w.vatId ? formatVatId(w.vatId) : "",
+        smallBusiness: w.smallBusiness,
+        bankName: w.bankName ?? "",
+        iban: w.iban ? formatIban(w.iban) : "",
+        bic: w.bic ?? "",
+        paymentTermDays: w.paymentTermDays,
+        managingDirector: w.managingDirector ?? "",
+        registerCourt: w.registerCourt ?? "",
+        registerNumber: w.registerNumber ?? "",
+        hourlyRate: centsToInput(w.hourlyRateCents),
+        workUnitMinutes: w.workUnitMinutes,
+        invoiceNumberFormat: w.invoiceNumberFormat,
       }}
       timezones={timezones}
+      previewWhen={{ year: getFullYear(now), month: getMonth(now) + 1 }}
     />
   );
 }

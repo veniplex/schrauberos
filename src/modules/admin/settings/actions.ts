@@ -2,12 +2,15 @@
 
 import { MAX_LOGO_BYTES } from "./limits";
 import { z } from "zod";
+import { isValidBic, isValidIban, isValidTaxNumber, isValidVatId, normalizeBic, normalizeIban, normalizeVatId } from "@/lib/bank-tax";
 import { isHexColor } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/constants";
 import { formObject } from "@/lib/forms";
 import { isValidTime } from "@/lib/opening-hours";
+import { DEFAULT_INVOICE_NUMBER_FORMAT, parseInvoiceNumberFormat } from "@/lib/invoice-number-format";
 import { LOGO_TYPES } from "@/lib/logo";
 import { checkUpload } from "@/lib/upload-sniff";
+import { moneyCents } from "@/lib/zod-fields";
 import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
 import { CSP_MODE_KEY, parseCspMode, setCspModeInProcess } from "@/lib/csp-mode";
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
@@ -32,11 +35,29 @@ const workshopInput = z
     website: z.string().max(200).optional(),
     accentColor: z.string().refine(isHexColor),
     timezone: z.string().max(60).refine(isValidTimezone, { error: "validation.invalid" }),
+    // Werkstattprofil für Rechnungen (P4b-7): alles optional
+    taxNumber: z.string().trim().max(30).refine(isValidTaxNumber, { error: "settings.errors.taxNumber" }).optional(),
+    vatId: z.string().trim().max(30).refine(isValidVatId, { error: "settings.errors.vatId" }).optional(),
+    smallBusiness: z.boolean(),
+    bankName: z.string().trim().max(80).optional(),
+    iban: z.string().trim().max(42).refine(isValidIban, { error: "settings.errors.iban" }).optional(),
+    bic: z.string().trim().max(14).refine(isValidBic, { error: "settings.errors.bic" }).optional(),
+    paymentTermDays: z.coerce.number().int().min(0).max(365).default(14),
+    managingDirector: z.string().trim().max(120).optional(),
+    registerCourt: z.string().trim().max(120).optional(),
+    registerNumber: z.string().trim().max(60).optional(),
+    hourlyRate: moneyCents("settings.errors.hourlyRate")
+      .refine((cents) => cents >= 0 && cents <= 1_000_000, { error: "settings.errors.hourlyRate" })
+      .optional(),
+    workUnitMinutes: z.coerce.number().int().min(1).max(60).default(5),
+    invoiceNumberFormat: z.string().trim().max(60).default(DEFAULT_INVOICE_NUMBER_FORMAT),
     hours: z.record(z.string(), dayHours),
     removeLogo: z.boolean(),
     logo: z.custom<File>((value) => value instanceof File).optional(),
   })
   .superRefine((d, ctx) => {
+    const format = parseInvoiceNumberFormat(d.invoiceNumberFormat);
+    if (!format.ok) ctx.addIssue({ code: "custom", message: `settings.errors.numberFormat.${format.error}`, path: ["invoiceNumberFormat"] });
     // Öffnungszeiten: Fehler je Wochentag (Feldname `hours.<tag>`)
     for (const day of WEEKDAYS) {
       const h = d.hours[day];
@@ -44,6 +65,9 @@ const workshopInput = z
       if (!isValidTime(h.from) || !isValidTime(h.to) || h.to <= h.from) ctx.addIssue({ code: "custom", message: "settings.errors.hoursInvalid", path: [`hours.${day}`] });
     }
   });
+
+/** Felder des Werkstattprofils für Rechnungen: ihre Änderung steht (ohne Werte) im Audit-Log. */
+const PROFILE_FIELDS = ["taxNumber", "vatId", "smallBusiness", "bankName", "iban", "bic", "paymentTermDays", "managingDirector", "registerCourt", "registerNumber", "hourlyRateCents", "workUnitMinutes", "invoiceNumberFormat"] as const;
 
 const saveWorkshopOperation = defineOperation({
   name: "admin.settings.saveWorkshop",
@@ -66,6 +90,7 @@ const saveWorkshopOperation = defineOperation({
     return { logoDataUrl };
   },
   run: async ({ input: d, prepared, tx, audit, afterCommit }) => {
+    const before = await tx.workshop.findUnique({ where: { id: "default" } });
     const hours: Record<string, [string, string] | null> = {};
     for (const day of WEEKDAYS) {
       const h = d.hours[day]!;
@@ -83,6 +108,19 @@ const saveWorkshopOperation = defineOperation({
       accentColor: d.accentColor.toLowerCase(),
       timezone: d.timezone,
       openingHours: JSON.stringify(hours),
+      taxNumber: d.taxNumber ?? null,
+      vatId: d.vatId ? normalizeVatId(d.vatId) : null,
+      smallBusiness: d.smallBusiness,
+      bankName: d.bankName ?? null,
+      iban: d.iban ? normalizeIban(d.iban) : null,
+      bic: d.bic ? normalizeBic(d.bic) : null,
+      paymentTermDays: d.paymentTermDays,
+      managingDirector: d.managingDirector ?? null,
+      registerCourt: d.registerCourt ?? null,
+      registerNumber: d.registerNumber ?? null,
+      hourlyRateCents: d.hourlyRate ?? null,
+      workUnitMinutes: d.workUnitMinutes,
+      invoiceNumberFormat: d.invoiceNumberFormat,
       ...(prepared.logoDataUrl !== undefined ? { logoDataUrl: prepared.logoDataUrl } : {}),
     };
     await tx.workshop.upsert({ where: { id: "default" }, update: data, create: { id: "default", ...data } });
@@ -91,7 +129,9 @@ const saveWorkshopOperation = defineOperation({
     afterCommit(async () => {
       if (applyTimezone(d.timezone)) await jobRunner().reschedule();
     });
-    audit({ target: d.name });
+    // Im Audit-Log stehen die geänderten Rechnungsangaben (nur die Namen der Felder, nie IBAN oder Steuernummer selbst)
+    const changed = before ? PROFILE_FIELDS.filter((field) => before[field] !== data[field]) : [];
+    audit({ target: changed.length > 0 ? `${d.name} (${changed.join(", ")})` : d.name });
     return { saved: true };
   },
 });
@@ -103,6 +143,7 @@ export const saveWorkshop = defineAction(saveWorkshopOperation, {
       WEEKDAYS.map((day) => [day, { closed: fd.get(`hours.${day}.closed`) === "on", from: String(fd.get(`hours.${day}.from`) ?? ""), to: String(fd.get(`hours.${day}.to`) ?? "") }]),
     ),
     removeLogo: fd.get("removeLogo") === "on",
+    smallBusiness: fd.get("smallBusiness") === "on",
     logo: fd.get("logo") instanceof File ? fd.get("logo") : undefined,
   }),
   revalidate: [["/", "layout"]],
