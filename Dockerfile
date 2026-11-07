@@ -2,9 +2,9 @@
 #
 # SchrauberOS – ein Container, ein Volume (/data), und NUR EIN winziges unveränderliches Programm im Image.
 #
-#   • Das Image enthält nichts außer dem Starter (docker/bootstrap.c, statisch, ~100 Zeilen) und der eingebauten App-Version für
-#     den ersten Start. Kein Betriebssystem, keine Shell, kein Paketmanager – also auch nichts, was veralten oder gepatcht
-#     werden müsste.
+#   • Das Image enthält nichts außer dem Starter (docker/bootstrap.c + Prüfer docker/verify.c + vendortes Monocypher, statisch als static-pie) und der eingebauten
+#     App-Version für den ersten Start. Kein Betriebssystem, keine Shell, kein Paketmanager – also auch nichts, was veralten oder gepatcht werden müsste. Der Starter ist
+#     der Vertrauensanker: Er startet eine installierte Version nur, wenn sie genau dem entspricht, was der Release-Schlüssel signiert hat.
 #   • Jede App-Version ist ein selbständiges Paket und bringt ALLES mit: Anwendung samt Abhängigkeiten, Node, die Systembibliotheken
 #     (glibc, libstdc++ …) samt Lader und den Launcher (Versionswahl, Rückfall, Wiederherstellung). Web-Updates erneuern damit
 #     die gesamte Laufzeitumgebung; vom Host kommt nur der Kernel.
@@ -69,8 +69,8 @@ RUN set -eux; \
 
 # ───────── Vertrauensanker des Starters: Schlüssel und Untergrenze aus dem Code (nur aus release-key.ts, keine Umgebungsvariable) ─────────
 # Bei Tag-Builds bricht dieser Schritt ab, wenn der Wurzelschlüssel fehlt, gleich dem Release-Schlüssel ist oder ein Testschlüssel wäre: Die Wurzel steht im Image, das vor dem
-# Release-Job veröffentlicht wird, und lässt sich danach nicht mehr ändern.
-FROM deps AS trust
+# Release-Job veröffentlicht wird, und lässt sich danach nicht mehr ändern. Läuft mit dem Node der Basis (TypeScript wird nativ gelesen), ohne npm ci.
+FROM base AS trust
 ARG APP_VERSION
 ARG SOS_TAG_BUILD=0
 COPY package.json ./
@@ -81,11 +81,50 @@ COPY src/lib/updates src/lib/updates
 COPY src/modules/admin/updates/release-key.ts src/modules/admin/updates/release-key.ts
 RUN SOS_TAG_BUILD="${SOS_TAG_BUILD}" node scripts/gen-trust-header.mjs --out /trust-keys.h
 
-# ───────── Der Starter: statisch gelinkt, braucht nichts außer dem Kernel ─────────
-FROM deps AS bootstrap
-COPY docker/bootstrap.c /src/bootstrap.c
+# Dasselbe mit den TESTSCHLÜSSELN (src/lib/updates/testdata/anchor/test-keys.ts): nur für das Ziel "runner-test" (Tests der Pipeline und der Entwickler, scripts/smoke-anchor.sh).
+# Nie ein veröffentlichtes Image; ein Tag-Build bricht ab.
+FROM base AS trust-test
+ARG APP_VERSION
+ARG SOS_TAG_BUILD=0
+COPY package.json ./
+COPY docker/BASE_VERSION docker/BASE_VERSION
+COPY scripts/gen-trust-header.mjs scripts/gen-trust-header.mjs
+COPY scripts/lib scripts/lib
+COPY src/lib/updates src/lib/updates
+COPY src/modules/admin/updates/release-key.ts src/modules/admin/updates/release-key.ts
+COPY docker/test/gen-test-header.mjs docker/test/gen-test-header.mjs
+RUN test "${SOS_TAG_BUILD}" = "0" || { echo "Ein Testschlüssel-Image gibt es nie als Tag-Build" >&2; exit 1; } \
+ && node docker/test/gen-test-header.mjs --out /trust-keys.h
+
+# ───────── Übersetzer für den Starter (nur gcc und die statische libc, ohne npm ci) ─────────
+FROM base AS cc
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# ───────── Der Starter: statisch gelinkt (static-pie), gehärtet, braucht nichts außer dem Kernel ─────────
+# Eigener Code mit -Werror und den strengen Warnungen der Produktion (-Wconversion -Wshadow -Wformat=2); die vendorte Bibliothek (docker/vendor/monocypher, Prüfsummen in
+# src/lib/updates/vendor-monocypher.test.ts) wird getrennt und ohne -Wconversion übersetzt. SOS_PRODUCTION verbietet die Test-Konstanten (README „Starter-Vertrauensanker“).
+FROM cc AS bootstrap-build
+COPY docker/bootstrap.c docker/verify.c docker/verify.h /src/
+COPY docker/vendor/monocypher /src/vendor/monocypher
 COPY --from=trust /trust-keys.h /src/trust-keys.h
-RUN gcc -static -Os -s -Wall -o /bootstrap /src/bootstrap.c
+RUN set -eux; cd /src; \
+    harden="-O2 -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -D_FILE_OFFSET_BITS=64"; \
+    gcc $harden -Wall -Wextra -c -Ivendor/monocypher vendor/monocypher/monocypher.c vendor/monocypher/monocypher-ed25519.c; \
+    gcc $harden -Wall -Wextra -Wformat=2 -Wconversion -Wshadow -Werror -DSOS_PRODUCTION=1 -Ivendor/monocypher -I. -c bootstrap.c verify.c; \
+    gcc -static-pie -Wl,-z,relro,-z,now -s -o /bootstrap bootstrap.o verify.o monocypher.o monocypher-ed25519.o; \
+    readelf -dW /bootstrap | grep -q BIND_NOW; readelf -lW /bootstrap | grep -q GNU_RELRO
+
+FROM cc AS bootstrap-test-build
+COPY docker/bootstrap.c docker/verify.c docker/verify.h /src/
+COPY docker/vendor/monocypher /src/vendor/monocypher
+COPY --from=trust-test /trust-keys.h /src/trust-keys.h
+RUN set -eux; cd /src; \
+    harden="-O2 -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -D_FILE_OFFSET_BITS=64"; \
+    gcc $harden -Wall -Wextra -c -Ivendor/monocypher vendor/monocypher/monocypher.c vendor/monocypher/monocypher-ed25519.c; \
+    gcc $harden -Wall -Wextra -Wformat=2 -Wconversion -Wshadow -Werror -DSOS_PRODUCTION=1 -Ivendor/monocypher -I. -c bootstrap.c verify.c; \
+    gcc -static-pie -Wl,-z,relro,-z,now -s -o /bootstrap bootstrap.o verify.o monocypher.o monocypher-ed25519.o
 
 # ───────── Das Paket: Anwendung + Abhängigkeiten + Laufzeit + Launcher + Dateiliste ─────────
 FROM scratch AS bundle
@@ -96,14 +135,14 @@ FROM base AS skeleton
 RUN mkdir -p /skeleton/data /skeleton/tmp && chmod 1777 /skeleton/tmp
 
 # ───────── Das Image ─────────
-FROM scratch AS runner
+# Gemeinsamer Unterbau; der Starter kommt erst im letzten Schritt der beiden Ziele darauf (runner = Produktion mit den Schlüsseln aus dem Code, runner-test = Testschlüssel).
+FROM scratch AS runner-base
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     TZ=Europe/Berlin \
     DATA_DIR=/data \
     DATABASE_URL=file:/data/schrauberos.db
-COPY --from=bootstrap /bootstrap /bootstrap
 # Die eingebaute App gehört root und ist für den Betriebsbenutzer nicht schreibbar (kein --chown): Wer die Anwendung kompromittiert, kann den
 # eingebauten Code nicht ändern. Geschrieben wird nur nach /data (Datenbank, Dateien, Backups, installierte Versionen) und /tmp.
 COPY --from=bundle / /app/
@@ -116,3 +155,11 @@ VOLUME ["/data"]
 # start-period/retries: Die Prüfung der installierten Version beim Start (ein Web-Update, danach jeder Neustart) und die Migration verlängern den Start; "unhealthy" während eines App-Neustarts ist kosmetisch
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=5 CMD ["/bootstrap", "--healthcheck"]
 ENTRYPOINT ["/bootstrap"]
+
+# Testziel: dasselbe Image, der Starter mit den Testschlüsseln (docker build --target runner-test; scripts/smoke-anchor.sh). Nie veröffentlichen.
+FROM runner-base AS runner-test
+COPY --from=bootstrap-test-build /bootstrap /bootstrap
+
+# Produktion: letzte Stufe = Standardziel
+FROM runner-base AS runner
+COPY --from=bootstrap-build /bootstrap /bootstrap

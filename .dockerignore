@@ -22,3 +22,6 @@ playwright.config.ts
 .e2e-data
 test-results
 playwright-report
+
+# Testbauten des Starters (docker/test/run.mjs)
+docker/test/build
