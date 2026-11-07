@@ -40,6 +40,16 @@ Ein Auftrag (Arbeitskarte) begleitet ein Fahrzeug von der Annahme bis zur Abholu
   Die Schnittstelle (API) behandelt sie wie nicht vorhanden. Beim **Anonymisieren** eines Kunden entfallen Kundenwunsch, Befunde und die Namen der freigebenden Personen (auch der getippte Name);
   Positionen, Begründung der Mehrarbeit, Beträge und die gespeicherte Unterschrift als Bild bleiben als Beleg des Vorgangs. Die **Auskunft** nennt auch, dass eine Unterschrift als Bilddatei gespeichert ist.
 
+## Auftragskarte drucken
+
+**Auftragskarte** auf der Seite eines Auftrags erzeugt den **Werkstattlaufzettel**: Auftrag, Fahrzeug, Kunde (Name; die Telefonnummer nur, wenn Sie Kunden sehen dürfen), Kundenwunsch, die **Positionen ohne Preise** und Platz für Notizen. Der **QR-Code** öffnet den Auftrag: mit der Kamera des Handys scannen, anmelden, fertig. **Preise stehen nie auf der Karte** – auch nicht für Personen mit dem Recht „Preise sehen“; die Karte bleibt in der Werkstatt.
+
+* **Papier:** A4 oder A5. Die Karte gibt es als **PDF** (Öffnen, Teilen, Herunterladen) und als **Druckansicht** über den Druckdialog.
+* **Annahmeprotokoll:** Sind die **Checklisten** eingeschaltet und Sie dürfen sie sehen, nennt die Karte den Stand des Annahmeprotokolls – nicht erstellt, begonnen oder abgeschlossen (mit Datum, Person und Art der Unterschrift). Das Protokoll selbst steht nicht auf der Karte; es bleibt bei den Checklisten.
+* **QR-Code:** Er braucht die **Adresse der Anwendung** (Einstellungen → Sicherheit, durch einen Administrator). Ohne sie druckt die Anwendung die Karte ohne QR-Code und weist darauf hin.
+* **Auf dem iPhone:** Bei der als App installierten Anwendung lieber **Teilen** oder **Herunterladen** statt **Öffnen** wählen (siehe „Auf dem Handy installieren“).
+* Aufträge von Kunden, deren Daten nur eingeschränkt verarbeitet werden (Art. 18 DSGVO), lassen sich nicht drucken.
+
 ## Hinweise
 
 * Die Liste zeigt standardmäßig die **offenen** Aufträge; die Suche findet Nummer, Kennzeichen, Fahrzeug, Halter und Kundenwunsch. Die Übersicht zeigt offene und abholbereite Aufträge.

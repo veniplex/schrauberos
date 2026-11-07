@@ -3,7 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { computeTotals, type Totals } from "@/lib/line-items";
 import { normalizePlate } from "@/lib/plate";
 import type { Viewer } from "@/modules/types";
-import { customerContacts, customerNameSelect } from "@/modules/workshop/customers/public";
+import { customerContacts, customerDisplayName, customerNameSelect, unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
 import { vehicleTextWhere } from "@/modules/workshop/vehicles/public";
 import { db } from "@/server/db";
 import { contains, FULLTEXT_MIN_LENGTH, keyContains } from "@/server/search";
@@ -231,3 +231,44 @@ export async function orderLabels(ids: readonly string[]): Promise<Map<string, {
   const rows = await db.order.findMany({ where: { id: { in: [...ids] } }, select: { id: true, number: true, vehicle: { select: { plate: true } } } });
   return new Map(rows.map((o) => [o.id, { number: o.number, plate: o.vehicle.plate }]));
 }
+
+/**
+ * Was die **Auftragskarte** (F8, Werkstattlaufzettel) braucht: Auftrag, Fahrzeug, Anzeigename des Kunden, Kundenwunsch und die Positionen **ohne jeden Preis** – auch mit `orders.prices` nicht (die Karte
+ * liegt in der Werkstatt, nicht beim Kunden). Verlangt `orders.view`. Das Telefon des Kunden nur mit `customers.view` (Richtlinie D7: ohne das Recht wird es gar nicht gelesen). Aufträge und Fahrzeuge von
+ * Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) gibt es nicht (`null`). Explizites `select`.
+ */
+export async function orderCardData(viewer: Viewer, id: string) {
+  if (!viewer.can("orders.view")) return null;
+  const unrestricted = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
+  const order = await db.order.findFirst({
+    where: { id, ...unrestricted, vehicle: { is: unrestricted } },
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      request: true,
+      mileageKm: true,
+      acceptedAt: true,
+      vehicle: { select: { plate: true, make: true, model: true } },
+      customer: { select: customerNameSelect },
+      items: { orderBy: { position: "asc" }, select: { id: true, kind: true, description: true, unit: true, quantityMilli: true } },
+    },
+  });
+  if (!order) return null;
+  const phone = order.customer ? ((await customerContacts(viewer, [order.customer.id])).get(order.customer.id)?.phone ?? null) : null;
+  return {
+    id: order.id,
+    number: order.number,
+    status: order.status,
+    request: order.request,
+    mileageKm: order.mileageKm,
+    acceptedAt: order.acceptedAt,
+    plate: order.vehicle.plate,
+    vehicleName: [order.vehicle.make, order.vehicle.model].filter(Boolean).join(" "),
+    customerName: order.customer ? customerDisplayName(order.customer) : null,
+    phone,
+    items: order.items,
+  };
+}
+
+export type OrderCardData = NonNullable<Awaited<ReturnType<typeof orderCardData>>>;

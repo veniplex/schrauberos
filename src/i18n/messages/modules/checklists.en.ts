@@ -167,4 +167,13 @@ export const checklistsEn: typeof checklistsDe = {
     reasonRequired: "Please give a reason (at least 5 characters).",
     defaultsPresent: "All bundled templates are already set up.",
   },
+  print: {
+    intake: "Intake protocol",
+    missing: "not created yet",
+    open: "started, not completed yet",
+    done: "completed on {date} by {name} – {signature}",
+    signed: "customer signature on file",
+    typed: "confirmed by name: {name}",
+    unsigned: "without signature",
+  },
 };

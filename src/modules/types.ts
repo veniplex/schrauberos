@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { MessageKey } from "@/i18n/translate";
 import type { PrivacySection, PrivacySubject, RetentionItem } from "@/lib/privacy";
+import type { Translator } from "@/i18n/translate";
 import type { AppSession } from "@/server/auth/session";
 import type { FeatureId, Permission } from "./catalog";
 
@@ -190,4 +191,25 @@ export type SectionDef = {
   uses?: readonly FeatureId[];
   /** Server Component; `null` = nichts anzuzeigen */
   Component: (props: SectionProps) => ReactNode | Promise<ReactNode>;
+};
+
+/**
+ * Ort, an dem eine gedruckte Karte Zeilen anderer Funktionen aufnimmt (F8, „Erweiterungspunkt“ für den Druck): Der Gastgeber (die Auftragskarte der Aufträge) kennt seine Gäste nicht, er fragt nur
+ * `printNotesFor` (`registry.ts`). `orders/card`: Zeilen auf der Auftragskarte (Checklisten: Stand des Annahmeprotokolls).
+ */
+export type PrintNoteHost = "orders/card";
+
+/**
+ * Beitrag einer Funktion zu einer gedruckten Karte (`print-notes.ts` der Funktion, eingesammelt in `registry.ts`): **Zeilen aus Beschriftung und Text** – so erscheinen sie im PDF und in der Druckansicht
+ * gleich. Erscheint nur bei aktiver Funktion (und deren aktiven weichen Abhängigkeiten) und vorhandenem Recht; die Zeilen dürfen nichts enthalten, was die Person nicht auch auf der Seite der Funktion
+ * sähe (Rechte der eigenen Abfragen beachten). Ein Fehler in einem Beitrag lässt ihn weg und stört die Karte nicht.
+ */
+export type PrintNoteDef = {
+  id: string;
+  feature: FeatureId;
+  host: PrintNoteHost;
+  permission: Permission;
+  order: number;
+  uses?: readonly FeatureId[];
+  lines: (props: { entityId: string; session: AppSession; i18n: Pick<Translator, "t" | "td" | "date"> }) => Promise<ReadonlyArray<readonly [string, string]>>;
 };

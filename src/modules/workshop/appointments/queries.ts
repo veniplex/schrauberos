@@ -6,7 +6,7 @@ import { appointmentWindow } from "./domain";
 import { buildAppointmentHints, touchedDays, type AppointmentHint, type HintBooking } from "./hints";
 import { staffWithAccount, userAbsentBetween } from "@/modules/office/employees/public";
 import type { Viewer } from "@/modules/types";
-import { customerNameSelect } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerContacts, customerNameSelect, unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
 
 export const appointmentInclude = {
   type: true,
@@ -96,3 +96,44 @@ export async function appointmentHintsFor(
   });
 }
 
+
+/**
+ * Was der **Terminzettel** (F8) braucht: Zeit, Bezeichnung, Terminart, Fahrzeug, **Anzeigename** des Kunden, Reifensatz (Größe und Saison) – und nur auf Wunsch (`withNotes`) die Notizen des Termins: Sie
+ * sind für die Werkstatt geschrieben, der Zettel geht oft an den Kunden. Das **Telefon** des Kunden nur mit `customers.view`. Verlangt `appointments.view`. Termine, deren Kunde oder Fahrzeughalter eingeschränkt
+ * verarbeitet wird (Art. 18 DSGVO), gibt es nicht (`null`). Arbeitsplatz und Zuständiger stehen bewusst nicht darauf (interne Planung). Explizites `select`.
+ */
+export async function appointmentSlipData(viewer: Viewer, id: string, options: { withNotes?: boolean } = {}) {
+  if (!viewer.can("appointments.view")) return null;
+  const unrestricted = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
+  const a = await db.appointment.findFirst({
+    where: { id, AND: [unrestricted, { OR: [{ vehicleId: null }, { vehicle: { is: unrestricted } }] }] },
+    select: {
+      id: true,
+      title: true,
+      startsAt: true,
+      endsAt: true,
+      status: true,
+      ...(options.withNotes ? { notes: true } : {}),
+      type: { select: { name: true } },
+      customer: { select: customerNameSelect },
+      vehicle: { select: { plate: true, make: true, model: true, customer: { select: customerNameSelect } } },
+      tireSet: { select: { season: true, width: true, aspect: true, rim: true, loadIndex: true, speedIndex: true } },
+    },
+  });
+  if (!a) return null;
+  const owner = a.vehicle?.customer ?? a.customer;
+  const phone = owner ? ((await customerContacts(viewer, [owner.id])).get(owner.id)?.phone ?? null) : null;
+  const { vehicle, customer: _customer, type, ...rest } = a;
+  void _customer;
+  return {
+    ...rest,
+    notes: "notes" in a ? ((a as { notes: string | null }).notes ?? null) : null,
+    typeName: type?.name ?? null,
+    plate: vehicle?.plate ?? null,
+    vehicleName: vehicle ? [vehicle.make, vehicle.model].filter(Boolean).join(" ") : "",
+    customerName: owner ? customerDisplayName(owner) : null,
+    phone,
+  };
+}
+
+export type AppointmentSlipData = NonNullable<Awaited<ReturnType<typeof appointmentSlipData>>>;

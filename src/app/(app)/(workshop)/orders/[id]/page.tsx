@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { ClipboardList, Pencil } from "lucide-react";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Alert, Card, DefinitionList, EmptyState, Plate, StatusBadge, TextLink } from "@/components/ui/layout";
@@ -104,11 +104,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </span>
         }
         actions={
-          canEdit ? (
-            <LinkButton href={`/orders/${order.id}/edit`} variant="secondary">
-              <Pencil className="size-4" aria-hidden /> {t("common.edit")}
+          <>
+            <LinkButton href={`/orders/${order.id}/card`} variant="secondary">
+              <ClipboardList className="size-4" aria-hidden /> {t("orders.card.button")}
             </LinkButton>
-          ) : null
+            {canEdit ? (
+              <LinkButton href={`/orders/${order.id}/edit`} variant="secondary">
+                <Pencil className="size-4" aria-hidden /> {t("common.edit")}
+              </LinkButton>
+            ) : null}
+          </>
         }
       />
 

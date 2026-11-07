@@ -67,6 +67,7 @@ export async function AppointmentDetail({ id, view, date, canEdit, sections }: {
       <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
         {!canEdit ? <p className="mr-auto text-xs text-ink-muted">{t("appointments.detail.editHint")}</p> : null}
         {sections}
+        <LinkButton href={`/appointments/${a.id}/slip`}>{t("appointments.slip.button")}</LinkButton>
         <LinkButton href={closeHref}>{t("common.close")}</LinkButton>
         {canEdit ? (
           <LinkButton variant="primary" href={calendarHref(view, date, { edit: a.id })}>

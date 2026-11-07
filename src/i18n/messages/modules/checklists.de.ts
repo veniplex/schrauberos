@@ -165,4 +165,14 @@ export const checklistsDe = {
     reasonRequired: "Bitte eine Begründung angeben (mindestens 5 Zeichen).",
     defaultsPresent: "Alle mitgelieferten Vorlagen sind schon eingerichtet.",
   },
+  /** Zeilen auf der Auftragskarte (F8) */
+  print: {
+    intake: "Annahmeprotokoll",
+    missing: "noch nicht erstellt",
+    open: "begonnen, noch nicht abgeschlossen",
+    done: "abgeschlossen am {date} von {name} – {signature}",
+    signed: "Unterschrift des Kunden liegt vor",
+    typed: "mit Namen bestätigt: {name}",
+    unsigned: "ohne Unterschrift",
+  },
 };

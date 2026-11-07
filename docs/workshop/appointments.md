@@ -24,6 +24,15 @@ Der Werkstattkalender zeigt die Termine als **Woche**, **Tag** (mit einer Spalte
   Setzt man einen solchen Termin auf **Fertig**, schlägt die Anwendung vor, den Satz **ein- oder auszubuchen** (Frage mit Bestätigung, nur mit dem Recht
   „Reifensätze ein-/ausbuchen“) – siehe Reifenlager.
 
+## Terminzettel drucken
+
+Im geöffneten Termin erzeugt **Terminzettel** einen Zettel zum Mitgeben: **Datum und Uhrzeit** (in der Zeitzone der Werkstatt), Anliegen, Terminart, Fahrzeug, Kunde (Name; die Telefonnummer nur, wenn Sie Kunden sehen dürfen) und – bei einem Reifenwechsel – der Reifensatz, dazu Platz für eigene Notizen. Arbeitsplatz und zuständige Person stehen bewusst nicht darauf.
+
+* **Papier:** A5 oder A6, als **PDF** (Öffnen, Teilen, Herunterladen) und als Druckansicht.
+* **Notizen:** Die Notizen des Termins sind für die Werkstatt geschrieben. Sie kommen **nur auf den Zettel, wenn Sie es ausdrücklich ankreuzen** („Notizen des Termins mit aufs Papier drucken“).
+* **Auf dem iPhone:** Bei der als App installierten Anwendung lieber **Teilen** oder **Herunterladen** statt **Öffnen** wählen (siehe „Auf dem Handy installieren“).
+* Termine von Kunden (oder Fahrzeughaltern), deren Daten nur eingeschränkt verarbeitet werden (Art. 18 DSGVO), lassen sich nicht drucken.
+
 **Arbeitsplätze und Terminarten archivieren:** Hängen Termine an einem Arbeitsplatz oder einer Terminart (die Zahl steht in der Zeile), lässt sich beides **nicht löschen** – stattdessen **archivieren**: Termine behalten Platz und Art, aber beide sind für neue Termine nicht mehr wählbar (im Tagesraster bekommt ein archivierter Platz nur eine Spalte, wenn in dem Zeitraum Termine an ihm hängen). **Wieder aktivieren** macht sie wieder wählbar; löschen lassen sie sich erst, wenn keine Termine mehr daran hängen.
 
 Arbeitsplätze, Terminarten und das Kalender-Raster pflegt, wer das Recht „Arbeitsplätze, Terminarten und Kalender einrichten“ hat

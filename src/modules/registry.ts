@@ -4,7 +4,8 @@ import { FEATURES, MODULES, fullFeatureId, isPermission, type FeatureId, type Mo
 import { withTimeout } from "@/lib/with-timeout";
 import type { IconName } from "./define";
 import { logError } from "@/lib/log-safe";
-import type { SearchHit, SearchProviderDef, SectionDef, SectionHost, SettingsTabDef, SetupCheckDef, WidgetDef } from "./types";
+import type { PrintNoteDef, PrintNoteHost, SearchHit, SearchProviderDef, SectionDef, SectionHost, SettingsTabDef, SetupCheckDef, WidgetDef } from "./types";
+import type { Translator } from "@/i18n/translate";
 
 import { widgets as appointmentsWidgets } from "./workshop/appointments/widgets";
 import { settingsTabs as appointmentsSettings } from "./workshop/appointments/settings-tab";
@@ -27,6 +28,7 @@ import { widgets as timeWidgets } from "./office/time/widgets";
 import { sections as timeSections } from "./office/time/sections";
 import { sections as filesSections } from "./workshop/files/sections";
 import { sections as checklistsSections } from "./workshop/checklists/sections";
+import { printNotes as checklistsPrintNotes } from "./workshop/checklists/print-notes";
 import { widgets as checklistsWidgets } from "./workshop/checklists/widgets";
 import { searchProviders as checklistsSearch } from "./workshop/checklists/search";
 import { settingsTabs as timeSettings } from "./office/time/settings-tab";
@@ -109,6 +111,9 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
  */
 const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections, ...filesSections, ...checklistsSections, ...billingSections];
 
+/** Beiträge zu gedruckten Karten (F8): Zeilen anderer Funktionen auf der Auftragskarte. Neue Funktion mit Beitrag: `print-notes.ts` anlegen und hier eintragen. */
+const ALL_PRINT_NOTES: PrintNoteDef[] = [...checklistsPrintNotes];
+
 const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...timeSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
 
 /** Punkte der Einrichtungs-Checkliste (Administration). Neue Funktion mit Einrichtungsschritten: `setup-checks.ts` anlegen und hier eintragen. */
@@ -165,6 +170,23 @@ export async function setupChecksFor(session: AppSession, secure: boolean): Prom
 /** Abschnitte für einen Erweiterungspunkt: nur von aktiven Funktionen (und deren aktiven weichen Abhängigkeiten), für die die Person das Recht hat. */
 export function sectionsFor(session: AppSession, host: SectionHost): SectionDef[] {
   return ALL_SECTIONS.filter((s) => s.host === host && session.features.has(s.feature) && session.can(s.permission) && (s.uses ?? []).every((f) => session.features.has(f))).sort((a, b) => a.order - b.order);
+}
+
+/**
+ * Zeilen anderer Funktionen für eine gedruckte Karte (`host`, Kennung der Sache): nur von aktiven Funktionen (samt weichen Abhängigkeiten), für die die Person das Recht hat, in der Reihenfolge der
+ * Beiträge. Ein Beitrag, der scheitert, fehlt (wird protokolliert) – die Karte entsteht trotzdem.
+ */
+export async function printNotesFor(session: AppSession, host: PrintNoteHost, entityId: string, i18n: Pick<Translator, "t" | "td" | "date">): Promise<Array<readonly [string, string]>> {
+  const notes = ALL_PRINT_NOTES.filter((n) => n.host === host && session.features.has(n.feature) && session.can(n.permission) && (n.uses ?? []).every((f) => session.features.has(f))).sort((a, b) => a.order - b.order);
+  const lines: Array<readonly [string, string]> = [];
+  for (const note of notes) {
+    try {
+      lines.push(...(await note.lines({ entityId, session, i18n })));
+    } catch (error) {
+      logError(`print-note:${note.id}`, error);
+    }
+  }
+  return lines;
 }
 
 export function settingsTabsFor(session: AppSession): SettingsTabDef[] {
