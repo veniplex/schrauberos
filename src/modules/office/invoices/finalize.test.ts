@@ -44,7 +44,7 @@ const flashKey = () => {
 };
 
 describe("Domain: Sperren und Gegenbeleg-Beträge", () => {
-  const base = { direction: "outgoing", finalizedAt: null, cancelsInvoiceId: null, status: "open" };
+  const base = { direction: "outgoing", finalizedAt: null, cancelsInvoiceId: null, status: "open", docType: "invoice" };
   it("finalizeBlock: nur offene, nicht festgeschriebene Ausgangsrechnungen", () => {
     assert.equal(finalizeBlock(base), null);
     assert.equal(finalizeBlock({ ...base, direction: "incoming" }), "incoming");
@@ -58,6 +58,9 @@ describe("Domain: Sperren und Gegenbeleg-Beträge", () => {
     assert.equal(cancelBlock({ ...final, direction: "incoming" }), "incoming");
     assert.equal(cancelBlock({ ...final, hasCounterDocument: true }), "already");
     assert.equal(cancelBlock({ ...final, cancelsInvoiceId: "x" }), "counterDocument");
+    // Angebote, Auftragsbestätigungen und Gegenbelege sind keine stornierbaren Rechnungen
+    for (const docType of ["offer", "confirmation", "credit"]) assert.equal(cancelBlock({ ...final, docType }), "notInvoice", docType);
+    for (const docType of ["invoice", "partial", "final"]) assert.equal(cancelBlock({ ...final, docType }), null, docType);
   });
   it("counterAmounts kehrt das Vorzeichen um, lässt Fehlendes fehlen und macht aus 0 keine -0", () => {
     assert.deepEqual(counterAmounts({ netCents: 10000, vatCents: 1900, grossCents: 11900 }), { netCents: -10000, vatCents: -1900, grossCents: -11900 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { claimRow } from "@/lib/concurrency";
 import { addDaysToKey, dayKey } from "@/lib/zone";
 import { noon, todayInput } from "@/lib/dates";
@@ -15,8 +16,8 @@ import { PdfError } from "@/server/pdf/errors";
 import { defineOperation, fail, failField, mapPrismaError, OperationError, type Tx } from "@/server/operations";
 import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { getWorkshop } from "@/server/workshop";
-import { CREATABLE_TYPES, OFFER_VALIDITY_DAYS, PAYMENT_METHODS, SENT_FILES_DIR, isInvoiceType, isQuoteType } from "./constants";
-import { amountColumns, checkInputOf, findLinkableCustomer, itemInputOf, loadWorkshop, normalizeItems, replaceItems, snapshotColumns, totalsOf } from "./core";
+import { CREATABLE_TYPES, OFFER_VALIDITY_DAYS, PAYMENT_METHODS, SENT_FILES_DIR, SENT_QUOTE_FILES_KEEP_DAYS, isInvoiceType, isQuoteType } from "./constants";
+import { amountColumns, assertCustomerUsable, checkInputOf, findLinkableCustomer, itemInputOf, loadWorkshop, normalizeItems, replaceItems, snapshotColumns, totalsOf } from "./core";
 import { dueDayKey, finalizeProblems, isDraft, mailContent, documentFileName, docTitle, remainingCents, statusAfterPayments } from "./domain";
 import { loadDocView } from "./queries";
 import { viewPayable } from "./view";
@@ -111,7 +112,13 @@ export const saveDraftOperation = defineOperation({
       customer = await findLinkableCustomer(tx, d.customerId, current?.customerId ?? null);
       if (!customer) failField("customerId", "validation.invalid");
     }
-    const partyName = d.partyName ?? customer?.displayName ?? current?.partyName;
+    // Wechselt ein Entwurf den Kunden, gehören Name, Anschrift und E-Mail dem **neuen** Kunden: Das Formular schickt die vorbelegten Werte des alten mit – sie dürfen nicht stehen bleiben (der Beleg wäre an den
+    // falschen Empfänger adressiert). Wer die Angaben ändern will, tut das nach dem Speichern.
+    const switched = Boolean(current && customer && customer.id !== current.customerId);
+    const recipient = switched && customer
+      ? { name: customer.displayName, street: customer.street, zip: customer.zip, city: customer.city, email: customer.email }
+      : { name: d.partyName ?? customer?.displayName ?? current?.partyName, street: d.partyStreet ?? customer?.street ?? null, zip: d.partyZip ?? customer?.zip ?? null, city: d.partyCity ?? customer?.city ?? null, email: d.buyerEmail ?? customer?.email ?? null };
+    const partyName = recipient.name;
     if (!partyName) failField("partyName", "validation.required");
     if (docType === "final" && !customer) failField("customerId", "billing.errors.finalCustomer");
 
@@ -119,8 +126,10 @@ export const saveDraftOperation = defineOperation({
     let vehicle: { id: string; label: string } | null = null;
     if (d.vehicleId) {
       if (!principal.features.has("workshop.vehicles")) failField("vehicleId", "validation.invalid");
-      const found = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true, make: true, model: true, customerId: true, archivedAt: true } });
+      const found = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true, make: true, model: true, customerId: true, archivedAt: true, customer: { select: { processingRestrictedAt: true, anonymizedAt: true } } } });
       if (!found || (found.archivedAt && found.id !== current?.vehicleId)) failField("vehicleId", "validation.invalid");
+      // Fahrzeug eines Kunden mit eingeschränkter Verarbeitung (Art. 18): keine neue Verknüpfung; eine bestehende bleibt
+      if ((found.customer?.processingRestrictedAt || found.customer?.anonymizedAt) && found.id !== current?.vehicleId) failField("vehicleId", "billing.errors.restricted");
       if (found.customerId && customer && found.customerId !== customer.id) failField("vehicleId", "billing.errors.vehicleCustomer");
       vehicle = { id: found.id, label: [found.plate, [found.make, found.model].filter(Boolean).join(" ")].filter(Boolean).join(" · ") };
     }
@@ -140,10 +149,10 @@ export const saveDraftOperation = defineOperation({
       partyName,
       partyKey: searchKey(partyName),
       customerId: customer?.id ?? null,
-      partyStreet: d.partyStreet ?? customer?.street ?? null,
-      partyZip: d.partyZip ?? customer?.zip ?? null,
-      partyCity: d.partyCity ?? customer?.city ?? null,
-      buyerEmail: d.buyerEmail ?? customer?.email ?? null,
+      partyStreet: recipient.street,
+      partyZip: recipient.zip,
+      partyCity: recipient.city,
+      buyerEmail: recipient.email,
       issueDate: current?.issueDate ?? noon(today),
       dueDate: null,
       ...amountColumns(totals),
@@ -222,7 +231,9 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
   if (doc.exempt !== workshop.smallBusiness) fail("invalid", "billing.errors.exemptChanged");
   const rows = doc.items.map((item) => ({ taxBp: item.taxBp, quantityMilli: item.quantityMilli, unitCents: item.unitCents, discountBp: item.discountBp }));
   const totals = totalsOf(rows, doc.exempt);
-  const today = todayInput();
+  // Ein Zeitpunkt für Rechnungsdatum, Nummernkreis (Jahr/Monat) und Festschreibezeitpunkt – kein Auseinanderfallen um Mitternacht oder zum Jahreswechsel
+  const now = new Date();
+  const today = todayInput(now);
   const problems = finalizeProblems({
     ...checkInputOf(
       {
@@ -254,7 +265,7 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
 
   let allocated: { number: string; key: string };
   try {
-    allocated = await allocateDocumentNumber(tx, doc.docType, workshop.invoiceNumberFormat, new Date());
+    allocated = await allocateDocumentNumber(tx, doc.docType, workshop.invoiceNumberFormat, now);
   } catch (error) {
     if (error instanceof NumberExhaustedError) fail("failed", "billing.errors.numberExhausted");
     throw error;
@@ -262,6 +273,8 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
   const customerNumber = doc.customerId ? ((await tx.customer.findUnique({ where: { id: doc.customerId }, select: { customerNumber: true } }))?.customerNumber ?? null) : null;
   const issueDay = today;
   const paymentDays = doc.paymentDays ?? 0;
+  // Zahlbetrag 0 (die Abschläge decken die Schlussrechnung voll): gilt von Anfang an als bezahlt – sonst bliebe der Beleg offen und würde überfällig
+  const settled = expect === "invoice" && totals.grossCents - deductedCents <= 0;
   const data = {
     number: allocated.number,
     outgoingKey: allocated.key,
@@ -270,10 +283,11 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
     ...amountColumns(totals),
     deductedCents,
     exempt: doc.exempt,
-    finalizedAt: new Date(),
+    finalizedAt: now,
     finalizedByName: who(principal),
     offerStatus: doc.docType === "offer" ? "open" : null,
-    status: "open",
+    status: settled ? "paid" : "open",
+    paidAt: settled ? noon(issueDay) : null,
   };
   try {
     await tx.invoice.update({ where: { id: doc.id }, data });
@@ -378,6 +392,8 @@ export const createConfirmationOperation = defineOperation({
   run: async ({ input, principal, tx, audit }) => {
     const offer = await billingDoc(tx, input.id);
     if (offer.docType !== "offer" || isDraft(offer) || offer.offerStatus !== "accepted") fail("invalid", "billing.errors.notAccepted");
+    // Ein neuer Entwurf für den Kunden ist eine neue Verknüpfung: bei eingeschränkter Verarbeitung (Art. 18) oder anonymisiertem Kunden nicht
+    await assertCustomerUsable(tx, offer.customerId);
     if (await tx.invoice.findFirst({ where: { sourceDocId: offer.id, docType: "confirmation" }, select: { id: true } })) fail("duplicate", "billing.errors.confirmationExists");
     const workshop = await loadWorkshop(tx);
     const rows = normalizeItems(offer.items.map(itemInputOf), workshop.smallBusiness);
@@ -432,6 +448,8 @@ export const orderFromOfferOperation = defineOperation({
     if (offer.docType !== "offer" || isDraft(offer) || offer.offerStatus !== "accepted") fail("invalid", "billing.errors.notAccepted");
     if (offer.orderId) fail("duplicate", "billing.errors.orderExists");
     if (!offer.vehicleId) fail("invalid", "billing.errors.noVehicle");
+    // Ein neuer Auftrag verknüpft Kunde und Fahrzeug neu: Art. 18 gilt für den Kunden des Angebots und – in `createOrderInTx` – für den Halter des Fahrzeugs
+    await assertCustomerUsable(tx, offer.customerId);
     const vehicle = await tx.vehicle.findUnique({ where: { id: offer.vehicleId }, select: { customerId: true } });
     if (!(await claimRow(tx.invoice, offer.id, input.version))) fail("conflict");
     const order = await createOrderInTx(
@@ -614,6 +632,23 @@ const sendInput = idInput.extend({
 type Prepared = { files: Array<{ path: string; filename: string; contentType: string }>; to: string; subject: string; text: string };
 
 /**
+ * An wen der Beleg geht: die **Adresse des Belegs** (Schnappschuss des festgeschriebenen Beleges – sie steht auch auf dem Beleg und in der XRechnung), nur ohne sie die aktuelle Adresse des verknüpften Kunden.
+ * So laufen Beleg und Versand nicht auseinander. Ein Kunde mit eingeschränkter Verarbeitung (Art. 18) oder anonymisierter Kunde bekommt nichts; ein stornierter Beleg wird nicht mehr versendet
+ * (die Stornorechnung selbst schon).
+ */
+async function mailRecipient(client: Pick<PrismaClient | Prisma.TransactionClient, "invoice" | "customer">, id: string) {
+  const row = await client.invoice.findFirst({
+    where: { id, source: "billing", finalizedAt: { not: null } },
+    select: { customerId: true, buyerEmail: true, snapshot: { select: { rEmail: true } }, cancelledBy: { select: { id: true } } },
+  });
+  if (!row) return null;
+  const customer = row.customerId ? await client.customer.findUnique({ where: { id: row.customerId }, select: { email: true, processingRestrictedAt: true, anonymizedAt: true } }) : null;
+  const restricted = Boolean(row.customerId && (!customer || customer.processingRestrictedAt || customer.anonymizedAt));
+  const docEmail = (row.snapshot ? row.snapshot.rEmail : row.buyerEmail)?.trim() || null;
+  return { email: restricted ? null : (docEmail ?? (customer?.email?.trim() || null)), restricted, cancelled: row.cancelledBy !== null };
+}
+
+/**
  * Beleg per E-Mail senden (`billing.send`; `queueMail` verlangt zusätzlich `mail.send` und einen eingerichteten Versand). Empfänger ist die E-Mail-Adresse des Kunden (aktuelle Adresse des verknüpften,
  * nicht eingeschränkten Kunden, sonst die des Beleges); es gibt kein freies Adressfeld. Betreff und Text stammen aus der festen Vorlage (`mailContent`: nur Nummer, Name, Betrag, Datum und Werkstattname).
  * Anhang ist das PDF (und auf Wunsch die XRechnung); beide entstehen in `prepare` aus dem Beleg und liegen danach als Dateien im Dateispeicher (so sieht man, was gesendet wurde). Wiederholter Versand
@@ -635,12 +670,11 @@ export const sendDocumentOperation = defineOperation({
     if (!loaded || loaded.view.draft) fail("notFound");
     const { view, row } = loaded;
     if (row.sentAt && !input.resend) fail("conflict", "billing.errors.alreadySent");
-    let email: string | null = view.recipient.email;
-    if (row.customerId) {
-      const customer = await db.customer.findUnique({ where: { id: row.customerId }, select: { email: true, processingRestrictedAt: true, anonymizedAt: true } });
-      if (!customer || customer.processingRestrictedAt || customer.anonymizedAt) fail("invalid", "billing.errors.restricted");
-      email = customer.email?.trim() || view.recipient.email;
-    }
+    const recipient = await mailRecipient(db, input.id);
+    if (!recipient) fail("notFound");
+    if (recipient.restricted) fail("invalid", "billing.errors.restricted");
+    if (recipient.cancelled) fail("invalid", "billing.errors.cancelledSend");
+    const email = recipient.email;
     if (!email) fail("invalid", "billing.errors.noEmail");
     const wantXml = Boolean(input.includeXml) && isInvoiceType(view.docType);
     const stored: string[] = [];
@@ -687,7 +721,15 @@ export const sendDocumentOperation = defineOperation({
     const doc = await tx.invoice.findUnique({ where: { id: input.id }, select: { id: true, source: true, finalizedAt: true, number: true, docType: true, partyName: true, sentAt: true } });
     if (!doc || doc.source !== "billing" || !doc.finalizedAt) fail("notFound");
     if (doc.sentAt && !input.resend) fail("conflict", "billing.errors.alreadySent");
+    // Zwischen Vorbereitung und Transaktion kann sich etwas geändert haben (Kunde eingeschränkt oder anonymisiert, Beleg storniert, Adresse anders): dann nichts senden
+    const recipient = await mailRecipient(tx, doc.id);
+    if (!recipient || recipient.restricted) fail("invalid", "billing.errors.restricted");
+    if (recipient.cancelled) fail("invalid", "billing.errors.cancelledSend");
+    if (recipient.email !== prepared.to) fail("conflict");
     await queueMail({ tx, emit, principal }, { to: [prepared.to], subject: prepared.subject, text: prepared.text, attachments: prepared.files, purpose: "billing", entityId: doc.id });
+    // Die Anhänge im Dateispeicher gehören zum Beleg: Angebote und Auftragsbestätigungen räumt der Aufräumlauf nach der Frist weg, bei Rechnungen bleiben sie bis zur Anonymisierung des Kunden
+    const purgeAfter = isQuoteType(doc.docType) ? new Date(Date.now() + SENT_QUOTE_FILES_KEEP_DAYS * 86_400_000) : null;
+    await tx.invoiceSentFile.createMany({ data: prepared.files.map((file) => ({ invoiceId: doc.id, path: file.path, purgeAfter })) });
     await tx.invoice.update({ where: { id: doc.id }, data: { sentAt: new Date(), sentCount: { increment: 1 } } });
     await emit("billing.sent", { type: doc.docType }, doc.id);
     audit({ target: labelOf(doc.docType, doc.number), entityId: doc.id });

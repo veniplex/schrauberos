@@ -10,7 +10,7 @@ import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { todayInput } from "@/lib/dates";
 import { versionOf } from "@/lib/concurrency";
-import { cancelBlock, DOC_TYPES_LEDGER, finalizeBlock, isFinalized, outstandingCents, paymentState } from "@/modules/office/invoices/domain";
+import { cancelBlock, finalizeBlock, isFinalized, ledgerWhere, outstandingCents, paymentState } from "@/modules/office/invoices/domain";
 import { PageSections } from "@/modules/page-sections";
 import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 import { formatCents } from "@/lib/money";
@@ -23,7 +23,8 @@ import { Field, Input, Textarea } from "@/components/ui/form";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   if (!(await sessionIfAllowed("invoices.view"))) return {};
-  const inv = await db.invoice.findUnique({ where: { id } });
+  // wie die Seite: nur Belege der Ausgangsliste (kein Entwurf, kein Angebot) liefern einen Titel
+  const inv = await db.invoice.findFirst({ where: { id, ...ledgerWhere }, select: { number: true, partyName: true } });
   return { title: inv ? `${inv.number} · ${inv.partyName}` : undefined };
 }
 
@@ -33,8 +34,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const { t, date, number, locale } = i18n;
   const eur = (c: number) => formatCents(c, INTL_LOCALE[locale]);
 
-  const inv = await db.invoice.findUnique({
-    where: { id },
+  // Entwürfe, Angebote und Auftragsbestätigungen der Rechnungserstellung gehören nicht in die Ausgangsliste (`ledgerWhere`)
+  const inv = await db.invoice.findFirst({
+    where: { id, ...ledgerWhere },
     include: {
       customer: { select: customerNameSelect },
       file: { select: { name: true, mime: true, size: true, uploadedAt: true } },
@@ -42,13 +44,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       cancelledBy: { select: { id: true, number: true } },
     },
   });
-  // Entwürfe, Angebote und Auftragsbestätigungen der Rechnungserstellung gehören nicht in die Ausgangsliste
-  if (!inv || !(DOC_TYPES_LEDGER as readonly string[]).includes(inv.docType) || (inv.source === "billing" && !inv.finalizedAt)) notFound();
+  if (!inv) notFound();
 
   const state = paymentState(inv);
   // Belege der Rechnungserstellung (Positionen, Schnappschuss, Zahlungen) werden dort bearbeitet: hier nur ansehen und stornieren
   const fromBilling = inv.source === "billing";
   const canEdit = session.can("invoices.edit") && !fromBilling;
+  // Zahlstatus: bei Belegen der Rechnungserstellung dort (Teilzahlungen) – ist die Funktion ausgeschaltet, bleibt er hier erfassbar
+  const canPay = session.can("invoices.edit") && (!fromBilling || !session.features.has("office.billing"));
   const finalized = isFinalized(inv);
   const canFinalize = session.can("invoices.finalize") && finalizeBlock(inv) === null;
   const deductedInFinal = (await db.invoiceDeduction.count({ where: { partialId: inv.id, finalKey: { not: null } } })) > 0;
@@ -82,7 +85,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </span>
         }
         actions={
-          canEdit ? (
+          canPay ? (
             <>
               {state === "paid" ? (
                 <form action={reopenInvoice}>
@@ -96,7 +99,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <SubmitButton variant="primary">{t("invoices.markPaid")}</SubmitButton>
                 </form>
               ) : null}
-              {finalized ? null : (
+              {finalized || !canEdit ? null : (
                 <LinkButton href={`/invoices/${inv.id}/edit`}>
                   <Pencil className="size-4" aria-hidden /> {t("common.edit")}
                 </LinkButton>
@@ -211,9 +214,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     <Input id="cancelNumber" name="number" maxLength={60} required autoComplete="off" className="font-mono" />
                   </Field>
                 )}
-                <Field label={t("invoices.cancel.issueDate")} htmlFor="cancelDate" name="issueDate" hint={t("invoices.cancel.issueDateHint")}>
-                  <Input id="cancelDate" name="issueDate" type="date" />
-                </Field>
+                {fromBilling ? (
+                  <p className="text-sm text-ink-muted">{t("invoices.cancel.issueDateToday")}</p>
+                ) : (
+                  <Field label={t("invoices.cancel.issueDate")} htmlFor="cancelDate" name="issueDate" hint={t("invoices.cancel.issueDateHint")}>
+                    <Input id="cancelDate" name="issueDate" type="date" max={todayInput()} />
+                  </Field>
+                )}
                 <Field label={t("invoices.cancel.reason")} htmlFor="cancelReason" name="reason">
                   <Textarea id="cancelReason" name="reason" maxLength={500} rows={2} />
                 </Field>

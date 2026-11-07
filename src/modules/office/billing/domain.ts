@@ -41,9 +41,13 @@ export function billingPaymentState(d: PayLike, now = new Date()): BillingPaymen
   return d.dueDate && startOfDay(d.dueDate) < startOfDay(now) ? "overdue" : "open";
 }
 
-/** Status und Zahlungsdatum nach einer Änderung der Zahlungen: bezahlt, sobald nichts mehr offen ist (und mindestens ein Betrag eingegangen ist). */
+/**
+ * Status nach einer Änderung der Zahlungen: bezahlt, sobald nichts mehr zu zahlen ist. Ein **Zahlbetrag von 0** (Schlussrechnung, die die Abschläge voll anrechnet) gilt von Anfang an als bezahlt –
+ * sonst bliebe der Beleg für immer „offen“ und nach der Fälligkeit „überfällig“, ohne dass sich eine Zahlung erfassen ließe.
+ */
 export function statusAfterPayments(d: Pick<PayLike, "grossCents" | "deductedCents">, paidCents: number): "open" | "paid" {
-  return paidCents > 0 && paidCents >= payableCents(d) ? "paid" : "open";
+  const payable = payableCents(d);
+  return payable <= 0 || paidCents >= payable ? "paid" : "open";
 }
 
 /* ───────────── Prüfliste vor dem Festschreiben ───────────── */
@@ -64,6 +68,8 @@ export type FinalizeCheckInput = {
   itemCount: number;
   /** die verwendeten Steuersätze in Basispunkten (ohne Kleinunternehmer-Zeilen: dort ist alles 0) */
   taxRates: readonly number[];
+  /** Gesamtbetrag (brutto) der Positionen, vor angerechneten Abschlägen */
+  grossCents: number;
   taxNote: string | null;
   exceedsLimit: boolean;
 };
@@ -89,6 +95,8 @@ export function finalizeProblems(input: FinalizeCheckInput): string[] {
     if (input.docType === "offer" && !input.validUntil) out.push("validUntil");
     return out;
   }
+  // Eine Rechnung über 0 € oder einen negativen Betrag gibt es nicht: korrigiert wird mit der Stornorechnung (Gegenbeleg zu einer Rechnung)
+  if (input.grossCents <= 0) out.push("amount");
   if (blank(sender.taxNumber) && blank(sender.vatId)) out.push("senderTaxId");
   if (!input.serviceFrom) out.push("serviceDate");
   else if (input.serviceTo && input.serviceTo < input.serviceFrom) out.push("serviceRange");

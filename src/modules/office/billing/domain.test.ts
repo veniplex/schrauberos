@@ -35,6 +35,7 @@ const base: FinalizeCheckInput = {
   taxRates: [1900],
   taxNote: null,
   exceedsLimit: false,
+  grossCents: 11900,
 };
 
 describe("Pflichtangaben vor dem Festschreiben (§ 14 UStG als Prüfliste)", () => {
@@ -74,6 +75,13 @@ describe("Pflichtangaben vor dem Festschreiben (§ 14 UStG als Prüfliste)", () 
   });
 
   it("zu große Summen verhindern das Festschreiben", () => assert.ok(finalizeProblems({ ...base, exceedsLimit: true }).includes("tooLarge")));
+
+  it("eine Rechnung über 0 € oder einen negativen Betrag lässt sich nicht festschreiben (korrigiert wird mit der Stornorechnung); Angebote bleiben möglich", () => {
+    assert.ok(finalizeProblems({ ...base, grossCents: 0 }).includes("amount"));
+    assert.ok(finalizeProblems({ ...base, grossCents: -5950 }).includes("amount"));
+    assert.ok(finalizeProblems({ ...base, docType: "final", grossCents: 0 }).includes("amount"));
+    assert.deepEqual(finalizeProblems({ ...base, docType: "offer", validUntil: "2026-12-01", grossCents: 0 }), []);
+  });
 });
 
 describe("Zahlstatus", () => {
@@ -91,11 +99,11 @@ describe("Zahlstatus", () => {
     assert.equal(remainingCents({ grossCents: 23800, deductedCents: 5950, paidCents: 10000 }), 7850);
     assert.equal(remainingCents({ grossCents: 1000, deductedCents: 0, paidCents: 5000 }), 0);
   });
-  it("bezahlt erst, wenn nichts mehr offen ist und mindestens ein Betrag eingegangen ist", () => {
+  it("bezahlt, sobald nichts mehr zu zahlen ist", () => {
     assert.equal(statusAfterPayments({ grossCents: 10000, deductedCents: 0 }, 0), "open");
     assert.equal(statusAfterPayments({ grossCents: 10000, deductedCents: 0 }, 9999), "open");
     assert.equal(statusAfterPayments({ grossCents: 10000, deductedCents: 0 }, 10000), "paid");
-    assert.equal(statusAfterPayments({ grossCents: 10000, deductedCents: 10000 }, 0), "open", "eine Schlussrechnung über 0 € gilt nicht von selbst als bezahlt");
+    assert.equal(statusAfterPayments({ grossCents: 10000, deductedCents: 10000 }, 0), "paid", "ein Zahlbetrag von 0 (Abschläge voll angerechnet) gilt als bezahlt");
   });
 });
 

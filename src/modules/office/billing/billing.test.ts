@@ -55,6 +55,7 @@ beforeEach(async () => {
   await env.db.mailMessage.deleteMany();
   await env.db.outboxEvent.deleteMany();
   await env.db.invoiceDeduction.deleteMany();
+  await env.db.invoiceSentFile.deleteMany();
   await env.db.invoicePayment.deleteMany();
   await env.db.invoice.deleteMany({ where: { cancelsInvoiceId: { not: null } } });
   await env.db.invoice.deleteMany({ where: { sourceDocId: { not: null } } });
@@ -777,5 +778,224 @@ describe("Datenschutz (Art. 15, Anonymisierung, Sendeprotokoll)", () => {
     const mail = await env.db.mailMessage.findFirstOrThrow({ where: { purpose: "billing" } });
     assert.deepEqual([mail.toAddresses, mail.deliveredTo, mail.subject, mail.body, mail.attachments], ["(anonymisiert)", null, "(anonymisiert)", null, null]);
     assert.equal((await env.db.mailMessage.findUniqueOrThrow({ where: { id: other.id } })).toAddresses, "andere@example.com", "fremde Protokollzeilen bleiben");
+  });
+});
+
+describe("Fix-Runde 12d: Storno nur für Rechnungen", () => {
+  const cancel = (session: AppSession, id: string, extra: Record<string, unknown> = {}) => invoiceOps.cancelInvoiceOperation.execute(session, { id, ...extra });
+
+  it("Angebot, Auftragsbestätigung und Entwurf lassen sich nicht stornieren – es entsteht kein Gegenbeleg und keine Rechnungsnummer wird verbraucht", async () => {
+    const session = await sessionFor(FINALIZE);
+    const offer = await ops.saveDraftOperation.execute(session, { docType: "offer", customerId, items: items() });
+    assert.ok(offer.ok);
+    assert.ok((await ops.issueDocumentOperation.execute(session, { id: offer.data.id, version: versionOf(await fresh(offer.data.id)) })).ok);
+    assert.ok((await ops.acceptOfferOperation.execute(session, { id: offer.data.id, version: versionOf(await fresh(offer.data.id)) })).ok);
+    const confirmation = await ops.createConfirmationOperation.execute(session, { id: offer.data.id });
+    assert.ok(confirmation.ok);
+    assert.ok((await ops.issueDocumentOperation.execute(session, { id: confirmation.data.id, version: versionOf(await fresh(confirmation.data.id)) })).ok);
+    const dr = await draft(session);
+    const before = await env.db.counter.findMany({ orderBy: { key: "asc" } });
+    for (const id of [offer.data.id, confirmation.data.id, dr]) {
+      const outcome = await cancel(session, id, { version: versionOf(await fresh(id)) });
+      assert.equal(failureOf(outcome).code, "notFound", id);
+    }
+    assert.equal(await env.db.invoice.count({ where: { cancelsInvoiceId: { not: null } } }), 0);
+    assert.deepEqual(await env.db.counter.findMany({ orderBy: { key: "asc" } }), before, "kein Zähler weitergestellt");
+    assert.equal((await fresh(offer.data.id)).status, "open", "das Angebot bleibt unverändert");
+    // die erste Rechnung bekommt weiterhin die erste Nummer
+    const invoice = await finalized(session);
+    assert.equal((await fresh(invoice)).number, `${YEAR}-0001`);
+  });
+
+  it("das Datum der Stornorechnung eines Buchungsbelegs ist immer heute (Eingabe wird ignoriert); manuell erfasste Rechnungen: nie in der Zukunft", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session);
+    const done = await cancel(session, id, { version: versionOf(await fresh(id)), issueDate: addDaysToKey(todayInput(), 30) });
+    assert.ok(done.ok, JSON.stringify(!done.ok && done.failure));
+    const counter = await fresh(done.data.counterId);
+    assert.equal(counter.issueDate.toISOString().slice(0, 10), todayInput(), "Datum = heute, nicht das eingegebene");
+
+    const manual = await env.db.invoice.create({ data: { direction: "outgoing", number: "M-7", outgoingKey: "M-7", partyName: "Alt", partyKey: "alt", issueDate: new Date("2026-01-10T12:00:00Z"), grossCents: 100, finalizedAt: new Date(), finalizedByName: "t" } });
+    const future = await cancel(session, manual.id, { version: versionOf(manual), number: "M-S-1", issueDate: addDaysToKey(todayInput(), 5) });
+    assert.equal(failureOf(future).fields?.issueDate?.key, "invoices.errors.cancelFuture");
+    assert.ok((await cancel(session, manual.id, { version: versionOf(await fresh(manual.id)), number: "M-S-1", issueDate: todayInput() })).ok);
+  });
+});
+
+describe("Fix-Runde 12d: 0-€-Belege", () => {
+  it("eine Rechnung über 0 € oder einen negativen Betrag lässt sich nicht festschreiben, es wird keine Nummer verbraucht", async () => {
+    const session = await sessionFor(FINALIZE);
+    for (const unitCents of [0, -5000]) {
+      const id = await draft(session, { items: items([{ unitCents }]) });
+      const failure = failureOf(await finalize(session, id));
+      assert.equal(failure.key, "billing.errors.incomplete");
+      assert.ok(failure.data?.problems?.includes("amount"), String(unitCents));
+    }
+    assert.equal(await env.db.counter.count(), 0);
+  });
+
+  it("eine Schlussrechnung, die die Abschläge voll anrechnet (Zahlbetrag 0), gilt von Anfang an als bezahlt – nicht offen und nicht überfällig", async () => {
+    const session = await sessionFor(FINALIZE);
+    const partialDraft = await ops.saveDraftOperation.execute(session, { docType: "partial", customerId, items: items([{ unitCents: 10000 }]), serviceFrom: todayInput() });
+    assert.ok(partialDraft.ok);
+    assert.ok((await finalize(session, partialDraft.data.id)).ok);
+    const finalId = await finalized(session, { docType: "final", deductPartialIds: [partialDraft.data.id], items: items([{ unitCents: 10000 }]) });
+    const row = await fresh(finalId);
+    assert.deepEqual([row.grossCents, row.deductedCents, row.status], [11900, 11900, "paid"]);
+    assert.ok(row.paidAt);
+    const sums = await invoiceQueries.invoiceSums({ direction: "outgoing" });
+    assert.equal(sums.overdueCount, 0);
+    assert.equal(sums.openCount, 1, "nur der Abschlag ist noch offen");
+    assert.equal((await queries.billingStats()).outstandingCount, 1);
+    // der Beleg lässt sich weiter stornieren (gibt den Abschlag frei)
+    assert.ok((await invoiceOps.cancelInvoiceOperation.execute(session, { id: finalId, version: versionOf(await fresh(finalId)) })).ok);
+  });
+});
+
+describe("Fix-Runde 12d: Kunde im Entwurf und Art. 18", () => {
+  it("beim Kundenwechsel eines Entwurfs werden Name, Anschrift und E-Mail neu aus dem neuen Kunden gefüllt – nie bleiben die Angaben des alten stehen", async () => {
+    const session = await sessionFor(EDIT);
+    const id = await draft(session);
+    const before = await fresh(id);
+    const other = await env.db.customer.create({ data: { lastName: "Beispiel", firstName: "Berta", street: "Ring 5", zip: "80331", city: "München", email: "berta@kunde.example", customerNumber: "K-2", nameKey: "beispiel berta" } });
+    // das Formular schickt die vorbelegten Werte des alten Kunden unverändert mit
+    const result = await ops.saveDraftOperation.execute(session, {
+      id, version: versionOf(before), customerId: other.id, partyName: before.partyName, partyStreet: before.partyStreet ?? undefined, partyZip: before.partyZip ?? undefined, partyCity: before.partyCity ?? undefined, buyerEmail: before.buyerEmail ?? undefined, items: items(),
+    });
+    assert.ok(result.ok, JSON.stringify(!result.ok && result.failure));
+    const row = await fresh(id);
+    assert.deepEqual([row.customerId, row.partyName, row.partyStreet, row.partyZip, row.partyCity, row.buyerEmail], [other.id, "Berta Beispiel", "Ring 5", "80331", "München", "berta@kunde.example"]);
+    // ohne Wechsel bleiben bewusst geänderte Angaben stehen
+    const kept = await ops.saveDraftOperation.execute(session, { id, version: versionOf(row), customerId: other.id, partyName: "Beispiel GmbH", items: items() });
+    assert.ok(kept.ok);
+    assert.equal((await fresh(id)).partyName, "Beispiel GmbH");
+  });
+
+  it("Auftragsbestätigung und Auftrag aus dem Angebot entstehen nicht für Kunden mit eingeschränkter Verarbeitung; ein Fahrzeug eines solchen Kunden lässt sich nicht neu verknüpfen", async () => {
+    await env.db.featureSetting.upsert({ where: { key: "workshop.orders" }, update: { enabled: true }, create: { key: "workshop.orders", enabled: true, updatedByName: "test" } });
+    const session = await sessionFor([...EDIT, "orders.view", "orders.create", "orders.edit", "orders.prices"]);
+    const vehicle = await env.db.vehicle.create({ data: { plate: "B-XY 1", plateNorm: "BXY1", make: "VW", model: "Golf", customerId } });
+    const created = await ops.saveDraftOperation.execute(session, { docType: "offer", customerId, vehicleId: vehicle.id, items: items() });
+    assert.ok(created.ok, JSON.stringify(!created.ok && created.failure));
+    const id = created.data.id;
+    assert.ok((await ops.issueDocumentOperation.execute(session, { id, version: versionOf(await fresh(id)) })).ok);
+    assert.ok((await ops.acceptOfferOperation.execute(session, { id, version: versionOf(await fresh(id)) })).ok);
+    await env.db.customer.update({ where: { id: customerId }, data: { processingRestrictedAt: new Date() } });
+    assert.equal(failureOf(await ops.createConfirmationOperation.execute(session, { id })).key, "billing.errors.restricted");
+    assert.equal(failureOf(await ops.orderFromOfferOperation.execute(session, { id, version: versionOf(await fresh(id)) })).key, "billing.errors.restricted");
+    assert.equal(await env.db.order.count(), 0);
+    assert.equal(await env.db.invoice.count({ where: { docType: "confirmation" } }), 0);
+    // Fahrzeug eines eingeschränkten Kunden: nicht neu verknüpfbar
+    const again = await ops.saveDraftOperation.execute(session, { docType: "invoice", vehicleId: vehicle.id, partyName: "Barkunde", items: items() });
+    assert.equal(failureOf(again).fields?.vehicleId?.key, "billing.errors.restricted");
+  });
+});
+
+describe("Fix-Runde 12d: Zahlungen bei ausgeschalteter Funktion", () => {
+  it("ist die Rechnungserstellung aus, lässt sich der Zahlstatus ihrer Rechnungen über das Archiv erfassen; ist sie an, bleibt die Sperre", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session);
+    assert.ok((await ops.addPaymentOperation.execute(session, { id, amount: "19,00" })).ok);
+    // Funktion an: das Archiv sperrt (Zahlungen werden in der Rechnungserstellung erfasst)
+    assert.equal(failureOf(await invoiceOps.markInvoicePaidOperation.execute(session, { id })).key, "invoices.errors.billingPayments");
+    // Funktion aus (Daten bleiben)
+    await env.db.featureSetting.update({ where: { key: "office.billing" }, data: { enabled: false } });
+    try {
+      const off = await sessionFor(FINALIZE);
+      assert.ok(!off.features.has("office.billing"));
+      const paid = await invoiceOps.markInvoicePaidOperation.execute(off, { id });
+      assert.ok(paid.ok, JSON.stringify(!paid.ok && paid.failure));
+      const row = await fresh(id);
+      assert.deepEqual([row.status, row.paidCents], ["paid", 11900]);
+      const payments = await env.db.invoicePayment.findMany({ where: { invoiceId: id }, orderBy: { createdAt: "asc" } });
+      assert.deepEqual(payments.map((p) => p.amountCents), [1900, 10000], "der Rest ist als Zahlung gebucht, Summe = Zahlstand");
+      assert.ok((await invoiceOps.reopenInvoiceOperation.execute(off, { id })).ok);
+      assert.equal((await fresh(id)).status, "open");
+      // die Belegfelder bleiben gesperrt
+      const edit = await invoiceOps.saveInvoiceOperation.execute(off, { id, version: versionOf(await fresh(id)), direction: "outgoing", number: "X-1", partyName: "X", issueDate: todayInput(), gross: "1,00", status: "open", removeFile: false });
+      assert.equal(failureOf(edit).key, "invoices.errors.billingDoc");
+    } finally {
+      await env.db.featureSetting.update({ where: { key: "office.billing" }, data: { enabled: true } });
+    }
+  });
+
+  it("Entwürfe haben im Archiv keinen Zahlstatus (nicht gefunden)", async () => {
+    const session = await sessionFor(FINALIZE);
+    const dr = await draft(session);
+    assert.equal(failureOf(await invoiceOps.markInvoicePaidOperation.execute(session, { id: dr })).code, "notFound");
+    assert.equal(failureOf(await invoiceOps.reopenInvoiceOperation.execute(session, { id: dr })).code, "notFound");
+  });
+});
+
+describe("Fix-Runde 12d: versendete Anhänge", () => {
+  let fake: FakeSmtp | null = null;
+  let settings: typeof import("@/server/mail/settings");
+  let hostPolicy: typeof import("@/lib/offsite/host-policy");
+  before(async () => {
+    settings = await import("@/server/mail/settings");
+    hostPolicy = await import("@/lib/offsite/host-policy");
+  });
+  beforeEach(async () => {
+    await env.db.appSetting.deleteMany({ where: { key: { startsWith: "mail." } } });
+    fake = await startFakeSmtp();
+    hostPolicy.allowLoopbackForTests();
+    await settings.saveMailSettings({ ...settings.DEFAULT_MAIL_SETTINGS, enabled: true, host: fake.host, port: fake.port, security: "none", allowPrivate: true, plainConfirmed: true, fromAddress: "werkstatt@example.org", fromName: "Autohaus Müller" }, env.db);
+  });
+  const SEND = [...FINALIZE, "billing.send", "mail.send"];
+  const exists = async (rel: string) => (await import("node:fs")).existsSync(`${env.dir}/files/${rel}`);
+
+  it("der Versand merkt die Anhänge am Beleg; Angebote räumt der Aufräumlauf nach 30 Tagen weg, Rechnungen behalten ihre Kopie bis zur Anonymisierung", async () => {
+    try {
+      const { purgeSentFiles } = await import("./sent-files");
+      const { hooks } = await import("./hooks");
+      const session = await sessionFor(SEND);
+      const invoice = await finalized(session);
+      const offer = await ops.saveDraftOperation.execute(session, { docType: "offer", customerId, items: items() });
+      assert.ok(offer.ok);
+      assert.ok((await ops.issueDocumentOperation.execute(session, { id: offer.data.id, version: versionOf(await fresh(offer.data.id)) })).ok);
+      assert.ok((await ops.sendDocumentOperation.execute(session, { id: invoice })).ok);
+      assert.ok((await ops.sendDocumentOperation.execute(session, { id: offer.data.id })).ok);
+      const invoiceFile = await env.db.invoiceSentFile.findFirstOrThrow({ where: { invoiceId: invoice } });
+      const offerFile = await env.db.invoiceSentFile.findFirstOrThrow({ where: { invoiceId: offer.data.id } });
+      assert.equal(invoiceFile.purgeAfter, null);
+      assert.ok(offerFile.purgeAfter && offerFile.purgeAfter.getTime() > Date.now() + 29 * 86_400_000);
+      assert.ok((await exists(invoiceFile.path)) && (await exists(offerFile.path)));
+
+      // vor der Frist passiert nichts, danach verschwindet nur die Angebotskopie
+      assert.equal(await purgeSentFiles(new Date()), 0);
+      assert.equal(await purgeSentFiles(new Date(Date.now() + 31 * 86_400_000)), 1);
+      assert.ok(!(await exists(offerFile.path)));
+      assert.ok(await exists(invoiceFile.path), "die Kopie der Rechnung bleibt");
+      assert.equal(await env.db.invoiceSentFile.count({ where: { invoiceId: offer.data.id } }), 0);
+      assert.equal(await purgeSentFiles(new Date(Date.now() + 31 * 86_400_000)), 0, "wiederholbar");
+
+      // Anonymisierung: die Kopie der Rechnung wird fällig und verschwindet mit dem nächsten Lauf
+      await env.db.$transaction(async (tx) => {
+        for (const hook of hooks) await hook.run({ tx, input: { id: customerId } } as never);
+      });
+      assert.equal(await purgeSentFiles(new Date(Date.now() + 1000)), 1);
+      assert.ok(!(await exists(invoiceFile.path)));
+    } finally {
+      await fake?.close();
+      fake = null;
+    }
+  });
+
+  it("ein stornierter Beleg wird nicht mehr versendet (die Stornorechnung schon); der Versand geht an die Adresse des Belegs", async () => {
+    try {
+      const session = await sessionFor(SEND);
+      const id = await finalized(session);
+      // Kunde bekommt später eine andere Adresse: der Beleg nennt weiter die alte, der Versand geht an die des Belegs
+      await env.db.customer.update({ where: { id: customerId }, data: { email: "neu@kunde.example" } });
+      assert.ok((await ops.sendDocumentOperation.execute(session, { id })).ok);
+      assert.equal((await env.db.mailMessage.findFirstOrThrow()).toAddresses, "max@kunde.example");
+      const cancelled = await invoiceOps.cancelInvoiceOperation.execute(session, { id, version: versionOf(await fresh(id)) });
+      assert.ok(cancelled.ok);
+      assert.equal(failureOf(await ops.sendDocumentOperation.execute(session, { id, resend: true })).key, "billing.errors.cancelledSend");
+      assert.ok((await ops.sendDocumentOperation.execute(session, { id: cancelled.data.counterId })).ok);
+    } finally {
+      await fake?.close();
+      fake = null;
+    }
   });
 });

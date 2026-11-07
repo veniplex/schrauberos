@@ -894,6 +894,7 @@ model Invoice {
   derivedDocs Invoice[]    @relation("InvoiceSource")
   items       InvoiceItem[]
   payments    InvoicePayment[]
+  sentFiles   InvoiceSentFile[]
   snapshot    InvoiceSnapshot?
   // Schlussrechnung: die angerechneten Abschlagsrechnungen; Abschlag: in welchen Schlussrechnungen vorgesehen
   deductions  InvoiceDeduction[] @relation("FinalDeductions")
@@ -944,6 +945,21 @@ model InvoicePayment {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
 
   @@index([invoiceId, paidAt])
+}
+
+// Anhänge (PDF, XRechnung), die der Versand eines Belegs per E-Mail im Dateispeicher abgelegt hat (`rechnungen/versand/…`). `purgeAfter`: ab diesem Zeitpunkt löst der Aufräumlauf die Datei vom Datenträger
+// (Angebote und Auftragsbestätigungen nach 30 Tagen; bei Rechnungen null: sie bleiben als Kopie „wie versendet“ bis zur Anonymisierung des Kunden, die `purgeAfter` auf „jetzt“ setzt).
+model InvoiceSentFile {
+  id         String    @id @default(cuid())
+  invoiceId  String
+  path       String
+  createdAt  DateTime  @default(now())
+  purgeAfter DateTime?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@index([purgeAfter])
 }
 
 // Unveränderlicher Schnappschuss von Absender (Werkstattprofil) und Empfänger (Kunde) zum Zeitpunkt des Festschreibens bzw. Ausstellens: ändert sich später das Profil oder der Kunde, ändert sich der Beleg nicht.

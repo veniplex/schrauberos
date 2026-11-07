@@ -6,7 +6,8 @@ import type { OperationHookDef } from "@/server/operations/hooks";
  *  - bei ausgestellten und festgeschriebenen Belegen entfallen die **E-Mail-Adresse** des Empfängers (Beleg und Schnappschuss) und die Käuferreferenz-unabhängigen Kontaktdaten, die der Beleg nicht braucht;
  *    **Name und Anschrift bleiben** (Pflichtangabe der Rechnung, Aufbewahrungsfrist – die Anonymisierung ist ohnehin erst nach Ablauf der Fristen freigegeben, `anonymizeBlock`),
  *  - das **Sendeprotokoll** (E-Mails zu Belegen des Kunden): Empfängeradresse, Betreff und Fehlercodes-freie Angaben werden unkenntlich gemacht, Inhalt und Anhänge entfallen; Zeitpunkt und Status bleiben.
- * Die Anhänge der versendeten Mails liegen als Dateien im Dateispeicher (Rechnungs-PDF); sie lassen sich nicht in der Transaktion zurückholen und bleiben liegen (die Auskunft nennt sie).
+ * Die Anhänge der versendeten Mails (PDF, XRechnung) liegen als Dateien im Dateispeicher; eine Datei lässt sich nicht in der Transaktion löschen. Der Hook setzt sie deshalb auf „jetzt fällig“
+ *    (`InvoiceSentFile.purgeAfter`), der Aufräumlauf `billing.sentFiles` löst sie vom Datenträger (Backups behalten ihre Hardlinks bis zur eigenen Aufbewahrung).
  */
 export const hooks: OperationHookDef[] = [
   {
@@ -22,6 +23,7 @@ export const hooks: OperationHookDef[] = [
       if (ids.length === 0) return;
       await tx.invoice.updateMany({ where: { id: { in: ids } }, data: { buyerEmail: null } });
       await tx.invoiceSnapshot.updateMany({ where: { invoiceId: { in: ids } }, data: { rEmail: null } });
+      await tx.invoiceSentFile.updateMany({ where: { invoiceId: { in: ids } }, data: { purgeAfter: new Date() } });
       await tx.mailMessage.updateMany({
         where: { purpose: "billing", entityId: { in: ids } },
         data: { toAddresses: "(anonymisiert)", deliveredTo: null, subject: "(anonymisiert)", body: null, attachments: null },

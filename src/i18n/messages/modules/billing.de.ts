@@ -177,6 +177,7 @@ export const billingDe = {
     validUntilPast: "Die Gültigkeit des Angebots liegt in der Vergangenheit",
     deductionTooHigh: "Die angerechneten Abschläge übersteigen die Rechnungssumme",
     exemptChanged: "Die Kleinunternehmer-Einstellung hat sich geändert – den Entwurf neu speichern",
+    amount: "Der Gesamtbetrag muss größer als 0 € sein – eine Rechnung über 0 € oder einen negativen Betrag gibt es nicht",
   },
   xrechnung: {
     hint: "Die XRechnung (UBL-XML) wird auf Wunsch erzeugt, vor allem für Behörden und Geschäftskunden. Für Privatkunden ist sie nicht nötig.",
@@ -205,6 +206,7 @@ export const billingDe = {
       taxNote: "Hinweis zur Steuerbefreiung",
       tooLarge: "Die Summe ist zu groß",
       prepaid: "Angerechnete Abschläge",
+      paymentTerms: "Fälligkeit oder Zahlungsbedingungen",
     },
   },
   paymentsCard: {
@@ -310,6 +312,7 @@ export const billingDe = {
     overpaid: "Der Betrag ist höher als der offene Betrag.",
     paymentDate: "Das Zahlungsdatum liegt vor dem Rechnungsdatum oder in der Zukunft.",
     alreadySent: "Dieser Beleg wurde schon versendet.",
+    cancelledSend: "Dieser Beleg ist storniert und wird nicht mehr versendet.",
     noEmail: "Der Kunde hat keine E-Mail-Adresse.",
     xrechnungIncomplete: "Für die XRechnung fehlen Angaben.",
     pdf: "Das PDF konnte nicht erzeugt werden (zu viele Positionen oder zu viel Text).",

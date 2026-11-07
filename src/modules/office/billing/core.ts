@@ -89,6 +89,16 @@ export async function findLinkableCustomer(tx: Tx, customerId: string, current: 
   return { ...customer, displayName: customerDisplayName(customer) };
 }
 
+/**
+ * Neue Verknüpfungen mit einem Kunden (Auftragsbestätigung, Auftrag aus Angebot) gibt es nicht für Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) und anonymisierte Kunden. Ohne Kunden (`null`)
+ * ist nichts zu prüfen. Die Prüfung läuft in der Transaktion der Operation.
+ */
+export async function assertCustomerUsable(tx: Tx, customerId: string | null): Promise<void> {
+  if (!customerId) return;
+  const customer = await tx.customer.findUnique({ where: { id: customerId }, select: { processingRestrictedAt: true, anonymizedAt: true } });
+  if (!customer || customer.processingRestrictedAt || customer.anonymizedAt) fail("invalid", "billing.errors.restricted");
+}
+
 /** Schnappschuss von Absender (Profil) und Empfänger (Beleg) als Spalten der Tabelle `InvoiceSnapshot` (ohne Kennung). */
 export function snapshotColumns(
   workshop: Workshop,
@@ -141,5 +151,6 @@ export function checkInputOf(
     taxRates: [...new Set(rows.map((row) => row.taxBp))],
     taxNote: doc.taxNote,
     exceedsLimit: totals.exceedsLimit,
+    grossCents: totals.grossCents,
   };
 }

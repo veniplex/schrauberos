@@ -1,5 +1,6 @@
 import { dayKey, startOfDay } from "@/lib/zone";
 import { safeName } from "@/lib/filename";
+import type { Prisma } from "@/generated/prisma/client";
 
 export const INVOICE_DIRECTIONS = ["incoming", "outgoing"] as const;
 export type InvoiceDirection = (typeof INVOICE_DIRECTIONS)[number];
@@ -69,14 +70,29 @@ export function finalizeBlock(inv: LockFields & { status: string }): FinalizeBlo
   return null;
 }
 
-export type CancelBlock = "incoming" | "notFinalized" | "counterDocument" | "already" | "deducted";
 /**
- * Warum sich die Rechnung nicht per Gegenbeleg stornieren lässt (null = möglich): nur festgeschriebene Ausgangsrechnungen, nur einmal, nie ein Gegenbeleg selbst – und kein Abschlag,
+ * Die **Ausgangsliste**: Buchungsbelege (Rechnung, Abschlag, Schlussrechnung, Gegenbeleg) – ohne Angebote und Auftragsbestätigungen (keine Buchungsbelege) und ohne **Entwürfe** der Rechnungserstellung
+ * (noch ohne Nummer, nicht festgeschrieben). Von Hand erfasste Rechnungen (`source = "manual"`) gehören immer dazu. Jede Liste, Summe, Suche, jeder Export und die API stützen sich auf diese Bedingung;
+ * auch die Operationen, die einen Beleg per Kennung laden (Storno), laden über sie.
+ */
+export const ledgerWhere = {
+  docType: { in: ["invoice", "partial", "final", "credit"] },
+  NOT: { source: "billing", finalizedAt: null },
+} as const satisfies Prisma.InvoiceWhereInput;
+
+/** Belegarten, die sich per Gegenbeleg stornieren lassen: Rechnung, Abschlag, Schlussrechnung (der Gegenbeleg selbst nicht, Angebote und Auftragsbestätigungen nie). */
+export const CANCELLABLE_DOC_TYPES = ["invoice", "partial", "final"] as const;
+
+export type CancelBlock = "incoming" | "notInvoice" | "notFinalized" | "counterDocument" | "already" | "deducted";
+/**
+ * Warum sich der Beleg nicht per Gegenbeleg stornieren lässt (null = möglich): nur festgeschriebene Ausgangsrechnungen (Rechnung, Abschlag, Schlussrechnung), nur einmal, nie ein Gegenbeleg selbst – und kein Abschlag,
  * den eine festgeschriebene Schlussrechnung anrechnet (erst die Schlussrechnung stornieren).
  */
-export function cancelBlock(inv: LockFields & { hasCounterDocument: boolean; deductedInFinal?: boolean }): CancelBlock | null {
+export function cancelBlock(inv: LockFields & { docType: string; hasCounterDocument: boolean; deductedInFinal?: boolean }): CancelBlock | null {
   if (inv.direction !== "outgoing") return "incoming";
   if (isCounterDocument(inv)) return "counterDocument";
+  // Angebote und Auftragsbestätigungen sind keine Rechnungen: ein Gegenbeleg würde eine Rechnungsnummer verbrauchen und eine Stornorechnung ohne Rechnung in die Ausgangsliste stellen
+  if (!(CANCELLABLE_DOC_TYPES as readonly string[]).includes(inv.docType)) return "notInvoice";
   if (!isFinalized(inv)) return "notFinalized";
   if (inv.hasCounterDocument) return "already";
   if (inv.deductedInFinal) return "deducted";

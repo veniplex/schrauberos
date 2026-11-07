@@ -179,6 +179,7 @@ export const billingEn: typeof billingDe = {
     validUntilPast: "The validity of the quote is in the past",
     deductionTooHigh: "The credited partial invoices exceed the invoice total",
     exemptChanged: "The small-business setting has changed – save the draft again",
+    amount: "The total must be greater than 0 EUR - there are no invoices for 0 EUR or a negative amount",
   },
   xrechnung: {
     hint: "The XRechnung (UBL XML) is generated on request, mainly for public bodies and business customers. Private customers do not need it.",
@@ -207,6 +208,7 @@ export const billingEn: typeof billingDe = {
       taxNote: "Note on tax exemption",
       tooLarge: "The total is too large",
       prepaid: "Credited partial invoices",
+      paymentTerms: "Due date or payment terms",
     },
   },
   paymentsCard: {
@@ -312,6 +314,7 @@ export const billingEn: typeof billingDe = {
     overpaid: "The amount is higher than the open amount.",
     paymentDate: "The payment date is before the invoice date or in the future.",
     alreadySent: "This document has already been sent.",
+    cancelledSend: "This document is cancelled and is no longer sent.",
     noEmail: "The customer has no e-mail address.",
     xrechnungIncomplete: "Details are missing for the XRechnung.",
     pdf: "The PDF could not be created (too many items or too much text).",

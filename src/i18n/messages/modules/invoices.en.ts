@@ -103,6 +103,8 @@ export const invoicesEn: typeof invoicesDe = {
     finalizeBilling: "Documents from invoicing are finalized there (number and snapshot).",
     numberRequired: "Please enter the number of the cancellation invoice.",
     cancelBeforeIssue: "The date of the cancellation document is before the invoice date.",
+    cancelFuture: "The date of the cancellation document must not be in the future.",
+    cancelNotInvoice: "Only invoices can be cancelled with a cancellation document - not quotes, order confirmations or cancellation documents.",
   },
   finalize: {
     title: "Finalize",
@@ -120,6 +122,7 @@ export const invoicesEn: typeof invoicesDe = {
     numberAuto: "Invoicing assigns the number in sequence.",
     issueDate: "Date of the cancellation document",
     issueDateHint: "Empty = today.",
+    issueDateToday: "The date of the cancellation document is today.",
     reason: "Reason",
     action: "Create cancellation document",
     confirm: "Create a cancellation document for invoice {original}? Both are then treated as cancelled and no longer count in the open amounts. This cannot be undone.",

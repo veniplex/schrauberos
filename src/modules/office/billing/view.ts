@@ -180,6 +180,7 @@ export function draftProblems(view: DocView, row: Pick<Invoice, "exempt" | "dedu
     taxRates: [...new Set(view.items.map((item) => item.taxBp))],
     taxNote: view.taxNote,
     exceedsLimit: view.totals.exceedsLimit,
+    grossCents: view.totals.grossCents,
   });
   if (view.docType === "offer" && view.validUntil && view.validUntil < today) problems.push("validUntilPast");
   if (row.exempt !== view.exempt) problems.push("exemptChanged");

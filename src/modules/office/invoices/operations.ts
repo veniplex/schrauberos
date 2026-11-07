@@ -6,7 +6,7 @@ import { truncateName } from "@/lib/file-delivery";
 import { checkUpload } from "@/lib/upload-sniff";
 import { searchKey } from "@/lib/search-key";
 import { dateText, moneyCents } from "@/lib/zod-fields";
-import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, cancelBlock, counterAmounts, finalizeBlock, invoiceFileLocation, isCounterDocument, isFinalized, outgoingKeyOf } from "@/modules/office/invoices/domain";
+import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES, amountsConsistent, cancelBlock, counterAmounts, finalizeBlock, invoiceFileLocation, isCounterDocument, isFinalized, ledgerWhere, outgoingKeyOf } from "@/modules/office/invoices/domain";
 import { dayKey } from "@/lib/zone";
 import { defineOperation, fail, failField, mapPrismaError, type Tx } from "@/server/operations";
 import { storeFile } from "@/server/files";
@@ -154,14 +154,20 @@ const idInput = z.object({ id: z.string().min(1) });
 
 /**
  * Der Zahlstatus bleibt auch bei festgeschriebenen Rechnungen änderbar (mit Audit) – nicht aber bei einem stornierten Paar: Original und Gegenbeleg gelten als erledigt und werden nicht mehr als
- * offen oder bezahlt geführt.
+ * offen oder bezahlt geführt. Geladen wird über die Ausgangsliste: ein Angebot, eine Auftragsbestätigung oder ein Entwurf ist „nicht gefunden“.
+ *
+ * Belege der Rechnungserstellung (`source = "billing"`) erfasst diese mit Teilzahlungen, **solange ihre Funktion aktiv ist**. Ist sie ausgeschaltet (die Daten bleiben), bleibt der Zahlstatus hier
+ * erfassbar – sonst würden offene Posten unbegrenzt überfällig, ohne dass jemand sie schließen kann. Gesperrt sind dort nur die Felder des Belegs (Inhalt, Nummer, Schnappschuss), nie die Zahlung.
  */
-async function assertPaymentEditable(tx: Tx, id: string): Promise<void> {
-  const invoice = await tx.invoice.findUnique({ where: { id }, select: { cancelsInvoiceId: true, source: true, cancelledBy: { select: { id: true } } } });
+async function loadPayable(tx: Tx, principal: { features: ReadonlySet<string> }, id: string) {
+  const invoice = await tx.invoice.findFirst({
+    where: { id, ...ledgerWhere },
+    select: { number: true, cancelsInvoiceId: true, source: true, grossCents: true, deductedCents: true, paidCents: true, cancelledBy: { select: { id: true } } },
+  });
   if (!invoice) fail("notFound");
   if (isCounterDocument(invoice) || invoice.cancelledBy) fail("inUse", "invoices.errors.cancelledLocked");
-  // Zahlungen zu Belegen der Rechnungserstellung sind Zahlungseingänge (Teilzahlungen): dort erfasst
-  if (invoice.source === "billing") fail("inUse", "invoices.errors.billingPayments");
+  if (invoice.source === "billing" && principal.features.has("office.billing")) fail("inUse", "invoices.errors.billingPayments");
+  return invoice;
 }
 
 /** Schnellaktion: als bezahlt markieren (Datum optional, Standard heute). */
@@ -170,9 +176,20 @@ export const markInvoicePaidOperation = defineOperation({
   permission: "invoices.edit",
   input: idInput.extend({ paidAt: dateText().optional() }),
   audit: "invoice.pay",
-  run: async ({ input, tx, audit }) => {
-    await assertPaymentEditable(tx, input.id);
-    const invoice = await tx.invoice.update({ where: { id: input.id }, data: { status: "paid", paidAt: input.paidAt ? noon(input.paidAt) : new Date() }, select: { number: true } });
+  run: async ({ input, principal, tx, audit }) => {
+    const invoice = await loadPayable(tx, principal, input.id);
+    const day = input.paidAt ?? todayInput();
+    // Beleg der Rechnungserstellung bei ausgeschalteter Funktion: der Rest wird als Zahlung gebucht, damit Zahlungen und Zahlstand zusammenpassen, wenn die Funktion wieder aktiv wird
+    let paidCents = invoice.paidCents;
+    if (invoice.source === "billing") {
+      const payable = invoice.grossCents - invoice.deductedCents;
+      const rest = Math.max(0, payable - invoice.paidCents);
+      if (rest > 0) {
+        await tx.invoicePayment.create({ data: { invoiceId: input.id, paidAt: noon(day), amountCents: rest, method: "other", note: "Als bezahlt markiert", recordedByName: principal.user.name.slice(0, 120) } });
+        paidCents = payable;
+      }
+    }
+    await tx.invoice.update({ where: { id: input.id }, data: { status: "paid", paidAt: input.paidAt ? noon(input.paidAt) : new Date(), paidCents } });
     audit({ target: invoice.number, entityId: input.id });
     return { id: input.id };
   },
@@ -183,9 +200,9 @@ export const reopenInvoiceOperation = defineOperation({
   permission: "invoices.edit",
   input: idInput,
   audit: "invoice.reopen",
-  run: async ({ input, tx, audit }) => {
-    await assertPaymentEditable(tx, input.id);
-    const invoice = await tx.invoice.update({ where: { id: input.id }, data: { status: "open", paidAt: null }, select: { number: true } });
+  run: async ({ input, principal, tx, audit }) => {
+    const invoice = await loadPayable(tx, principal, input.id);
+    await tx.invoice.update({ where: { id: input.id }, data: { status: "open", paidAt: null } });
     audit({ target: invoice.number, entityId: input.id });
     return { id: input.id };
   },
@@ -237,6 +254,7 @@ export const finalizeInvoiceOperation = defineOperation({
 
 const cancelErrors = {
   incoming: "invoices.errors.cancelIncoming",
+  notInvoice: "invoices.errors.cancelNotInvoice",
   notFinalized: "invoices.errors.cancelNotFinalized",
   counterDocument: "invoices.errors.cancelCounterDocument",
   already: "invoices.errors.cancelAlready",
@@ -264,22 +282,29 @@ export const cancelInvoiceOperation = defineOperation({
   }),
   audit: "invoice.cancel",
   run: async ({ input, principal, tx, audit, emit }) => {
-    const original = await tx.invoice.findUnique({ where: { id: input.id }, include: { items: { orderBy: { position: "asc" } }, snapshot: true, cancelledBy: { select: { id: true } } } });
+    // Nur Belege der Ausgangsliste: ein Angebot, eine Auftragsbestätigung oder ein Entwurf der Rechnungserstellung ist „nicht gefunden“ – ihre Kennung öffnet keinen Weg zu einer Rechnungsnummer
+    const original = await tx.invoice.findFirst({ where: { id: input.id, ...ledgerWhere }, include: { items: { orderBy: { position: "asc" } }, snapshot: true, cancelledBy: { select: { id: true } } } });
     if (!original) fail("notFound");
     const deductedInFinal = (await tx.invoiceDeduction.count({ where: { partialId: original.id, finalKey: { not: null } } })) > 0;
     const block = cancelBlock({ ...original, hasCounterDocument: original.cancelledBy !== null, deductedInFinal });
     if (block) fail("inUse", cancelErrors[block]);
 
     const billing = original.source === "billing";
-    const issueDate = input.issueDate ?? todayInput();
+    // Ein Zeitpunkt für Datum, Nummernkreis (Jahr/Monat) und Festschreibezeitpunkt – kein Auseinanderfallen um Mitternacht
+    const now = new Date();
+    const today = todayInput(now);
+    // Belege der Rechnungserstellung: Datum der Stornorechnung = heute (wie beim Festschreiben; eine eingegebene Eingabe wird ignoriert). Von Hand erfasste Rechnungen (Archiv): frei wählbar, aber nie vor dem
+    // Rechnungsdatum des Originals und nie in der Zukunft.
+    const issueDate = billing ? today : (input.issueDate ?? today);
     if (issueDate < dayKey(original.issueDate)) failField("issueDate", "invoices.errors.cancelBeforeIssue");
+    if (issueDate > today) failField("issueDate", "invoices.errors.cancelFuture");
     if (!(await claimRow(tx.invoice, original.id, input.version))) fail("conflict");
 
     let number: string;
     let key: string | null;
     if (billing) {
       const workshop = await tx.workshop.findUnique({ where: { id: "default" }, select: { invoiceNumberFormat: true } });
-      ({ number, key } = await allocateDocumentNumber(tx, "credit", workshop?.invoiceNumberFormat, new Date()));
+      ({ number, key } = await allocateDocumentNumber(tx, "credit", workshop?.invoiceNumberFormat, now));
     } else {
       if (!input.number) failField("number", "invoices.errors.numberRequired");
       number = input.number;
@@ -327,7 +352,7 @@ export const cancelInvoiceOperation = defineOperation({
           category: original.category,
           reference: original.reference,
           notes: input.reason || null,
-          finalizedAt: new Date(),
+          finalizedAt: now,
           finalizedByName: who,
           cancelsInvoiceId: original.id,
           docType: "credit",

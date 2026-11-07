@@ -3,7 +3,7 @@ import { startOfDay, wallOf } from "@/lib/zone";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { contains, keyContains } from "@/server/search";
-import type { InvoiceTotals } from "./domain";
+import { ledgerWhere, type InvoiceTotals } from "./domain";
 
 /**
  * Suchbedingungen für Rechnungen (Liste, Schnellsuche, API): der Geschäftspartner über die normalisierte Spalte `partyKey` (Umlaute, Groß-/Kleinschreibung, Trenner), Nummer, Referenz
@@ -13,14 +13,7 @@ export function invoiceTextWhere(term: string, options: { category?: boolean } =
   return [{ number: contains(term) }, keyContains("partyKey", term), { reference: contains(term) }, ...(options.category === false ? [] : [{ category: contains(term) }])];
 }
 
-/**
- * Die **Ausgangsliste**: Buchungsbelege (Rechnung, Abschlag, Schlussrechnung, Gegenbeleg) – ohne Angebote und Auftragsbestätigungen (keine Buchungsbelege) und ohne **Entwürfe** der Rechnungserstellung
- * (noch ohne Nummer, nicht festgeschrieben). Von Hand erfasste Rechnungen (`source = "manual"`) gehören immer dazu. Jede Liste, Summe, Suche, jeder Export und die API stützen sich auf diese Bedingung.
- */
-export const ledgerWhere = {
-  docType: { in: ["invoice", "partial", "final", "credit"] },
-  NOT: { source: "billing", finalizedAt: null },
-} as const satisfies Prisma.InvoiceWhereInput;
+export { ledgerWhere };
 
 /**
  * Summen über alle Rechnungen, die `where` trifft – von der Datenbank gerechnet (`aggregate`), nicht über eine geladene Seite: Die Kacheln über der Liste

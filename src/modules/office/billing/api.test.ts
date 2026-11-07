@@ -34,6 +34,7 @@ beforeEach(async () => {
   state.resetApiLimiters();
   await env.db.apiIdempotencyKey.deleteMany();
   await env.db.invoiceDeduction.deleteMany();
+  await env.db.invoiceSentFile.deleteMany();
   await env.db.invoicePayment.deleteMany();
   await env.db.invoice.deleteMany({ where: { cancelsInvoiceId: { not: null } } });
   await env.db.invoice.deleteMany({ where: { sourceDocId: { not: null } } });

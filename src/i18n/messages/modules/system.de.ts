@@ -69,6 +69,7 @@ export const systemDe = {
     audit: { retention: "Audit-Log aufräumen (Aufbewahrung)" },
     mail: { prune: "Sendeprotokoll aufräumen (Aufbewahrung)" },
     files: { purge: "Entfernte Dateien endgültig löschen" },
+    billing: { sentFiles: "Versendete Belegkopien aufräumen" },
     platform: {
       outbox: "Ereignisse zustellen",
       "outbox-prune": "Zugestellte Ereignisse aufräumen",

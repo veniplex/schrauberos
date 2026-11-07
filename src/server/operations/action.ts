@@ -96,7 +96,13 @@ export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOp
 
     if (!outcome.ok) {
       if (formMode) {
-        await setFlash({ tone: "error", key: outcome.failure.key ?? (outcome.failure.fields ? "validation.invalid" : DEFAULT_KEYS[outcome.failure.code]), params: outcome.failure.params });
+        // Formulare ohne Formularzustand zeigen nur diese eine Meldung: bei Feldfehlern die des ersten Feldes (konkret: „Der Betrag ist höher als der offene Betrag“), nicht nur „Ungültiger Wert.“
+        const firstField = outcome.failure.key ? undefined : Object.values(outcome.failure.fields ?? {})[0];
+        await setFlash(
+          firstField
+            ? { tone: "error", key: firstField.key, params: firstField.params }
+            : { tone: "error", key: outcome.failure.key ?? (outcome.failure.fields ? "validation.invalid" : DEFAULT_KEYS[outcome.failure.code]), params: outcome.failure.params },
+        );
         const target = typeof options.redirectOnError === "function" ? options.redirectOnError(formData) : options.redirectOnError;
         if (target) redirect(target);
         return;

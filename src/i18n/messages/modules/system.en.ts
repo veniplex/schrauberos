@@ -71,6 +71,7 @@ export const systemEn: typeof systemDe = {
     audit: { retention: "Clean up audit log (retention)" },
     mail: { prune: "Clean up send log (retention)" },
     files: { purge: "Permanently delete removed files" },
+    billing: { sentFiles: "Clean up sent document copies" },
     platform: {
       outbox: "Deliver events (outbox)",
       "outbox-prune": "Clean up delivered events",
