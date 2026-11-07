@@ -181,6 +181,11 @@ h1, h2, h3, h4 {
   textarea.input {
     @apply min-h-20 resize-y;
   }
+  /* Mehrzeiliges Geheimnis (privater Schlüssel): Zeichen wie bei einem Passwortfeld verdeckt (-webkit-text-security: Chromium, Safari, aktuelle Firefox-Versionen) */
+  .input-masked {
+    -webkit-text-security: disc;
+    font-family: var(--ff-mono);
+  }
 
   /* Badges / Chips */
   .badge {

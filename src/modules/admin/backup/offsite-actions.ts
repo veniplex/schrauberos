@@ -8,6 +8,7 @@ import { HOST_KEY_FINGERPRINT, normalizeRemotePath, normalizeWebdavUrl, OFFSITE_
 import { RestoreError } from "@/server/backup/restore";
 import { fetchOffsiteBackup, testOffsite } from "@/server/backup/offsite/service";
 import { getOffsiteCredentials, getOffsiteSettings, saveOffsiteCredentials, saveOffsiteSettings, saveUploadedNames, type OffsiteCredentials } from "@/server/backup/offsite/settings";
+import { checkPrivateKey } from "@/server/backup/offsite/private-key";
 import { fetchSftpHostKey } from "@/server/backup/offsite/sftp";
 import { OffsiteError } from "@/server/backup/offsite/transport";
 import { jobRunner } from "@/server/jobs";
@@ -79,8 +80,13 @@ const saveOffsiteOperation = defineOperation({
       url = normalized.url;
     }
 
-    const privateKey = input.privateKey?.trim();
-    if (privateKey && !/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(privateKey)) failField("privateKey", "backup.offsite.errors.privateKey");
+    // Der private Schlüssel wird beim Speichern gelesen (ssh2), nicht erst beim ersten Verbindungsversuch; Zeilenumbrüche, die ein Eingabefeld verliert, werden wiederhergestellt
+    let privateKey: string | undefined;
+    if (input.protocol === "sftp" && input.privateKey?.trim()) {
+      const checked = await checkPrivateKey(input.privateKey, input.passphrase);
+      if (!checked.ok) failField("privateKey", `backup.offsite.errors.${checked.problem}` as MessageKey);
+      privateKey = checked.pem;
+    }
     const provided: OffsiteCredentials = {
       ...(input.password ? { password: input.password } : {}),
       ...(input.protocol === "sftp" && privateKey ? { privateKey, ...(input.passphrase ? { passphrase: input.passphrase } : {}) } : {}),

@@ -292,6 +292,45 @@ describe("Off-Site: Übertragen (WebDAV)", () => {
   });
 });
 
+describe("Off-Site: privater SSH-Schlüssel (ZP5-4)", () => {
+  const sftpForm = (extra: Record<string, string | number | boolean> = {}) =>
+    form({ enabled: false, protocol: "sftp", host: "127.0.0.1", port: sftp.port, path: "/srv/backups", username: "sicherung", hostKey: sftp.fingerprint, hostKeyConfirmed: true, keep: 14, ...extra });
+  const generate = async (passphrase?: string) => {
+    const ssh2 = (await import("ssh2")) as unknown as typeof import("ssh2") & { default?: typeof import("ssh2") };
+    return (ssh2.utils ? ssh2 : ssh2.default!).utils.generateKeyPairSync("ed25519", passphrase ? { passphrase, cipher: "aes256-ctr", rounds: 4 } : {});
+  };
+  const save = (extra: Record<string, string | number | boolean>) => actions.saveOffsite({}, sftpForm(extra)) as Promise<{ ok?: boolean; fieldErrors?: Record<string, string> }>;
+
+  it("ein mehrzeiliger Schlüssel wird gespeichert und bleibt benutzbar (Zeilen und Endmarke bleiben erhalten)", async () => {
+    const { private: pem } = await generate();
+    assert.ok((await save({ privateKey: pem })).ok);
+    const stored = (await offsiteSettings.getOffsiteCredentials())?.privateKey;
+    assert.equal(stored, `${pem.trim()}\n`);
+    assert.ok(!JSON.stringify(await env.db.auditLog.findMany()).includes("OPENSSH PRIVATE KEY"));
+  });
+
+  it("verliert ein Eingabefeld die Zeilenumbrüche, wird der Schlüssel wieder umbrochen und gelesen", async () => {
+    const { private: pem } = await generate();
+    assert.ok((await save({ privateKey: pem.replace(/\r?\n/g, " ") })).ok);
+    const stored = (await offsiteSettings.getOffsiteCredentials())?.privateKey ?? "";
+    assert.equal(stored.replace(/\s/g, ""), pem.replace(/\s/g, ""), "derselbe Schlüssel");
+    assert.ok(stored.split("\n").every((line) => line.length <= 70) && stored.endsWith("-----END OPENSSH PRIVATE KEY-----\n"));
+    // Windows-Zeilenenden
+    assert.ok((await save({ privateKey: pem.replace(/\n/g, "\r\n") })).ok);
+  });
+
+  it("verschlüsselte Schlüssel brauchen die richtige Passphrase; Müll und öffentliche Schlüssel werden abgewiesen, nichts wird gespeichert", async () => {
+    const encrypted = await generate("richtig-geheim");
+    assert.ok((await save({ privateKey: encrypted.private })).fieldErrors?.privateKey, "Passphrase fehlt");
+    assert.ok((await save({ privateKey: encrypted.private, passphrase: "falsch" })).fieldErrors?.privateKey, "Passphrase falsch");
+    assert.equal(await offsiteSettings.getOffsiteCredentials(), null);
+    assert.ok((await save({ privateKey: encrypted.private, passphrase: "richtig-geheim" })).ok);
+    assert.equal((await offsiteSettings.getOffsiteCredentials())?.passphrase, "richtig-geheim");
+    const bads = ["kein Schlüssel", (await generate()).public, "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----", "-----BEGIN RSA PRIVATE KEY----- Proc-Type: 4,ENCRYPTED -----END RSA PRIVATE KEY-----"];
+    for (const bad of bads) assert.ok((await save({ privateKey: bad })).fieldErrors?.privateKey, bad.slice(0, 40));
+  });
+});
+
 describe("Off-Site: Übertragen (SFTP)", () => {
   const sftpForm = (extra: Record<string, string | number | boolean> = {}) =>
     form({ enabled: true, protocol: "sftp", host: "127.0.0.1", port: sftp.port, path: "/srv/backups", username: "sicherung", password: "geheim", hostKey: sftp.fingerprint, hostKeyConfirmed: true, keep: 14, ...extra });

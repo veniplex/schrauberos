@@ -437,10 +437,10 @@ export function Select({ invalid, className, children, autoFocus, ref, ...props 
   );
 }
 
-export function Textarea({ invalid, className, autoFocus, ref, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & WithInvalid & { ref?: Ref<HTMLTextAreaElement> }) {
+export function Textarea({ invalid, masked, className, autoFocus, ref, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & WithInvalid & { ref?: Ref<HTMLTextAreaElement>; /** Inhalt wie ein Passwort verdeckt (mehrzeilige Geheimnisse, z. B. ein privater Schlüssel) */ masked?: boolean }) {
   const setRef = useDesktopAutoFocus(autoFocus, ref);
   const attributes = useFieldAttributes({ id: props.id, name: props.name, invalid, "aria-describedby": props["aria-describedby"], "aria-required": props["aria-required"] });
-  return <textarea {...props} {...attributes} ref={setRef} className={clsx("input", className)} />;
+  return <textarea {...props} {...attributes} ref={setRef} className={clsx("input", masked && "input-masked", className)} />;
 }
 
 /** Farbauswahl aus Vorschlägen plus freier Wahl. `name` ist das Formularfeld, `onChange` meldet jede Änderung. Gehört in ein `Field group` (Beschriftung und Beschreibung der Gruppe). */

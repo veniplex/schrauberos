@@ -8,7 +8,7 @@ import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Alert, Card } from "@/components/ui/layout";
 import { createManualBackup, restoreBackup, runAutoBackupNow } from "./actions";
-import { Checkbox, Field, FieldHint, FileInput, Form, FormMessage, Input, Select, type ActionState } from "@/components/ui/form";
+import { Checkbox, Field, FieldHint, FileInput, Form, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
 import { useI18n } from "@/i18n/client";
 import { RecoveryCodeView } from "@/platform/account/recovery-code-view";
 import { confirmRecoveryKeyAction, createRecoveryKey } from "./key-actions";
@@ -292,7 +292,7 @@ export function OffsiteForm({ initial, hasCredentials, keyReady, keepMax }: { in
           {protocol === "sftp" ? (
             <>
               <Field label={t("backup.offsite.privateKey")} htmlFor="privateKey" name="privateKey" hint={t("backup.offsite.privateKeyHint")}>
-                <Input id="privateKey" name="privateKey" type="password" maxLength={20000} autoComplete="off" spellCheck={false} />
+                <Textarea id="privateKey" name="privateKey" masked data-no-draft rows={4} maxLength={20000} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
               </Field>
               <Field label={t("backup.offsite.passphrase")} htmlFor="passphrase" name="passphrase">
                 <Input id="passphrase" name="passphrase" type="password" maxLength={1024} autoComplete="new-password" />
