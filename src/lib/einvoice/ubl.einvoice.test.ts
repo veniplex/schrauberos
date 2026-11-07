@@ -133,6 +133,58 @@ describe("Kleinunternehmer § 19 UStG", () => {
   });
 });
 
+describe("Verkäuferkennung (BR-CO-26)", () => {
+  const ids = (xml: string) => ({
+    vat: xml.includes("<cbc:CompanyID>DE123456789</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID>"),
+    fc: xml.includes("<cbc:CompanyID>12/345/67890</cbc:CompanyID><cac:TaxScheme><cbc:ID>FC</cbc:ID>"),
+    register: xml.includes("<cbc:CompanyID>HRB 12345</cbc:CompanyID></cac:PartyLegalEntity>"),
+    identification: xml.includes("<cac:PartyIdentification><cbc:ID>12/345/67890</cbc:ID></cac:PartyIdentification>"),
+  });
+  const withSeller = (extra: Partial<EinvoiceInput["seller"]>) => buildUblXml({ ...base, seller: { ...seller, ...extra } });
+
+  it("nur USt-IdNr.: BT-31", () => {
+    assert.deepEqual(ids(withSeller({ registerNumber: null })), { vat: true, fc: false, register: false, identification: false });
+  });
+  it("USt-IdNr. und Steuernummer: BT-31 und BT-32, keine zusätzliche Kennung", () => {
+    assert.deepEqual(ids(withSeller({ registerNumber: null, taxNumber: "12/345/67890" })), { vat: true, fc: true, register: false, identification: false });
+  });
+  it("nur Steuernummer (Kleinunternehmer ohne USt-IdNr. und Register): BT-32 und – für BR-CO-26 – als Kennung BT-29", () => {
+    const xml = withSeller({ vatId: null, registerNumber: null, taxNumber: "12/345/67890" });
+    assert.deepEqual(ids(xml), { vat: false, fc: true, register: false, identification: true });
+    // Reihenfolge im Party-Element: EndpointID, PartyIdentification, PartyName, PostalAddress, PartyTaxScheme, PartyLegalEntity, Contact
+    const order = ["<cbc:EndpointID", "<cac:PartyIdentification>", "<cac:PartyName>", "<cac:PostalAddress>", "<cac:PartyTaxScheme>", "<cac:PartyLegalEntity>", "<cac:Contact>"].map((tag) => xml.indexOf(tag));
+    assert.deepEqual([...order].sort((a, b) => a - b), order);
+    assert.ok(order.every((i) => i >= 0));
+  });
+  it("Steuernummer und Registernummer: BT-32 und BT-30 (BT-29 überflüssig)", () => {
+    assert.deepEqual(ids(withSeller({ vatId: null, taxNumber: "12/345/67890" })), { vat: false, fc: true, register: true, identification: false });
+  });
+  it("ohne jede Kennung keine XRechnung", () => {
+    assert.ok(einvoiceProblems({ ...base, seller: { ...seller, vatId: null, registerNumber: null } }).includes("sellerTaxId"));
+  });
+});
+
+describe("Zahlungsbedingung (BR-CO-25)", () => {
+  it("ein positiver Zahlbetrag braucht Fälligkeit oder Zahlungsbedingungen", () => {
+    assert.deepEqual(einvoiceProblems({ ...base, dueDate: null, paymentTerms: null }), ["paymentTerms"]);
+    assert.deepEqual(einvoiceProblems({ ...base, dueDate: "2026-03-24", paymentTerms: null }), []);
+    assert.deepEqual(einvoiceProblems({ ...base, dueDate: null, paymentTerms: "Zahlbar sofort." }), []);
+  });
+  it("Zahlbetrag 0 (voll angerechnet) braucht keine", () => {
+    const gross = computeTotals(base.lines).grossCents;
+    assert.deepEqual(einvoiceProblems({ ...base, dueDate: null, paymentTerms: null, prepaid: { cents: gross, refs: [] } }), []);
+  });
+  it("die Gutschrift trägt die Zahlungsbedingung als Text in cac:PaymentTerms, nie ein erfundenes Fälligkeitsdatum", () => {
+    const negated = base.lines.map((line) => ({ ...line, quantityMilli: -line.quantityMilli }));
+    const input: EinvoiceInput = { ...base, type: "credit", number: "2026-0002", dueDate: null, paymentTerms: "Gutschrift: kein Zahlungsziel.", lines: negated, creditOf: { number: "2026-0001", issueDate: "2026-03-10" } };
+    const xml = buildUblXml(input);
+    assert.ok(xml.includes("<cac:PaymentTerms><cbc:Note>Gutschrift: kein Zahlungsziel.</cbc:Note></cac:PaymentTerms>"));
+    assert.ok(!xml.includes("PaymentDueDate") && !xml.includes("<cbc:DueDate>"));
+    assert.ok(xml.indexOf("<cac:PaymentMeans>") < xml.indexOf("<cac:PaymentTerms>") && xml.indexOf("<cac:PaymentTerms>") < xml.indexOf("<cac:TaxTotal>"), "Reihenfolge PaymentMeans, PaymentTerms, TaxTotal");
+    assert.deepEqual(einvoiceProblems({ ...input, paymentTerms: null }), ["paymentTerms"]);
+  });
+});
+
 describe("Stornorechnung (Gutschrift)", () => {
   it("UBL-CreditNote mit positiven Beträgen, Bezug auf das Original; der Leser liest negative Beträge", () => {
     const negated = base.lines.map((line) => ({ ...line, quantityMilli: -line.quantityMilli }));
@@ -149,6 +201,15 @@ describe("Stornorechnung (Gutschrift)", () => {
     assert.equal(read.proposal.creditNote, true);
     assert.equal(read.proposal.grossCents, -original.grossCents);
     assert.equal(read.proposal.vatCents, -original.taxCents);
+  });
+});
+
+describe("Korrekturposition mit negativer Menge und Rabatt", () => {
+  it("der Rabatt wird zum Aufschlag mit positivem Betrag (EN 16931 kennt keine negativen Beträge)", () => {
+    const lines = [...base.lines, { description: "Rückgabe", unit: "Stk", quantityMilli: -1000, unitCents: 10000, taxBp: 1900, discountBp: 1000 }];
+    const xml = buildUblXml({ ...base, lines });
+    assert.ok(!/<cbc:Amount[^>]*>-/.test(xml));
+    assert.ok(xml.includes('<cbc:ChargeIndicator>true</cbc:ChargeIndicator><cbc:AllowanceChargeReason>Rabatt (Korrekturposition)</cbc:AllowanceChargeReason><cbc:Amount currencyID="EUR">10.00</cbc:Amount>'));
   });
 });
 

@@ -59,11 +59,36 @@ async function document(extra: Record<string, unknown>, lines: Array<Record<stri
   return created.data.id;
 }
 
+/**
+ * Die rechnerischen Regeln der EN 16931, die sich ohne Prüfer nachrechnen lassen (BR-CO-10, -13, -14, -15, -16; BR-CO-25): Summe der Zeilen = Nettosumme, Steuer = Summe der Steueraufschlüsselung,
+ * Brutto = Netto + Steuer, Zahlbetrag = Brutto − Vorauszahlung, positiver Zahlbetrag ⇒ Fälligkeit oder Zahlungsbedingungen. Der KoSIT-Prüfer der Pipeline bleibt maßgeblich.
+ */
+function assertArithmetic(name: string, xml: string) {
+  const cents = (text: string) => Math.round(Number(text) * 100);
+  const sum = (tag: string, scope = xml) => [...scope.matchAll(new RegExp(`<${tag}[^>]*>(-?[0-9.]+)</${tag}>`, "g"))].reduce((total, m) => total + cents(m[1]), 0);
+  const one = (tag: string, scope = xml) => {
+    const m = new RegExp(`<${tag}[^>]*>(-?[0-9.]+)</${tag}>`).exec(scope);
+    return m ? cents(m[1]) : 0;
+  };
+  const monetary = /<cac:LegalMonetaryTotal>[\s\S]*<\/cac:LegalMonetaryTotal>/.exec(xml)![0];
+  const taxTotal = /<cac:TaxTotal>[\s\S]*<\/cac:TaxTotal>/.exec(xml)![0];
+  const lineSum = [...xml.matchAll(/<cac:(?:Invoice|CreditNote)Line>[\s\S]*?<\/cac:(?:Invoice|CreditNote)Line>/g)].reduce((total, m) => total + one("cbc:LineExtensionAmount", m[0]), 0);
+  assert.equal(lineSum, one("cbc:LineExtensionAmount", monetary), `${name}: BR-CO-10`);
+  assert.equal(one("cbc:TaxExclusiveAmount", monetary), one("cbc:LineExtensionAmount", monetary), `${name}: BR-CO-13`);
+  assert.equal(one("cbc:TaxAmount", taxTotal), sum("cbc:TaxAmount", taxTotal.slice(taxTotal.indexOf("<cac:TaxSubtotal>"))), `${name}: BR-CO-14`);
+  assert.equal(one("cbc:TaxInclusiveAmount", monetary), one("cbc:TaxExclusiveAmount", monetary) + one("cbc:TaxAmount", taxTotal), `${name}: BR-CO-15`);
+  const payable = one("cbc:PayableAmount", monetary);
+  assert.equal(payable, one("cbc:TaxInclusiveAmount", monetary) - one("cbc:PrepaidAmount", monetary), `${name}: BR-CO-16`);
+  if (payable > 0) assert.ok(/<cbc:DueDate>|<cbc:PaymentDueDate>|<cac:PaymentTerms>/.test(xml), `${name}: BR-CO-25`);
+  assert.ok(/<cac:PartyIdentification>|<cbc:CompanyID>[^<]+<\/cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT|<cac:PartyLegalEntity><cbc:RegistrationName>[^<]*<\/cbc:RegistrationName><cbc:CompanyID>/.test(/<cac:AccountingSupplierParty>[\s\S]*<\/cac:AccountingSupplierParty>/.exec(xml)![0]), `${name}: BR-CO-26`);
+}
+
 async function check(name: string, id: string) {
   const { view } = (await queries.loadDocView(id))!;
   assert.deepEqual(docs.xrechnungProblems(view), [], `${name}: vollständig`);
   const xml = docs.buildDocumentXml(view);
   writeEinvoiceSample(`${name}.xml`, xml);
+  assertArithmetic(name, xml);
   const read = readEInvoice(new TextEncoder().encode(xml));
   assert.ok(read.ok, `${name}: lesbar`);
   if (!read.ok) throw new Error("unreachable");
@@ -90,9 +115,12 @@ describe("XRechnung aus Belegen der Rechnungserstellung", () => {
   });
 
   it("Kleinunternehmer § 19 UStG", async () => {
-    await env.db.workshop.update({ where: { id: "default" }, data: { smallBusiness: true, vatId: null } });
+    // ohne USt-IdNr. und ohne Handelsregister: nur die Steuernummer – sie steht als BT-32 und (BR-CO-26) als Kennung des Verkäufers BT-29
+    await env.db.workshop.update({ where: { id: "default" }, data: { smallBusiness: true, vatId: null, registerNumber: null, registerCourt: null } });
     const id = await document({}, [{ description: "Reifenwechsel", unitCents: 4900 }]);
     const { view, p, xml } = await check("billing-invoice-small-business", id);
+    assert.ok(xml.includes("<cac:PartyIdentification><cbc:ID>12/345/67890</cbc:ID></cac:PartyIdentification>"), "BT-29");
+    assert.ok(xml.includes("<cbc:CompanyID>12/345/67890</cbc:CompanyID><cac:TaxScheme><cbc:ID>FC</cbc:ID>"), "BT-32");
     assert.equal(p.vatCents, 0);
     assert.equal(p.grossCents, view.totals.netCents);
     assert.ok(xml.includes("Kleinunternehmer gemäß § 19 UStG"));
@@ -114,6 +142,9 @@ describe("XRechnung aus Belegen der Rechnungserstellung", () => {
     assert.ok(cancelled.ok, JSON.stringify(!cancelled.ok && cancelled.failure));
     const credit = await check("billing-credit-note", cancelled.data.counterId);
     assert.ok(credit.xml.includes("<CreditNote "));
+    // BR-CO-25: positiver Zahlbetrag ohne Fälligkeit braucht Zahlungsbedingungen
+    assert.ok(credit.xml.includes("<cac:PaymentTerms><cbc:Note>Stornorechnung (Gutschrift): kein Zahlungsziel"));
+    assert.ok(!credit.xml.includes("PaymentDueDate"));
     assert.equal(credit.p.creditNote, true);
     assert.equal(credit.p.grossCents, -final.view.totals.grossCents);
   });

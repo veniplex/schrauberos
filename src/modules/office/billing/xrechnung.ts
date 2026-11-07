@@ -10,6 +10,9 @@ import type { DocView } from "./view";
  */
 
 
+/** Zahlungsbedingung (BT-20) einer Stornorechnung. */
+export const CREDIT_TERMS = "Stornorechnung (Gutschrift): kein Zahlungsziel, der Betrag wird verrechnet bzw. erstattet.";
+
 const XML_TYPE: Record<string, EinvoiceInput["type"]> = { invoice: "invoice", final: "invoice", partial: "partial", credit: "credit" };
 
 /** Die Eingabe des XML-Schreibers aus dem Ansichtsmodell (nur Buchungsbelege). */
@@ -41,7 +44,8 @@ export function einvoiceInputOf(view: DocView): EinvoiceInput {
     taxNote: view.taxNote,
     lines: view.items.map((item) => ({ description: item.description, unit: item.unit, quantityMilli: item.quantityMilli, unitCents: item.unitCents, taxBp: item.taxBp, discountBp: item.discountBp })),
     payment: { method: (["transfer", "cash", "card", "other"] as const).find((m) => m === view.paymentMethod) ?? "transfer", iban: view.sender.iban, bic: view.sender.bic, accountHolder: view.sender.name, reference: paymentReference(view.docType, view.number) },
-    paymentTerms: credit || !view.dueDay ? null : `Zahlbar bis ${dateDe(view.dueDay)} ohne Abzug.`,
+    // BR-CO-25: Rechnungen tragen die Fälligkeit (BT-9) und den Text dazu; Stornorechnungen nur einen Text – es gibt keine Zahlungsaufforderung, also auch keine erfundene Fälligkeit
+    paymentTerms: credit ? CREDIT_TERMS : !view.dueDay ? null : `Zahlbar bis ${dateDe(view.dueDay)} ohne Abzug.`,
     prepaid: { cents: Math.abs(view.deductedCents), refs: credit ? [] : view.deductions.map((d) => ({ number: d.number, issueDate: d.issueDay })) },
     creditOf: view.cancels ? { number: view.cancels.number, issueDate: view.cancels.issueDay } : null,
   };

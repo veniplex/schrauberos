@@ -13,6 +13,13 @@ import { computeTotals, lineResult, type ParsedLine } from "@/lib/line-items";
  * **Vorzeichen:** Intern sind Gutschriften negativ (negative Mengen). In der UBL-Gutschrift stehen die Beträge positiv (Dokumenttyp 381 macht die Richtung); der Schreiber kehrt sie um. Ein negativer
  * Einzelpreis ist in EN 16931 verboten (BR-27): er wandert in die Menge.
  *
+ * **Verkäuferkennung (BR-CO-26, BR-S-02/BR-E-02):** USt-IdNr. → BT-31 (`PartyTaxScheme`/`VAT`), Steuernummer → BT-32 (`PartyTaxScheme`/`FC`, auch neben der USt-IdNr.), Registernummer → BT-30
+ * (`PartyLegalEntity/CompanyID`). Eine Steuernummer allein genügt BR-CO-26 nicht (verlangt BT-29, BT-30 und/oder BT-31): Hat der Verkäufer weder USt-IdNr. noch Registernummer (Kleinunternehmer),
+ * steht die Steuernummer zusätzlich als Kennung des Verkäufers (BT-29, `PartyIdentification/ID`).
+ *
+ * **Zahlungsbedingung (BR-CO-25):** Ist der Zahlbetrag positiv, braucht jede E-Rechnung Fälligkeit (BT-9) oder Zahlungsbedingungen (BT-20). Rechnungen tragen die Fälligkeit; Gutschriften
+ * (Stornorechnungen) einen Text als Zahlungsbedingung – ein erfundenes Fälligkeitsdatum wäre eine Zahlungsaufforderung, die es nicht gibt.
+ *
  * `einvoiceProblems` nennt vorab, was für eine gültige XRechnung fehlt (Pflichtangaben der Xrechnung: Käuferreferenz, Kontakt des Verkäufers, elektronische Adressen, Steuerkennzeichen …).
  */
 
@@ -151,6 +158,9 @@ export function einvoiceProblems(input: EinvoiceInput): string[] {
   const totals = computeTotals(input.lines, { exempt: input.smallBusiness });
   if (totals.exceedsLimit) out.push("tooLarge");
   if (input.prepaid.cents < 0 || input.prepaid.cents > Math.max(0, Math.abs(totals.grossCents))) out.push("prepaid");
+  // BR-CO-25: ein positiver Zahlbetrag braucht Fälligkeit oder Zahlungsbedingungen
+  const payable = Math.abs(totals.grossCents) - input.prepaid.cents;
+  if (payable > 0 && !input.dueDate && missing(input.paymentTerms)) out.push("paymentTerms");
   return out;
 }
 
@@ -178,13 +188,17 @@ function party(p: EinvoiceParty, side: "seller" | "buyer"): Tag {
   const taxSchemes: Tag[] = [];
   if (side === "seller") {
     if (p.vatId?.trim()) taxSchemes.push(el("cac:PartyTaxScheme", [el("cbc:CompanyID", oneLine(p.vatId)), el("cac:TaxScheme", [el("cbc:ID", "VAT")])]));
-    else if (p.taxNumber?.trim()) taxSchemes.push(el("cac:PartyTaxScheme", [el("cbc:CompanyID", oneLine(p.taxNumber)), el("cac:TaxScheme", [el("cbc:ID", "FC")])]));
+    if (p.taxNumber?.trim()) taxSchemes.push(el("cac:PartyTaxScheme", [el("cbc:CompanyID", oneLine(p.taxNumber)), el("cac:TaxScheme", [el("cbc:ID", "FC")])]));
   }
+  // BT-29: Ohne USt-IdNr. und ohne Registernummer wäre der Verkäufer nach BR-CO-26 nicht kenntlich – dann dient die Steuernummer als Kennung
+  const identification =
+    side === "seller" && !p.vatId?.trim() && !p.registerNumber?.trim() && p.taxNumber?.trim() ? [el("cac:PartyIdentification", [el("cbc:ID", oneLine(p.taxNumber))])] : [];
   const legal = [el("cbc:RegistrationName", oneLine(p.name)), ...(side === "seller" ? optional("cbc:CompanyID", p.registerNumber) : [])];
   const contact =
     side === "seller" ? [el("cac:Contact", [el("cbc:Name", oneLine(p.contactName || p.name)), ...optional("cbc:Telephone", p.phone), ...optional("cbc:ElectronicMail", p.email)])] : [];
   return el("cac:Party", [
     ...(p.email?.trim() ? [el("cbc:EndpointID", oneLine(p.email), { schemeID: "EM" })] : []),
+    ...identification,
     el("cac:PartyName", [el("cbc:Name", oneLine(p.name))]),
     el("cac:PostalAddress", [...optional("cbc:StreetName", p.street), ...optional("cbc:CityName", p.city), ...optional("cbc:PostalZone", p.zip), el("cac:Country", [el("cbc:IdentificationCode", "DE")])]),
     ...taxSchemes,
@@ -272,16 +286,12 @@ export function buildUblXml(input: EinvoiceInput): string {
       el("cbc:ID", String(index + 1)),
       el(quantityName, scaled(line.quantityMilli, 3), { unitCode: unitCode(line.unit) }),
       amount("cbc:LineExtensionAmount", result.netCents),
-      ...(result.discountCents !== 0
-        ? [
-            el("cac:AllowanceCharge", [
-              el("cbc:ChargeIndicator", "false"),
-              el("cbc:AllowanceChargeReasonCode", "95"),
-              el("cbc:AllowanceChargeReason", "Rabatt"),
-              amount("cbc:Amount", result.discountCents),
-            ]),
-          ]
-        : []),
+      // Rabatt als Nachlass; bei negativer Menge (Korrekturposition) ist der „Rabatt“ rechnerisch ein Aufschlag – Beträge sind in EN 16931 nie negativ
+      ...(result.discountCents > 0
+        ? [el("cac:AllowanceCharge", [el("cbc:ChargeIndicator", "false"), el("cbc:AllowanceChargeReasonCode", "95"), el("cbc:AllowanceChargeReason", "Rabatt"), amount("cbc:Amount", result.discountCents)])]
+        : result.discountCents < 0
+          ? [el("cac:AllowanceCharge", [el("cbc:ChargeIndicator", "true"), el("cbc:AllowanceChargeReason", "Rabatt (Korrekturposition)"), amount("cbc:Amount", 0 - result.discountCents)])]
+          : []),
       el("cac:Item", [
         el("cbc:Name", oneLine(line.description, 200) || "-"),
         el("cac:ClassifiedTaxCategory", [el("cbc:ID", cat), el("cbc:Percent", scaled(input.smallBusiness ? 0 : line.taxBp, 2)), el("cac:TaxScheme", [el("cbc:ID", "VAT")])]),
