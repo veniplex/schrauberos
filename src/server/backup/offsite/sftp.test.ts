@@ -80,6 +80,32 @@ describe("SFTP-Ziel (ssh2, reine JavaScript-Variante)", () => {
     }
   });
 
+  it("ZP5-10: besteht das Ziel schon, geht die gültige Datei nie verloren – scheitert das Einsetzen der neuen, kommt die alte zurück; es bleibt nichts Unfertiges liegen", async () => {
+    const t = await SftpTransport.connect(config());
+    const final = "/srv/backups/schrauberos-20260101T020000Z-auto.sobk";
+    try {
+      await t.put("schrauberos-20260101T020000Z-auto.sobk", Readable.from([Buffer.from("GUELTIG")]));
+      // das Einsetzen der neuen Datei scheitert (nachdem die alte beiseitegelegt wurde)
+      server.failRename = (from, to) => from.endsWith(".sobk.part") && to === final;
+      const error = await errorOf(t.put("schrauberos-20260101T020000Z-auto.sobk", Readable.from([Buffer.from("NEU")])));
+      assert.ok(error, "der Fehler wird gemeldet");
+      assert.equal(server.files.get(final)?.toString(), "GUELTIG", "die gültige Datei ist wieder an ihrem Platz");
+      assert.deepEqual([...server.files.keys()].filter((p) => p.startsWith("/srv/backups/")), [final], "weder .part noch .old.part bleiben liegen");
+      // ohne Störung wird ersetzt, die beiseitegelegte Datei verschwindet
+      server.failRename = null;
+      await t.put("schrauberos-20260101T020000Z-auto.sobk", Readable.from([Buffer.from("NEU")]));
+      assert.equal(server.files.get(final)?.toString(), "NEU");
+      assert.deepEqual([...server.files.keys()].filter((p) => p.startsWith("/srv/backups/")), [final]);
+      // ein anderer Fehler beim Umbenennen (Ziel besteht nicht) löscht nichts und wird gemeldet
+      server.failRename = (from) => from.endsWith(".sobk.part");
+      assert.ok(await errorOf(t.put("schrauberos-20260102T020000Z-auto.sobk", Readable.from([Buffer.from("X")]))));
+      assert.equal(server.files.get(final)?.toString(), "NEU");
+    } finally {
+      server.failRename = null;
+      await t.close();
+    }
+  });
+
   it("bricht bei abweichendem Hostschlüssel ab – ohne je Zugangsdaten zu senden", async () => {
     const before = server.authAttempts;
     const error = await errorOf(SftpTransport.connect(config({ hostKey: `SHA256:${"A".repeat(43)}` })));

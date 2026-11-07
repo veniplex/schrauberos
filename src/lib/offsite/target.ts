@@ -15,7 +15,7 @@ export const OFFSITE_KEEP_MAX = 365;
 /** Dateiname einer Sicherung am Ziel: eigener Präfix und eigene Endung – nur solche Dateien werden je gelöscht. */
 export const OFFSITE_NAME = /^schrauberos-\d{8}T\d{6}Z-(auto|manual|pre-update|pre-restore|pre-migration|upload)\.sobk$/;
 /** Unfertige Übertragung (wird nach dem Hochladen umbenannt) */
-export const OFFSITE_PART = /^schrauberos-\d{8}T\d{6}Z-(auto|manual|pre-update|pre-restore|pre-migration|upload)\.sobk\.part$/;
+export const OFFSITE_PART = /^schrauberos-\d{8}T\d{6}Z-(auto|manual|pre-update|pre-restore|pre-migration|upload)\.sobk(\.old)?\.part$/;
 
 export const offsiteFileName = (backupName: string): string => `${backupName}.sobk`;
 /** Name der lokalen Sicherung zu einer Datei am Ziel (`schrauberos-…-auto.sobk` → `schrauberos-…-auto`) */

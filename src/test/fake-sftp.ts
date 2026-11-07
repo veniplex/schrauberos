@@ -19,6 +19,8 @@ export type FakeSftp = {
   dirs: Set<string>;
   authAttempts: number;
   options: { user: string; password: string };
+  /** Test: lässt ein Umbenennen scheitern, wenn die Funktion `true` liefert (nach der Prüfung auf ein bestehendes Ziel) */
+  failRename: ((from: string, to: string) => boolean) | null;
   close(): Promise<void>;
 };
 
@@ -35,7 +37,7 @@ export async function startFakeSftp(): Promise<FakeSftp> {
 
   const files = new Map<string, Buffer>();
   const dirs = new Set<string>(["/"]);
-  const state = { authAttempts: 0, options: { user: "sicherung", password: "geheim" } };
+  const state: { authAttempts: number; options: { user: string; password: string }; failRename: ((from: string, to: string) => boolean) | null } = { authAttempts: 0, options: { user: "sicherung", password: "geheim" }, failRename: null };
   const clients = new Set<{ end(): void }>();
 
   const server = new Server({ hostKeys: [hostKey.private] }, (client) => {
@@ -133,6 +135,7 @@ export async function startFakeSftp(): Promise<FakeSftp> {
             const data = files.get(from);
             if (!data) return sftp.status(reqid, STATUS_CODE.NO_SUCH_FILE);
             if (files.has(to)) return sftp.status(reqid, STATUS_CODE.FAILURE); // wie OpenSSH (SFTP v3): das Ziel darf nicht bestehen
+            if (state.failRename?.(from, to)) return sftp.status(reqid, STATUS_CODE.FAILURE);
             files.delete(from);
             files.set(to, data);
             sftp.status(reqid, STATUS_CODE.OK);
@@ -154,6 +157,12 @@ export async function startFakeSftp(): Promise<FakeSftp> {
       return state.authAttempts;
     },
     options: state.options,
+    get failRename() {
+      return state.failRename;
+    },
+    set failRename(value) {
+      state.failRename = value;
+    },
     close: () =>
       new Promise<void>((resolve) => {
         for (const client of clients) client.end();

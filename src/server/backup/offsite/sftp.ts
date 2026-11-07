@@ -188,14 +188,31 @@ export class SftpTransport implements OffsiteTransport {
     }
   }
 
-  /** Umbenennen; das SFTP-Protokoll (Version 3) lehnt ab, wenn das Ziel besteht – dann zuerst löschen (Namen tragen einen Zeitstempel, das ist die Ausnahme). */
+  /**
+   * Umbenennen. Das SFTP-Protokoll (Version 3) lehnt ab, wenn das Ziel besteht (Namen tragen einen Zeitstempel, das ist die Ausnahme). Dann wird die bestehende Datei **nicht gelöscht**,
+   * sondern zuerst beiseitegelegt (`<Name>.old.part`), die neue eingesetzt und erst danach die alte entfernt; scheitert das Einsetzen, kommt die alte zurück – eine gültige Sicherung
+   * geht so nie verloren (ZP5-10). Besteht das Ziel gar nicht, ist der Fehler ein anderer und wird weitergereicht.
+   */
   private async rename(from: string, to: string): Promise<void> {
+    const rename = (a: string, b: string) => this.call<void>((done) => this.sftp.rename(a, b, (error) => done(error)));
+    const unlink = (file: string) => this.call<void>((done) => this.sftp.unlink(file, (error) => done(error)));
     try {
-      await this.call<void>((done) => this.sftp.rename(from, to, (error) => done(error)));
-    } catch {
-      await this.call<void>((done) => this.sftp.unlink(to, (error) => done(error))).catch(() => undefined);
-      await this.call<void>((done) => this.sftp.rename(from, to, (error) => done(error)));
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const exists = await this.call<boolean>((done) => this.sftp.stat(to, (e) => done(null, !e)));
+      if (!exists) throw error;
     }
+    const aside = `${to}.old.part`;
+    await unlink(aside).catch(() => undefined);
+    await rename(to, aside);
+    try {
+      await rename(from, to);
+    } catch (error) {
+      await rename(aside, to).catch(() => undefined); // die alte Datei zurück
+      throw error;
+    }
+    await unlink(aside).catch(() => undefined);
   }
 
   async get(name: string): Promise<Readable> {
