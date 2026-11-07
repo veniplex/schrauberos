@@ -17,7 +17,7 @@ import { resolve } from "node:path";
 import { pemToRawKey, rootKeyProblem } from "../src/lib/updates/keychain.ts";
 import { floorOf } from "../src/lib/updates/semver.ts";
 import { TEST_RELEASE, TEST_ROGUE, TEST_ROOT, TEST_OTHER_ROOT, TEST_SECOND } from "../src/lib/updates/testdata/anchor/test-keys.ts";
-import { argOf, readTrustAnchors, repoRoot } from "./lib/trust.mjs";
+import { argOf, readTrustAnchorsChecked, repoRoot } from "./lib/trust.mjs";
 
 const args = process.argv.slice(2);
 const fingerprint = (buffer) => createHash("sha256").update(buffer).digest("hex").slice(0, 16);
@@ -36,7 +36,7 @@ if (!/^[a-z0-9_]{1,16}$/.test(arch)) throw new Error(`Ungültige Architektur: ${
 const base = Number(readFileSync(resolve(repoRoot, "docker/BASE_VERSION"), "utf8").trim());
 if (!Number.isInteger(base) || base < 1) throw new Error("docker/BASE_VERSION muss eine ganze Zahl >= 1 enthalten.");
 
-const anchors = readTrustAnchors(argOf(args, "--release-key-file", false));
+const anchors = await readTrustAnchorsChecked(argOf(args, "--release-key-file", false));
 const problem = rootKeyProblem(anchors.releasePem, anchors.rootPem);
 if (problem && tagBuild) {
   throw new Error(

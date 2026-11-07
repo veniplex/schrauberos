@@ -52,8 +52,15 @@ else
   echo "Hinweis: Node >= 24 fehlt, die Dateiliste wird nicht gegen den Baum geprüft."
 fi
 echo "$listing" | awk '$6 ~ /^data\/?$/ && $2 == "1000/1000" {ok = 1} END {exit ok ? 0 : 1}' || fail "/data gehört nicht dem Betriebsbenutzer 1000"
+# Wer das Wurzelverzeichnis ("/") oder den Starter (/bootstrap) ändern könnte, könnte den Vertrauensanker austauschen: beide gehören root und sind für Gruppe und Andere nicht schreibbar.
+# (docker export nennt "/" nicht; docker cp "<Container>:/" liefert den Eintrag samt Besitzer und Modus.)
+anchor_entries="$(docker cp "$cid:/" - 2>/dev/null | tar --numeric-owner -tvf - 2>/dev/null | awk '$6 == "/" || $6 == "/bootstrap" {print}')"
+[ "$(echo "$anchor_entries" | grep -c .)" = "2" ] || fail "Der Eintrag für / oder /bootstrap fehlt im Image:"$'\n'"$anchor_entries"
+bad_anchor="$(echo "$anchor_entries" | awk '$2 != "0/0" || substr($1,6,1) == "w" || substr($1,9,1) == "w" || substr($1,4,1) ~ /[sS]/ || substr($1,7,1) ~ /[sS]/ || substr($1,10,1) ~ /[tT]/ {print}')"
+[ -z "$bad_anchor" ] || fail "/ oder /bootstrap gehört nicht root oder ist für Gruppe/Andere schreibbar:"$'\n'"$bad_anchor"
+echo "$anchor_entries" | awk '$6 == "/bootstrap" && substr($1,1,1) == "-" && substr($1,4,1) == "x" {ok = 1} END {exit ok ? 0 : 1}' || fail "/bootstrap ist keine ausführbare reguläre Datei"
 docker rm -f "$cid" >/dev/null && cid=""
-echo "ok: /app ist root:root und nicht schreibbar, SOS-TREE passt, /data gehört 1000:1000"
+echo "ok: /app ist root:root und nicht schreibbar, SOS-TREE passt, / und /bootstrap gehören root, /data gehört 1000:1000"
 
 check_running() {
   local name="$1"; shift

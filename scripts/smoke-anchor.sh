@@ -39,6 +39,7 @@ expected="$(node --no-warnings scripts/gen-trust-header.mjs --print-test-fingerp
 actual="$(docker run --rm --entrypoint /bootstrap "$image" --print-keys)" || fail "Das Image kennt /bootstrap --print-keys nicht."
 [ "$(echo "$actual" | awk '$1 == "root" {print $2}')" = "$(echo "$expected" | sed -n 1p)" ] || fail "Der Wurzelschlüssel im Image ist kein Testschlüssel – dieses Skript prüft nur Testschlüssel-Images (Ziel runner-test)."
 [ "$(echo "$actual" | awk '$1 == "release" {print $2}')" = "$(echo "$expected" | sed -n 2p)" ] || fail "Der Release-Schlüssel im Image ist kein Testschlüssel."
+[ "$(echo "$actual" | awk '$1 == "tag-build" {print $2}')" = "0" ] || fail "Ein Testschlüssel-Image darf kein Tag-Build sein."
 echo "ok"
 
 echo "== 1. Testpaket aus dem Image ableiten =="

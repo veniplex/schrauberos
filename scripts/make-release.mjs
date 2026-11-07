@@ -8,7 +8,7 @@ import { createHash, createPublicKey, sign, verify } from "node:crypto";
 import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { manifestSignedBytes, parseEndorsements, trustedReleaseKeys } from "../src/lib/updates/keychain.ts";
-import { assertOwnRootKey, endorsementsFile, readTrustAnchors } from "./lib/trust.mjs";
+import { assertOwnRootKey, endorsementsFile, readTrustAnchorsChecked } from "./lib/trust.mjs";
 
 const args = process.argv.slice(2);
 const arg = (name) => {
@@ -42,7 +42,7 @@ const signature = sign(null, signed, privateKey);
 
 // Kein stilles Zurückfallen: Ist ROOT_PUBLIC_KEY noch eine Zuweisung `= RELEASE_PUBLIC_KEY` (oder dasselbe PEM), schützt die Kette nicht –
 // wer das GitHub-Secret hat, könnte zugleich beglaubigen. Der Tag-Build bricht dann ab, bis ein eigener Offline-Wurzelschlüssel eingetragen ist.
-const anchors = readTrustAnchors();
+const anchors = await readTrustAnchorsChecked();
 assertOwnRootKey(anchors);
 const { releasePem: publicPem, rootPem } = anchors;
 const keysFile = endorsementsFile();

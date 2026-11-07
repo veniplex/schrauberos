@@ -2,22 +2,37 @@
 // src/modules/admin/updates/release-key.ts – die **einzige** Quelle der Schlüssel (App und Starter).
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { rootKeyProblem } from "../../src/lib/updates/keychain.ts";
 
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-const keyOf = (source, name) => new RegExp(`${name}\\s*=\\s*\`(-----BEGIN PUBLIC KEY-----[\\s\\S]*?-----END PUBLIC KEY-----\\n?)\``).exec(source)?.[1];
+// Nur am Zeilenanfang (`export const NAME = …`): ein Schlüssel in einem Kommentar oder in einer Beispielzeile darf nie gewinnen
+const keyOf = (source, name) => new RegExp(`^export const ${name}\\s*=\\s*\`(-----BEGIN PUBLIC KEY-----[\\s\\S]*?-----END PUBLIC KEY-----\\n?)\``, "m").exec(source)?.[1];
+const defaultKeyFile = () => process.env.RELEASE_KEY_FILE ?? resolve(repoRoot, "src/modules/admin/updates/release-key.ts");
 
 /**
  * Release- und Wurzelschlüssel (PEM) aus release-key.ts. `RELEASE_KEY_FILE`: nur für Tests (Pfad zu einer Kopie). `rootPem` ist `undefined`, solange
  * ROOT_PUBLIC_KEY noch die Zuweisung `= RELEASE_PUBLIC_KEY` ist.
  */
-export function readTrustAnchors(file = process.env.RELEASE_KEY_FILE ?? resolve(repoRoot, "src/modules/admin/updates/release-key.ts")) {
+export function readTrustAnchors(file = defaultKeyFile()) {
   const source = readFileSync(file, "utf8");
   const releasePem = keyOf(source, "RELEASE_PUBLIC_KEY");
   if (!releasePem) throw new Error("Öffentlicher Schlüssel in release-key.ts nicht gefunden.");
   return { releasePem, rootPem: keyOf(source, "ROOT_PUBLIC_KEY") };
+}
+
+/**
+ * Wie `readTrustAnchors`, aber die Werte werden zusätzlich gegen die **Auswertung** der TypeScript-Datei geprüft (so liest die App sie): Der Starter bekommt seine Schlüssel aus
+ * diesem Skript (Textmuster), die App wertet die Datei aus – weichen beide ab, brechen die Skripte ab, statt dass Starter und App verschiedenen Schlüsseln vertrauen.
+ */
+export async function readTrustAnchorsChecked(file = defaultKeyFile()) {
+  const anchors = readTrustAnchors(file);
+  const evaluated = await import(pathToFileURL(resolve(file)).href);
+  const normal = (pem) => String(pem ?? "").replace(/\r\n/g, "\n").trim();
+  if (normal(evaluated.RELEASE_PUBLIC_KEY) !== normal(anchors.releasePem)) throw new Error("RELEASE_PUBLIC_KEY in release-key.ts: Textmuster und Auswertung der Datei weichen ab – abgebrochen.");
+  if (normal(evaluated.ROOT_PUBLIC_KEY) !== normal(anchors.rootPem ?? anchors.releasePem)) throw new Error("ROOT_PUBLIC_KEY in release-key.ts: Textmuster und Auswertung der Datei weichen ab – abgebrochen.");
+  return anchors;
 }
 
 /** Datei mit den Beglaubigungen (`release-keys.json` im Repository; `RELEASE_KEYS_FILE` nur für Tests). */

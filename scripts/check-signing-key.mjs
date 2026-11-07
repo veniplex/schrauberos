@@ -4,11 +4,11 @@
 import { createHash, createPublicKey, randomBytes, sign, verify } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { parseEndorsements, pemToRawKey, trustedReleaseKeys } from "../src/lib/updates/keychain.ts";
-import { assertOwnRootKey, endorsementsFile, readTrustAnchors } from "./lib/trust.mjs";
+import { assertOwnRootKey, endorsementsFile, readTrustAnchorsChecked } from "./lib/trust.mjs";
 
 const privateKey = process.env.RELEASE_SIGNING_KEY;
 if (!privateKey) throw new Error("RELEASE_SIGNING_KEY ist nicht gesetzt.");
-const anchors = readTrustAnchors();
+const anchors = await readTrustAnchorsChecked();
 assertOwnRootKey(anchors);
 const file = endorsementsFile();
 const endorsements = existsSync(file) ? parseEndorsements(JSON.parse(readFileSync(file, "utf8"))) : [];

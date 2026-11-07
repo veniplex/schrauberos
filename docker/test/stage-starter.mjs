@@ -194,6 +194,7 @@ export async function starterStage(log) {
     check("marker-hindernis inconclusive: Marker trotz Hindernis", r.code === 0 && /builtin/.test(s.log()) && readMarker(ctx.dataDir, "inconclusive") === "0.3.0\nquiesce\n", `${r.code} ${s.log()} ${readMarker(ctx.dataDir, "inconclusive")}`);
   });
   await scenario("Marker nicht schreibbar: Logzeile, der Start läuft trotzdem", async (ctx) => {
+    if (process.getuid?.() === 0) return; // root ignoriert die Dateirechte: das Hindernis ließe sich trotzdem wegräumen
     const dir = await install(ctx, "0.3.0", "log installed\nexit 0\n");
     writeFileSync(join(dir, "extra.txt"), "x");
     activate(ctx.dataDir, "0.3.0");
@@ -502,7 +503,7 @@ export async function starterStage(log) {
     const header = readFileSync(join(headerDir(FLOOR), "trust-keys.h"), "utf8");
     const keyBytes = (name) => Buffer.from([...new RegExp(`${name}\\[32\\] = \\{([^}]*)\\}`).exec(header)[1].matchAll(/0x([0-9a-f]{2})/g)].map((m) => parseInt(m[1], 16)));
     const fp = (b) => createHash("sha256").update(b).digest("hex").slice(0, 16);
-    check("--print-keys: Fingerabdrücke = SHA-256 über die einkompilierten Schlüsselbytes", r.status === 0 && r.stdout === `root ${fp(keyBytes("SOS_ROOT_KEY"))}\nrelease ${fp(keyBytes("SOS_RELEASE_KEY"))}\n`, r.stdout);
+    check("--print-keys: Fingerabdrücke = SHA-256 über die einkompilierten Schlüsselbytes; Test-Binaries sind keine Tag-Builds", r.status === 0 && r.stdout === `root ${fp(keyBytes("SOS_ROOT_KEY"))}\nrelease ${fp(keyBytes("SOS_RELEASE_KEY"))}\ntag-build 0\n`, r.stdout);
   });
   await scenario("--verify bereinigt C1-, Bidi- und Zeilentrenner-Zeichen in Pfaden", async (ctx) => {
     const dir = await install(ctx, "0.3.0", "exit 0\n", { files: { "a.txt": "a" } });

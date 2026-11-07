@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createEndorsement, isCalendarDate, parseEndorsements, verifyEndorsement } from "../src/lib/updates/keychain.ts";
-import { argOf, readTrustAnchors, repoRoot } from "./lib/trust.mjs";
+import { argOf, readTrustAnchorsChecked, repoRoot } from "./lib/trust.mjs";
 
 const args = process.argv.slice(2);
 const keyFile = process.env.ROOT_SIGNING_KEY_FILE;
@@ -23,7 +23,7 @@ const limit = new Date();
 limit.setUTCFullYear(limit.getUTCFullYear() + 5);
 if (Date.parse(`${validUntil}T23:59:59Z`) > limit.getTime()) throw new Error("--valid-until liegt mehr als 5 Jahre in der Zukunft.");
 
-const { rootPem } = readTrustAnchors();
+const { rootPem } = await readTrustAnchorsChecked();
 if (!rootPem) throw new Error("ROOT_PUBLIC_KEY in release-key.ts ist kein eigener Schlüssel (noch gleich dem Release-Schlüssel): zuerst den Wurzelschlüssel eintragen.");
 
 const file = resolve(repoRoot, "release-keys.json");

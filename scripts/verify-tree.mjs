@@ -10,7 +10,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pemToRawKey } from "../src/lib/updates/keychain.ts";
 import { verifyVersion } from "../src/lib/updates/seal.ts";
 import { nodeFs, parseTree, TREE_FILE, treeStats, verifyTreeAgainstFs } from "../src/lib/updates/tree.ts";
-import { argOf, readTrustAnchors } from "./lib/trust.mjs";
+import { argOf, readTrustAnchorsChecked } from "./lib/trust.mjs";
 
 const args = process.argv.slice(2);
 if (!args[0]) throw new Error("Aufruf: node scripts/verify-tree.mjs <verzeichnis> [--seal DATEI --expect-version V ...]");
@@ -24,7 +24,7 @@ const print = (value, code) => {
 };
 
 if (sealFile) {
-  const anchors = readTrustAnchors();
+  const anchors = await readTrustAnchorsChecked();
   const base = nodeFs(dir);
   const external = nodeFs(dirname(resolve(sealFile)));
   const sealName = basename(sealFile);

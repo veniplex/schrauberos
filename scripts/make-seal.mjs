@@ -14,7 +14,7 @@ import { resolve } from "node:path";
 import { endOfDay, parseEndorsements, parseEndorsementStatement, pemToRawKey, samePublicKey, verifyEndorsement } from "../src/lib/updates/keychain.ts";
 import { createSeal, sealFieldsFor, verifySeal } from "../src/lib/updates/seal.ts";
 import { nodeFs, parseTree, TREE_FILE, verifyTreeAgainstFs } from "../src/lib/updates/tree.ts";
-import { argOf, assertOwnRootKey, endorsementsFile, readTrustAnchors } from "./lib/trust.mjs";
+import { argOf, assertOwnRootKey, endorsementsFile, readTrustAnchorsChecked } from "./lib/trust.mjs";
 
 const MIN_DAYS = 90;
 const WARN_DAYS = 180;
@@ -38,7 +38,7 @@ const failure = await verifyTreeAgainstFs(nodeFs(bundle), entries);
 if (failure) throw new Error(`Das Paket weicht von ${TREE_FILE} ab (${failure.reason}: ${failure.path}) – es wird nicht gesiegelt.`);
 
 // 2) Schlüssel
-const anchors = readTrustAnchors();
+const anchors = await readTrustAnchorsChecked();
 assertOwnRootKey(anchors);
 const signingPublic = createPublicKey(privateKey).export({ type: "spki", format: "pem" }).toString();
 let endorsement;

@@ -97,34 +97,47 @@ RUN test "${SOS_TAG_BUILD}" = "0" || { echo "Ein Testschlüssel-Image gibt es ni
  && node docker/test/gen-test-header.mjs --out /trust-keys.h
 
 # ───────── Übersetzer für den Starter (nur gcc und die statische libc, ohne npm ci) ─────────
+# Compiler und libc stammen aus einem festen Debian-Schnappschuss (dasselbe Datum, aus dem das Basisimage gebaut wurde – steht als Kommentar in dessen
+# /etc/apt/sources.list.d/debian.sources): Gleicher Quelltext + gleiche Schlüssel + gleiche Werkzeuge = gleiches Binary. Einen neueren Compiler gibt es nur mit einem
+# bewussten Commit (Datum erhöhen), nicht still über apt. Die statische glibc steckt im Starter – er ist das Einzige im Image, das sich nicht per Web-Update erneuern lässt.
 FROM base AS cc
-RUN apt-get update \
- && apt-get install -y --no-install-recommends gcc libc6-dev \
- && rm -rf /var/lib/apt/lists/*
+ARG DEBIAN_SNAPSHOT=20261104T212339Z
+RUN <<'EOF'
+set -eux
+cat > /etc/apt/sources.list.d/debian.sources <<SOURCES
+Types: deb
+URIs: http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}
+Suites: bookworm bookworm-updates
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}
+Suites: bookworm-security
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+SOURCES
+# Schnappschuss-Archive tragen ein Ablaufdatum, das lange vorbei ist
+apt-get -o Acquire::Check-Valid-Until=false update
+apt-get install -y --no-install-recommends gcc libc6-dev
+rm -rf /var/lib/apt/lists/*
+dpkg-query -W gcc libc6-dev binutils
+EOF
 
 # ───────── Der Starter: statisch gelinkt (static-pie), gehärtet, braucht nichts außer dem Kernel ─────────
-# Eigener Code mit -Werror und den strengen Warnungen der Produktion (-Wconversion -Wshadow -Wformat=2); die vendorte Bibliothek (docker/vendor/monocypher, Prüfsummen in
-# src/lib/updates/vendor-monocypher.test.ts) wird getrennt und ohne -Wconversion übersetzt. SOS_PRODUCTION verbietet die Test-Konstanten (README „Starter-Vertrauensanker“).
-FROM cc AS bootstrap-build
-COPY docker/bootstrap.c docker/verify.c docker/verify.h /src/
+# Beide Stufen übersetzen mit demselben Skript (docker/build-bootstrap.sh: Prüfsummen der vendorten Bibliothek, Produktionsflags, kein INTERP, Härtung); sie unterscheiden sich
+# nur im Header mit den Schlüsseln (bootstrap-test-build: Testschlüssel, nur für Tests, nie veröffentlicht).
+FROM cc AS bootstrap-src
+COPY docker/bootstrap.c docker/verify.c docker/verify.h docker/build-bootstrap.sh /src/
 COPY docker/vendor/monocypher /src/vendor/monocypher
-COPY --from=trust /trust-keys.h /src/trust-keys.h
-RUN set -eux; cd /src; \
-    harden="-O2 -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -D_FILE_OFFSET_BITS=64"; \
-    gcc $harden -Wall -Wextra -c -Ivendor/monocypher vendor/monocypher/monocypher.c vendor/monocypher/monocypher-ed25519.c; \
-    gcc $harden -Wall -Wextra -Wformat=2 -Wconversion -Wshadow -Werror -DSOS_PRODUCTION=1 -Ivendor/monocypher -I. -c bootstrap.c verify.c; \
-    gcc -static-pie -Wl,-z,relro,-z,now -s -o /bootstrap bootstrap.o verify.o monocypher.o monocypher-ed25519.o; \
-    readelf -dW /bootstrap | grep -q BIND_NOW; readelf -lW /bootstrap | grep -q GNU_RELRO
 
-FROM cc AS bootstrap-test-build
-COPY docker/bootstrap.c docker/verify.c docker/verify.h /src/
-COPY docker/vendor/monocypher /src/vendor/monocypher
+FROM bootstrap-src AS bootstrap-build
+COPY --from=trust /trust-keys.h /src/trust-keys.h
+RUN sh /src/build-bootstrap.sh
+
+FROM bootstrap-src AS bootstrap-test-build
 COPY --from=trust-test /trust-keys.h /src/trust-keys.h
-RUN set -eux; cd /src; \
-    harden="-O2 -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -D_FILE_OFFSET_BITS=64"; \
-    gcc $harden -Wall -Wextra -c -Ivendor/monocypher vendor/monocypher/monocypher.c vendor/monocypher/monocypher-ed25519.c; \
-    gcc $harden -Wall -Wextra -Wformat=2 -Wconversion -Wshadow -Werror -DSOS_PRODUCTION=1 -Ivendor/monocypher -I. -c bootstrap.c verify.c; \
-    gcc -static-pie -Wl,-z,relro,-z,now -s -o /bootstrap bootstrap.o verify.o monocypher.o monocypher-ed25519.o
+RUN sh /src/build-bootstrap.sh
 
 # ───────── Das Paket: Anwendung + Abhängigkeiten + Laufzeit + Launcher + Dateiliste ─────────
 FROM scratch AS bundle

@@ -8,18 +8,19 @@
  *   1. Wählt das App-Verzeichnis: den strengen Zeiger <DATA_DIR>/app/active (eine installierte Version) oder die eingebaute Version /app.
  *   2. Prüft eine installierte Version in einem Kindprozess (ein Speicherfehler im Prüfer darf den Start der eingebauten Version nie verhindern), nachdem alle Nachfahren
  *      des vorigen Laufs beendet sind (Ruhezustand: geprüft wird nur, wenn keine fremde Prozessgruppe der App mehr läuft).
- *   3. Startet den Launcher des gewählten Verzeichnisses mit der mitgelieferten Laufzeit:
- *        <dir>/runtime/<loader> --library-path <dir>/runtime/lib <dir>/runtime/node <dir>/launcher.mjs
+ *   3. Startet den Launcher des gewählten Verzeichnisses mit der mitgelieferten Laufzeit, im Arbeitsverzeichnis <dir> und mit relativen Pfaden:
+ *        ./runtime/<loader> --library-path ./runtime/lib ./runtime/node ./launcher.mjs
+ *      Bei einer installierten Version wechselt der Starter per fchdir in genau den Ordner, den der Prüfer durchlaufen hat (Deskriptor aus der Prüfung), nicht in den Pfad.
  *   4. Exit-Code des Launchers: 0 = sauber beendet, 42 = neu prüfen und auswählen (jeder Neustart der App geht über den Starter), sonst Absturz. Stürzt der Launcher einer
  *      installierten Version zweimal kurz nach dem Start ab, nimmt der Starter die eingebaute Version und hinterlässt <DATA_DIR>/app/launcher-crash.
  *
- * Prüfergebnisse: ok · negativ (Integritätsbefund 10–16, 18: Marker verify-failed) · veraltet (19: nur ein Logeintrag) · unklar (Signal, Zeitüberschreitung, Ein-/Ausgabe:
- * Marker inconclusive, kein Befund über den Inhalt). In allen Fällen außer ok läuft für diesen Durchlauf die eingebaute Version; der Starter selbst ist zustandslos (der Zeiger
+ * Prüfergebnisse: ok · negativ (Integritätsbefund 10–16, 18: Marker verify-failed) · veraltet (19: nur ein Logeintrag) · unklar (Signal, Zeitüberschreitung, Ein-/Ausgabe, Ruhezustand
+ * nicht herstellbar: Marker inconclusive, kein Befund über den Inhalt; nur Signal und Ein-/Ausgabe zählen im Launcher als Fehlversuch). In allen Fällen außer ok läuft für diesen Durchlauf die eingebaute Version; der Starter selbst ist zustandslos (der Zeiger
  * bleibt, die Vorversion-Logik liegt im Launcher der eingebauten Version).
  *
  * Kommandozeile:
  *   /bootstrap --healthcheck                 fragt http://127.0.0.1:$PORT/api/health ab (Exit 0 = gesund) – für Docker HEALTHCHECK
- *   /bootstrap --print-keys                  "root <16 Hex>" / "release <16 Hex>": Fingerabdrücke der einkompilierten Schlüssel (Echtprobe)
+ *   /bootstrap --print-keys                  "root <16 Hex>" / "release <16 Hex>" / "tag-build 0|1": Fingerabdrücke der einkompilierten Schlüssel, ob es ein Tag-Build ist (Echtprobe)
  *   /bootstrap --verify DIR [--expect-version V] [--no-floor] [--check-expiry JJJJ-MM-TT]
  *                                            prüft ein Versionsverzeichnis wie der Starter (Installer, Echtprobe); eine JSON-Zeile auf stdout, Exit-Code = Befund
  *
@@ -566,7 +567,7 @@ static int healthcheck(void) {
 /* ───────── Kommandozeilen-Modi ───────── */
 
 static int print_keys(void) {
-  printf("root %s\nrelease %s\n", SOS_ROOT_FINGERPRINT, SOS_RELEASE_FINGERPRINT);
+  printf("root %s\nrelease %s\ntag-build %d\n", SOS_ROOT_FINGERPRINT, SOS_RELEASE_FINGERPRINT, SOS_TAG_BUILD);
   return 0;
 }
 

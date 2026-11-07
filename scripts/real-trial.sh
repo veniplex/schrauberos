@@ -6,7 +6,7 @@
 #   bash scripts/real-trial.sh <image@sha256:…> <version> <paketverzeichnis> <SOS-SEAL>
 #
 # Die Probe verlangt vom Starter im Image die Schnittstelle aus README „Starter-Vertrauensanker“ (Teil 2 des Pakets P1b-6):
-#   /bootstrap --print-keys                        gibt "root <16 Hex>" und "release <16 Hex>" aus (Fingerabdrücke der einkompilierten Schlüssel)
+#   /bootstrap --print-keys                        gibt "root <16 Hex>", "release <16 Hex>" und "tag-build 0|1" aus (Fingerabdrücke der einkompilierten Schlüssel; ob das Image ein Tag-Build ist)
 #   /bootstrap --verify DIR --expect-version V [--no-floor] [--check-expiry JJJJ-MM-TT]
 #                                                  prüft Siegel, Dateiliste und Baum; Exit-Code 0 = ok, 10–19 siehe README. --no-floor: Die Untergrenze (eingebaute Version)
 #                                                  wird nur gemeldet, nicht erzwungen – das veröffentlichte Paket hat dieselbe Version wie das Image.
@@ -39,7 +39,11 @@ docker pull "$image" >/dev/null
 echo "== 1. Schlüssel im Image =="
 expected="$(node --no-warnings scripts/gen-trust-header.mjs --print-fingerprints 2>/dev/null)"
 actual="$(starter "$image" --print-keys)" || fail "Der Starter des Images kennt --print-keys nicht (der Prüfer gehört zum Paket P1b-6, Teil 2) – ohne ihn gibt es keine Echtprobe und kein Release."
-[ "$actual" = "$expected" ] || fail "Die Schlüssel im Image weichen vom Code ab."$'\n'"erwartet:"$'\n'"$expected"$'\n'"gefunden:"$'\n'"$actual"
+# Das veröffentlichte Image ist ein Tag-Build (der Wurzelgate des Dockerfiles ist durchlaufen): die Zeile "tag-build 1" gehört zur Aussage
+expected="$expected"$'\n'"tag-build 1"
+[ "$actual" = "$expected" ] || fail "Die Schlüssel im Image weichen vom Code ab (oder es ist kein Tag-Build)."$'\n'"erwartet:"$'\n'"$expected"$'\n'"gefunden:"$'\n'"$actual"
+# Der Wurzelschlüssel muss ein eigener sein – im Binary selbst nachgesehen, nicht nur im Quelltext (ein Image mit Wurzel = Release-Schlüssel schützt nicht vor dem Diebstahl des Secrets)
+[ "$(echo "$actual" | awk '$1 == "root" {print $2}')" != "$(echo "$actual" | awk '$1 == "release" {print $2}')" ] || fail "Wurzel- und Release-Schlüssel im Image sind derselbe Schlüssel."
 # Negativprobe: ein Testschlüssel darf nie Vertrauensanker eines veröffentlichten Images sein
 while read -r _ fingerprint; do
   echo "$actual" | grep -q " $fingerprint" && fail "Das Image enthält einen Testschlüssel ($fingerprint)."
