@@ -25,7 +25,6 @@ export const customersDe = {
   appointments: "Letzte Termine",
   noAppointments: "Noch keine Termine.",
   contact: "Kontakt",
-  externalNotice: "Dieser Datensatz stammt aus {source}. Lokale Änderungen können bei der nächsten Synchronisierung überschrieben werden.",
   fields: {
     firstName: "Vorname",
     lastName: "Nachname",

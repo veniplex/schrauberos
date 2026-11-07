@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Alert } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
@@ -24,7 +23,6 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
     <>
       <PageHeader breadcrumbs={[{ href: "/customers", label: t("nav.customers") }, { href: `/customers/${c.id}`, label: customerDisplayName(c) }]} help="workshop.customers" title={t("customers.edit")} />
       <div className="flex max-w-3xl flex-col gap-4">
-        {c.externalSource ? <Alert tone="warning">{t("customers.externalNotice", { source: c.externalSource === "werbas" ? "Werbas" : c.externalSource })}</Alert> : null}
         <CustomerForm
           cancelHref={`/customers/${c.id}`}
           initial={{

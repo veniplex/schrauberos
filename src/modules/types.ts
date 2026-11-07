@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { PrismaClient } from "@/generated/prisma/client";
 import type { MessageKey } from "@/i18n/translate";
 import type { AppSession } from "@/server/auth/session";
 import type { FeatureId, Permission } from "./catalog";
@@ -87,3 +88,20 @@ export type PageDef = {
 export function definePages(feature: FeatureId, pages: ReadonlyArray<Omit<PageDef, "feature">>): PageDef[] {
   return pages.map((page) => ({ ...page, feature }));
 }
+
+/**
+ * Start- und Beispieldaten einer Funktion (`seed.ts` der Funktion, eingesammelt in `src/modules/seed.ts`). Die Plattform (`src/server/seed`) kennt keine Funktion – sie führt die
+ * Beiträge nur der Reihe nach (`order`) aus.
+ *  - `base`: Grunddaten einer **frischen** Installation (Einstellungszeile, Standardwerte wie Arbeitsplätze); läuft bei jedem Start, aber nur bei leerer Datenbank.
+ *  - `demo`: Beispieldaten zum Ausprobieren (Einrichtung auf Wunsch, Entwicklung, Browser-CI). Jeder Beitrag prüft selbst, ob seine Tabelle schon Daten hat, und findet Daten
+ *    anderer Funktionen über natürliche Schlüssel (Kennzeichen, Nachname) statt über Ids – fehlen sie, entsteht der Datensatz ohne Verknüpfung oder gar nicht.
+ * Der Demo-Seed muss jede Seite der Routen-Inventur (`pages.ts`) abdecken (Test in `seed.test.ts`). Seeds importieren nichts mit `server-only` (das Seed-Skript lädt sie).
+ */
+export type SeedDef = {
+  id: string;
+  feature: FeatureId;
+  /** Reihenfolge der Ausführung (Kunden vor Fahrzeugen vor Reifen und Terminen …) */
+  order: number;
+  base?: (db: PrismaClient) => Promise<void>;
+  demo?: (db: PrismaClient) => Promise<void>;
+};

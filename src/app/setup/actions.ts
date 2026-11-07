@@ -74,7 +74,8 @@ export async function completeSetup(_prev: RecoveryActionState, formData: FormDa
   await jobRunner().reschedule().catch((error) => logError("setup:reschedule", error));
   removeSetupToken();
 
-  if (formData.get("demo") === "on" && (await db.customer.count()) === 0) await seedAllDemo(db);
+  // Beispieldaten: jeder Beitrag der Funktionen legt nur an, wenn seine Tabelle leer ist
+  if (formData.get("demo") === "on") await seedAllDemo(db);
   await audit("setup.complete", { actor: { id: null, name: d.name }, target: d.workshopName });
 
   // Angemeldet wird sofort; danach zeigt die Einrichtung den Wiederherstellungs-Code auf einer eigenen Seite mit Pflicht-Bestätigung

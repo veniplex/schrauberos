@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
-import { Badge, EmptyState, Plate } from "@/components/ui/layout";
+import { EmptyState, Plate } from "@/components/ui/layout";
 import { ExchangeMenu } from "@/components/exchange/exchange-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
@@ -95,13 +95,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             priority: "primary",
             sort: "name",
             cell: (c) => customerDisplayName(c),
-            sub: (c) =>
-              c.customerNumber || c.externalSource ? (
-                <span className="flex items-center gap-2">
-                  {c.customerNumber ? <span className="tabular">#{c.customerNumber}</span> : null}
-                  {c.externalSource ? <Badge tone="info">{c.externalSource === "werbas" ? "Werbas" : c.externalSource}</Badge> : null}
-                </span>
-              ) : null,
+            sub: (c) => (c.customerNumber ? <span className="tabular">#{c.customerNumber}</span> : null),
           },
           {
             id: "contact",

@@ -14,9 +14,9 @@ import { featureKey } from "@/modules/catalog-logic";
 
 const SRC = path.resolve(process.cwd(), "src");
 /** Kompositionswurzeln: dürfen die Beschreibungen und Beiträge aller Funktionen einsammeln. */
-const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts", "modules/pages.ts", "modules/operation-hooks.ts", "modules/api.ts", "modules/jobs.ts", "modules/secrets.ts", "modules/exchange.ts"]);
+const COMPOSITION_ROOTS = new Set(["modules/catalog.ts", "modules/registry.ts", "modules/help.ts", "modules/pages.ts", "modules/operation-hooks.ts", "modules/api.ts", "modules/jobs.ts", "modules/secrets.ts", "modules/exchange.ts", "modules/seed.ts"]);
 /** Dateien im Modul-Wurzelordner, die Plattform-Code importieren darf (Katalog, Aktivierung, Registry …). */
-const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "pages", "registry", "types", "default-roles", "operation-hooks", "api", "jobs", "secrets", "exchange"]);
+const MODULE_ROOT_FILES = new Set(["catalog", "catalog-logic", "define", "features", "help", "pages", "registry", "types", "default-roles", "operation-hooks", "api", "jobs", "secrets", "exchange", "seed"]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -29,8 +29,12 @@ function walk(dir: string): string[] {
 type Import = { spec: string; line: number };
 
 function importsOf(file: string): Import[] {
+  return importsOfText(readFileSync(file, "utf8"));
+}
+
+function importsOfText(source: string): Import[] {
   const result: Import[] = [];
-  readFileSync(file, "utf8")
+  source
     .split("\n")
     .forEach((text, i) => {
       for (const m of text.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)) result.push({ spec: m[1], line: i + 1 });
@@ -47,7 +51,7 @@ function resolve(file: string, spec: string): string | null {
 
 /** "modules/workshop/tires/queries" → { module: "workshop", feature: "tires", rest: "queries" } */
 function featureTarget(resolved: string) {
-  const m = /^modules\/([a-z]+)\/([a-z]+)(?:\/(.+))?$/.exec(resolved);
+  const m = /^modules\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)(?:\/(.+))?$/.exec(resolved);
   if (!m || MODULE_ROOT_FILES.has(m[1])) return null;
   // modules/<datei> (z. B. modules/catalog) sind keine Funktionen; module.ts liegt direkt im Modulordner
   if (!m[3] && !FEATURES.some((f) => f.module === m[1] && f.id === m[2])) return null;
@@ -58,7 +62,7 @@ const featureById = new Map(FEATURES.map((f) => [featureKey(f), f]));
 
 /** Wem gehört eine Datei? Funktionsordner unter modules, Seiten über ihre Route. */
 function ownerOf(rel: string): string | null {
-  const m = /^modules\/([a-z]+)\/([a-z]+)\//.exec(rel);
+  const m = /^modules\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\//.exec(rel);
   if (m && featureById.has(`${m[1]}.${m[2]}`)) return `${m[1]}.${m[2]}`;
   if (rel.startsWith("app/")) {
     const url = rel
@@ -179,7 +183,7 @@ describe("Job-Runner", () => {
     let found = 0;
     for (const file of files) {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
-      const m = /^modules\/([a-z]+)\/([a-z]+)\/jobs\.ts$/.exec(rel);
+      const m = /^modules\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\/jobs\.ts$/.exec(rel);
       if (!m) continue;
       found++;
       const source = readFileSync(file, "utf8");
@@ -199,7 +203,7 @@ describe("Job-Runner", () => {
     const missing: string[] = [];
     for (const file of files) {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
-      const m = /^modules\/([a-z]+)\/([a-z]+)\/jobs\.ts$/.exec(rel);
+      const m = /^modules\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\/jobs\.ts$/.exec(rel);
       if (m && !root.includes(`./${m[1]}/${m[2]}/jobs`)) missing.push(rel);
     }
     assert.deepEqual(missing, []);
@@ -213,7 +217,7 @@ describe("Geheimnis-Verbraucher", () => {
     let found = 0;
     for (const file of files) {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
-      const m = /^modules\/([a-z]+)\/([a-z]+)\/secrets\.ts$/.exec(rel);
+      const m = /^modules\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\/secrets\.ts$/.exec(rel);
       if (!m) continue;
       found++;
       if (!root.includes(`./${m[1]}/${m[2]}/secrets`)) missing.push(rel);
@@ -226,7 +230,7 @@ describe("Geheimnis-Verbraucher", () => {
     const missing: string[] = [];
     for (const file of files) {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
-      const m = /^modules\/([a-z]+)\/([a-z]+)\//.exec(rel);
+      const m = /^modules\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\//.exec(rel);
       if (!m || /\/secrets\.ts$/.test(rel) || !/\bsetSecret\(|\bsaveOffsiteCredentials\(/.test(readFileSync(file, "utf8"))) continue;
       if (!files.some((f) => path.relative(SRC, f).split(path.sep).join("/") === `modules/${m[1]}/${m[2]}/secrets.ts`)) missing.push(rel);
     }
@@ -354,5 +358,108 @@ describe("Seitentitel (generateMetadata)", () => {
       }
     }
     assert.deepEqual(unguarded, [], "generateMetadata liest die Datenbank ohne Rechteprüfung: sessionIfAllowed(\"<recht>\") vorschalten");
+  });
+});
+
+/**
+ * Modulautonomie (P1c-1): Die Zuordnung von Dateien zu Funktionen darf nicht an ungewöhnlichen IDs scheitern, und jede Route gehört einer Funktion oder der Plattform.
+ */
+describe("Modulautonomie", () => {
+  const relOf = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
+
+  it("Funktions-IDs sind tolerant gegenüber Ziffern und Bindestrichen (sonst entginge z. B. `time-tracking` der Importprüfung)", () => {
+    const target = featureTarget("modules/office/time-tracking/queries");
+    assert.deepEqual(target, { id: "office.time-tracking", rest: "queries" });
+    assert.equal(featureTarget("modules/office/time-tracking/public")?.rest, "public");
+    assert.equal(featureTarget("modules/catalog"), null);
+  });
+
+  it("jeder Ordner unter src/modules/<modul>/ ist eine Funktion des Katalogs (keine Funktion ohne Eintrag, die der Prüfung entgeht)", () => {
+    const modulesDir = path.join(SRC, "modules");
+    const unregistered: string[] = [];
+    for (const mod of readdirSync(modulesDir, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+      for (const dir of readdirSync(path.join(modulesDir, mod.name), { withFileTypes: true }).filter((d) => d.isDirectory())) {
+        const id = `${mod.name}.${dir.name}`;
+        if (!featureById.has(id)) unregistered.push(id);
+        assert.match(dir.name, /^[a-z][a-z0-9-]*$/, `${id}: Ordnername nicht als Funktions-ID erlaubt`);
+      }
+    }
+    assert.deepEqual(unregistered, [], "Ordner unter modules/<modul>/ ohne Eintrag in catalog.ts");
+  });
+
+  /** Plattform-Route Handler (keiner Funktion zugeordnet) – mit Begründung. Neue Route Handler gehören der Funktion (`routes` in der `feature.ts`), nicht hierher. */
+  const PLATFORM_API_ROUTES: Record<string, string> = {
+    "api/health": "Gesundheitsprüfung des Containers",
+    "api/search": "Schnellsuche: aggregiert die Anbieter der Funktionen (registry.ts)",
+    "api/setup": "Wiederherstellung bei der Einrichtung vor dem ersten Benutzer",
+    "api/exchange": "CSV-Austausch: ein Rahmen für alle Datenarten (server/csv), die Funktionen liefern Spalten und Rechte (modules/exchange.ts)",
+    "api/docs": "Bilder der Querschnittsfunktion Dokumentation (capabilities/docs)",
+    "api/v1": "Programmierschnittstelle: ein Rahmen für alle Ressourcen (server/api), die Funktionen liefern `api.ts` (modules/api.ts)",
+  };
+  const routeFiles = walk(path.join(SRC, "app")).filter((f) => /\/route\.ts$/.test(f.split(path.sep).join("/")));
+  const urlOf = (file: string) =>
+    relOf(file)
+      .replace(/^app\//, "")
+      .replace(/\/route\.ts$/, "")
+      .split("/")
+      .filter((seg) => !/^\(.+\)$/.test(seg))
+      .join("/");
+
+  it("jeder Route Handler unter app/api gehört einer Funktion (routes in der feature.ts) oder steht mit Begründung in PLATFORM_API_ROUTES", () => {
+    const unowned: string[] = [];
+    for (const file of routeFiles) {
+      const url = urlOf(file);
+      if (!url.startsWith("api/")) continue;
+      const platform = Object.keys(PLATFORM_API_ROUTES).some((p) => url === p || url.startsWith(`${p}/`));
+      if (!platform && !ownerOf(relOf(file))) unowned.push(url);
+    }
+    assert.deepEqual(unowned, [], "Route Handler ohne Funktion: `routes` der feature.ts ergänzen (z. B. \"api/<name>\") oder begründet in PLATFORM_API_ROUTES");
+    for (const [prefix, reason] of Object.entries(PLATFORM_API_ROUTES)) {
+      assert.ok(reason.length > 10, `${prefix}: Begründung fehlt`);
+      assert.ok(routeFiles.some((f) => urlOf(f) === prefix || urlOf(f).startsWith(`${prefix}/`)), `${prefix}: kein Route Handler mehr – Eintrag streichen`);
+      assert.ok(!FEATURES.some((f) => f.routes.some((r) => r === prefix || r.startsWith(`${prefix}/`))), `${prefix}: gehört einer Funktion – aus PLATFORM_API_ROUTES streichen`);
+    }
+  });
+
+  it("keine verwaiste Route: jeder Eintrag `routes` einer Funktion hat eine Seite oder einen Route Handler", () => {
+    const urls = walk(path.join(SRC, "app"))
+      .filter((f) => /\/(page\.tsx|route\.ts)$/.test(f.split(path.sep).join("/")))
+      .map((f) => relOf(f).replace(/^app\//, "").replace(/\/(page\.tsx|route\.ts)$/, "").split("/").filter((seg) => !/^\(.+\)$/.test(seg)).join("/"));
+    const orphans: string[] = [];
+    for (const f of FEATURES) {
+      for (const route of f.routes) if (!urls.some((u) => u === route || u.startsWith(`${route}/`))) orphans.push(`${featureKey(f)}: ${route}`);
+    }
+    assert.deepEqual(orphans, []);
+  });
+
+  it("das Seed-Skript (prisma/seed.ts) erreicht kein `server-only` – es läuft außerhalb von Next.js (Hilfsmittel: server/db-client.ts)", () => {
+    const seen = new Set<string>();
+    const offenders: string[] = [];
+    const visit = (file: string) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const text = readFileSync(file, "utf8");
+      if (/["']server-only["']/.test(text)) offenders.push(path.relative(path.resolve(SRC, ".."), file).split(path.sep).join("/"));
+      // Nur Laufzeit-Importe: `import type` wird beim Übersetzen entfernt
+      const runtime = text
+        .split("\n")
+        .filter((line) => !/^\s*(?:import|export)\s+type\b/.test(line))
+        .join("\n");
+      for (const imp of importsOfText(runtime)) {
+        const target = imp.spec.startsWith("@/") ? path.join(SRC, imp.spec.slice(2)) : imp.spec.startsWith(".") ? path.resolve(path.dirname(file), imp.spec) : null;
+        if (!target) continue;
+        const resolved = [".ts", ".tsx", "/index.ts", "/index.tsx"].map((ext) => target + ext).find((candidate) => {
+          try {
+            return statSync(candidate).isFile();
+          } catch {
+            return false;
+          }
+        });
+        if (resolved) visit(resolved);
+      }
+    };
+    visit(path.resolve(SRC, "..", "prisma", "seed.ts"));
+    assert.ok(seen.size > 20, `nur ${seen.size} Dateien erreicht – Auflösung der Importe prüfen`);
+    assert.deepEqual(offenders, []);
   });
 });

@@ -26,7 +26,6 @@ export const customersEn: typeof customersDe = {
   appointments: "Recent appointments",
   noAppointments: "No appointments yet.",
   contact: "Contact",
-  externalNotice: "This record comes from {source}. Local changes may be overwritten by the next synchronisation.",
   fields: {
     firstName: "First name",
     lastName: "Last name",

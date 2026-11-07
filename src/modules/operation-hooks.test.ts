@@ -31,7 +31,7 @@ function operationOwners(): Map<string, string | null> {
     const source = readFileSync(file, "utf8");
     if (!source.includes("defineOperation")) continue;
     const rel = path.relative(SRC, file).split(path.sep).join("/");
-    const owner = /^modules\/([a-z]+)\/([a-z]+)\//.exec(rel);
+    const owner = /^modules\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\//.exec(rel);
     for (const m of source.matchAll(/defineOperation\s*(?:<[^(]*>)?\s*\(\{[\s\S]*?\bname:\s*"([^"]+)"/g)) owners.set(m[1], owner ? `${owner[1]}.${owner[2]}` : null);
   }
   return owners;

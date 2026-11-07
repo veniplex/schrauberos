@@ -183,9 +183,6 @@ CREATE TABLE "Customer" (
     "zip" TEXT,
     "city" TEXT,
     "notes" TEXT,
-    "externalSource" TEXT,
-    "externalId" TEXT,
-    "syncedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -209,9 +206,6 @@ CREATE TABLE "Vehicle" (
     "extraInspectionKind" TEXT,
     "extraInspectionDue" DATETIME,
     "notes" TEXT,
-    "externalSource" TEXT,
-    "externalId" TEXT,
-    "syncedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Vehicle_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -748,9 +742,6 @@ CREATE INDEX "TwoFactorBackupCode_userId_idx" ON "TwoFactorBackupCode"("userId")
 CREATE INDEX "Customer_lastName_idx" ON "Customer"("lastName");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Customer_externalSource_externalId_key" ON "Customer"("externalSource", "externalId");
-
--- CreateIndex
 CREATE INDEX "Vehicle_plateNorm_idx" ON "Vehicle"("plateNorm");
 
 -- CreateIndex
@@ -758,9 +749,6 @@ CREATE INDEX "Vehicle_customerId_idx" ON "Vehicle"("customerId");
 
 -- CreateIndex
 CREATE INDEX "Vehicle_inspectionDue_idx" ON "Vehicle"("inspectionDue");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Vehicle_externalSource_externalId_key" ON "Vehicle"("externalSource", "externalId");
 
 -- CreateIndex
 CREATE INDEX "VehicleOwnership_vehicleId_idx" ON "VehicleOwnership"("vehicleId");

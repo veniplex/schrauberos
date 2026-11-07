@@ -49,12 +49,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <PageHeader
         back={{ href: "/customers", label: t("nav.customers") }} help="workshop.customers"
         title={customerDisplayName(customer)}
-        description={
-          <span className="flex flex-wrap items-center gap-2">
-            {customer.customerNumber ? <span className="tabular">#{customer.customerNumber}</span> : null}
-            {customer.externalSource ? <Badge tone="info">{customer.externalSource === "werbas" ? "Werbas" : customer.externalSource}</Badge> : null}
-          </span>
-        }
+        description={customer.customerNumber ? <span className="tabular">#{customer.customerNumber}</span> : undefined}
         actions={
           canEdit ? (
             <LinkButton href={`/customers/${customer.id}/edit`}>

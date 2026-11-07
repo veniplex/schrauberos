@@ -238,7 +238,7 @@ model TireSettings {
   updatedAt           DateTime @updatedAt
 }
 
-// ───────────── Kunden & Fahrzeuge (später aus Werbas) ─────────────
+// ───────────── Kunden & Fahrzeuge ─────────────
 
 model Customer {
   id             String    @id @default(cuid())
@@ -252,10 +252,6 @@ model Customer {
   zip            String?
   city           String?
   notes          String?
-  // Herkunft der Daten: null = lokal angelegt, sonst z. B. "werbas"
-  externalSource String?
-  externalId     String?
-  syncedAt       DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -264,7 +260,6 @@ model Customer {
   appointments Appointment[]
   invoices     Invoice[]
 
-  @@unique([externalSource, externalId])
   @@index([lastName])
 }
 
@@ -294,9 +289,6 @@ model Vehicle {
   extraInspectionKind String?
   extraInspectionDue  DateTime?
   notes          String?
-  externalSource String?
-  externalId     String?
-  syncedAt       DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -305,7 +297,6 @@ model Vehicle {
   tireSets     TireSet[]
   appointments Appointment[]
 
-  @@unique([externalSource, externalId])
   // Kein Unique auf dem Kennzeichen: Dubletten sind erlaubt (Warnung mit Bestätigung in der Anwendung), etwa bei Halterwechsel oder wiederverwendeten Kennzeichen
   @@index([plateNorm])
   @@index([customerId])

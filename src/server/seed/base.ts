@@ -1,9 +1,10 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { DEFAULT_ROLES } from "@/modules/default-roles";
+import { ALL_SEEDS } from "@/modules/seed";
 
 /**
- * Basisdaten einer frischen Installation: Werkstatt-Profil, Einstellungs-Zeilen, Standardrollen, Arbeitsplätze und Terminarten.
- * Läuft bei jedem App-Start, legt aber nur bei einer leeren Datenbank etwas an – spätere Änderungen und bewusst gelöschte
+ * Basisdaten einer frischen Installation: Werkstatt-Profil, Standardrollen und die Grunddaten der Funktionen (`base` ihrer `seed.ts`: Einstellungszeilen, Arbeitsplätze,
+ * Terminarten …). Läuft bei jedem App-Start, legt aber nur bei einer leeren Datenbank etwas an – spätere Änderungen und bewusst gelöschte
  * Standardwerte bleiben unangetastet. Nur die Administrator-Rolle wird immer sichergestellt.
  */
 export async function ensureBaseData(db: PrismaClient): Promise<{ fresh: boolean }> {
@@ -11,8 +12,6 @@ export async function ensureBaseData(db: PrismaClient): Promise<{ fresh: boolean
 
   if (fresh) {
     await db.workshop.create({ data: { id: "default" } });
-    await db.appointmentSettings.upsert({ where: { id: "default" }, update: {}, create: { id: "default" } });
-    await db.tireSettings.upsert({ where: { id: "default" }, update: {}, create: { id: "default" } });
     for (const role of DEFAULT_ROLES) {
       if (await db.role.findUnique({ where: { key: role.key } })) continue;
       await db.role.create({
@@ -26,23 +25,7 @@ export async function ensureBaseData(db: PrismaClient): Promise<{ fresh: boolean
         },
       });
     }
-    await db.bay.createMany({
-      data: [
-        { name: "Hebebühne 1", sortOrder: 1 },
-        { name: "Hebebühne 2", sortOrder: 2 },
-        { name: "Reifenplatz", sortOrder: 3 },
-      ],
-    });
-    await db.appointmentType.createMany({
-      data: [
-        { name: "Inspektion", color: "#2459c9", defaultMinutes: 90, sortOrder: 1 },
-        { name: "Ölwechsel", color: "#b45309", defaultMinutes: 45, sortOrder: 2 },
-        { name: "Reifenwechsel", color: "#0f766e", defaultMinutes: 45, sortOrder: 3, kind: "tire_change" },
-        { name: "HU/AU", color: "#7e22ce", defaultMinutes: 60, sortOrder: 4 },
-        { name: "Reparatur", color: "#b91c1c", defaultMinutes: 120, sortOrder: 5 },
-        { name: "Diagnose", color: "#475569", defaultMinutes: 30, sortOrder: 6 },
-      ],
-    });
+    for (const seed of ALL_SEEDS) await seed.base?.(db);
   }
 
   // Ohne Administrator-Rolle ließe sich niemand mehr einrichten oder aussperren-retten
