@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { qrMatrix } from "@/lib/qr";
+import { qrMatrix, QrTooLongError } from "@/lib/qr";
 import { PdfError } from "./errors";
 import { loadFonts } from "./fonts";
 
@@ -75,9 +75,46 @@ export type PdfOptions = {
 export const DEFAULT_MAX_PAGES = 200;
 export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 
-/** Steuerzeichen (außer Zeilenumbruch) und Zeichen, die die Schrift nicht kennt und die nur stören, entfernen. */
+/** Steuerzeichen (außer Zeilenumbruch) und Zeichen, die die Schrift nicht kennt und die nur stören, entfernen (als Escapes geschrieben, damit sie im Quelltext sichtbar bleiben). */
+const UNWANTED = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]/g;
 export function cleanPdfText(value: string): string {
-  return value.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]/g, "").normalize("NFC");
+  return value.replace(/\r\n?/g, "\n").replace(UNWANTED, "").normalize("NFC");
+}
+
+/** Grenzen gegen außer Kontrolle geratene Eingaben: pdfkit bricht sehr lange Wörter in quadratischer Zeit um (40 000 Zeichen ohne Leerzeichen erschöpfen den Speicher). */
+export const MAX_TEXT_CHARS = 20_000;
+export const MAX_DOCUMENT_CHARS = 400_000;
+export const MAX_TABLE_ROWS = 3_000;
+export const MAX_TABLE_COLUMNS = 24;
+/** Wörter ohne Leerraum werden vorab nach so vielen Zeichen hart umbrochen (linearer Aufwand; bei Kennungen und Adressen sieht das kaum anders aus als der Umbruch am Zeilenende). */
+export const MAX_WORD_CHARS = 80;
+/** Größte Bilddatei für `image()` (Logo, Unterschrift); pdfkit dekodiert PNG synchron. */
+export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+
+/** Bricht jede Folge ohne Leerraum, die länger als `limit` ist, mit einem Zeilenumbruch auf (linear). */
+export function breakLongWords(value: string, limit = MAX_WORD_CHARS): string {
+  if (value.length <= limit) return value;
+  let out = "";
+  let run = 0;
+  for (const char of value) {
+    if (/\s/.test(char)) {
+      run = 0;
+    } else {
+      if (run >= limit) {
+        out += "\n";
+        run = 0;
+      }
+      run++;
+    }
+    out += char;
+  }
+  return out;
+}
+
+/** Einzeiliger Text (Kopf-/Fußzeile, Summenzeilen): bereinigt, ohne Zeilenumbrüche und auf eine feste Länge begrenzt, damit er nie über den Rand läuft. */
+function oneLine(value: string, max: number): string {
+  const text = cleanPdfText(value).replace(/\n/g, " ");
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 type Doc = InstanceType<typeof PDFDocument>;
@@ -89,6 +126,8 @@ export class PdfBuilder {
   private readonly margins: { top: number; right: number; bottom: number; left: number };
   private readonly options: PdfOptions;
   private finished = false;
+  /** bisher gesetzte Zeichen (Summe aller Texte und Zellen) – Obergrenze `MAX_DOCUMENT_CHARS` */
+  private chars = 0;
 
   constructor(options: PdfOptions) {
     this.options = options;
@@ -117,6 +156,18 @@ export class PdfBuilder {
     this.doc.on("pageAdded", () => {
       if (this.doc.bufferedPageRange().count > maxPages) throw new PdfError("tooManyPages", String(maxPages));
     });
+  }
+
+  /**
+   * Bereitet jeden Text vor, bevor er an pdfkit geht: bereinigt, begrenzt (Länge je Text und im ganzen Dokument; Überschreitung ist ein `PdfError("tooLarge")`, kein stilles Kürzen) und bricht
+   * sehr lange Wörter hart um. So bleibt der Aufwand linear und der Speicherbedarf beschränkt.
+   */
+  private prep(value: string): string {
+    const clean = cleanPdfText(value);
+    if (clean.length > MAX_TEXT_CHARS) throw new PdfError("tooLarge", "text");
+    this.chars += clean.length;
+    if (this.chars > MAX_DOCUMENT_CHARS) throw new PdfError("tooLarge", "document");
+    return breakLongWords(clean);
   }
 
   /* ------------------------------------------------------------ Maße */
@@ -170,8 +221,11 @@ export class PdfBuilder {
   /* ------------------------------------------------------------ Text */
 
   text(value: string, style: TextStyle = {}): this {
+    return this.put(this.prep(value), style);
+  }
+
+  private put(text: string, style: TextStyle): this {
     const { size = 10, bold = false, muted = false, color, align = "left", width = this.contentWidth, x = this.left, after = 0, lineGap = 1.5 } = style;
-    const text = cleanPdfText(value);
     this.font(bold, size);
     const height = this.doc.heightOfString(text, { width, align, lineGap });
     if (height <= this.limit - this.margins.top) this.ensure(height);
@@ -184,10 +238,11 @@ export class PdfBuilder {
     const size = { 1: 17, 2: 12.5, 3: 10.5 }[level];
     const before = this.doc.y > this.margins.top + 1 ? { 1: 8, 2: 10, 3: 6 }[level] : 0;
     this.font(true, size);
-    const height = this.doc.heightOfString(cleanPdfText(value), { width: this.contentWidth });
+    const text = this.prep(value);
+    const height = this.doc.heightOfString(text, { width: this.contentWidth });
     this.ensure(before + height + 24); // eine Überschrift steht nie allein am Seitenende
     this.doc.y += before;
-    return this.text(value, { size, bold: true, after: level === 1 ? 8 : 4 });
+    return this.put(text, { size, bold: true, after: level === 1 ? 8 : 4 });
   }
 
   rule(): this {
@@ -205,11 +260,12 @@ export class PdfBuilder {
     const gap = 8;
     for (const [label, value] of rows) {
       this.font(false, size);
-      const valueText = cleanPdfText(value);
-      const height = Math.max(this.doc.heightOfString(cleanPdfText(label), { width: labelWidth }), this.doc.heightOfString(valueText, { width: this.contentWidth - labelWidth - gap }));
+      const labelText = this.prep(label);
+      const valueText = this.prep(value);
+      const height = Math.max(this.doc.heightOfString(labelText, { width: labelWidth }), this.doc.heightOfString(valueText, { width: this.contentWidth - labelWidth - gap }));
       this.ensure(height + 2);
       const top = this.doc.y;
-      this.doc.fillColor(MUTED).text(cleanPdfText(label), this.left, top, { width: labelWidth });
+      this.doc.fillColor(MUTED).text(labelText, this.left, top, { width: labelWidth });
       this.font(false, size);
       this.doc.fillColor(INK).text(valueText, this.left + labelWidth + gap, top, { width: this.contentWidth - labelWidth - gap });
       this.doc.y = top + height + 2;
@@ -220,6 +276,13 @@ export class PdfBuilder {
   /* ------------------------------------------------------------ Tabelle */
 
   table(spec: TableSpec): this {
+    if (spec.columns.length === 0 || spec.columns.length > MAX_TABLE_COLUMNS) throw new PdfError("invalid", "columns");
+    if (spec.rows.length > MAX_TABLE_ROWS) throw new PdfError("tooLarge", "rows");
+    const columnCount = spec.columns.length;
+    // alle Zellen einmal vorbereiten (Länge, Wortbruch); zu kurze Zeilen werden aufgefüllt, überzählige Zellen verworfen
+    const prepare = (cells: readonly string[]) => Array.from({ length: columnCount }, (_, i) => this.prep(cells[i] ?? ""));
+    const head = spec.columns.map((c) => this.prep(c.header));
+    const body = spec.rows.map(prepare);
     const size = spec.fontSize ?? 9.5;
     const pad = 4;
     const weights = spec.columns.map((c) => c.weight ?? 1);
@@ -228,7 +291,7 @@ export class PdfBuilder {
     const offsets = widths.map((_, i) => this.left + widths.slice(0, i).reduce((a, b) => a + b, 0));
     const cellHeight = (cells: readonly string[], bold: boolean) => {
       this.font(bold, size);
-      return Math.max(...cells.map((cell, i) => this.doc.heightOfString(cleanPdfText(cell ?? ""), { width: widths[i] - 2 * pad, align: spec.columns[i].align ?? "left" }))) + 2 * pad;
+      return Math.max(...cells.map((cell, i) => this.doc.heightOfString(cell, { width: widths[i] - 2 * pad, align: spec.columns[i].align ?? "left" }))) + 2 * pad;
     };
     const drawRow = (cells: readonly string[], bold: boolean, fill: string | null) => {
       const height = cellHeight(cells, bold);
@@ -236,16 +299,16 @@ export class PdfBuilder {
       if (fill) this.doc.rect(this.left, top, this.contentWidth, height).fill(fill);
       this.font(bold, size);
       this.doc.fillColor(INK);
-      cells.forEach((cell, i) => this.doc.text(cleanPdfText(cell ?? ""), offsets[i] + pad, top + pad, { width: widths[i] - 2 * pad, align: spec.columns[i].align ?? "left" }));
+      cells.forEach((cell, i) => this.doc.text(cell, offsets[i] + pad, top + pad, { width: widths[i] - 2 * pad, align: spec.columns[i].align ?? "left" }));
       this.doc.moveTo(this.left, top + height).lineTo(this.right, top + height).lineWidth(0.4).strokeColor(LINE).stroke();
       this.doc.y = top + height;
     };
-    const header = spec.columns.map((c) => c.header);
+    const header = head;
     const headerHeight = cellHeight(header, true);
-    const firstRow = spec.rows[0] ? cellHeight(spec.rows[0], false) : 0;
+    const firstRow = body[0] ? cellHeight(body[0], false) : 0;
     this.ensure(headerHeight + firstRow); // Kopf und mindestens eine Zeile zusammen
     drawRow(header, true, HEAD);
-    spec.rows.forEach((row, index) => {
+    body.forEach((row, index) => {
       const height = cellHeight(row, false);
       if (this.doc.y + height > this.limit + 0.01) {
         this.doc.addPage();
@@ -273,8 +336,8 @@ export class PdfBuilder {
       const top = this.doc.y;
       this.font(Boolean(row.strong), row.strong ? size + 1 : size);
       this.doc.fillColor(INK);
-      this.doc.text(cleanPdfText(row.label), x, top, { width: width * 0.58, lineBreak: false });
-      this.doc.text(cleanPdfText(row.value), x + width * 0.58, top, { width: width * 0.42, align: "right", lineBreak: false });
+      this.doc.text(oneLine(row.label, 80), x, top, { width: width * 0.58, lineBreak: false });
+      this.doc.text(oneLine(row.value, 60), x + width * 0.58, top, { width: width * 0.42, align: "right", lineBreak: false });
       this.doc.y = top + lineHeight;
     }
     return this;
@@ -292,7 +355,12 @@ export class PdfBuilder {
     if (!placed) this.ensure(size);
     const x = options.x ?? this.left;
     const y = options.y ?? this.doc.y;
-    const matrix = qrMatrix(data);
+    let matrix;
+    try {
+      matrix = qrMatrix(data);
+    } catch (error) {
+      throw error instanceof QrTooLongError ? new PdfError("tooLarge", "qr") : error;
+    }
     const quiet = 2;
     const cell = size / (matrix.size + 2 * quiet);
     this.doc.rect(x, y, size, size).fill("#ffffff");
@@ -316,6 +384,7 @@ export class PdfBuilder {
 
   /** Bild (PNG/JPEG, z. B. das Firmenlogo) in den Textfluss oder an eine feste Stelle. */
   image(data: Buffer | Uint8Array, options: { width?: number; height?: number; x?: number; y?: number } = {}): this {
+    if (data.byteLength > MAX_IMAGE_BYTES) throw new PdfError("tooLarge", "image");
     const placed = options.y !== undefined;
     const fit: [number, number] = [options.width ?? mm(40), options.height ?? mm(20)];
     if (!placed) this.ensure(fit[1]);
@@ -336,15 +405,15 @@ export class PdfBuilder {
       this.doc.page.margins.top = 0;
       if (this.options.runningHeader && index > 0) {
         this.font(false, 8);
-        this.doc.fillColor(MUTED).text(cleanPdfText(this.options.runningHeader), this.left, mm(10), { width: this.contentWidth, lineBreak: false });
+        this.doc.fillColor(MUTED).text(oneLine(this.options.runningHeader, 200), this.left, mm(10), { width: this.contentWidth, lineBreak: false });
       }
       if (footer !== false) {
         const label = (footer?.pageLabel ?? ((page: number, count: number) => `Seite ${page} von ${count}`))(index + 1, total);
         const y = A4_HEIGHT - mm(12);
         this.font(false, 8);
         this.doc.fillColor(MUTED);
-        if (footer?.text) this.doc.text(cleanPdfText(footer.text), this.left, y, { width: this.contentWidth * 0.7, lineBreak: false });
-        this.doc.text(cleanPdfText(label), this.left, y, { width: this.contentWidth, align: "right", lineBreak: false });
+        if (footer?.text) this.doc.text(oneLine(footer.text, 160), this.left, y, { width: this.contentWidth * 0.7, lineBreak: false });
+        this.doc.text(oneLine(label, 80), this.left, y, { width: this.contentWidth, align: "right", lineBreak: false });
       }
     }
   }

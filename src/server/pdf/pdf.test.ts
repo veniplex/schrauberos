@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { inspectPdf } from "@/test/pdf-text";
+import { breakLongWords } from "./builder";
 import { cleanPdfText, createPdf, mm, pdfResponse, PdfError } from ".";
 
 /**
@@ -161,6 +162,77 @@ describe("PDF-Erzeugung", () => {
     assert.equal(read.pageCount, 1);
     assert.ok(read.pages[0].includes("Hallo") && read.pages[0].includes("Welt ok"));
     assert.equal(cleanPdfText("a\u0000b\r\nc‮d"), "ab\ncd");
+  });
+
+  describe("Grenzen gegen außer Kontrolle geratene Eingaben", () => {
+    const tooLarge = (error: unknown) => error instanceof PdfError && error.code === "tooLarge";
+
+    it("ein Wort mit 20 000 Zeichen ohne Leerzeichen wird in kurzer Zeit gesetzt (vorher quadratisch, 40 000 Zeichen erschöpften den Speicher)", async () => {
+      const started = Date.now();
+      const pdf = createPdf(opts);
+      pdf.text("A".repeat(20_000));
+      pdf.keyValues([["Kennung", "B".repeat(20_000)]]);
+      pdf.table({ columns: [{ header: "Zelle" }, { header: "Zelle" }], rows: [["C".repeat(20_000), "D".repeat(20_000)]] });
+      const read = inspectPdf(await pdf.finish());
+      assert.ok(read.pageCount >= 1);
+      assert.ok(Date.now() - started < 8000, "Aufwand ist linear");
+    });
+
+    it("mehr als 20 000 Zeichen in einem Text oder einer Zelle sind ein Fehler (tooLarge), auch bei 100 000 Zeichen sofort", () => {
+      const started = Date.now();
+      const text = "Z".repeat(100_000);
+      assert.throws(() => createPdf(opts).text(text), tooLarge);
+      assert.throws(() => createPdf(opts).heading(text), tooLarge);
+      assert.throws(() => createPdf(opts).keyValues([["a", text]]), tooLarge);
+      assert.throws(() => createPdf(opts).table({ columns: [{ header: "a" }], rows: [[text]] }), tooLarge);
+      assert.ok(Date.now() - started < 2000);
+    });
+
+    it("das ganze Dokument hat eine Zeichenobergrenze", () => {
+      const pdf = createPdf({ ...opts, maxPages: 10_000 });
+      assert.throws(() => {
+        for (let i = 0; i < 100; i++) pdf.text("x ".repeat(5000));
+      }, tooLarge);
+    });
+
+    it("Tabellen: Zeilen- und Spaltenlimit", () => {
+      const columns = [{ header: "a" }];
+      assert.throws(() => createPdf(opts).table({ columns, rows: Array.from({ length: 3001 }, () => ["x"]) }), tooLarge);
+      assert.throws(() => createPdf(opts).table({ columns: [], rows: [] }), (e: unknown) => e instanceof PdfError && e.code === "invalid");
+      assert.throws(() => createPdf(opts).table({ columns: Array.from({ length: 25 }, () => ({ header: "a" })), rows: [] }), (e: unknown) => e instanceof PdfError && e.code === "invalid");
+    });
+
+    it("Tabellenzeilen mit zu wenigen oder zu vielen Zellen bringen nichts durcheinander", async () => {
+      const pdf = createPdf(opts);
+      pdf.table({ columns: [{ header: "A" }, { header: "B" }], rows: [["nur eine"], ["eins", "zwei", "drei"]] });
+      const text = inspectPdf(await pdf.finish()).pages[0];
+      assert.ok(text.includes("nur eine") && text.includes("zwei") && !text.includes("drei"));
+    });
+
+    it("sehr lange Wörter werden hart umbrochen, nichts geht verloren; Leerraum und kurze Wörter bleiben unberührt", () => {
+      assert.equal(breakLongWords("kurz und gut"), "kurz und gut");
+      const word = "x".repeat(200);
+      const broken = breakLongWords(word, 80);
+      assert.equal(broken.replaceAll(String.fromCharCode(10), ""), word);
+      assert.ok(broken.split(String.fromCharCode(10)).every((part) => part.length <= 80));
+    });
+
+    it("Unicode-Zeilen- und Absatztrenner (U+2028/U+2029) werden entfernt", () => {
+      assert.equal(cleanPdfText("a" + String.fromCharCode(0x2028) + "b" + String.fromCharCode(0x2029) + "c"), "abc");
+    });
+
+    it("zu langer QR-Inhalt ist ein PdfError, ein zu großes Bild ebenfalls", () => {
+      assert.throws(() => createPdf(opts).qr("a".repeat(3000)), tooLarge);
+      assert.throws(() => createPdf(opts).image(Buffer.alloc(3 * 1024 * 1024)), tooLarge);
+    });
+
+    it("Kopf- und Fußzeile mit sehr langem Text laufen nicht über den Rand (gekürzt)", async () => {
+      const pdf = createPdf({ ...opts, runningHeader: "H".repeat(5000), footer: { text: "F".repeat(5000) } });
+      pdf.text("a").pageBreak().text("b");
+      const read = inspectPdf(await pdf.finish());
+      assert.equal(read.pageCount, 2);
+      assert.ok(!read.pages[1].includes("H".repeat(300)) && !read.pages[1].includes("F".repeat(300)));
+    });
   });
 
   it("zweimal abschließen ist ein Fehler", async () => {

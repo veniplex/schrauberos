@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { BACKUP_CODE_COUNT, generateBackupCodes, hashBackupCode, normalizeBackupCode } from "./backup-codes";
 import { ipHint } from "./ip-hint";
-import { qrMatrix } from "./qr";
+import qrcode from "qrcode-generator";
+import { QR_MAX_BYTES, qrMatrix, QrTooLongError } from "./qr";
 import { base32Decode, base32Encode, generateTotpSecret, hotp, matchTotp, normalizeTotpCode, otpauthUri, timeStep, totp, TOTP_SECRET_BYTES } from "./totp";
 import { describeAgent } from "./user-agent";
 
@@ -99,6 +100,35 @@ describe("QR-Code", () => {
       assert.equal(rows[y0 + 3][x0 + 3], "1");
       assert.equal(rows[y0 + 6][x0 + 6], "1");
     }
+  });
+});
+
+describe("QR-Code: Zeichenkodierung", () => {
+  /** Matrix aus den UTF-8-Bytes, unabhängig von `qrMatrix` gebaut */
+  function reference(text: string): string[] {
+    qrcode.stringToBytes = (value: string) => [...Buffer.from(value, "utf8")];
+    const qr = qrcode(0, "M");
+    qr.addData(text, "Byte");
+    qr.make();
+    const rows: string[] = [];
+    for (let y = 0; y < qr.getModuleCount(); y++) rows.push(Array.from({ length: qr.getModuleCount() }, (_, x) => (qr.isDark(y, x) ? "1" : "0")).join(""));
+    return rows;
+  }
+
+  it("kodiert als UTF-8: „€“ und „¬“ ergeben verschiedene Codes (vorher dasselbe untere Byte)", () => {
+    assert.notDeepEqual(qrMatrix("€").rows, qrMatrix("¬").rows);
+    assert.deepEqual(qrMatrix("€").rows, reference("€"));
+  });
+
+  it("Girocode-Beispiel mit Umlauten und Euro entspricht der UTF-8-Bytefolge", () => {
+    const epc = ["BCD", "002", "1", "SCT", "GENODEF1XXX", "Müller & Söhne Kfz-Meisterbetrieb GmbH", "DE89370400440532013000", "EUR123.45", "", "RE-2026-0001 Größe € Ölwechsel"].join(String.fromCharCode(10));
+    assert.deepEqual(qrMatrix(epc).rows, reference(epc));
+  });
+
+  it("zu langer Inhalt ist ein echter Fehler (QrTooLongError), keine geworfene Zeichenkette", () => {
+    assert.throws(() => qrMatrix("a".repeat(QR_MAX_BYTES + 1)), (error: unknown) => error instanceof QrTooLongError && error instanceof Error);
+    assert.throws(() => qrMatrix("€".repeat(900)), QrTooLongError); // 2700 Bytes
+    assert.ok(qrMatrix("a".repeat(QR_MAX_BYTES)).size === 177);
   });
 });
 
