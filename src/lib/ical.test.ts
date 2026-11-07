@@ -167,3 +167,56 @@ describe("Kalender (RFC 5545 4.6)", () => {
     assert.ok(empty.includes("BEGIN:VCALENDAR") && empty.includes("END:VCALENDAR") && !empty.includes("BEGIN:VEVENT"));
   });
 });
+
+describe("Kürzen vor dem Maskieren (clampText)", () => {
+  const BS = String.fromCharCode(92);
+  const lineOf = (text: string, name: string) => unfold(text).split("\r\n").find((l) => l.startsWith(`${name}:`)) ?? "";
+  /** der Wert endet nie auf einem unpaarigen Rückwärtsschrägstrich (halbes Escape) */
+  const endsWithHalfEscape = (value: string) => /(^|[^\\])(\\\\)*\\$/.test(value);
+
+  it("ein Komma an der Grenze: das Escape wird nie zerschnitten (die Zeile endet nicht auf einem einzelnen Rückwärtsschrägstrich)", () => {
+    for (const filler of [498, 499, 500, 501]) {
+      const summary = `${"x".repeat(filler)},,,y`;
+      const value = lineOf(buildCalendar({ name: "x", events: [timed({ summary })] }), "SUMMARY").slice("SUMMARY:".length);
+      assert.ok(!endsWithHalfEscape(value), `${filler}: ${value.slice(-8)}`);
+      assert.ok(value.endsWith("…"), "ein gekürzter Text endet auf „…“");
+    }
+    // Rückwärtsschrägstriche selbst: jeder wird ganz maskiert
+    const value = lineOf(buildCalendar({ name: "x", events: [timed({ summary: `${"x".repeat(497)}${BS}${BS}${BS}end` })] }), "SUMMARY").slice("SUMMARY:".length);
+    assert.ok(!endsWithHalfEscape(value));
+    assert.equal(escapeText(`a${BS}b`), `a${BS}${BS}b`);
+  });
+
+  it("ein Emoji (Ersatzzeichenpaar) und eine Familien-Folge mit Verbindungszeichen werden nie geteilt", () => {
+    const family = "👨‍👩‍👧‍👦"; // vier Personen, drei Zero-Width-Joiner
+    const flag = "🇩🇪";
+    for (const emoji of ["😀", family, flag, "👍🏽"]) {
+      for (let pad = 494; pad <= 500; pad++) {
+        const text = buildCalendar({ name: "x", events: [timed({ summary: `${"a".repeat(pad)}${emoji}${emoji}` })] });
+        const value = unfold(text).split("\r\n").find((l) => l.startsWith("SUMMARY:"))!.slice("SUMMARY:".length);
+        // kein einzelnes Ersatzzeichen, kein Verbindungszeichen am Ende, kein halbes Emoji
+        assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(value), `${emoji} bei ${pad}: einzelnes Ersatzzeichen`);
+        assert.ok(!value.replace("…", "").endsWith("‍"), `${emoji} bei ${pad}: endet auf Verbindungszeichen`);
+        const withoutPad = value.replace(/^a+/, "").replace("…", "");
+        assert.ok(withoutPad === "" || withoutPad === emoji || withoutPad === emoji + emoji, `${emoji} bei ${pad}: ganz oder gar nicht, war ${JSON.stringify(withoutPad)}`);
+        // die Zeile bleibt gültiges UTF-8 (kein U+FFFD)
+        assert.ok(!text.includes("�"));
+      }
+    }
+  });
+
+  it("die Beschreibung (2000) und der Kalendername (120) werden ebenso gekürzt; kurze Texte bleiben unverändert", () => {
+    const text = buildCalendar({ name: `${"n".repeat(119)},,`, events: [timed({ description: `${"d".repeat(1999)},x` })] });
+    const name = lineOf(text, "X-WR-CALNAME").slice("X-WR-CALNAME:".length);
+    const description = lineOf(text, "DESCRIPTION").slice("DESCRIPTION:".length);
+    assert.ok(!endsWithHalfEscape(name) && name.endsWith("…") && !endsWithHalfEscape(description) && description.endsWith("…"));
+    assert.equal(lineOf(buildCalendar({ name: "Kurz", events: [timed({ summary: "Räder, Winter" })] }), "SUMMARY"), `SUMMARY:Räder${BS}, Winter`);
+  });
+
+  it("SEQUENCE steht nur, wenn sie angegeben ist (ganze Zahl ≥ 0)", () => {
+    assert.ok(!buildCalendar({ name: "x", events: [timed()] }).includes("SEQUENCE"));
+    assert.ok(buildCalendar({ name: "x", events: [timed({ sequence: 7 })] }).includes("SEQUENCE:7\r\n"));
+    assert.ok(buildCalendar({ name: "x", events: [timed({ sequence: 0 })] }).includes("SEQUENCE:0\r\n"));
+    for (const bad of [-1, 1.5, Number.NaN]) assert.ok(!buildCalendar({ name: "x", events: [timed({ sequence: bad })] }).includes("SEQUENCE"));
+  });
+});

@@ -6,7 +6,10 @@
  *  - **Zeilenfaltung** nach 75 Oktetten (UTF-8), nie mitten in einem Zeichen; Folgezeilen beginnen mit einem Leerzeichen. Zeilenende CRLF.
  *  - **Escaping** von Textwerten (3.3.11): Rückwärtsschrägstrich, Semikolon, Komma, Zeilenumbruch. **Schutz gegen Einschleusen von Zeilen:** Zeilenumbrüche aus Nutzertexten werden zu `\n`, alle übrigen
  *    Steuerzeichen und die Unicode-Zeilentrenner entfernt – ein Termintitel kann keine eigene Eigenschaft (`ATTENDEE`, `URL`) hinzufügen. Namen von Eigenschaften und Parametern sind feste Texte im Code.
- *  - **UID stabil** (aus der Kennung der Sache), `DTSTAMP`/`LAST-MODIFIED` aus dem Änderungszeitpunkt (nicht „jetzt“): dieselben Daten ergeben dieselbe Datei.
+ *  - **UID stabil** (aus der Kennung der Sache), `DTSTAMP`/`LAST-MODIFIED` aus dem Änderungszeitpunkt (nicht „jetzt“): dieselben Daten ergeben dieselbe Datei. Für abgeleitete Einträge (Fristen) wählt der
+ *    Aufrufer einen **festen** Zeitpunkt, sonst änderte sich die Datei täglich. `SEQUENCE` (optional) ist die Revisionsnummer; der Aufrufer leitet sie monoton aus dem Änderungszeitpunkt ab.
+ *  - **Erst kürzen, dann maskieren** (`clampText`): Texte werden bereinigt, auf ganze Schriftzeichen gekürzt (nie mitten in einem Ersatzzeichenpaar oder einer Emoji-Folge) und erst danach maskiert –
+ *    ein Escape wird nie zerschnitten.
  */
 
 import { addDaysToKey } from "./zone";
@@ -14,18 +17,38 @@ import { addDaysToKey } from "./zone";
 const CRLF = "\r\n";
 const encoder = new TextEncoder();
 
-/** Steuerzeichen (außer Tabulator und Zeilenumbruch), Unicode-Zeilen-/Absatztrenner, Umkehrzeichen (Bidi) und Nullbreitenzeichen – kommen in keinem Text vor. */
-const UNWANTED = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]/g;
+/** Steuerzeichen (außer Tabulator und Zeilenumbruch), Unicode-Zeilen-/Absatztrenner, Umkehrzeichen (Bidi) und das Nullbreiten-Leerzeichen – kommen in keinem Text vor. Verbindungszeichen (U+200C/U+200D) bleiben: Emoji-Folgen (Familie, Hautton) und Schriften wie Persisch brauchen sie. */
+const UNWANTED = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200b\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]/g;
+
+/** Zeilenumbrüche vereinheitlichen und unerwünschte Zeichen entfernen (noch nicht maskiert). */
+const clean = (value: string): string => value.replace(/\r\n?/g, "\n").replace(UNWANTED, "");
+
+const escapeClean = (value: string): string => value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 
 /** Textwert nach RFC 5545 3.3.11 maskieren; Zeilenumbrüche (CR, LF, CRLF) werden zu `\n`. */
 export function escapeText(value: string): string {
-  return value
-    .replace(/\r\n?/g, "\n")
-    .replace(UNWANTED, "")
-    .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,")
-    .replace(/\n/g, "\\n");
+  return escapeClean(clean(value));
+}
+
+const segmenter = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+
+/**
+ * Erst bereinigen, dann auf höchstens `max` Schriftzeichen kürzen (ganze Graphem-Cluster: ein Emoji mit Hautton oder eine Familien-Folge mit Verbindungszeichen bleibt ganz oder fällt ganz weg),
+ * ein gekürzter Text endet auf „…“ – und **danach** erst maskieren. So entsteht nie ein halbes Escape (eine Zeile, die auf einem einzelnen Rückwärtsschrägstrich endet) oder ein einzelnes Ersatzzeichen.
+ */
+export function clampText(value: string, max: number): string {
+  const text = clean(value);
+  const parts = segmenter ? Array.from(segmenter.segment(text), (s) => s.segment) : Array.from(text);
+  if (Array.from(text).length <= max) return escapeClean(text);
+  const kept: string[] = [];
+  let count = 0;
+  for (const part of parts) {
+    const size = Array.from(part).length;
+    if (count + size > max - 1) break;
+    kept.push(part);
+    count += size;
+  }
+  return escapeClean(`${kept.join("")}…`);
 }
 
 /** Eine Zeile auf höchstens 75 Oktette je Zeile falten (RFC 5545 3.1); ein Zeichen wird nie geteilt. Das Ergebnis enthält die CRLF zwischen den Teilen, nicht am Ende. */
@@ -72,6 +95,8 @@ type IcalBase = {
   modified: Date;
   summary: string;
   description?: string;
+  /** Revisionsnummer (ganze Zahl ≥ 0); fehlt sie, steht keine `SEQUENCE` im Eintrag */
+  sequence?: number;
   url?: string;
   status?: IcalStatus;
 };
@@ -100,8 +125,9 @@ function eventLines(event: IcalEvent, domain: string): string[] | null {
     // DTEND muss nach DTSTART liegen; ein Ende davor oder gleich ergibt einen Termin ohne Dauer (kein DTEND)
     if (event.end.getTime() > event.start.getTime()) lines.push(`DTEND:${utcStamp(event.end)}`);
   }
-  lines.push(`SUMMARY:${escapeText(event.summary).slice(0, 500)}`);
-  if (event.description) lines.push(`DESCRIPTION:${escapeText(event.description).slice(0, 2000)}`);
+  lines.push(`SUMMARY:${clampText(event.summary, 500)}`);
+  if (event.description) lines.push(`DESCRIPTION:${clampText(event.description, 2000)}`);
+  if (event.sequence !== undefined && Number.isInteger(event.sequence) && event.sequence >= 0) lines.push(`SEQUENCE:${event.sequence}`);
   // URL ist ein URI-Wert (kein Text): nur eine einfache http(s)-Adresse ohne Leerraum und Steuerzeichen
   if (event.url && /^https?:\/\/[^\s\u0000-\u001f\u007f-\u009f]+$/.test(event.url)) lines.push(`URL:${event.url}`);
   if (event.status) lines.push(`STATUS:${event.status}`);
@@ -122,7 +148,7 @@ export function buildCalendar(options: { name: string; domain?: string; events: 
     "PRODID:-//SchrauberOS//Kalender-Abo//DE",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:${escapeText(options.name).slice(0, 120)}`,
+    `X-WR-CALNAME:${clampText(options.name, 120)}`,
     `REFRESH-INTERVAL;VALUE=DURATION:${refresh}`,
     `X-PUBLISHED-TTL:${refresh}`,
   ];
