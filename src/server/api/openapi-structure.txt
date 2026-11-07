@@ -16,6 +16,25 @@ GET /articles/{id} articles.get parts.view
 PATCH /articles/{id} articles.update parts.edit body=number,name,unit,supplier,taxBp,minStockMilli,notes,purchaseCents,saleCents
 POST /articles/{id}/archive articles.archive parts.edit
 POST /articles/{id}/unarchive articles.unarchive parts.edit
+GET /billing-documents billing-documents.list billing.view query=docType,state,customerId,orderId,q sort=createdAt,issueDate,number,grossCents
+POST /billing-documents billing-documents.create billing.edit body=docType,customerId,partyName,partyStreet,partyZip,partyCity,buyerEmail,introText,footerText,serviceFrom,serviceTo,validUntil,paymentDays,paymentMethod,buyerReference,taxNote,vehicleId,mileageKm,deductPartialIds,items
+GET /billing-documents/{id} billing-documents.get billing.view
+PATCH /billing-documents/{id} billing-documents.update billing.edit body=customerId,partyName,partyStreet,partyZip,partyCity,buyerEmail,introText,footerText,serviceFrom,serviceTo,validUntil,paymentDays,paymentMethod,buyerReference,taxNote,vehicleId,mileageKm,deductPartialIds,items
+DELETE /billing-documents/{id} billing-documents.delete billing.edit
+POST /billing-documents/{id}/accept billing-documents.accept billing.accept body=acceptedOn
+POST /billing-documents/{id}/confirmation billing-documents.confirmation billing.edit
+POST /billing-documents/{id}/finalize billing-documents.finalize invoices.finalize
+POST /billing-documents/{id}/issue billing-documents.issue billing.edit
+POST /billing-documents/{id}/order billing-documents.order billing.accept
+GET /billing-documents/{id}/pdf billing-documents.pdf billing.view
+POST /billing-documents/{id}/reject billing-documents.reject billing.accept
+POST /billing-documents/{id}/send billing-documents.send billing.send body=includeXml,resend
+GET /billing-documents/{id}/xml billing-documents.xml billing.view
+POST /billing-documents/from-order billing-documents.fromOrder billing.edit body=orderId,confirmOpen,acknowledgeDuplicate
+GET /billing-payments billing-payments.list billing.view query=documentId sort=paidAt,createdAt
+POST /billing-payments billing-payments.create invoices.edit body=documentId,amountCents,paidAt,method,note
+GET /billing-payments/{id} billing-payments.get billing.view
+DELETE /billing-payments/{id} billing-payments.delete invoices.edit
 PATCH /checklist-items/{id} checklist-items.update checklists.fill body=done,numberValue,textValue
 GET /checklist-templates checklist-templates.list checklists.view sort=name
 GET /checklist-templates/{id} checklist-templates.get checklists.view

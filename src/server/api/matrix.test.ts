@@ -74,7 +74,9 @@ describe("Registry der Endpunkte", () => {
     for (const e of endpoints) {
       const feature = FEATURES.find((f) => fullFeatureId(f) === e.feature);
       assert.ok(feature, `${label(e)}: unbekannte Funktion ${e.feature}`);
-      assert.ok((feature.permissions.keys as readonly string[]).includes(e.permission), `${label(e)}: ${e.permission} gehört nicht zu ${e.feature}`);
+      // das Recht gehört zur Funktion selbst oder zu einer hart vorausgesetzten (die Rechnungserstellung nutzt `invoices.finalize`/`invoices.edit` des Rechnungsarchivs)
+      const owners = [feature, ...FEATURES.filter((f) => "requires" in feature && (feature.requires as readonly string[]).includes(fullFeatureId(f)))];
+      assert.ok(owners.some((f) => (f.permissions.keys as readonly string[]).includes(e.permission)), `${label(e)}: ${e.permission} gehört nicht zu ${e.feature} oder seinen Voraussetzungen`);
       assert.ok(grantable.has(e.permission), `${label(e)}: ${e.permission} kann kein Token tragen`);
     }
   });

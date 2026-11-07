@@ -65,6 +65,12 @@ export const permissionHintsDe = {
     delete: "Mitarbeiter endgültig löschen.",
     sensitive: "Notfallkontakt und die Art von Abwesenheiten (Krankheit) sehen und ändern.",
   },
+  billing: {
+    view: "Angebote, Auftragsbestätigungen und Rechnungsentwürfe ansehen. Festgeschriebene Rechnungen stehen im Rechnungsarchiv.",
+    edit: "Angebote, Auftragsbestätigungen und Rechnungsentwürfe anlegen, ändern und löschen; Angebote ausstellen; Rechnungen aus Aufträgen vorbereiten. Das Festschreiben von Rechnungen braucht das Recht „Ausgangsrechnungen festschreiben“.",
+    accept: "Angebote als angenommen oder abgelehnt vermerken und daraus einen Werkstattauftrag anlegen.",
+    send: "Angebote und Rechnungen per E-Mail an Kunden senden (zusätzlich ist das Recht „E-Mails senden“ nötig). Wird nie automatisch vergeben.",
+  },
   checklists: {
     view: "Checklisten an Fahrzeugen und Aufträgen ansehen – nur dort, wo die Person auch das Fahrzeug bzw. den Auftrag sehen darf.",
     fill: "Checklisten beginnen, Punkte abhaken, Messwerte erfassen, den Kunden unterschreiben lassen und abschließen.",

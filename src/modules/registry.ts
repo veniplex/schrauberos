@@ -18,6 +18,10 @@ import { settingsTabs as tiresSettings } from "./workshop/tires/settings-tab";
 import { settingsTabs as employeesSettings } from "./office/employees/settings-tab";
 import { settingsTabs as customersSettings } from "./workshop/customers/settings-tab";
 import { widgets as invoicesWidgets } from "./office/invoices/widgets";
+import { widgets as billingWidgets } from "./office/billing/widgets";
+import { sections as billingSections } from "./office/billing/sections";
+import { setupChecks as billingChecks } from "./office/billing/setup-checks";
+import { searchProviders as billingSearch } from "./office/billing/search";
 import { widgets as employeesWidgets } from "./office/employees/widgets";
 import { widgets as timeWidgets } from "./office/time/widgets";
 import { sections as timeSections } from "./office/time/sections";
@@ -69,6 +73,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   ...tiresWidgets,
   ...vehiclesWidgets,
   ...invoicesWidgets,
+  ...billingWidgets,
   ...employeesWidgets,
   ...timeWidgets,
   ...fleetWidgets,
@@ -86,6 +91,7 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
   ...checklistsSearch,
   ...partsSearch,
   ...tiresSearch,
+  ...billingSearch,
   ...customersSearch,
   ...vehiclesSearch,
   ...invoicesSearch,
@@ -101,12 +107,12 @@ export const ALL_SEARCH_PROVIDERS: SearchProviderDef[] = [
  * Beiträge von Funktionen zu Seiten anderer Funktionen („Erweiterungspunkte“): Der Gastgeber (Auftragsseite, Termin) fragt `sectionsFor(session, host)` und kennt seine Gäste nicht.
  * Neue Funktion mit Abschnitten: `sections.tsx` anlegen und hier eintragen.
  */
-const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections, ...filesSections, ...checklistsSections];
+const ALL_SECTIONS: SectionDef[] = [...ordersSections, ...partsSections, ...timeSections, ...filesSections, ...checklistsSections, ...billingSections];
 
 const ALL_SETTINGS_TABS: SettingsTabDef[] = [...workshopProfileSettings, ...appointmentsSettings, ...tiresSettings, ...customersSettings, ...employeesSettings, ...timeSettings, ...backupSettings, ...mailSettings, ...updatesSettings];
 
 /** Punkte der Einrichtungs-Checkliste (Administration). Neue Funktion mit Einrichtungsschritten: `setup-checks.ts` anlegen und hier eintragen. */
-const ALL_SETUP_CHECKS: SetupCheckDef[] = [...settingsChecks, ...usersChecks, ...backupChecks, ...mailChecks, ...appointmentsChecks, ...employeesChecks];
+const ALL_SETUP_CHECKS: SetupCheckDef[] = [...settingsChecks, ...usersChecks, ...backupChecks, ...mailChecks, ...appointmentsChecks, ...employeesChecks, ...billingChecks];
 
 export type NavEntry = { id: string; href: string; labelKey: MessageKey; icon: IconName; module: ModuleId; order: number };
 

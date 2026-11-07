@@ -5,6 +5,7 @@ import { hooks as ordersHooks } from "./workshop/orders/hooks";
 import { hooks as partsHooks } from "./workshop/parts/hooks";
 import { hooks as filesHooks } from "./workshop/files/hooks";
 import { hooks as checklistsHooks } from "./workshop/checklists/hooks";
+import { hooks as billingHooks } from "./office/billing/hooks";
 import { hooks as tiresHooks } from "./workshop/tires/hooks";
 import { hooks as vehiclesHooks } from "./workshop/vehicles/hooks";
 
@@ -14,4 +15,4 @@ import { hooks as vehiclesHooks } from "./workshop/vehicles/hooks";
  * Funktion kennt sie nicht. Aktuell: die Bereinigung beim Anonymisieren eines Kunden (`customers.anonymize`, P4b-5). **Reihenfolge zählt:** Die Reifen kommen vor den Fahrzeugen,
  * denn sie finden ihre Sätze über den Halter des Fahrzeugs.
  */
-export const operationHooks: readonly OperationHookDef[] = [...tiresHooks, ...ordersHooks, ...partsHooks, ...filesHooks, ...checklistsHooks, ...appointmentsHooks, ...vehiclesHooks];
+export const operationHooks: readonly OperationHookDef[] = [...tiresHooks, ...ordersHooks, ...partsHooks, ...filesHooks, ...checklistsHooks, ...billingHooks, ...appointmentsHooks, ...vehiclesHooks];

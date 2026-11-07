@@ -58,4 +58,6 @@ async function ConsumedParts({ entityId, session }: SectionProps) {
 export const sections: SectionDef[] = [
   { id: "parts-consumed", feature: "workshop.parts", host: "orders/detail", permission: "parts.view", order: 20, Component: ConsumedParts },
   { id: "parts-picker", feature: "workshop.parts", host: "orders/items", permission: "parts.view", order: 20, Component: () => <ArticlePicker /> },
+  // „Artikel einfügen“ auch im Positionen-Editor der Angebote und Rechnungen (Verweis nur zur Anzeige, gebucht wird beim Auftragsabschluss)
+  { id: "parts-picker-billing", feature: "workshop.parts", host: "billing/items", permission: "parts.view", order: 20, Component: () => <ArticlePicker /> },
 ];

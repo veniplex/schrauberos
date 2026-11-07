@@ -10,6 +10,7 @@ import { partsDe } from "./modules/parts.de";
 import { timeDe } from "./modules/time.de";
 import { filesDe } from "./modules/files.de";
 import { checklistsDe } from "./modules/checklists.de";
+import { billingDe } from "./modules/billing.de";
 import { customersDe } from "./modules/customers.de";
 import { exchangeDe } from "./modules/exchange.de";
 import { usersDe } from "./modules/users.de";
@@ -169,6 +170,7 @@ export const de = {
     parts: "Teile & Lager",
     files: "Dokumente & Fotos",
     checklists: "Checklisten",
+    billing: "Angebote & Rechnungen",
     tires: "Reifenlager",
     customers: "Kunden",
     users: "Benutzer",
@@ -224,6 +226,7 @@ export const de = {
       basic: { name: "Basis", description: "Termine, Reifenlager, Kunden, Fahrzeuge, Rechnungsarchiv, Mitarbeiter, Fuhrpark, Handbuch und IT-Dokumentation." },
       orders: { name: "Mit Aufträgen und Lager", description: "Zusätzlich Werkstattaufträge (Arbeitskarten) und Teile & Lager für den Werkstattalltag." },
       daily: { name: "Werkstattalltag", description: "Aufträge, Teile & Lager und Zeiterfassung (Stempeln, Arbeitszeiten, Wochenübersicht)." },
+      invoicing: { name: "Mit Angeboten und Rechnungen", description: "Zusätzlich Aufträge, Teile & Lager sowie Angebote & Rechnungen (Angebot, Rechnung, XRechnung, Versand per E-Mail)." },
     },
     demo: "Mit Beispieldaten starten",
     demoHint: "Legt Beispiel-Kunden, -Fahrzeuge, -Termine usw. zum Ausprobieren an (nur sinnvoll für einen Test).",
@@ -322,6 +325,7 @@ export const de = {
   time: timeDe,
   files: filesDe,
   checklists: checklistsDe,
+  billing: billingDe,
   customers: customersDe,
   exchange: exchangeDe,
   users: usersDe,
@@ -341,6 +345,7 @@ export const de = {
     settings: "Einstellungen",
     network: "IT & Netzwerk",
     invoices: "Rechnungsarchiv",
+    billing: "Angebote & Rechnungen",
     employees: "Mitarbeiter",
     time: "Zeiterfassung",
     fleet: "Fuhrpark",
@@ -413,6 +418,12 @@ export const de = {
       finalize: "Ausgangsrechnungen festschreiben",
       export: "Rechnungen exportieren (CSV, Rechnungsarchiv und Steuerberater)",
       import: "Rechnungen importieren (CSV, legt neue Rechnungen an)",
+    },
+    billing: {
+      view: "Angebote und Rechnungsentwürfe ansehen",
+      edit: "Angebote, Auftragsbestätigungen und Rechnungsentwürfe anlegen und bearbeiten",
+      accept: "Angebote als angenommen oder abgelehnt vermerken und daraus Aufträge anlegen",
+      send: "Belege per E-Mail an Kunden senden",
     },
     employees: {
       view: "Mitarbeiter ansehen",

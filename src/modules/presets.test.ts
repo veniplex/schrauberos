@@ -33,7 +33,7 @@ describe("Presets (ausgeliefert)", () => {
     const orders = PRESETS.find((p) => p.id === "orders")!;
     assert.ok(orders.enable.includes("workshop.orders"));
     assert.deepEqual(Object.keys(planPreset(orders, MODULES, FEATURES).overrides).sort(), orders.enable.slice().sort(), "jede Funktion des Presets ist von Haus aus aus und wird eingeschaltet");
-    assert.deepEqual(presetChoices(PRESETS, MODULES, FEATURES).map((p) => p.id), ["basic", "orders", "daily"]);
+    assert.deepEqual(presetChoices(PRESETS, MODULES, FEATURES).map((p) => p.id), ["basic", "orders", "invoicing", "daily"]);
   });
 });
 

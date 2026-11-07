@@ -11,6 +11,7 @@ import { partsEn } from "./modules/parts.en";
 import { timeEn } from "./modules/time.en";
 import { filesEn } from "./modules/files.en";
 import { checklistsEn } from "./modules/checklists.en";
+import { billingEn } from "./modules/billing.en";
 import { customersEn } from "./modules/customers.en";
 import { exchangeEn } from "./modules/exchange.en";
 import { usersEn } from "./modules/users.en";
@@ -168,6 +169,7 @@ export const en: Messages = {
     parts: "Parts & stock",
     files: "Documents & photos",
     checklists: "Checklists",
+    billing: "Quotes & invoicing",
     tires: "Tyre storage",
     customers: "Customers",
     users: "Users",
@@ -223,6 +225,7 @@ export const en: Messages = {
       basic: { name: "Basic", description: "Appointments, tire storage, customers, vehicles, invoice archive, employees, fleet, handbook and IT documentation." },
       orders: { name: "With orders and stock", description: "Additionally workshop orders (job cards) and parts & stock for the daily workshop routine." },
       daily: { name: "Daily workshop routine", description: "Orders, parts & stock and time tracking (clocking in, working times, weekly overview)." },
+      invoicing: { name: "With quotes and invoicing", description: "Additionally orders, parts & stock and quotes & invoicing (quotes, invoices, XRechnung, sending by e-mail)." },
     },
     demo: "Start with sample data",
     demoHint: "Creates sample customers, vehicles, appointments etc. for trying things out (only sensible for a test).",
@@ -321,6 +324,7 @@ export const en: Messages = {
   time: timeEn,
   files: filesEn,
   checklists: checklistsEn,
+  billing: billingEn,
   customers: customersEn,
   exchange: exchangeEn,
   users: usersEn,
@@ -341,6 +345,7 @@ export const en: Messages = {
     settings: "Settings",
     network: "IT & network",
     invoices: "Invoice archive",
+    billing: "Quotes & invoicing",
     employees: "Employees",
     time: "Time tracking",
     fleet: "Fleet",
@@ -413,6 +418,12 @@ export const en: Messages = {
       finalize: "Finalize outgoing invoices",
       export: "Export invoices (CSV, invoice archive and accountant)",
       import: "Import invoices (CSV, creates new invoices)",
+    },
+    billing: {
+      view: "View quotes and invoice drafts",
+      edit: "Create and edit quotes, order confirmations and invoice drafts",
+      accept: "Mark quotes as accepted or rejected and create orders from them",
+      send: "Send documents to customers by e-mail",
     },
     employees: {
       view: "View employees",

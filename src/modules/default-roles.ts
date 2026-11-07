@@ -24,6 +24,8 @@ export const DEFAULT_ROLES: Array<{
     description: "Büro-Bereich vollständig, Werkstatt lesend.",
     permissions: [
       "invoices.view", "invoices.edit", "invoices.delete",
+      // Angebote & Rechnungen: ansehen, Entwürfe bearbeiten, Angebote annehmen; Festschreiben (invoices.finalize) und Versand (billing.send) sind gekennzeichnet (Regel 9) und in keiner Standardrolle
+      "billing.view", "billing.edit", "billing.accept",
       "employees.view", "employees.edit", "employees.delete", "employees.sensitive",
       "fleet.view", "fleet.edit", "fleet.delete",
       "handbook.view", "handbook.edit",
@@ -43,6 +45,7 @@ export const DEFAULT_ROLES: Array<{
     description: "Rechnungen, Mitarbeiter (ohne sensible Daten), Fuhrpark und Handbuch (lesen und schreiben).",
     permissions: [
       "invoices.view", "invoices.edit",
+      "billing.view", "billing.edit", "billing.accept",
       "employees.view",
       "fleet.view", "fleet.edit",
       "handbook.view", "handbook.edit",
@@ -63,6 +66,8 @@ export const DEFAULT_ROLES: Array<{
       // Aufträge: annehmen, bearbeiten, Preise erfassen und abschließen; „Wieder öffnen“ (orders.reopen) ist gekennzeichnet (Regel 9) und gehört in keine Standardrolle
       "orders.view", "orders.create", "orders.edit", "orders.close", "orders.prices",
       "parts.view", "parts.prices",
+      // Angebote erstellen und annehmen: Teil der Annahme (Rechnungen festschreiben und versenden darf der Serviceberater nicht)
+      "billing.view", "billing.edit", "billing.accept",
       "time.view", "time.stamp", "time.correct",
       // Dokumente & Fotos: hochladen und – als Leitung der Annahme – auch fremde Dateien entfernen
       "files.view", "files.upload", "files.delete",

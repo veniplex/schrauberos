@@ -70,8 +70,13 @@ describe("API: Registrierung und Ausnahmeliste", () => {
     }
   });
 
-  it("jede Funktion mit Endpunkten gehört zum Katalog, ihr Recht zu ihrer Rechte-Gruppe", () => {
-    for (const e of endpoints) assert.equal(featureOfPermission(e.permission), e.feature, `${e.operationId}: ${e.permission} gehört nicht zu ${e.feature}`);
+  it("jede Funktion mit Endpunkten gehört zum Katalog, ihr Recht zu ihrer Rechte-Gruppe (oder zu der einer hart vorausgesetzten Funktion: die Rechnungserstellung nutzt `invoices.finalize`/`invoices.edit` des Rechnungsarchivs)", () => {
+    for (const e of endpoints) {
+      const owner = featureOfPermission(e.permission);
+      const own = FEATURES.find((f) => fullFeatureId(f) === e.feature);
+      const allowed = new Set<string>([e.feature, ...(own && "requires" in own ? (own.requires as readonly string[]) : [])]);
+      assert.ok(owner && allowed.has(owner), `${e.operationId}: ${e.permission} gehört nicht zu ${e.feature} oder seinen Voraussetzungen`);
+    }
   });
 
   it("jede schreibende UI-Aktion hat ein API-Pendant oder steht mit Begründung auf der Ausnahmeliste", () => {

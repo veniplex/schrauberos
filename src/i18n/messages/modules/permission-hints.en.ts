@@ -66,6 +66,12 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     delete: "Delete employees permanently.",
     sensitive: "See and change the emergency contact and the type of absences (sickness).",
   },
+  billing: {
+    view: "View quotes, order confirmations and invoice drafts. Finalized invoices are in the invoice archive.",
+    edit: "Create, change and delete quotes, order confirmations and invoice drafts; issue quotes; prepare invoices from orders. Finalizing invoices needs the permission “Finalize outgoing invoices”.",
+    accept: "Mark quotes as accepted or rejected and create a workshop order from them.",
+    send: "Send quotes and invoices to customers by e-mail (the permission “Send e-mails” is needed as well). Never assigned automatically.",
+  },
   checklists: {
     view: "View checklists on vehicles and orders – only where the person may also see the vehicle or order.",
     fill: "Start checklists, tick items, record measurements, have the customer sign and complete them.",
