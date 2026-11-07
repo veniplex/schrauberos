@@ -7,7 +7,7 @@ import { normalizePlate } from "@/lib/plate";
 import { dayKey } from "@/lib/zone";
 import type { Permission } from "@/modules/catalog";
 import type { Viewer } from "@/modules/types";
-import { customerContacts, customerNameSelect } from "@/modules/workshop/customers/public";
+import { customerContacts, customerNameSelect, unrestrictedByCustomer } from "@/modules/workshop/customers/public";
 import { db } from "@/server/db";
 import { keyContains, searchWhere } from "@/server/search";
 import { INSPECTION_SOON_MONTHS } from "./domain";
@@ -105,7 +105,7 @@ export type VehicleDeadline = { id: string; kind: "inspection" | "extra"; /** nu
  */
 export async function vehicleDeadlines(viewer: Viewer, from: string, to: string, take = 2000): Promise<VehicleDeadline[]> {
   if (!viewer.can("vehicles.view")) return [];
-  const unrestricted = { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+  const unrestricted = unrestrictedByCustomer;
   const fromMonth = from.slice(0, 7);
   const toMonth = to.slice(0, 7);
   const rows = await db.vehicle.findMany({
@@ -149,7 +149,7 @@ export type VehicleInspectionOverview = {
  */
 export async function vehicleInspectionOverview(viewer: Viewer, options: { currentMonth: string; untilMonth: string; limit: number }): Promise<VehicleInspectionOverview | null> {
   if (!viewer.can("vehicles.view")) return null;
-  const unrestricted = { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+  const unrestricted = unrestrictedByCustomer;
   const where: Prisma.VehicleWhereInput = { archivedAt: null, AND: [unrestricted, { inspectionDue: { not: null, lte: options.untilMonth } }] };
   const [groups, rows] = await Promise.all([
     db.vehicle.groupBy({ by: ["inspectionDue"], where, _count: { _all: true } }),

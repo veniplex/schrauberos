@@ -1,5 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
-import { unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
+import { unrestrictedByCustomer, unrestrictedByVehicle } from "@/modules/workshop/customers/public";
 import { orderRef } from "@/modules/workshop/orders/public";
 import { vehicleRef } from "@/modules/workshop/vehicles/public";
 import type { AppSession } from "@/server/auth/session";
@@ -16,14 +16,15 @@ type Actor = Pick<AppSession, "can" | "features">;
 export const canSeeVehicles = (actor: Actor): boolean => actor.features.has("workshop.vehicles") && actor.can("vehicles.view");
 export const canSeeOrders = (actor: Actor): boolean => actor.features.has("workshop.orders") && actor.can("orders.view");
 
-const UNRESTRICTED = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
+/** Checkliste, deren Fahrzeughalter und (falls am Auftrag) Auftragskunde nicht eingeschränkt sind – unabhängig vom Betrachter (API-Sichtbarkeit und Webhooks teilen sie). */
+export const unrestrictedChecklistWhere: Prisma.ChecklistWhereInput = { AND: [unrestrictedByVehicle, { OR: [{ orderId: null }, { order: { is: unrestrictedByCustomer } }] }] };
 
 /** Bedingung für alle Checklisten, die der Betrachter sehen darf; `null`, wenn er keine sehen darf. */
 export function visibleChecklistsWhere(actor: Actor): Prisma.ChecklistWhereInput | null {
   if (!actor.can("checklists.view")) return null;
   const alternatives: Prisma.ChecklistWhereInput[] = [];
-  if (canSeeVehicles(actor)) alternatives.push({ orderId: null, vehicle: { is: UNRESTRICTED } });
-  if (canSeeOrders(actor)) alternatives.push({ orderId: { not: null }, order: { is: UNRESTRICTED }, vehicle: { is: UNRESTRICTED } });
+  if (canSeeVehicles(actor)) alternatives.push({ orderId: null, ...unrestrictedByVehicle });
+  if (canSeeOrders(actor)) alternatives.push({ orderId: { not: null }, order: { is: unrestrictedByCustomer }, ...unrestrictedByVehicle });
   return alternatives.length > 0 ? { OR: alternatives } : null;
 }
 

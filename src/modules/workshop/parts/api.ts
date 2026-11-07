@@ -5,6 +5,7 @@ import { scaledToInput } from "@/lib/line-items";
 import { centsText, iso, isoOrNull, nullableString, oneOf, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
+import { restrictedOrderIds } from "@/modules/workshop/orders/public";
 import { MOVEMENT_KINDS } from "./constants";
 import { receiptOperation, saveArticleOperation, setArchivedOperation } from "./operations";
 
@@ -160,6 +161,12 @@ export const movementEndpoints = defineResource({
   path: "/stock-movements",
   read: "parts.view",
   model: db.stockMovement as unknown as Delegate<StockMovement>,
+  // Buchungen zu Aufträgen eingeschränkter Kunden (Art. 18; Kunde oder Fahrzeughalter) gibt es für die API nicht – Auftragsnummer und Notiz könnten sonst Kundenbezug verraten. Die Buchung kennt den Auftrag nur über
+  // die Kennung (kein Fremdschlüssel), deshalb zählt die Liste der eingeschränkten Aufträge; ist sie zu lang, sind alle Buchungen mit Auftrag unsichtbar (nie das Gegenteil).
+  scope: async () => {
+    const ids = await restrictedOrderIds();
+    return ids === null ? { orderId: null } : ids.length === 0 ? {} : { OR: [{ orderId: null }, { orderId: { notIn: ids } }] };
+  },
   item: movementItem,
   toItem: (m): z.input<typeof movementItem> => ({
     id: m.id,

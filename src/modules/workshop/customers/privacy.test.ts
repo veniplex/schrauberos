@@ -142,7 +142,7 @@ describe("Verarbeitung einschränken", () => {
 
 describe("Kundennummern", () => {
   it("doppelte Nummer: Warnung mit Verweis, mit Bestätigung gespeichert; Schreibweise und Leerraum zählen nicht; der Kunde selbst ist keine Dublette", async () => {
-    await login(["customers.edit"]);
+    await login(["customers.edit", "customers.view"]);
     await redirectOf(() => actions.saveCustomer({}, form({ lastName: "Eins", customerNumber: "K-7" })));
     const first = await env.db.customer.findFirstOrThrow();
     const dup = await actions.saveCustomer({}, form({ lastName: "Zwei", customerNumber: " k-7 " }));
@@ -156,6 +156,23 @@ describe("Kundennummern", () => {
     const third = await env.db.customer.findFirstOrThrow({ where: { lastName: "Drei" } });
     assert.ok(await redirectOf(() => actions.saveCustomer({}, form({ id: third.id, version: versionOf(third), lastName: "Drei", customerNumber: "K-9", city: "Ort" }))), "die eigene Nummer beim Ändern ist keine Dublette");
     assert.ok((await actions.saveCustomer({}, form({ id: third.id, version: versionOf(await env.db.customer.findUniqueOrThrow({ where: { id: third.id } })), lastName: "Drei", customerNumber: "K-7" }))).fieldErrors?.customerNumber, "Ändern auf eine vorhandene Nummer warnt");
+  });
+});
+
+describe("Kundennummern ohne Leserecht", () => {
+  it("doppelte Nummer ohne `customers.view`: nur „vergeben“, weder Name noch Kennung; ebenso bei einem Kunden mit eingeschränkter Verarbeitung", async () => {
+    await login(["customers.edit", "customers.view"]);
+    await redirectOf(() => actions.saveCustomer({}, form({ lastName: "Eins", customerNumber: "K-71" })));
+    const first = await env.db.customer.findFirstOrThrow({ where: { customerNumber: "K-71" } });
+    await login(["customers.edit"]);
+    const blind = await actions.saveCustomer({}, form({ lastName: "Zwei", customerNumber: "k-71" }));
+    assert.match(blind.fieldErrors?.customerNumber ?? "", /schon vergeben/);
+    assert.ok(!JSON.stringify(blind).includes("Eins") && blind.data?.duplicateId === undefined);
+    await env.db.customer.update({ where: { id: first.id }, data: { processingRestrictedAt: new Date() } });
+    await login(["customers.edit", "customers.view"]);
+    const restricted = await actions.saveCustomer({}, form({ lastName: "Zwei", customerNumber: "k-71" }));
+    assert.equal(restricted.fieldErrors?.customerNumber, blind.fieldErrors?.customerNumber, "gleiche Meldung für eingeschränkte Kunden");
+    assert.ok(!JSON.stringify(restricted).includes("Eins") && restricted.data?.duplicateId === undefined);
   });
 });
 

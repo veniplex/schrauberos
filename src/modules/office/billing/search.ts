@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/server/db";
+import { unrestrictedDocument } from "@/modules/workshop/customers/public";
 import type { SearchProviderDef } from "@/modules/types";
 import { docTitle } from "./domain";
 import { billingTextWhere } from "./queries";
@@ -14,7 +15,7 @@ export const searchProviders: SearchProviderDef[] = [
     order: 41,
     async search(q, { limit }) {
       const rows = await db.invoice.findMany({
-        where: { AND: [{ source: "billing" }, { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] }, { OR: billingTextWhere(q) }] },
+        where: { AND: [{ source: "billing" }, unrestrictedDocument, { OR: billingTextWhere(q) }] },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: { id: true, number: true, partyName: true, docType: true, finalizedAt: true },

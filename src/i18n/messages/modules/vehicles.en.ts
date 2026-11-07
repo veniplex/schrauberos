@@ -145,6 +145,7 @@ export const vehiclesEn: typeof vehiclesDe = {
     inUse: "This vehicle cannot be deleted: {appointments} appointments, {tireSets} tyre sets, {orders} orders (orders are never deleted), {transfers} changes of keeper, {files} files and photos, {checklists} checklists, {invoices} invoices and documents (including quotes and drafts). Archive it instead: the vehicle is kept with its history but no longer appears in selection fields and search.",
     plateExists: "There is already a vehicle with this plate (owner: {customer}).",
     plateExistsNoOwner: "There is already a vehicle with this plate (no owner).",
+    plateExistsHidden: "There is already a vehicle with this plate.",
     sameOwner: "This is already the current owner.",
     mileage: "Please enter the mileage as a whole number (0 to 9,999,999).",
     hsn: "The HSN has exactly 4 characters (digits or letters).",

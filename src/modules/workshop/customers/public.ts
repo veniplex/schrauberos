@@ -5,4 +5,4 @@
  */
 export { customerDisplayName } from "./client";
 export { findCustomerIdsByNumber, numberKey } from "./lookup";
-export { customerContacts, customerForDocument, customerNameSelect, customerTitle, unrestrictedCustomerWhere, type CustomerContact } from "./queries";
+export { customerContacts, customerForDocument, customerNameSelect, customerTitle, unrestrictedByCustomer, unrestrictedByOptionalVehicle, unrestrictedByVehicle, unrestrictedCustomerWhere, unrestrictedDocument, unrestrictedOrder, type CustomerContact } from "./queries";

@@ -4,6 +4,7 @@ import { versionOf } from "@/lib/concurrency";
 import { dateOnly, day, iso, nullableString, oneOf, requiredRef } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
+import { unrestrictedByVehicle } from "@/modules/workshop/customers/public";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "./constants";
 import { createTireSetOperation, deleteTireSetOperation, disposeOperation, setStatusOperation, STOCK_STATUSES, updateTireSetOperation } from "./operations";
 
@@ -88,7 +89,7 @@ function toInput(b: Record<string, unknown>): Record<string, unknown> {
 }
 
 /** Reifensätze an Fahrzeugen von Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) gibt es für die API nicht (404); Fahrzeuge ohne Halter bleiben sichtbar. */
-const UNRESTRICTED = { vehicle: { is: { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] } } };
+const UNRESTRICTED = unrestrictedByVehicle;
 
 export const endpoints = defineResource({
   feature: "workshop.tires",

@@ -56,17 +56,23 @@ export const saveCustomerOperation = defineOperation({
   permission: "customers.edit",
   input: customerInput,
   audit: (input) => (input.id ? "customer.update" : "customer.create"),
-  run: async ({ input: { id, version, allowDuplicate, ...d }, tx, audit }) => {
+  run: async ({ input: { id, version, allowDuplicate, ...d }, principal, tx, audit }) => {
     const data = customerRecord(d);
     // Kundennummer doppelt vergeben: eine Warnung mit Bestätigung, keine Sperre (wie beim Kennzeichen). Verglichen wird ohne Leerraum und Groß-/Kleinschreibung.
     if (d.customerNumber && !allowDuplicate) {
       const key = numberKey(d.customerNumber);
       const candidates = await tx.customer.findMany({
         where: { customerNumber: { contains: d.customerNumber.trim() }, ...(id ? { id: { not: id } } : {}) },
-        select: { id: true, firstName: true, lastName: true, company: true, customerNumber: true },
+        select: { id: true, customerNumber: true, processingRestrictedAt: true },
       });
       const twin = candidates.find((c) => numberKey(c.customerNumber ?? "") === key);
-      if (twin) failFields({ customerNumber: { key: "customers.errors.numberExists", params: { name: customerDisplayName(twin) } } }, { duplicateId: twin.id, duplicateName: customerDisplayName(twin), duplicateNumber: d.customerNumber });
+      if (twin) {
+        // Name und Kennung nur für Personen mit `customers.view` und nie von einem Kunden mit eingeschränkter Verarbeitung (Art. 18): sonst nur „vergeben“ – gleiche Antwort für jeden Kunden,
+        // damit sich die Kundennummern nicht durchzählen lassen
+        if (twin.processingRestrictedAt || !principal.can("customers.view")) failFields({ customerNumber: { key: "customers.errors.numberExistsHidden" } }, {});
+        const named = await tx.customer.findUniqueOrThrow({ where: { id: twin.id }, select: { firstName: true, lastName: true, company: true } });
+        failFields({ customerNumber: { key: "customers.errors.numberExists", params: { name: customerDisplayName(named) } } }, { duplicateId: twin.id, duplicateName: customerDisplayName(named), duplicateNumber: d.customerNumber });
+      }
     }
     if (id && !(await claimRow(tx.customer, id, version))) fail("conflict");
     const saved = id ? await tx.customer.update({ where: { id }, data }) : await tx.customer.create({ data });

@@ -47,6 +47,20 @@ export const searchableCustomerWhere = { archivedAt: null, processingRestrictedA
 export const unrestrictedCustomerWhere = { processingRestrictedAt: null } as const satisfies Prisma.CustomerWhereInput;
 
 /**
+ * **Die eine Auslegung von „eingeschränkt“ (Art. 18 DSGVO) für alles, was an einem Kunden und/oder Fahrzeug hängt** – Aufträge, Belege, Termine, Dateien, Checklisten, Reifensätze, Fahrzeuge:
+ * Eine Sache gilt als eingeschränkt, wenn ihr **Kunde oder der Halter ihres Fahrzeugs** eingeschränkt verarbeitet wird. API (`scope`), Webhooks, Suche und Oberfläche bauen keine eigene Bedingung,
+ * sondern nehmen eine dieser (der Typ des Fremdschlüssels entscheidet, welche):
+ *  - `unrestrictedByCustomer`: die Sache hat einen optionalen Kunden (Fahrzeug, Auftrag, Beleg, Termin) – ohne Kunden oder Kunde nicht eingeschränkt;
+ *  - `unrestrictedByVehicle` / `unrestrictedByOptionalVehicle`: der Halter des (immer vorhandenen bzw. optionalen) Fahrzeugs ist nicht eingeschränkt (Reifensatz, Checkliste / Datei, Beleg);
+ *  - `unrestrictedOrder` (Kunde und Fahrzeug, Fahrzeug Pflicht) und `unrestrictedDocument` (Kunde und optionales Fahrzeug): beides zusammen.
+ */
+export const unrestrictedByCustomer = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
+export const unrestrictedByVehicle = { vehicle: { is: unrestrictedByCustomer } };
+export const unrestrictedByOptionalVehicle = { OR: [{ vehicleId: null }, { vehicle: { is: unrestrictedByCustomer } }] };
+export const unrestrictedOrder = { AND: [unrestrictedByCustomer, unrestrictedByVehicle] };
+export const unrestrictedDocument = { AND: [unrestrictedByCustomer, unrestrictedByOptionalVehicle] };
+
+/**
  * Suchfelder der Kundenliste, der Schnellsuche und der API (Wörterbuch pro Berechtigung, `searchWhere`): Name und Firma über die normalisierte Spalte `nameKey`, Kundennummer,
  * Ort (`cityKey`), Telefon (`phoneKey`, nur Ziffern) und E-Mail. Alle Felder sind Kontaktdaten und gehören zu `customers.view`; wer nur den Namen sehen darf, nimmt `customerNameSearch`.
  */

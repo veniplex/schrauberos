@@ -3,7 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { computeTotals, type Totals } from "@/lib/line-items";
 import { normalizePlate } from "@/lib/plate";
 import type { Viewer } from "@/modules/types";
-import { customerContacts, customerDisplayName, customerNameSelect, unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
+import { customerContacts, customerDisplayName, customerNameSelect, unrestrictedOrder } from "@/modules/workshop/customers/public";
 import { vehicleTextWhere } from "@/modules/workshop/vehicles/public";
 import { db } from "@/server/db";
 import { contains, FULLTEXT_MIN_LENGTH, keyContains } from "@/server/search";
@@ -177,21 +177,21 @@ export const orderForAppointment = (appointmentId: string) => db.order.findFirst
 
 /**
  * Kurzbeschreibung eines Auftrags für Funktionen, die sich an ihn hängen (Zeiterfassung, Dokumente, Checklisten): Nummer, Status, Kennzeichen und ob an ihm neue Verknüpfungen erlaubt sind –
- * nicht, wenn er abgeschlossen/storniert ist (`open`) oder der Kunde eingeschränkt verarbeitet wird (`restricted`, Art. 18 DSGVO). Kein Betrachter nötig: nichts über `orders.view` hinaus.
+ * nicht, wenn er abgeschlossen/storniert ist (`open`) oder sein Kunde **oder der Halter seines Fahrzeugs** eingeschränkt verarbeitet wird (`restricted`, Art. 18 DSGVO). Kein Betrachter nötig: nichts über `orders.view` hinaus.
  * `client` darf die Transaktion einer Operation sein.
  */
 export async function orderRef(orderId: string, client: Pick<Prisma.TransactionClient, "order"> = db): Promise<{ id: string; number: string; status: string; open: boolean; restricted: boolean; vehicleId: string; plate: string } | null> {
   const order = await client.order.findUnique({
     where: { id: orderId },
-    select: { id: true, number: true, status: true, vehicleId: true, vehicle: { select: { plate: true } }, customer: { select: { processingRestrictedAt: true } } },
+    select: { id: true, number: true, status: true, vehicleId: true, vehicle: { select: { plate: true, customer: { select: { processingRestrictedAt: true } } } }, customer: { select: { processingRestrictedAt: true } } },
   });
-  return order ? { id: order.id, number: order.number, status: order.status, open: isOpen(order.status), restricted: Boolean(order.customer?.processingRestrictedAt), vehicleId: order.vehicleId, plate: order.vehicle.plate } : null;
+  return order ? { id: order.id, number: order.number, status: order.status, open: isOpen(order.status), restricted: Boolean(order.customer?.processingRestrictedAt || order.vehicle.customer?.processingRestrictedAt), vehicleId: order.vehicleId, plate: order.vehicle.plate } : null;
 }
 
 /** Aufträge zur Auswahl beim Stempeln: offene Aufträge (Angenommen, In Arbeit, Fertig), neueste zuerst, ohne Kunden mit eingeschränkter Verarbeitung. */
 export async function stampableOrders(limit = 40): Promise<Array<{ id: string; number: string; plate: string; status: string }>> {
   const rows = await db.order.findMany({
-    where: { status: { in: ["accepted", "in_progress", "ready"] }, OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] },
+    where: { status: { in: ["accepted", "in_progress", "ready"] }, ...unrestrictedOrder },
     orderBy: { acceptedAt: "desc" },
     take: limit,
     select: { id: true, number: true, status: true, vehicle: { select: { plate: true } } },
@@ -215,14 +215,24 @@ export async function orderForBilling(orderId: string, client: Pick<Prisma.Trans
       mileageKm: true,
       acceptedAt: true,
       closedAt: true,
-      vehicle: { select: { id: true, plate: true, make: true, model: true } },
+      vehicle: { select: { id: true, plate: true, make: true, model: true, customer: { select: { processingRestrictedAt: true } } } },
       customer: { select: { processingRestrictedAt: true, archivedAt: true } },
       items: { orderBy: { position: "asc" }, select: { id: true, kind: true, description: true, unit: true, quantityMilli: true, unitCents: true, taxBp: true, discountBp: true, refType: true, refId: true } },
     },
   });
   if (!order) return null;
-  const { customer, ...rest } = order;
-  return { ...rest, restricted: Boolean(customer?.processingRestrictedAt), open: isOpen(order.status) };
+  const { customer, vehicle: { customer: holder, ...vehicle }, ...rest } = order;
+  // eingeschränkt: der Kunde des Auftrags **oder der Halter seines Fahrzeugs** (`customers/public.ts`)
+  return { ...rest, vehicle, restricted: Boolean(customer?.processingRestrictedAt || holder?.processingRestrictedAt), open: isOpen(order.status) };
+}
+
+/**
+ * Kennungen der Aufträge, die für Art. 18 DSGVO als eingeschränkt gelten (Kunde oder Fahrzeughalter eingeschränkt; `unrestrictedOrder`) – für Datenbestände, die Aufträge nur über die Kennung kennen (Lagerbuchungen).
+ * Mehr als `limit` Treffer: `null` (der Aufrufer behandelt das als „alle unsichtbar“, nie als „keine eingeschränkt“).
+ */
+export async function restrictedOrderIds(limit = 5000): Promise<string[] | null> {
+  const rows = await db.order.findMany({ where: { NOT: unrestrictedOrder }, select: { id: true }, take: limit + 1 });
+  return rows.length > limit ? null : rows.map((r) => r.id);
 }
 
 /** Aufträge zu den Kennungen (Anzeige von Zeiten und Dateien): Nummer und Kennzeichen. */
@@ -239,9 +249,8 @@ export async function orderLabels(ids: readonly string[]): Promise<Map<string, {
  */
 export async function orderCardData(viewer: Viewer, id: string) {
   if (!viewer.can("orders.view")) return null;
-  const unrestricted = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
   const order = await db.order.findFirst({
-    where: { id, ...unrestricted, vehicle: { is: unrestricted } },
+    where: { id, ...unrestrictedOrder },
     select: {
       id: true,
       number: true,

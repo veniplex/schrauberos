@@ -125,6 +125,7 @@ export const employeesEn: typeof employeesDe = {
     leaveBeforeHire: "The end date is before the start date.",
     numberTaken: "This personnel number is already in use.",
     userTaken: "This account already belongs to {name}.",
+    userTakenHidden: "This account already belongs to an employee.",
     endBeforeStart: "The end is before the start.",
     absenceDuplicate: "This exact absence (same type, same period) is already recorded for this person.",
     sickRestricted: "Sick-leave entries require the permission for sensitive employee data.",

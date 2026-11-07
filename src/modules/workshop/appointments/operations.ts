@@ -3,6 +3,7 @@ import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { isHexColor } from "@/lib/color";
 import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, QUICK_STATUSES } from "@/modules/workshop/appointments/constants";
+import { unrestrictedDocument } from "@/modules/workshop/customers/public";
 import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { defineOperation, fail, failField, type RunContext } from "@/server/operations";
 import { FEED_EXPIRY_CHOICES, feedExpiry, feedTokenHint, generateFeedToken, hashFeedToken } from "./feed-token";
@@ -74,7 +75,13 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
       include: { vehicle: { select: { plate: true } } },
     });
     const clash = findBayClash({ id: d.id, bayId: d.bayId, status: d.status, startsAt, endsAt }, candidates);
-    if (clash) failField("bayId", "appointments.errors.bayBusy", { from: clash.startsAt.toISOString(), to: clash.endsAt.toISOString(), title: clash.vehicle?.plate ?? clash.title });
+    if (clash) {
+      // Kennzeichen/Titel des fremden Termins nur für Personen, die Termine sehen dürfen, und nie von einem Kunden mit eingeschränkter Verarbeitung (Art. 18; Kunde oder Fahrzeughalter) – sonst nur der Zeitraum
+      const mayName = principal.can("appointments.view") && (await tx.appointment.count({ where: { id: clash.id, ...unrestrictedDocument } })) > 0;
+      const span = { from: clash.startsAt.toISOString(), to: clash.endsAt.toISOString() };
+      if (mayName) failField("bayId", "appointments.errors.bayBusy", { ...span, title: clash.vehicle?.plate ?? clash.title });
+      failField("bayId", "appointments.errors.bayBusyUnnamed", span);
+    }
   }
 
   const data = {

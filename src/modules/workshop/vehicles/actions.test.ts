@@ -19,7 +19,7 @@ beforeEach(async () => {
   await env.db.auditLog.deleteMany();
   await env.db.user.deleteMany();
   env.browser.reset();
-  const role = await env.role({ key: `r-${Math.random()}`, permissions: ["vehicles.view", "vehicles.edit", "vehicles.delete"] });
+  const role = await env.role({ key: `r-${Math.random()}`, permissions: ["vehicles.view", "vehicles.edit", "vehicles.delete", "customers.view"] });
   await env.signIn(await env.user({ username: "werkstatt", roles: [role] }));
 });
 

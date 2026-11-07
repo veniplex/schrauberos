@@ -193,7 +193,7 @@ describe("Subnetze: Überschneidung, /31, /32 und IP-Eindeutigkeit je Netz (P4b-
   });
 
   it("in einem anderen VLAN: Warnung mit Bestätigung (allowOverlap), danach gespeichert; ändern ohne eigene Überschneidung", async () => {
-    await login(["network.edit"]);
+    await login(["network.edit", "network.view"]);
     const v10 = await vlan(10);
     const v20 = await vlan(20);
     await redirectOf(() => subnet({ name: "Büro", cidr: "192.168.1.0/24", vlanId: v10 }));
@@ -207,6 +207,14 @@ describe("Subnetze: Überschneidung, /31, /32 und IP-Eindeutigkeit je Netz (P4b-
     // ein vorhandenes Netz ändern: es überschneidet sich nicht mit sich selbst
     const own = await env.db.netSubnet.findFirstOrThrow({ where: { name: "Büro" } });
     assert.ok(await redirectOf(() => subnet({ id: own.id, name: "Büro neu", cidr: "192.168.1.0/24", vlanId: v10 })));
+  });
+
+  it("ohne `network.view` nennt die Überschneidungsmeldung weder Namen noch Netz des vorhandenen Eintrags", async () => {
+    await login(["network.edit"]);
+    await redirectOf(() => subnet({ name: "Geheimnetz", cidr: "10.77.0.0/24" }));
+    const blind = await subnet({ name: "Zweit", cidr: "10.77.0.0/25" });
+    assert.ok(blind.fieldErrors?.cidr);
+    assert.ok(!JSON.stringify(blind).includes("Geheimnetz") && !JSON.stringify(blind).includes("10.77.0.0/24"));
   });
 
   it("/31 und /32 werden angelegt; die Adressen sind im Netz nutzbar", async () => {

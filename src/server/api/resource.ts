@@ -45,7 +45,7 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
    * Bedingung, die jede gelesene Zeile erfüllt (Prisma-`where`, z. B. „Art ist nicht Krankheit“): Zeilen außerhalb werden weder in Listen noch beim Einzelzugriff gelesen
    * (`visible` bleibt als zweite Linie).
    */
-  scope?: object;
+  scope?: object | (() => Promise<object>);
   /** Zeilen, die die API nicht zeigen darf (z. B. Krankheit): gelten überall als nicht vorhanden */
   visible?: (row: Row) => boolean;
   item: z.ZodObject;
@@ -127,10 +127,14 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
   const itemPath = `${cfg.path}/{id}`;
   const include = cfg.include;
   const select = cfg.select;
-  const scoped = (where: object): object => (cfg.scope ? { AND: [cfg.scope, where] } : where);
+  const scopeNow = async (): Promise<object | undefined> => (typeof cfg.scope === "function" ? await cfg.scope() : cfg.scope);
+  const scoped = async (where: object): Promise<object> => {
+    const scope = await scopeNow();
+    return scope ? { AND: [scope, where] } : where;
+  };
   const find = async (id: string): Promise<Row | null> => {
     if (!ID_SHAPE.test(id)) return null;
-    const row = await cfg.model.findUnique({ where: { id, ...cfg.scope }, include, select });
+    const row = await cfg.model.findUnique({ where: { id, ...(await scopeNow()) }, include, select });
     return row && (!cfg.visible || cfg.visible(row)) ? row : null;
   };
   const common = { feature: cfg.feature, tag: cfg.tag };
@@ -161,7 +165,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       const sort = parseSort(call.searchParams.get("sort"), Object.keys(cfg.list.sorts), cfg.list.defaultSort);
       for (const bad of [paging, sort]) if (isParamError(bad)) throw apiProblem("validation_failed", { fields: { [bad.field]: { code: bad.code } } });
       const { page, limit } = paging as { page: number; limit: number };
-      const where = scoped(cfg.list.where?.(call.query as z.output<Q>) ?? {});
+      const where = await scoped(cfg.list.where?.(call.query as z.output<Q>) ?? {});
       // stabile Reihenfolge: zuletzt immer nach id
       const orderBy = [...(sort as SortKey[]).map((k) => cfg.list.sorts[k.key](k.dir)), { id: "asc" }];
       const [rows, total] = await Promise.all([cfg.model.findMany({ where, orderBy, skip: (page - 1) * limit, take: limit, include, select }), cfg.model.count({ where })]);

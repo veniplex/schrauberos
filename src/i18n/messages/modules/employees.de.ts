@@ -124,6 +124,7 @@ export const employeesDe = {
     leaveBeforeHire: "Der Austritt liegt vor dem Eintritt.",
     numberTaken: "Diese Personalnummer ist bereits vergeben.",
     userTaken: "Dieses Konto gehört bereits zu {name}.",
+    userTakenHidden: "Dieses Konto gehört bereits zu einem Mitarbeiter.",
     endBeforeStart: "Das Ende liegt vor dem Beginn.",
     absenceDuplicate: "Genau diese Abwesenheit (gleiche Art, gleicher Zeitraum) ist für die Person schon eingetragen.",
     sickRestricted: "Krankheitseinträge erfordern das Recht für sensible Mitarbeiterdaten.",

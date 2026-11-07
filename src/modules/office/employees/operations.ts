@@ -65,7 +65,11 @@ export const saveEmployeeOperation = defineOperation({
     if (d.userId) {
       const user = await tx.user.findUnique({ where: { id: d.userId }, include: { employee: { select: { id: true, firstName: true, lastName: true } } } });
       if (!user) failField("userId", "validation.invalid");
-      if (user.employee && user.employee.id !== id) failField("userId", "employees.errors.userTaken", { name: employeeName(user.employee) });
+      if (user.employee && user.employee.id !== id) {
+        // der Name des anderen Mitarbeiters nur mit `employees.view` (sonst erfährt ein Token mit nur `employees.edit` Namen aus der Fehlermeldung)
+        if (!principal.can("employees.view")) failField("userId", "employees.errors.userTakenHidden");
+        failField("userId", "employees.errors.userTaken", { name: employeeName(user.employee) });
+      }
     }
 
     // Notfallkontakt nur mit dem Recht ändern – sonst bleibt der gespeicherte Wert unangetastet

@@ -6,7 +6,7 @@ import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { searchKey } from "@/lib/search-key";
-import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect, unrestrictedByCustomer } from "@/modules/workshop/customers/public";
 import { parseMonthInput } from "@/lib/month";
 import { writeAudit } from "@/server/audit";
 import { auditActorName, defineOperation, fail, failField, failFields } from "@/server/operations";
@@ -94,11 +94,20 @@ export const saveVehicleOperation = defineOperation({
     // Ein Kennzeichen kann mehrfach vorkommen (Halterwechsel, wiederverwendete Kennzeichen, Altfahrzeug noch erfasst): Das ist eine **Warnung mit Bestätigung**, keine Sperre.
     // Die Antwort nennt das vorhandene Fahrzeug (Kennung, Kennzeichen, Halter), damit das Formular „Vorhandenes Fahrzeug öffnen“, „Trotzdem anlegen“ und „Altfahrzeug archivieren“ anbieten kann.
     // Archivierte Fahrzeuge zählen nicht (sie sind außer Dienst; so wird ein Kennzeichen frei, wenn das Altfahrzeug archiviert ist).
-    const duplicate = await tx.vehicle.findFirst({ where: { plateNorm, archivedAt: null, ...(id ? { id: { not: id } } : {}) }, include: { customer: { select: customerNameSelect } }, orderBy: { createdAt: "asc" } });
-    if (duplicate && !d.allowDuplicate && !d.archiveDuplicate) {
-      const owner = duplicate.customer ? customerDisplayName(duplicate.customer) : "";
+    const duplicate = await tx.vehicle.findFirst({
+      where: { plateNorm, archivedAt: null, ...(id ? { id: { not: id } } : {}) },
+      select: { id: true, plate: true, customerId: true, customer: { select: { processingRestrictedAt: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    // Was die Warnung über das vorhandene Fahrzeug verraten darf (Art. 18 DSGVO, Datensparsamkeit): Kennung und Kennzeichen nur, wenn die Person Fahrzeuge sehen darf **und** der Halter nicht eingeschränkt verarbeitet
+    // wird; der Name des Halters zusätzlich nur mit `customers.view`. Sonst nur „es gibt schon eines“ – ohne Namen, Kennung oder Halter. Ein solches Fahrzeug wird auch nie als „Altfahrzeug“ archiviert.
+    const duplicateVisible = Boolean(duplicate && !duplicate.customer?.processingRestrictedAt && principal.can("vehicles.view"));
+    if (duplicate && ((!d.allowDuplicate && !d.archiveDuplicate) || (d.archiveDuplicate && !duplicateVisible))) {
+      if (!duplicateVisible) failFields({ plate: { key: "vehicles.errors.plateExistsHidden" } }, {});
+      const holder = duplicate.customerId && principal.can("customers.view") ? await tx.customer.findUnique({ where: { id: duplicate.customerId }, select: customerNameSelect }) : null;
+      const owner = holder ? customerDisplayName(holder) : "";
       failFields(
-        { plate: duplicate.customer ? { key: "vehicles.errors.plateExists", params: { customer: owner } } : { key: "vehicles.errors.plateExistsNoOwner" } },
+        { plate: holder ? { key: "vehicles.errors.plateExists", params: { customer: owner } } : duplicate.customerId ? { key: "vehicles.errors.plateExistsHidden" } : { key: "vehicles.errors.plateExistsNoOwner" } },
         { duplicateId: duplicate.id, duplicatePlate: duplicate.plate, duplicateOwner: owner },
       );
     }
@@ -125,8 +134,8 @@ export const saveVehicleOperation = defineOperation({
     }
     // Dritter Weg der Warnung: das Altfahrzeug (alle nicht archivierten mit diesem Kennzeichen) wird in derselben Transaktion archiviert, mit eigenem Audit-Eintrag je Fahrzeug
     let archivedOld = 0;
-    if (duplicate && d.archiveDuplicate) {
-      const old = await tx.vehicle.findMany({ where: { plateNorm, archivedAt: null, id: { not: savedId } }, select: { id: true, plate: true } });
+    if (duplicate && d.archiveDuplicate && duplicateVisible) {
+      const old = await tx.vehicle.findMany({ where: { plateNorm, archivedAt: null, id: { not: savedId }, ...unrestrictedByCustomer }, select: { id: true, plate: true } });
       await tx.vehicle.updateMany({ where: { id: { in: old.map((v) => v.id) } }, data: { archivedAt: new Date() } });
       for (const v of old) await writeAudit(tx, "vehicle.archive", { target: `${v.plate} (Altfahrzeug beim Speichern von ${data.plate})`, entityId: v.id, actor: { id: principal.user.id, name: auditActorName(principal) } });
       archivedOld = old.length;

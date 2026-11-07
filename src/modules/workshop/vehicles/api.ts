@@ -5,6 +5,7 @@ import { versionOf } from "@/lib/concurrency";
 import { dateOnly, dayOrNull, iso, nullableString, oneOf, optionalDate, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
+import { unrestrictedByCustomer } from "@/modules/workshop/customers/public";
 import { EXTRA_INSPECTION_KINDS, FUEL_TYPES, HSN_PATTERN, TSN_PATTERN } from "./domain";
 import { vehicleTextWhere } from "./queries";
 import { archiveVehicleOperation, deleteVehicleOperation, saveVehicleOperation, transferVehicleOperation, unarchiveVehicleOperation } from "./operations";
@@ -63,7 +64,7 @@ const item = z.object({
 });
 
 /** Fahrzeuge von Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) gibt es für die API nicht (404 wie beim Kunden selbst); Fahrzeuge ohne Halter bleiben sichtbar. */
-const UNRESTRICTED = { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+const UNRESTRICTED = unrestrictedByCustomer;
 
 export const endpoints = defineResource({
   feature: "workshop.vehicles",

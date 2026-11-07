@@ -8,6 +8,7 @@ import { centsText, day, dayOrNull, iso, isoOrNull, nullableString, oneOf, optio
 import { defineResource, ID_SHAPE, type Delegate } from "@/server/api/resource";
 import type { ApiEndpoint } from "@/server/api/types";
 import { db } from "@/server/db";
+import { unrestrictedByCustomer, unrestrictedDocument, unrestrictedOrder } from "@/modules/workshop/customers/public";
 import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { PdfError } from "@/server/pdf";
 import { apiProblem, runApiOperation } from "@/server/operations";
@@ -37,7 +38,7 @@ import { BILLING_STATUS_FILTERS, billingListWhere, loadDocView } from "./queries
  * Festschreiben, Schnappschuss, Prüfliste, Steuerprüfung, Grenzen, Audit).
  *
  *  - `GET /billing-documents`: Belege **aller** Arten, auch Entwürfe und Angebote (die Ausgangsliste der Rechnungen selbst: `/invoices`); Positionen stehen im Beleg. Belege von Kunden mit eingeschränkter
- *    Verarbeitung (Art. 18 DSGVO) gibt es für die API nicht (404).
+ *    Verarbeitung (Art. 18 DSGVO) und Belege an Fahrzeugen, deren Halter eingeschränkt ist, gibt es für die API nicht (404).
  *  - `POST`/`PATCH`/`DELETE`: nur **Entwürfe** (festgeschriebene Belege sind unveränderlich: 409). Beim Anlegen wird ein Kunde (`customerId`) nur verknüpft, wenn er für die API sichtbar ist.
  *  - Aktionen: `finalize` (Rechnungen, `invoices.finalize`), `issue` (Angebote/Auftragsbestätigungen), `accept`/`reject`, `send` (E-Mail; Recht `billing.send`, ausdrücklich im Token), `confirmation`
  *    (Auftragsbestätigung aus Angebot), `order` (Auftrag aus Angebot), `from-order` (Rechnungsentwurf aus Auftrag), `pdf` und `xml` (Downloads). **Storno:** `POST /invoices/{id}/cancel`
@@ -47,8 +48,8 @@ import { BILLING_STATUS_FILTERS, billingListWhere, loadDocView } from "./queries
 
 const common = { feature: "office.billing" as const, tag: "Billing" };
 
-/** Beleg der Rechnungserstellung, nicht von einem Kunden mit eingeschränkter Verarbeitung (Art. 18). */
-const DOC_SCOPE = { source: "billing", OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+/** Beleg der Rechnungserstellung, weder von einem Kunden noch an einem Fahrzeug mit eingeschränkt verarbeitetem Halter (Art. 18; `customers/public.ts`). */
+const DOC_SCOPE = { source: "billing", ...unrestrictedDocument };
 
 type Row = Invoice & { items: InvoiceItem[]; cancelledBy: { id: string } | null; deductions: Array<{ partialId: string }> };
 
@@ -226,7 +227,7 @@ const toInput = (b: Record<string, unknown>): Record<string, unknown> => ({ ...b
 /** Kunde (und Fahrzeug) für die API sichtbar? Sonst gibt es den Elternteil für sie nicht (404, nichts wird angelegt). */
 async function parentsVisible(b: { customerId?: string | null; vehicleId?: string | null }): Promise<boolean> {
   if (b.customerId && (await db.customer.count({ where: { id: b.customerId, processingRestrictedAt: null } })) === 0) return false;
-  if (b.vehicleId && (await db.vehicle.count({ where: { id: b.vehicleId, OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] } })) === 0) return false;
+  if (b.vehicleId && (await db.vehicle.count({ where: { id: b.vehicleId, ...unrestrictedByCustomer } })) === 0) return false;
   return true;
 }
 
@@ -403,7 +404,7 @@ const documentActions: ApiEndpoint[] = [
     handler: async (call) => {
       const body = call.body as { orderId: string; confirmOpen?: boolean; acknowledgeDuplicate?: boolean };
       // Aufträge von Kunden mit eingeschränkter Verarbeitung gibt es für die API nicht
-      const order = await db.order.count({ where: { id: body.orderId, OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] } });
+      const order = await db.order.count({ where: { id: body.orderId, ...unrestrictedOrder } });
       if (order === 0) throw apiProblem("not_found");
       const created = await runApiOperation(invoiceFromOrderOperation, call.principal, { orderId: body.orderId, confirmOpen: body.confirmOpen === true, acknowledgeDuplicate: body.acknowledgeDuplicate === true });
       call.committed({ status: 201, body: { data: { id: created.id } }, headers: { location: `/api/v1/billing-documents/${created.id}` } });

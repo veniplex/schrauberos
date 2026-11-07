@@ -144,6 +144,7 @@ export const vehiclesDe = {
     inUse: "Dieses Fahrzeug kann nicht gelöscht werden: {appointments} Termine, {tireSets} Reifensätze, {orders} Aufträge (Aufträge werden nie gelöscht), {transfers} Halterwechsel, {files} Dateien und Fotos, {checklists} Checklisten, {invoices} Rechnungen und Belege (auch Angebote und Entwürfe). Stattdessen archivieren: Das Fahrzeug bleibt mit seiner Geschichte erhalten, erscheint aber nicht mehr in Auswahlfeldern und Suche.",
     plateExists: "Es gibt schon ein Fahrzeug mit diesem Kennzeichen (Halter: {customer}).",
     plateExistsNoOwner: "Es gibt schon ein Fahrzeug mit diesem Kennzeichen (ohne Halter).",
+    plateExistsHidden: "Es gibt schon ein Fahrzeug mit diesem Kennzeichen.",
     sameOwner: "Das ist bereits der aktuelle Halter.",
     mileage: "Bitte den Kilometerstand als ganze Zahl angeben (0 bis 9.999.999).",
     hsn: "Die HSN hat genau 4 Zeichen (Ziffern oder Buchstaben).",

@@ -6,6 +6,7 @@ import { formatCents } from "@/lib/money";
 import { startOfDay } from "@/lib/zone";
 import type { WidgetDef } from "@/modules/types";
 import { db } from "@/server/db";
+import { unrestrictedDocument } from "@/modules/workshop/customers/public";
 import { billingStats } from "./queries";
 
 /** Dashboard: Entwürfe, offene Angebote und offene Rechnungen (noch zu zahlen) mit den zuletzt bearbeiteten Entwürfen und offenen Angeboten. */
@@ -19,7 +20,7 @@ export async function BillingWidget() {
       where: {
         source: "billing",
         OR: [{ finalizedAt: null }, { docType: "offer", offerStatus: "open", OR: [{ validUntil: null }, { validUntil: { gte: today } }] }],
-        AND: [{ OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] }],
+        AND: [unrestrictedDocument],
       },
       select: { id: true, docType: true, number: true, partyName: true, finalizedAt: true, grossCents: true },
       orderBy: { updatedAt: "desc" },

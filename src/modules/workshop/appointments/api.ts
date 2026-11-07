@@ -6,6 +6,7 @@ import { addDays } from "@/lib/zone";
 import { dateOnly, iso, nullableString, optionalRef } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
+import { unrestrictedDocument } from "@/modules/workshop/customers/public";
 import { apiProblem } from "@/server/operations";
 import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, QUICK_STATUSES } from "./constants";
 import { createAppointmentOperation, deleteAppointmentOperation, setAppointmentStatusOperation, updateAppointmentOperation } from "./operations";
@@ -69,12 +70,7 @@ const dayStart = (value: string, field: string): Date => {
 };
 
 /** Termine eines Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) – direkt oder über das Fahrzeug – gibt es für die API nicht (404). */
-const UNRESTRICTED = {
-  AND: [
-    { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] },
-    { OR: [{ vehicleId: null }, { vehicle: { is: { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] } } }] },
-  ],
-};
+const UNRESTRICTED = unrestrictedDocument;
 
 export const appointmentEndpoints = defineResource({
   feature: "workshop.appointments",

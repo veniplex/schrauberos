@@ -4,6 +4,7 @@ import { versionOf } from "@/lib/concurrency";
 import { centsText, iso, isoOrNull, nullableString, oneOf, optionalRef, requiredRef, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
+import { unrestrictedOrder } from "@/modules/workshop/customers/public";
 import { APPROVAL_METHODS, ORDER_ITEM_KINDS, ORDER_STATUSES } from "./constants";
 import { addFindingOperation, approveOperation, closeOrderOperation, createOrderOperation, saveItemsOperation, setStatusOperation, updateOrderOperation } from "./operations";
 
@@ -15,11 +16,11 @@ import { addFindingOperation, approveOperation, closeOrderOperation, createOrder
  *  - Positionen ersetzt man als Ganzes: `POST /orders/{id}/items` (wie der Editor in der Oberfläche; `If-Match`). Befund anlegen: `POST /orders/{id}/findings`.
  *  - Freigaben (Protokoll) sind **nur lesend und anlegend**; die Unterschrift am Tablet gibt es nicht über die API (telefonisch oder getippter Name mit Bestätigung).
  *  - Nicht über die API: „Wieder öffnen“ (hebt einen Abschluss samt Rückbuchungen auf – eine bewusste Handlung in der Oberfläche) und das Entfernen von Befunden (`api-exceptions.ts`).
- *  - Aufträge eingeschränkter Kunden (Art. 18 DSGVO) gibt es für die API nicht (404).
+ *  - Aufträge eingeschränkter Kunden (Art. 18 DSGVO) – auch solche an einem Fahrzeug, dessen Halter eingeschränkt ist – gibt es für die API nicht (404).
  */
 
-/** Aufträge ohne eingeschränkten Kunden – die Bedingung für alle Ressourcen hier. */
-const UNRESTRICTED = { OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] };
+/** Aufträge, deren Kunde **und** deren Fahrzeughalter nicht eingeschränkt sind (`customers/public.ts`) – die Bedingung für alle Ressourcen hier. */
+const UNRESTRICTED = unrestrictedOrder;
 
 const orderItem = z.object({
   id: z.string(),

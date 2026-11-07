@@ -5,7 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { StartForm } from "@/modules/workshop/checklists/start-form";
 import { listTemplates } from "@/modules/workshop/checklists/queries";
 import { canSeeOrders, canSeeVehicles } from "@/modules/workshop/checklists/access";
-import { customerNameSelect } from "@/modules/workshop/customers/public";
+import { customerNameSelect, unrestrictedByCustomer } from "@/modules/workshop/customers/public";
 import { orderRef } from "@/modules/workshop/orders/public";
 import { toVehicleOption } from "@/modules/workshop/vehicles/public";
 import { requirePermission } from "@/server/auth/session";
@@ -29,7 +29,7 @@ export default async function NewChecklistPage({ searchParams }: { searchParams:
   const order = ref && ref.open && !ref.restricted ? { id: ref.id, number: ref.number, plate: ref.plate } : null;
   const vehicleId = !order && sp.vehicle && canSeeVehicles(session) ? sp.vehicle : null;
   const vehicle = vehicleId
-    ? await db.vehicle.findFirst({ where: { id: vehicleId, archivedAt: null, OR: [{ customerId: null }, { customer: { is: { processingRestrictedAt: null } } }] }, select: { id: true, plate: true, make: true, model: true, customer: { select: customerNameSelect } } })
+    ? await db.vehicle.findFirst({ where: { id: vehicleId, archivedAt: null, ...unrestrictedByCustomer }, select: { id: true, plate: true, make: true, model: true, customer: { select: customerNameSelect } } })
     : null;
 
   return (

@@ -1,6 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { normalizePlate } from "@/lib/plate";
-import { unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
+import { unrestrictedByCustomer, unrestrictedOrder } from "@/modules/workshop/customers/public";
 import { orderRef } from "@/modules/workshop/orders/public";
 import { vehicleRef } from "@/modules/workshop/vehicles/public";
 import type { AppSession } from "@/server/auth/session";
@@ -20,9 +20,17 @@ type Actor = Pick<AppSession, "can" | "features">;
 export const canSeeVehicles = (actor: Actor): boolean => actor.features.has("workshop.vehicles") && actor.can("vehicles.view");
 export const canSeeOrders = (actor: Actor): boolean => actor.features.has("workshop.orders") && actor.can("orders.view");
 
-const UNRESTRICTED = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
-/** Ein Auftrag zählt als eingeschränkt, wenn sein Kunde **oder der Halter seines Fahrzeugs** eingeschränkt verarbeitet wird (wie bei den Checklisten: die strengere Auslegung). */
-const ORDER_UNRESTRICTED = { AND: [UNRESTRICTED, { vehicle: { is: UNRESTRICTED } }] };
+const UNRESTRICTED = unrestrictedByCustomer;
+/** Ein Auftrag zählt als eingeschränkt, wenn sein Kunde **oder der Halter seines Fahrzeugs** eingeschränkt verarbeitet wird (`customers/public.ts`: die eine Auslegung für alle Funktionen). */
+const ORDER_UNRESTRICTED = unrestrictedOrder;
+
+/** Datei an einem Fahrzeug (Halter nicht eingeschränkt) oder an einem Auftrag (Kunde und Fahrzeughalter nicht eingeschränkt) – unabhängig vom Betrachter (API-Sichtbarkeit und Webhooks teilen sie). */
+export const unrestrictedFileWhere: Prisma.FileAttachmentWhereInput = {
+  OR: [
+    { vehicleId: { not: null }, vehicle: { is: UNRESTRICTED } },
+    { orderId: { not: null }, order: { is: ORDER_UNRESTRICTED } },
+  ],
+};
 
 /** Bedingung für alle Dateien, die der Betrachter sehen darf; `null`, wenn er keine sehen darf. */
 export function visibleFilesWhere(actor: Actor): Prisma.FileAttachmentWhereInput | null {

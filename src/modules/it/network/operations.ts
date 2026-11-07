@@ -133,7 +133,7 @@ export const saveSubnetOperation = defineOperation({
   permission: "network.edit",
   input: subnetInput,
   audit: (input) => (input.id ? "network.update" : "network.create"),
-  run: async ({ input: { id, allowOverlap, ...d }, tx, audit }) => {
+  run: async ({ input: { id, allowOverlap, ...d }, principal, tx, audit }) => {
     const net = parseCidr(d.cidr);
     if (!net) failField("cidr", "network.errors.cidr");
     const cidr = `${formatIPv4(net.network)}/${net.prefix}`;
@@ -158,9 +158,16 @@ export const saveSubnetOperation = defineOperation({
     const unchanged = existing !== null && existing.cidr === cidr && (existing.vlanId ?? null) === (d.vlanId ?? null);
     const overlapping = unchanged ? [] : overlappingSubnets(cidr, await tx.netSubnet.findMany({ select: { id: true, name: true, cidr: true, vlanId: true } }), id);
     const sameVlan = overlapping.find((o) => (o.vlanId ?? null) === (d.vlanId ?? null));
-    if (sameVlan) failField("cidr", sameVlan.cidr === cidr ? "network.errors.subnetExists" : "network.errors.subnetOverlap", { name: sameVlan.name, cidr: sameVlan.cidr });
+    // Namen und Netze anderer Einträge nur für Personen, die das Netzwerk sehen dürfen (ein Token mit nur `network.edit` erfährt sonst Bestandsdaten aus Fehlermeldungen)
+    const mayName = principal.can("network.view");
+    if (sameVlan) {
+      if (sameVlan.cidr === cidr) failField("cidr", "network.errors.subnetExists");
+      if (!mayName) failField("cidr", "network.errors.subnetOverlapHidden");
+      failField("cidr", "network.errors.subnetOverlap", { name: sameVlan.name, cidr: sameVlan.cidr });
+    }
     const otherVlan = overlapping[0];
     if (otherVlan && !allowOverlap) {
+      if (!mayName) failFields({ cidr: { key: "network.errors.subnetOverlapOtherVlanHidden" } }, {});
       failFields({ cidr: { key: "network.errors.subnetOverlapOtherVlan", params: { name: otherVlan.name, cidr: otherVlan.cidr } } }, { duplicateId: otherVlan.id, duplicateName: otherVlan.name, duplicateCidr: otherVlan.cidr });
     }
 
@@ -214,7 +221,7 @@ export const saveIpOperation = defineOperation({
   permission: "network.edit",
   input: ipInput,
   audit: (input) => (input.id ? "network.update" : "network.create"),
-  run: async ({ input: { id, version, ...d }, tx, audit }) => {
+  run: async ({ input: { id, version, ...d }, principal, tx, audit }) => {
     const subnet = await tx.netSubnet.findUnique({ where: { id: d.subnetId } });
     if (!subnet) fail("invalid", "validation.invalid");
     const parsed = parseIPv4(d.address);
@@ -224,7 +231,10 @@ export const saveIpOperation = defineOperation({
     const address = formatIPv4(parsed);
     // Eindeutig je Netz (Subnetz): dieselbe Adresse darf in einem anderen Netz vorkommen (zusätzlich der Unique-Index (subnetId, address) gegen Wettläufe)
     const dup = await tx.netIp.findFirst({ where: { subnetId: subnet.id, address, ...(id ? { id: { not: id } } : {}) }, include: { device: true } });
-    if (dup) failField("address", "network.errors.ipTaken", { who: dup.device?.name ?? dup.hostname ?? "–" });
+    if (dup) {
+      if (!principal.can("network.view")) failField("address", "network.errors.ipTakenHidden");
+      failField("address", "network.errors.ipTaken", { who: dup.device?.name ?? dup.hostname ?? "–" });
+    }
 
     let mac: string | null = null;
     if (d.mac) {
