@@ -512,3 +512,48 @@ describe("Datenzugriff", () => {
     assert.match(api, /scope:\s*\{\s*type:\s*\{\s*not:\s*"sick"/);
   });
 });
+
+/**
+ * Zeitzone (P1c-3): Tage, Uhrzeiten, Wochen und Monate der Werkstatt rechnen in der **Werkstatt-Zone** (`src/lib/zone.ts`), nie in der Prozess-Zone (`TZ`). Statisch prüfbar:
+ * kein `date-fns` (die Gegenstücke stehen in `zone.ts`), keine Ortszeit-Zugriffe auf `Date` (`getHours`, `setDate` …) und keine Ortszeit-Konstruktoren (`new Date(2026, 0, 1)`,
+ * `new Date("…T12:00:00")` ohne Zone) im Produktivcode; `process.env.TZ` liest nur `zone.ts` (Rückfall), geschrieben wird es nur in `startup.ts` (Kompatibilität).
+ */
+describe("Zeitzone", () => {
+  const rel = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
+  const sources = files.map((file) => ({ file: rel(file), text: readFileSync(file, "utf8") }));
+  /** Ohne Kommentarzeilen. */
+  const code = (text: string) =>
+    text
+      .split("\n")
+      .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+      .join("\n");
+  const production = sources.filter(({ file }) => !file.startsWith("launcher/") && !file.startsWith("test/"));
+
+  it("kein date-fns im Produktivcode: Tagesrechnung steht in lib/zone.ts (gleiche Namen, Zone als letzter Parameter)", () => {
+    const offenders = production.filter(({ text }) => /from\s+["']date-fns(?:\/[^"']*)?["']/.test(text)).map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  it("keine Ortszeit-Zugriffe auf Date (getHours, getDate, getDay, getMonth, getFullYear, setHours …): sie rechnen in der Prozess-Zone", () => {
+    const local = /\.(?:getHours|getMinutes|getSeconds|getDate|getDay|getMonth|getFullYear|setHours|setMinutes|setSeconds|setDate|setMonth|setFullYear)\(/;
+    const offenders = production.filter(({ text }) => local.test(code(text))).map(({ file }) => file);
+    assert.deepEqual(offenders, [], "stattdessen getHours(date)/getDay(date)/… aus @/lib/zone (Zone: Werkstatt-Zone)");
+  });
+
+  it("keine Ortszeit-Konstruktoren: `new Date(2026, 0, 1)` und `new Date(\"…T12:00:00\")` ohne Zone meinen die Prozess-Zone", () => {
+    const parts = /new Date\(\s*[\w.]+\s*,\s*[\w.+ -]+\s*,\s*[\w.+ -]+/; // mehrere Zahlen: Jahr, Monat, Tag …
+    const wall = /new Date\(\s*`[^`]*T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?`\s*\)/; // Datum-Uhrzeit ohne Z/Versatz
+    const offenders = production.filter(({ text }) => parts.test(code(text)) || wall.test(code(text))).map(({ file }) => file);
+    assert.deepEqual(offenders, [], "stattdessen noon(day), startOfDayIn(day), parseLocalDateTime(day, time) aus @/lib/dates bzw. instantOf aus @/lib/zone");
+  });
+
+  it("process.env.TZ lesen nur zone.ts (Rückfall) und startup.ts; schreiben nur startup.ts (applyTimezone, Kompatibilität)", () => {
+    const offenders = production.filter(({ file, text }) => /process\.env\.TZ/.test(code(text)) && !["lib/zone.ts", "server/startup.ts"].includes(file)).map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  it("Zeitpunkte werden in der Oberfläche in der Werkstatt-Zone angezeigt: getI18n übergibt workshopZone() an den Übersetzer", () => {
+    const server = readFileSync(path.join(SRC, "i18n/server.ts"), "utf8");
+    assert.match(server, /createTranslator\(locale, dictionaries\[locale\], workshopZone\(\)\)/);
+  });
+});
