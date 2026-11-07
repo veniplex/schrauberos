@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { ABSENCE_TYPES, DEPARTMENTS } from "@/modules/office/employees/domain";
 import { useI18n } from "@/i18n/client";
+import { endAfterStartChange } from "./absence-dates";
 import { saveAbsence, saveEmployee, saveQualification } from "./actions";
 
 export type EmployeeFormInitial = {
@@ -162,9 +163,9 @@ export function AbsenceForm({
   const { t, td } = useI18n();
   const [start, setStart] = useState(initialDate);
   const [end, setEnd] = useState(initialDate);
-  // „Bis“ zieht „Von“ nach: Wer den Beginn verschiebt, meint meist denselben Tag oder einen späteren Zeitraum – das Ende folgt, solange es nicht bewusst später gesetzt wurde
+  // „Bis“ zieht „Von“ nach (absence-dates.ts)
   const moveStart = (value: string) => {
-    setEnd((current) => (current === "" || current < value || current === start ? value : current));
+    setEnd((current) => endAfterStartChange(current, start, value));
     setStart(value);
   };
   return (

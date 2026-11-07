@@ -93,7 +93,7 @@ export default async function AbsencesPage({
         <ul className="ml-auto flex flex-wrap gap-3 text-xs text-ink-muted" aria-label={t("employees.legend")}>
           {(["vacation", ...(sensitive ? (["sick"] as const) : []), "training", "other"] as const).map((k) => (
             <li key={k} className="flex items-center gap-1.5">
-              <span aria-hidden className={clsx("grid size-5 place-items-center rounded-sm text-[11px] font-semibold", CELL[k])}>
+              <span aria-hidden className={clsx("grid size-5 place-items-center rounded-sm text-xs font-semibold", CELL[k])}>
                 {t(`employees.absenceAbbr.${k}`)}
               </span>{" "}
               {td(`employees.absenceTypes.${k}`, k)}
@@ -101,7 +101,7 @@ export default async function AbsencesPage({
           ))}
           {!sensitive ? (
             <li className="flex items-center gap-1.5">
-              <span aria-hidden className={clsx("grid size-5 place-items-center rounded-sm text-[11px] font-semibold", CELL.masked)}>
+              <span aria-hidden className={clsx("grid size-5 place-items-center rounded-sm text-xs font-semibold", CELL.masked)}>
                 {t("employees.absenceAbbr.masked")}
               </span>{" "}
               {t("employees.absent")}
@@ -126,7 +126,7 @@ export default async function AbsencesPage({
                     scope="col"
                     className={clsx("min-w-[max(1.75rem,var(--tap-row))] border-b border-l border-line px-0.5 py-1 text-center font-normal tabular", weekend ? "bg-surface-2 text-ink-muted" : "", isSameDay(d, today) && "font-bold text-accent-text")}
                   >
-                    <span className="block text-[10px] uppercase">{date(d, { weekday: "narrow" })}</span>
+                    <span className="block text-xs uppercase">{date(d, { weekday: "narrow" })}</span>
                     {d.getDate()}
                   </th>
                 );
@@ -158,7 +158,7 @@ export default async function AbsencesPage({
                       <td key={key} className={clsx("h-7 border-b border-l border-line p-0.5", weekend && "bg-surface-2")}>
                         {type ? (
                           <span
-                            className={clsx("grid h-full min-h-(--tap-row) w-full place-items-center rounded-sm text-[11px] font-semibold", CELL[type])}
+                            className={clsx("grid h-full min-h-(--tap-row) w-full place-items-center rounded-sm text-xs font-semibold", CELL[type])}
                             title={`${label}${a?.note && type !== "masked" && type !== "sick" ? ` – ${a.note}` : ""}`}
                           >
                             <span aria-hidden>{t(`employees.absenceAbbr.${type}`)}</span>
@@ -168,6 +168,7 @@ export default async function AbsencesPage({
                           // Die Matrixzelle öffnet das Formular vorbelegt (Mitarbeiter und Tag). Nur ein Mausweg: per Tastatur und Screenreader gibt es „Abwesenheit eintragen“.
                           <Link
                             href={`${base}&new=1&employee=${e.id}&date=${key}`}
+                            prefetch={false}
                             tabIndex={-1}
                             aria-hidden
                             className="block h-full min-h-(--tap-row) w-full rounded-sm hover:bg-accent-subtle"

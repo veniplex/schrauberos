@@ -44,11 +44,17 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
   });
   if (!v) notFound();
 
-  const km = currentMileage(v.mileage);
+  // Summen und Kilometerspanne über ALLE Einträge des Fahrzeugs (von der Datenbank gerechnet) – die Listen darunter zeigen nur die neuesten
+  const [costSum, costGroups, kmRange] = await Promise.all([
+    db.fleetCost.aggregate({ where: { fleetVehicleId: id }, _sum: { amountCents: true } }),
+    db.fleetCost.groupBy({ by: ["category"], where: { fleetVehicleId: id }, _sum: { amountCents: true } }),
+    db.fleetMileage.aggregate({ where: { fleetVehicleId: id }, _min: { km: true }, _max: { km: true }, _count: { _all: true } }),
+  ]);
+  const km = kmRange._max.km ?? currentMileage(v.mileage);
   const dues = fleetDues(v, km);
-  const total = v.costs.reduce((n, c) => n + c.amountCents, 0);
-  const perKm = costPerKm(total, v.mileage);
-  const byCategory = COST_CATEGORIES.map((c) => ({ c, sum: v.costs.filter((x) => x.category === c).reduce((n, x) => n + x.amountCents, 0) })).filter((x) => x.sum > 0);
+  const total = costSum._sum.amountCents ?? 0;
+  const perKm = costPerKm(total, kmRange._count._all >= 2 ? [{ km: kmRange._min.km ?? 0 }, { km: kmRange._max.km ?? 0 }] : []);
+  const byCategory = COST_CATEGORIES.map((c) => ({ c, sum: costGroups.find((g) => g.category === c)?._sum.amountCents ?? 0 })).filter((x) => x.sum > 0);
   const license = v.driver?.licenseChecks[0];
   const licenseState = license ? dueState(license.nextDue, 60) : null;
   const today = todayInput();
