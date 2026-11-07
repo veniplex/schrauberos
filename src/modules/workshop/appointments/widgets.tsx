@@ -6,7 +6,7 @@ import { getSession } from "@/server/auth/session";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { toDateInput } from "@/lib/dates";
 import { AppointmentQuickStatus } from "./appointment-quick-status";
-import { calendarHref } from "./calendar";
+import { appointmentOpenParams, calendarHref } from "./calendar";
 import { appointmentsBetween } from "./queries";
 import { STATUS_TONE } from "./status-tone";
 import type { WidgetDef } from "@/modules/types";
@@ -41,7 +41,7 @@ export async function TodayAppointmentsWidget() {
             {open.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
                 <Link
-                  href={calendarHref("day", a.startsAt, canEdit ? { edit: a.id } : {})}
+                  href={calendarHref("day", a.startsAt, appointmentOpenParams(a.id, canEdit))}
                   className="flex min-h-(--tap-row) min-w-0 flex-1 basis-60 items-center gap-4 hover:underline"
                 >
                   <span className="w-24 shrink-0 text-sm font-medium tabular">

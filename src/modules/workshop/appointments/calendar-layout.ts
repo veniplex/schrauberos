@@ -36,3 +36,67 @@ export function assignLanes<T>(items: T[], range: (item: T) => [number, number])
   flush();
   return result;
 }
+
+export const minutesOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes();
+
+/**
+ * Beginn und Ende eines Termins in Minuten ab Mitternacht seines Starttages – für Lage und Spuren im Raster. Jeder Termin belegt **mindestens `minDuration`** (das
+ * Raster für neue Termine, mindestens 15 Minuten): So ist jeder Block mindestens einen Rasterschritt hoch (bei Touch ≥ 44 px, siehe `--tap-row`) und zwei kurze
+ * Termine hintereinander überdecken sich nie. Endet ein Termin erst am Folgetag, reicht er bis Mitternacht.
+ */
+export function eventSpan(startsAt: Date, endsAt: Date, minDuration: number): [start: number, end: number] {
+  const start = minutesOfDay(startsAt);
+  const sameDay = startsAt.getFullYear() === endsAt.getFullYear() && startsAt.getMonth() === endsAt.getMonth() && startsAt.getDate() === endsAt.getDate();
+  const end = sameDay ? minutesOfDay(endsAt) : 24 * 60;
+  return [start, Math.max(end, start + Math.max(minDuration, 15))];
+}
+
+/** Anteil der Terminfarbe an der Fläche eines Blocks (Rest: die Kartenfläche). Je mehr, desto kräftiger – aber nur so viel, dass auch gedämpfter Text (`ink-muted`) bei jeder gewählten Farbe lesbar bleibt (Test `calendar-contrast.test.ts`). */
+export const EVENT_TINT_PERCENT = 12;
+
+/** Fläche eines Termin-Blocks: Terminfarbe schwach in die Kartenfläche gemischt (Hell und Dunkel folgen `--surface`). */
+export const eventSurface = (color: string) => `color-mix(in oklab, ${color} ${EVENT_TINT_PERCENT}%, var(--surface))`;
+
+/** Wo die Tastatur in einem Raster aus Zeitfenstern (Spalten × Zeilen) landet; Pfeiltasten bewegen, Pos1/Ende springen in der Spalte, Bild auf/ab um `page` Zeilen. Null: Taste bewegt nichts. */
+export function moveSlot(from: { col: number; row: number }, key: string, size: { cols: number; rows: number }, page = 4): { col: number; row: number } | null {
+  const clamp = (v: number, max: number) => Math.min(Math.max(v, 0), Math.max(max - 1, 0));
+  let { col, row } = from;
+  switch (key) {
+    case "ArrowDown":
+      row += 1;
+      break;
+    case "ArrowUp":
+      row -= 1;
+      break;
+    case "ArrowRight":
+      col += 1;
+      break;
+    case "ArrowLeft":
+      col -= 1;
+      break;
+    case "PageDown":
+      row += page;
+      break;
+    case "PageUp":
+      row -= page;
+      break;
+    case "Home":
+      row = 0;
+      break;
+    case "End":
+      row = size.rows - 1;
+      break;
+    default:
+      return null;
+  }
+  const next = { col: clamp(col, size.cols), row: clamp(row, size.rows) };
+  return next.col === from.col && next.row === from.row ? null : next;
+}
+
+/** Das Zeitfenster, das der Tab-Stopp des Rasters zuerst bekommt: das jetzige, wenn heute im Raster liegt, sonst das erste des ersten Tages. */
+export function initialSlot(opts: { days: Date[]; now: Date; startMin: number; slotMinutes: number; rows: number }): { col: number; row: number } {
+  const col = opts.days.findIndex((d) => d.getFullYear() === opts.now.getFullYear() && d.getMonth() === opts.now.getMonth() && d.getDate() === opts.now.getDate());
+  if (col < 0) return { col: 0, row: 0 };
+  const row = Math.floor((minutesOfDay(opts.now) - opts.startMin) / opts.slotMinutes);
+  return { col, row: Math.min(Math.max(row, 0), Math.max(opts.rows - 1, 0)) };
+}

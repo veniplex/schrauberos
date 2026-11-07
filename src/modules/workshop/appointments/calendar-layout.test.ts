@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { assignLanes } from "./calendar-layout";
+import { assignLanes, eventSpan, initialSlot, moveSlot } from "./calendar-layout";
 
 type Ev = { id: string; s: number; e: number };
 const range = (x: Ev): [number, number] => [x.s, x.e];
@@ -24,5 +24,66 @@ describe("assignLanes", () => {
   });
   test("leere Liste", () => {
     assert.deepEqual(assignLanes([], range), []);
+  });
+});
+
+describe("eventSpan", () => {
+  const at = (h: number, m = 0, day = 5) => new Date(2030, 4, day, h, m);
+  test("Beginn und Ende in Minuten", () => {
+    assert.deepEqual(eventSpan(at(8), at(9, 30), 30), [480, 570]);
+  });
+  test("ein kurzer Termin belegt mindestens einen Rasterschritt (mindestens 15 Minuten)", () => {
+    assert.deepEqual(eventSpan(at(8), at(8, 10), 30), [480, 510]);
+    assert.deepEqual(eventSpan(at(8), at(8, 10), 5), [480, 495], "nie unter 15");
+    assert.deepEqual(eventSpan(at(8), at(8), 15), [480, 495], "Ende = Beginn");
+  });
+  test("zwei kurze Termine hintereinander bekommen eigene Spuren nur, wenn sie sich überlappen würden – mit Rasterschritt nie", () => {
+    const events = [{ s: at(8), e: at(8, 10) }, { s: at(8, 30), e: at(8, 40) }];
+    const lanes = assignLanes(events, (x) => eventSpan(x.s, x.e, 30));
+    assert.deepEqual(lanes.map((p) => [p.lane, p.lanes]), [[0, 1], [0, 1]]);
+  });
+  test("endet am Folgetag: bis Mitternacht", () => {
+    assert.deepEqual(eventSpan(at(22), at(2, 0, 6), 30), [1320, 1440]);
+  });
+});
+
+describe("moveSlot", () => {
+  const size = { cols: 3, rows: 10 };
+  test("Pfeiltasten bewegen um einen Schritt", () => {
+    assert.deepEqual(moveSlot({ col: 1, row: 4 }, "ArrowDown", size), { col: 1, row: 5 });
+    assert.deepEqual(moveSlot({ col: 1, row: 4 }, "ArrowUp", size), { col: 1, row: 3 });
+    assert.deepEqual(moveSlot({ col: 1, row: 4 }, "ArrowRight", size), { col: 2, row: 4 });
+    assert.deepEqual(moveSlot({ col: 1, row: 4 }, "ArrowLeft", size), { col: 0, row: 4 });
+  });
+  test("am Rand bleibt es stehen (null: nichts bewegt sich)", () => {
+    assert.equal(moveSlot({ col: 0, row: 0 }, "ArrowUp", size), null);
+    assert.equal(moveSlot({ col: 0, row: 0 }, "ArrowLeft", size), null);
+    assert.equal(moveSlot({ col: 2, row: 9 }, "ArrowDown", size), null);
+    assert.equal(moveSlot({ col: 2, row: 9 }, "ArrowRight", size), null);
+  });
+  test("Bild auf/ab, Pos1 und Ende springen in der Spalte und halten am Rand", () => {
+    assert.deepEqual(moveSlot({ col: 1, row: 4 }, "PageDown", size), { col: 1, row: 8 });
+    assert.deepEqual(moveSlot({ col: 1, row: 8 }, "PageDown", size), { col: 1, row: 9 });
+    assert.deepEqual(moveSlot({ col: 1, row: 2 }, "PageUp", size), { col: 1, row: 0 });
+    assert.deepEqual(moveSlot({ col: 1, row: 4 }, "Home", size), { col: 1, row: 0 });
+    assert.deepEqual(moveSlot({ col: 1, row: 4 }, "End", size), { col: 1, row: 9 });
+  });
+  test("andere Tasten tun nichts", () => {
+    assert.equal(moveSlot({ col: 1, row: 4 }, "a", size), null);
+    assert.equal(moveSlot({ col: 1, row: 4 }, "Enter", size), null);
+  });
+});
+
+describe("initialSlot", () => {
+  const days = [1, 2, 3].map((d) => new Date(2030, 4, d));
+  test("heute im Raster: das jetzige Zeitfenster dieses Tages", () => {
+    assert.deepEqual(initialSlot({ days, now: new Date(2030, 4, 2, 10, 20), startMin: 8 * 60, slotMinutes: 30, rows: 20 }), { col: 1, row: 4 });
+  });
+  test("vor dem Raster und nach dem Raster: erste bzw. letzte Zeile", () => {
+    assert.deepEqual(initialSlot({ days, now: new Date(2030, 4, 2, 6), startMin: 8 * 60, slotMinutes: 30, rows: 20 }), { col: 1, row: 0 });
+    assert.deepEqual(initialSlot({ days, now: new Date(2030, 4, 2, 23), startMin: 8 * 60, slotMinutes: 30, rows: 20 }), { col: 1, row: 19 });
+  });
+  test("heute nicht sichtbar: erstes Zeitfenster der ersten Spalte", () => {
+    assert.deepEqual(initialSlot({ days, now: new Date(2030, 5, 9, 10), startMin: 8 * 60, slotMinutes: 30, rows: 20 }), { col: 0, row: 0 });
   });
 });

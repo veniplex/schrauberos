@@ -9,6 +9,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { getWorkshop } from "@/server/workshop";
 import { getAppointmentSettings } from "@/modules/workshop/appointments/settings";
+import { AppointmentDetail } from "@/modules/workshop/appointments/appointment-detail";
 import { AppointmentModal } from "@/modules/workshop/appointments/appointment-modal";
 import { appointmentsBetween } from "@/modules/workshop/appointments/queries";
 import {
@@ -31,6 +32,8 @@ type SearchParams = {
   date?: string;
   new?: string;
   edit?: string;
+  /** Leseansicht eines Termins (für alle mit Kalenderzugriff) */
+  show?: string;
   at?: string;
   bay?: string;
   tireSet?: string;
@@ -70,6 +73,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
 
   const closeHref = calendarHref(view, date);
   const showModal = (sp.edit && canEdit) || (sp.new && canCreate);
+  const showDetail = !showModal && sp.show;
 
   return (
     <>
@@ -99,6 +103,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
           canDelete={session.can("appointments.delete")}
         />
       ) : null}
+      {showDetail ? <AppointmentDetail key={sp.show} id={sp.show!} view={view} date={date} canEdit={canEdit} /> : null}
     </>
   );
 }

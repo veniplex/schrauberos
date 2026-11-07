@@ -34,8 +34,6 @@ type Finding = { file: string; line: number; text: string };
 const ALLOWLIST: Record<string, string[]> = {
   // Zellenfarben des Abwesenheitsrasters (Fläche und Schrift aus den Statustönen, Kürzel in der Zelle) – ein echter Spezialfall des Rasters
   "app/(app)/(office)/employees/absences/page.tsx": ["Hinweis-/Statusfläche selbst gebaut (Alert/StatusBadge verwenden)"],
-  // Kalender (Block 6, wird dort einmal umgebaut)
-  "modules/workshop/appointments/calendar.tsx": ["<Table> ohne caption"],
 };
 const REBUILT = "Hinweis-/Statusfläche selbst gebaut (Alert/StatusBadge verwenden)";
 

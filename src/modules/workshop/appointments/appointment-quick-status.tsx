@@ -26,12 +26,12 @@ export type QuickStatusAppointment = {
 };
 
 /**
- * Schnellstatus mit Vorschlag für Karte, Liste und Übersicht (Server-Teil): zeigt „Starten“/„Fertig“ nur mit dem Recht zum Bearbeiten und baut – nur mit dem Recht zum Ein-/Ausbuchen
+ * Schnellstatus mit Vorschlag für Karte, Raster, Liste und Übersicht (Server-Teil): zeigt „Starten“/„Fertig“ nur mit dem Recht zum Bearbeiten und baut – nur mit dem Recht zum Ein-/Ausbuchen
  * (`canStock`: schließt die aktive Reifenfunktion ein, die Sitzung kennt kein Recht ausgeschalteter Funktionen) und nur bei einem verknüpften, buchbaren Reifensatz – den
  * Vorschlag „Satz jetzt ein-/ausbuchen?“ der Reifenfunktion, den die Karte nach „Fertig“ zeigt. Ohne Schritt und ohne Vorschlag entsteht nichts.
  */
 export function AppointmentQuickStatus({ a, canEdit, canStock, i18n }: { a: QuickStatusAppointment; canEdit: boolean; canStock: boolean; i18n: Translator }) {
-  if (!canEdit || quickStatusOptions(a.status).length === 0) return null;
+  if (!canEdit) return null;
   const set = canStock ? a.tireSet : null;
   const prompt =
     set && suggestedStockStatus(set.status) ? (
@@ -42,5 +42,8 @@ export function AppointmentQuickStatus({ a, canEdit, canStock, i18n }: { a: Quic
         label={[set.vehicle.plate, i18n.td(`enums.season.${set.season}`, set.season), set.brand, formatTireSize(set)].filter((part) => part && part !== "–").join(" · ")}
       />
     ) : undefined;
+  // Nach „Fertig“ lädt die Seite neu, der Termin hat dann keinen Schritt mehr – die Karte bleibt aber eingehängt (und mit ihr der Vorschlag, den sie nach „Fertig“ zeigt), solange
+  // es einen Vorschlag geben kann; ohne Schritt und ohne Vorschlag entsteht nichts. Die Knöpfe zeigt `QuickStatus` nur, wenn der Status einen Schritt hat.
+  if (quickStatusOptions(a.status).length === 0 && !prompt) return null;
   return <QuickStatus id={a.id} version={versionOf(a)} status={a.status} title={a.title} prompt={prompt} />;
 }

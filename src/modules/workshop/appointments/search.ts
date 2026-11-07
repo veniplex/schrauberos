@@ -31,15 +31,15 @@ export const searchProviders: SearchProviderDef[] = [
         take: limit,
         select: { id: true, title: true, startsAt: true, vehicle: { select: { plate: true } } },
       });
-      // Ohne Bearbeiten-Recht öffnet die Kalenderseite den Termin nicht im Dialog: dann nur der Tag
-      const canOpen = session.can("appointments.edit");
+      // Mit dem Recht zum Bearbeiten öffnet der Treffer das Formular, sonst die Leseansicht des Termins
+      const canEdit = session.can("appointments.edit");
       return rows.map((a) => {
         const day = toDateInput(a.startsAt);
         return {
           id: a.id,
           title: a.title,
           subtitle: [day, a.vehicle?.plate ?? ""].filter(Boolean).join(" · "),
-          href: `/appointments?view=day&date=${day}${canOpen ? `&edit=${a.id}` : ""}`,
+          href: `/appointments?view=day&date=${day}&${canEdit ? "edit" : "show"}=${a.id}`,
         };
       });
     },

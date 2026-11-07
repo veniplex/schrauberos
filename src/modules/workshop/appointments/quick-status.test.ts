@@ -211,8 +211,15 @@ describe("AppointmentQuickStatus (Server-Teil: Rechte und Vorschlag)", () => {
 
   it("ohne appointments.edit oder ohne mögliche Schritte entsteht nichts", async () => {
     assert.equal(await build(appointment("scheduled"), { canEdit: false, canStock: true }), null);
-    assert.equal(await build(appointment("done"), { canEdit: true, canStock: true }), null);
-    assert.equal(await build(appointment("cancelled"), { canEdit: true, canStock: true }), null);
+    assert.equal(await build(appointment("done", null), { canEdit: true, canStock: true }), null);
+    assert.equal(await build(appointment("cancelled", null), { canEdit: true, canStock: true }), null);
+    assert.equal(await build(appointment("done"), { canEdit: true, canStock: false }), null, "ohne tires.stock auch mit Satz nichts");
+  });
+
+  it("ein erledigter Termin mit buchbarem Satz bleibt eingehängt: Nach „Fertig“ lädt die Seite neu, der Vorschlag der Karte darf dabei nicht verschwinden", async () => {
+    const element = await build(appointment("done"), { canEdit: true, canStock: true });
+    assert.ok(element, "die Karte bleibt im Baum (sonst ginge ihr Zustand mit dem Vorschlag beim Neuladen verloren)");
+    assert.equal(element.props.prompt?.props.id, "s1");
   });
 
   it("der Vorschlag entsteht nur mit tires.stock und einem buchbaren verknüpften Satz – mit dessen Version und Bezeichnung", async () => {
