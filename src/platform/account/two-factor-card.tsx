@@ -43,7 +43,7 @@ export function TwoFactorCard({ status, required, account }: { status: { enabled
     return (
       <div className="flex flex-col gap-5">
         <p className="text-sm text-ink-muted print:hidden">{t("security.twoFactor.setupIntro")}</p>
-        <div className="grid gap-5 print:hidden sm:grid-cols-[auto_1fr]">
+        <div className="grid gap-5 print:hidden md:grid-cols-[auto_1fr]">
           <QrCode matrix={setup.qr} label={t("security.twoFactor.qrLabel")} />
           <div className="flex min-w-0 flex-col gap-2">
             <p className="text-sm font-medium">{t("security.twoFactor.step1")}</p>

@@ -82,7 +82,7 @@ export default async function AccountPage() {
         </div>
         {!forced ? (
           <div className="contents">
-            <Card title={t("security.twoFactor.title")}>
+            <Card title={t("security.twoFactor.title")} className="lg:col-span-2">
               <TwoFactorCard
                 status={{ enabled: twoFactor.enabled, enabledOn: twoFactor.enabledAt ? date(twoFactor.enabledAt, { dateStyle: "medium" }) : null, codesLeft: twoFactor.backupCodesLeft }}
                 required={requireSecond}

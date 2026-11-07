@@ -62,7 +62,7 @@ export async function SessionsCard({ sessions }: { sessions: SessionRow[] }) {
       ),
   });
   return (
-    <Card title={t("security.sessions.title")} className="print:hidden">
+    <Card title={t("security.sessions.title")} className="print:hidden lg:col-span-2">
       <div className="flex flex-col gap-4">
         <p className="text-sm text-ink-muted">{t("security.sessions.intro")}</p>
         <DataTable caption={t("security.sessions.title")} columns={table} rows={rows} rowKey={(row) => row.id} minWidth="36rem" />
@@ -95,7 +95,7 @@ export async function DevicesCard({ devices }: { devices: DeviceRow[] }) {
     ),
   });
   return (
-    <Card title={t("security.devices.title")} className="print:hidden">
+    <Card title={t("security.devices.title")} className="print:hidden lg:col-span-2">
       <div className="flex flex-col gap-4">
         <p className="text-sm text-ink-muted">{t("security.devices.intro")}</p>
         {rows.length === 0 ? (
