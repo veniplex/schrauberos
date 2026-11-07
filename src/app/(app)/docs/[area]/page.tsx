@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Lock, Pin, Plus, Trash2 } from "lucide-react";
-import { Badge, Card, CardLink, EmptyState, NavLink, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, CardLink, EmptyState, NavLink } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { Disclosure } from "@/components/ui/disclosure";
 import { SearchInput } from "@/components/ui/form";
 import { Button, LinkButton } from "@/components/ui/buttons";

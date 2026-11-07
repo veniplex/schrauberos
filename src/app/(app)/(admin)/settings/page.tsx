@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PageHeader } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { settingsTabsFor } from "@/modules/registry";
 import { requireSession } from "@/server/auth/session";

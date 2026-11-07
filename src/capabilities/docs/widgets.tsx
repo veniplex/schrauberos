@@ -18,7 +18,7 @@ export async function PinnedDocs({ area }: { area: DocArea }) {
   });
 
   return (
-    <Card title={t(`docs.areas.${area}.title`)} actions={<TextLink href={`/docs/${area}`} className="text-sm">{t("common.showAll")}</TextLink>} padded={false}>
+    <Card headingLevel={3} title={t(`docs.areas.${area}.title`)} actions={<TextLink href={`/docs/${area}`} className="text-sm">{t("common.showAll")}</TextLink>} padded={false}>
       {pages.length === 0 ? (
         <EmptyState title={t("docs.widgets.nonePinned")} hint={t("docs.widgets.pinHint")} />
       ) : (

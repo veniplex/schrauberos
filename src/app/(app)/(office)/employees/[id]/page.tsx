@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Pencil, Trash2 } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { currentYear } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
+import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
 import { employeeName, visibleAbsenceType, workdaysBetween, workdaysWithin } from "@/modules/office/employees/domain";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -21,7 +22,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: e ? employeeName(e) : undefined };
 }
 
-const TYPE_TONE = { vacation: "info", sick: "danger", training: "accent", other: "neutral", masked: "neutral" } as const;
 
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission("employees.view");
@@ -54,7 +54,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           <span className="flex flex-wrap items-center gap-2">
             {e.jobTitle ? <span>{e.jobTitle}</span> : null}
             <Badge>{td(`employees.departments.${e.department}`, e.department)}</Badge>
-            {!e.active ? <Badge tone="warning">{t("employees.inactive")}</Badge> : null}
+            {!e.active ? <StatusBadge tone="warning">{t("employees.inactive")}</StatusBadge> : null}
           </span>
         }
         actions={
@@ -95,7 +95,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                   return (
                     <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                       <span className="flex flex-wrap items-center gap-2">
-                        <Badge tone={TYPE_TONE[type]}>{type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}</Badge>
+                        <StatusBadge tone={ABSENCE_TONE[type]}>{type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}</StatusBadge>
                         <span className="tabular">
                           {date(a.startDate)}
                           {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""}
@@ -131,9 +131,9 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                       <span className="font-medium">{q.name}</span>
                       <span className="flex items-center gap-3">
                         {q.expiresAt ? (
-                          <Badge tone={state ? DUE_TONE[state] : "neutral"}>
+                          <StatusBadge tone={state ? DUE_TONE[state] : "neutral"}>
                             {state === "expired" ? t("employees.expired") : t("employees.validUntil")} {date(q.expiresAt)}
-                          </Badge>
+                          </StatusBadge>
                         ) : (
                           <span className="text-ink-muted">{t("employees.noExpiry")}</span>
                         )}
@@ -164,7 +164,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             <DefinitionList
               items={[
                 { label: t("employees.fields.personnelNumber"), value: e.personnelNumber },
-                { label: t("customers.fields.email"), value: e.email ? <a className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline" href={`mailto:${e.email}`}>{e.email}</a> : null },
+                { label: t("customers.fields.email"), value: e.email ? <TextLink external href={`mailto:${e.email}`}>{e.email}</TextLink> : null },
                 { label: t("customers.fields.phone"), value: e.phone },
                 { label: t("employees.fields.mobile"), value: e.mobile },
                 { label: t("employees.fields.hireDate"), value: e.hireDate ? date(e.hireDate) : null },
@@ -178,14 +178,14 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             {e.user ? (
               <p className="text-sm">
                 {session.can("users.manage") ? (
-                  <Link href={`/admin/users/${e.user.id}`} className="font-medium text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                  <TextLink href={`/admin/users/${e.user.id}`} className="font-medium">
                     {e.user.name}
-                  </Link>
+                  </TextLink>
                 ) : (
                   <span className="font-medium">{e.user.name}</span>
                 )}{" "}
                 <span className="text-ink-muted">({e.user.username})</span>
-                {!e.user.active ? <Badge tone="warning" className="ml-2">{t("users.inactive")}</Badge> : null}
+                {!e.user.active ? <StatusBadge tone="warning" className="ml-2">{t("users.inactive")}</StatusBadge> : null}
               </p>
             ) : (
               <p className="text-sm text-ink-muted">{t("employees.noUserLinked")}</p>

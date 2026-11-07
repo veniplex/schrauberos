@@ -1,17 +1,23 @@
 import type { Metadata } from "next";
-import clsx from "clsx";
-import Link from "next/link";
 import { Paperclip, Plus } from "lucide-react";
-import { Card, EmptyState, FilterBar, PageHeader, Table } from "@/components/ui/layout";
+import { EmptyState, StatCard } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
+import { FilterBar } from "@/components/ui/filter-bar";
 import { LinkButton } from "@/components/ui/buttons";
+import { DataTable } from "@/components/ui/data-table";
+import { Pagination } from "@/components/ui/pagination";
+import { TabNav } from "@/components/ui/tab-nav";
+import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { currentYear, nowDate } from "@/lib/dates";
-import { INVOICE_DIRECTIONS, invoiceTotals, paymentState, type InvoiceDirection } from "@/modules/office/invoices/domain";
+import { clampPage, listHref, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { INVOICE_DIRECTIONS, paymentState, type InvoiceDirection } from "@/modules/office/invoices/domain";
+import { invoiceSums, invoiceYears } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
+import { contains, searchWhere } from "@/server/search";
 import { PaymentBadge } from "@/modules/office/invoices/ui";
 import { SearchInput, Select } from "@/components/ui/form";
 
@@ -20,8 +26,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("nav.invoices") };
 }
 
-type SearchParams = { dir?: string; q?: string; status?: string; year?: string };
+type SearchParams = { dir?: string; q?: string; status?: string; year?: string; sort?: string; order?: string; page?: string };
 const STATES = ["open", "overdue", "paid", "cancelled"] as const;
+const SORTS = ["date", "number", "party", "due", "gross"] as const;
+const DEFAULT = { sort: "date", dir: "desc" } as const;
+/** `dir` ist hier die Richtung der Rechnung (Eingang/Ausgang), die Sortierrichtung heißt `order`. */
+const ORDER_PARAM = "order";
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const session = await requirePermission("invoices.view");
@@ -29,83 +39,82 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const { t, tp, date, locale } = i18n;
   const eur = (c: number) => formatCents(c, INTL_LOCALE[locale]);
 
-  const dir: InvoiceDirection = (INVOICE_DIRECTIONS as readonly string[]).includes(sp.dir ?? "") ? (sp.dir as InvoiceDirection) : "incoming";
+  const direction: InvoiceDirection = (INVOICE_DIRECTIONS as readonly string[]).includes(sp.dir ?? "") ? (sp.dir as InvoiceDirection) : "incoming";
   const q = (sp.q ?? "").trim();
   const state = (STATES as readonly string[]).includes(sp.status ?? "") ? sp.status! : "";
   const thisYear = currentYear();
   const year = /^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : sp.year === "all" ? 0 : thisYear;
   const today = nowDate();
   today.setHours(0, 0, 0, 0);
+  const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT, dirParam: ORDER_PARAM });
 
-  const where = {
-    direction: dir,
-    ...(year ? { issueDate: { gte: new Date(year, 0, 1), lt: new Date(year + 1, 0, 1) } } : {}),
-    ...(q ? { OR: [{ number: contains(q) }, { partyName: contains(q) }, { reference: contains(q) }, { category: contains(q) }] } : {}),
+  const yearRange = year ? { issueDate: { gte: new Date(year, 0, 1), lt: new Date(year + 1, 0, 1) } } : {};
+  const text = searchWhere<Prisma.InvoiceWhereInput>(q, session.can, [
+    { where: (term) => ({ number: contains(term) }) },
+    { where: (term) => ({ partyName: contains(term) }) },
+    { where: (term) => ({ reference: contains(term) }) },
+    { where: (term) => ({ category: contains(term) }) },
+  ]);
+  const where: Prisma.InvoiceWhereInput = {
+    direction,
+    ...yearRange,
+    ...(text ?? {}),
     ...(state === "paid" ? { status: "paid" } : state === "cancelled" ? { status: "cancelled" } : {}),
     ...(state === "overdue" ? { status: "open", dueDate: { lt: today } } : {}),
-    ...(state === "open" ? { status: "open", OR: [{ dueDate: null }, { dueDate: { gte: today } }] } : {}),
+    ...(state === "open" ? { status: "open", AND: [{ OR: [{ dueDate: null }, { dueDate: { gte: today } }] }] } : {}),
   };
 
-  // Summen immer über alle Rechnungen der Richtung im gewählten Jahr (ohne Status-/Suchfilter)
-  const [invoices, total, forTotals, years] = await Promise.all([
-    db.invoice.findMany({ where, include: { file: { select: { id: true } } }, orderBy: [{ issueDate: "desc" }, { number: "desc" }], take: 300 }),
-    db.invoice.count({ where }),
-    db.invoice.findMany({ where: { direction: dir, ...(year ? { issueDate: { gte: new Date(year, 0, 1), lt: new Date(year + 1, 0, 1) } } : {}) }, select: { status: true, dueDate: true, grossCents: true } }),
-    db.invoice.findMany({ select: { issueDate: true }, distinct: ["issueDate"] }),
-  ]);
-  const totals = invoiceTotals(forTotals);
-  const yearOptions = [...new Set([thisYear, ...years.map((y) => y.issueDate.getFullYear())])].sort((a, b) => b - a);
+  const orderBy =
+    list.sort === "number"
+      ? [{ number: list.dir }]
+      : list.sort === "party"
+        ? [{ partyName: list.dir }, { issueDate: "desc" as const }]
+        : list.sort === "due"
+          ? [{ dueDate: list.dir }, { issueDate: "desc" as const }]
+          : list.sort === "gross"
+            ? [{ grossCents: list.dir }, { issueDate: "desc" as const }]
+            : [{ issueDate: list.dir }, { number: list.dir }];
+
+  // Summen immer über alle Rechnungen der Richtung im gewählten Jahr (ohne Status-/Suchfilter), von der Datenbank gerechnet
+  const [total, totals, years] = await Promise.all([db.invoice.count({ where }), invoiceSums({ direction, ...yearRange }), invoiceYears(thisYear)]);
+  const page = clampPage(list.page, total, list.pageSize);
+  const invoices = await db.invoice.findMany({ where, include: { file: { select: { id: true } } }, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("invoices.edit");
-  const keep = (extra: Record<string, string>) => {
-    const p = new URLSearchParams({ dir, ...(sp.year ? { year: sp.year } : {}), ...extra });
-    return `/invoices?${p.toString()}`;
-  };
 
-  const tab = (value: InvoiceDirection) => (
-    <Link
-      href={keep({ dir: value })}
-      aria-current={dir === value ? "page" : undefined}
-      className={clsx("-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", dir === value ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
-    >
-      {t(`invoices.tabs.${value}`)}
-    </Link>
-  );
-  const stat = (label: string, value: string, sub?: string, tone?: string) => (
-    <Card as="div">
-      <p className="text-sm text-ink-muted">{label}</p>
-      <p className={clsx("mt-1 text-2xl font-semibold tabular", tone)}>{value}</p>
-      {sub ? <p className="mt-0.5 text-xs text-ink-muted">{sub}</p> : null}
-    </Card>
-  );
+  const links = listLinks("/invoices", { dir: direction, q: q || undefined, status: state || undefined, year: sp.year }, list, DEFAULT, ORDER_PARAM);
+  const tabHref = (value: InvoiceDirection) => listHref("/invoices", { dir: value, year: sp.year });
 
   return (
     <>
       <PageHeader
         title={t("invoices.title")}
         description={t("invoices.description")}
+        help="office.invoices"
         actions={
           canEdit ? (
-            <LinkButton href={`/invoices/new?dir=${dir}`} variant="primary">
-              <Plus className="size-4" aria-hidden /> {dir === "incoming" ? t("invoices.newIncoming") : t("invoices.newOutgoing")}
+            <LinkButton href={`/invoices/new?dir=${direction}`} variant="primary">
+              <Plus className="size-4" aria-hidden /> {direction === "incoming" ? t("invoices.newIncoming") : t("invoices.newOutgoing")}
             </LinkButton>
           ) : null
         }
       />
-      <nav className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line" aria-label={t("invoices.title")}>
-        {tab("incoming")}
-        {tab("outgoing")}
-      </nav>
+      <TabNav label={t("invoices.title")} items={INVOICE_DIRECTIONS.map((value) => ({ href: tabHref(value), label: t(`invoices.tabs.${value}`), active: direction === value }))} />
 
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        {stat(dir === "incoming" ? t("invoices.stats.toPay") : t("invoices.stats.toReceive"), eur(totals.openCents), tp("invoices.stats.count", totals.openCount))}
-        {stat(t("invoices.stats.overdue"), eur(totals.overdueCents), tp("invoices.stats.count", totals.overdueCount), totals.overdueCents > 0 ? "text-danger-ink" : undefined)}
-        {stat(dir === "incoming" ? t("invoices.stats.paid") : t("invoices.stats.received"), eur(totals.paidCents), year ? String(year) : t("invoices.allYears"))}
+        <StatCard label={direction === "incoming" ? t("invoices.stats.toPay") : t("invoices.stats.toReceive")} value={eur(totals.openCents)} sub={tp("invoices.stats.count", totals.openCount)} />
+        <StatCard label={t("invoices.stats.overdue")} value={eur(totals.overdueCents)} sub={tp("invoices.stats.count", totals.overdueCount)} tone={totals.overdueCents > 0 ? "danger" : undefined} />
+        <StatCard label={direction === "incoming" ? t("invoices.stats.paid") : t("invoices.stats.received")} value={eur(totals.paidCents)} sub={year ? String(year) : t("invoices.allYears")} />
       </div>
 
-      <FilterBar columns="sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto]" submitLabel={t("common.filter")}>
-        <input type="hidden" name="dir" value={dir} />
-        <SearchInput name="q" defaultValue={q} placeholder={t("invoices.searchPlaceholder")} aria-label={t("common.search")} />
-        <Select name="status" defaultValue={state}  aria-label={t("common.status")}>
+      <FilterBar
+        columns="sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto]"
+        active={Boolean(q || state || sp.year)}
+        extrasOpen={Boolean(state || sp.year)}
+        resetHref={listHref("/invoices", { dir: direction })}
+        search={<SearchInput name="q" defaultValue={q} placeholder={t("invoices.searchPlaceholder")} aria-label={t("common.search")} />}
+      >
+        <input type="hidden" name="dir" value={direction} />
+        <Select name="status" defaultValue={state} aria-label={t("common.status")}>
           <option value="">{t("invoices.filters.anyStatus")}</option>
           {STATES.map((s) => (
             <option key={s} value={s}>
@@ -113,59 +122,62 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             </option>
           ))}
         </Select>
-        <Select name="year" defaultValue={year ? String(year) : "all"}  aria-label={t("invoices.fields.year")}>
+        <Select name="year" defaultValue={year ? String(year) : "all"} aria-label={t("invoices.fields.year")}>
           <option value="all">{t("invoices.allYears")}</option>
-          {yearOptions.map((y) => (
+          {years.map((y) => (
             <option key={y} value={y}>
               {y}
             </option>
           ))}
         </Select>
-</FilterBar>
+      </FilterBar>
 
-      <Card padded={false} className="overflow-hidden">
-        {invoices.length === 0 ? (
-          <EmptyState title={t("invoices.empty")} hint={t("invoices.emptyHint")} />
-        ) : (
-          <>
-            <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("invoices.count", total)}{total > invoices.length ? ` · ${t("invoices.newestShown", { count: invoices.length })}` : ""}</p>
-            <Table className="min-w-[52rem]">
-                <thead>
-                  <tr>
-                    <th>{t("invoices.fields.issueDate")}</th>
-                    <th>{t("invoices.fields.number")}</th>
-                    <th>{dir === "incoming" ? t("invoices.fields.supplier") : t("invoices.fields.recipient")}</th>
-                    <th>{t("invoices.fields.dueDate")}</th>
-                    <th className="text-right">{t("invoices.fields.gross")}</th>
-                    <th>{t("common.status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((inv) => (
-                    <tr key={inv.id} className="row-link">
-                      <td className="whitespace-nowrap tabular text-sm">{date(inv.issueDate)}</td>
-                      <td>
-                        <Link href={`/invoices/${inv.id}`} className="font-mono text-[13px] font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                          {inv.number}
-                        </Link>
-                        {inv.file ? <Paperclip className="ml-1.5 inline size-3.5 text-ink-muted" aria-label={t("invoices.hasFile")} /> : null}
-                      </td>
-                      <td className="text-sm">
-                        {inv.partyName}
-                        {inv.category ? <div className="text-xs text-ink-muted">{inv.category}</div> : null}
-                      </td>
-                      <td className="whitespace-nowrap tabular text-sm">{inv.dueDate ? date(inv.dueDate) : <span className="text-ink-muted">–</span>}</td>
-                      <td className="whitespace-nowrap text-right tabular font-medium">{eur(inv.grossCents)}</td>
-                      <td>
-                        <PaymentBadge state={paymentState(inv)} t={t} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-          </>
-        )}
-      </Card>
+      <DataTable
+        caption={t("invoices.title")}
+        rows={invoices}
+        rowKey={(inv) => inv.id}
+        rowHref={(inv) => `/invoices/${inv.id}`}
+        sort={{ key: list.sort, dir: list.dir }}
+        sortHref={links.sortHref}
+        minWidth="52rem"
+        summary={tp("invoices.count", total)}
+        footer={<Pagination page={page} pageSize={list.pageSize} total={total} hrefFor={links.pageHref} />}
+        empty={<EmptyState title={t("invoices.empty")} hint={t("invoices.emptyHint")} />}
+        columns={[
+          {
+            id: "number",
+            header: t("invoices.fields.number"),
+            priority: "primary",
+            sort: "number",
+            cell: (inv) => (
+              <span className="font-mono text-[13px]">
+                {inv.number}
+                {inv.file ? <Paperclip className="ml-1.5 inline size-3.5 text-ink-muted" aria-label={t("invoices.hasFile")} /> : null}
+              </span>
+            ),
+          },
+          { id: "date", header: t("invoices.fields.issueDate"), sort: "date", cell: (inv) => <span className="whitespace-nowrap tabular text-sm">{date(inv.issueDate)}</span> },
+          {
+            id: "party",
+            header: direction === "incoming" ? t("invoices.fields.supplier") : t("invoices.fields.recipient"),
+            sort: "party",
+            cell: (inv) => (
+              <div className="text-sm">
+                {inv.partyName}
+                {inv.category ? <div className="text-xs text-ink-muted">{inv.category}</div> : null}
+              </div>
+            ),
+          },
+          {
+            id: "due",
+            header: t("invoices.fields.dueDate"),
+            sort: "due",
+            cell: (inv) => (inv.dueDate ? <span className="whitespace-nowrap tabular text-sm">{date(inv.dueDate)}</span> : <span className="text-ink-muted">–</span>),
+          },
+          { id: "gross", header: t("invoices.fields.gross"), align: "end", sort: "gross", cell: (inv) => <span className="whitespace-nowrap font-medium">{eur(inv.grossCents)}</span> },
+          { id: "status", header: t("common.status"), cell: (inv) => <PaymentBadge state={paymentState(inv)} t={t} /> },
+        ]}
+      />
     </>
   );
 }

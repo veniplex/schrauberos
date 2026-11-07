@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader, Plate, Table } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, Table, TextLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { todayInput } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
+import { FLEET_STATUS_TONE } from "@/modules/office/fleet/status-tone";
+import type { FleetStatus } from "@/modules/office/fleet/domain";
 import { employeeName } from "@/modules/office/employees/public";
 import { COST_CATEGORIES, costPerKm, currentMileage, fleetDues } from "@/modules/office/fleet/domain";
 import { formatCents } from "@/lib/money";
@@ -62,7 +64,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
         }
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <Badge tone={v.status === "active" ? "success" : "neutral"}>{td(`fleet.statuses.${v.status}`, v.status)}</Badge>
+            <StatusBadge tone={FLEET_STATUS_TONE[v.status as FleetStatus] ?? "neutral"}>{td(`fleet.statuses.${v.status}`, v.status)}</StatusBadge>
             {km != null ? <span className="tabular">{number(km)} km</span> : null}
           </span>
         }
@@ -183,20 +185,20 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                 {
                   label: t("fleet.fields.driver"),
                   value: v.driver ? (
-                    <Link href={`/employees/${v.driver.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                    <TextLink href={`/employees/${v.driver.id}`}>
                       {employeeName(v.driver)}
-                    </Link>
+                    </TextLink>
                   ) : null,
                 },
                 {
                   label: t("fleet.tabs.licenses"),
                   value: v.driver ? (
                     license ? (
-                      <Badge tone={licenseState ? DUE_TONE[licenseState] : "neutral"}>
+                      <StatusBadge tone={licenseState ? DUE_TONE[licenseState] : "neutral"}>
                         {t("fleet.nextCheck")} {date(license.nextDue)}
-                      </Badge>
+                      </StatusBadge>
                     ) : (
-                      <Badge tone="danger">{t("fleet.neverChecked")}</Badge>
+                      <StatusBadge tone="danger">{t("fleet.neverChecked")}</StatusBadge>
                     )
                   ) : null,
                 },

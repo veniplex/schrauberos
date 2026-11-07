@@ -27,8 +27,11 @@ export function Menu({
 }: {
   /** Inhalt des Knopfes */
   trigger: ReactNode;
-  /** Zugänglicher Name des Knopfes */
-  label: string;
+  /**
+   * Zugänglicher Name des Knopfes – **nur** für einen Knopf ohne sichtbaren Text (nur Symbol). Trägt der Knopf sichtbaren Text, ist dieser der Name (kein `aria-label`: ein
+   * abweichender Name verletzt „Label im Namen“ – Sprachsteuerung sagt, was man sieht).
+   */
+  label?: string;
   children: ReactNode;
   placement?: "down" | "up";
   /** Ausrichtung der Fläche am Knopf */

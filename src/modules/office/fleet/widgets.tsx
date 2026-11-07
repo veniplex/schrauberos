@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, Plate } from "@/components/ui/layout";
+import { Card, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { employeeName } from "@/modules/office/employees/public";
@@ -28,7 +28,7 @@ export async function FleetWidget() {
     .slice(0, 4);
 
   return (
-    <Card title={t("fleet.widgets.title")} actions={<Link href="/fleet?due=1" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">{t("common.showAll")}</Link>} padded={false}>
+    <Card headingLevel={3} title={t("fleet.widgets.title")} actions={<TextLink href="/fleet?due=1" className="text-sm">{t("common.showAll")}</TextLink>} padded={false}>
       {dueVehicles.length === 0 && dueDrivers.length === 0 ? (
         <EmptyState title={t("fleet.widgets.allFine")} />
       ) : (
@@ -55,7 +55,7 @@ export async function FleetWidget() {
                   <li key={d.id}>
                     <Link href="/fleet/licenses" className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm hover:bg-surface-hover">
                       <span className="font-medium">{employeeName(d)}</span>
-                      {last ? <Badge tone={state ? DUE_TONE[state] : "neutral"}>{date(last.nextDue)}</Badge> : <Badge tone="danger">{t("fleet.neverChecked")}</Badge>}
+                      {last ? <StatusBadge tone={state ? DUE_TONE[state] : "neutral"}>{date(last.nextDue)}</StatusBadge> : <StatusBadge tone="danger">{t("fleet.neverChecked")}</StatusBadge>}
                     </Link>
                   </li>
                 ))}

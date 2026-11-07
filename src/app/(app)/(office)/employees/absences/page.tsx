@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
 import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, isSameDay, startOfDay } from "date-fns";
-import { CalendarPlus, Trash2 } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { CalendarPlus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { Card, EmptyState, StatusBadge, Table, TextLink } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
@@ -14,20 +15,21 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteAbsence } from "@/modules/office/employees/actions";
 import { AbsenceForm } from "@/modules/office/employees/forms";
+import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return { title: t("nav.absences") };
 }
 
+/** Zellenfarben: Fläche und Schrift aus den Statustönen (gesicherter Kontrast); die Art steht zusätzlich als Kürzel in der Zelle, nie nur als Farbe. */
 const CELL = {
-  vacation: "bg-info-ink/70",
-  sick: "bg-danger-ink/75",
-  training: "bg-accent",
-  other: "bg-ink-muted/60",
-  masked: "bg-ink-muted/40",
+  vacation: "bg-info-bg text-info-ink",
+  sick: "bg-danger-bg text-danger-ink",
+  training: "bg-accent-subtle text-accent-text",
+  other: "bg-surface-2 text-ink",
+  masked: "bg-surface-2 text-ink-muted",
 } as const;
-const TYPE_TONE = { vacation: "info", sick: "danger", training: "accent", other: "neutral", masked: "neutral" } as const;
 
 export default async function AbsencesPage({
   searchParams,
@@ -64,6 +66,8 @@ export default async function AbsencesPage({
       <PageHeader
         title={t("employees.absencesTitle")}
         description={t("employees.absencesDescription")}
+        back={{ href: "/employees", label: t("employees.title") }}
+        help="office.employees"
         actions={
           canEdit ? (
             <LinkButton href={`${base}&new=1`} variant="primary">
@@ -76,41 +80,51 @@ export default async function AbsencesPage({
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
           <LinkButton size="icon" href={`/employees/absences?month=${format(addMonths(monthStart, -1), "yyyy-MM")}`} aria-label={t("common.previous")}>
-            ‹
+            <ChevronLeft className="size-4" aria-hidden />
           </LinkButton>
           <LinkButton href="/employees/absences">
             {t("common.today")}
           </LinkButton>
           <LinkButton size="icon" href={`/employees/absences?month=${format(addMonths(monthStart, 1), "yyyy-MM")}`} aria-label={t("common.next")}>
-            ›
+            <ChevronRight className="size-4" aria-hidden />
           </LinkButton>
         </div>
         <h2 className="text-base font-semibold">{date(monthStart, { month: "long", year: "numeric" })}</h2>
         <ul className="ml-auto flex flex-wrap gap-3 text-xs text-ink-muted" aria-label={t("employees.legend")}>
           {(["vacation", ...(sensitive ? (["sick"] as const) : []), "training", "other"] as const).map((k) => (
             <li key={k} className="flex items-center gap-1.5">
-              <span aria-hidden className={clsx("size-3 rounded-sm", CELL[k])} /> {td(`employees.absenceTypes.${k}`, k)}
+              <span aria-hidden className={clsx("grid size-5 place-items-center rounded-sm text-[11px] font-semibold", CELL[k])}>
+                {t(`employees.absenceAbbr.${k}`)}
+              </span>{" "}
+              {td(`employees.absenceTypes.${k}`, k)}
             </li>
           ))}
           {!sensitive ? (
             <li className="flex items-center gap-1.5">
-              <span aria-hidden className={clsx("size-3 rounded-sm", CELL.masked)} /> {t("employees.absent")}
+              <span aria-hidden className={clsx("grid size-5 place-items-center rounded-sm text-[11px] font-semibold", CELL.masked)}>
+                {t("employees.absenceAbbr.masked")}
+              </span>{" "}
+              {t("employees.absent")}
             </li>
           ) : null}
         </ul>
       </div>
 
-      <Card padded={false}>
-        <Table variant="grid">
+      {/* Mobil-Regel: Das Monatsraster braucht Breite – unter md gibt es stattdessen die Liste „Einträge in diesem Monat“ (und „Abwesenheit eintragen“) */}
+      <Card padded={false} className="max-md:hidden">
+        <Table variant="grid" caption={t("employees.absencesTitle")}>
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 min-w-40 border-b border-line bg-surface-2 px-3 py-2 text-left font-medium text-ink-muted">{t("employees.title")}</th>
+              <th scope="col" className="sticky left-0 z-10 min-w-40 border-b border-line bg-surface-2 px-3 py-2 text-left font-medium text-ink-muted">
+                {t("employees.title")}
+              </th>
               {days.map((d) => {
                 const weekend = getDay(d) === 0 || getDay(d) === 6;
                 return (
                   <th
                     key={d.toISOString()}
-                    className={clsx("min-w-7 border-b border-l border-line px-0.5 py-1 text-center font-normal tabular", weekend ? "bg-surface-2 text-ink-muted" : "", isSameDay(d, today) && "font-bold text-accent-text")}
+                    scope="col"
+                    className={clsx("min-w-[max(1.75rem,var(--tap-row))] border-b border-l border-line px-0.5 py-1 text-center font-normal tabular", weekend ? "bg-surface-2 text-ink-muted" : "", isSameDay(d, today) && "font-bold text-accent-text")}
                   >
                     <span className="block text-[10px] uppercase">{date(d, { weekday: "narrow" })}</span>
                     {d.getDate()}
@@ -130,20 +144,34 @@ export default async function AbsencesPage({
               employees.map((e) => (
                 <tr key={e.id}>
                   <th scope="row" className="sticky left-0 z-10 border-b border-line bg-surface px-3 py-1.5 text-left font-medium">
-                    <Link href={`/employees/${e.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                    <TextLink href={`/employees/${e.id}`} className="text-inherit no-underline hover:underline">
                       {employeeName(e)}
-                    </Link>
+                    </TextLink>
                   </th>
                   {days.map((d) => {
                     const a = covering(e.id, d);
                     const weekend = getDay(d) === 0 || getDay(d) === 6;
                     const type = a ? visibleAbsenceType(a.type, sensitive) : null;
+                    const label = type ? (type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)) : "";
+                    const key = format(d, "yyyy-MM-dd");
                     return (
-                      <td key={d.toISOString()} className={clsx("h-7 border-b border-l border-line p-0.5", weekend && "bg-surface-2")}>
+                      <td key={key} className={clsx("h-7 border-b border-l border-line p-0.5", weekend && "bg-surface-2")}>
                         {type ? (
                           <span
-                            className={clsx("block h-full w-full rounded-sm", CELL[type])}
-                            title={`${type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}${a?.note && type !== "masked" && type !== "sick" ? ` – ${a.note}` : ""}`}
+                            className={clsx("grid h-full min-h-(--tap-row) w-full place-items-center rounded-sm text-[11px] font-semibold", CELL[type])}
+                            title={`${label}${a?.note && type !== "masked" && type !== "sick" ? ` – ${a.note}` : ""}`}
+                          >
+                            <span aria-hidden>{t(`employees.absenceAbbr.${type}`)}</span>
+                            <span className="sr-only">{label}</span>
+                          </span>
+                        ) : canEdit ? (
+                          // Die Matrixzelle öffnet das Formular vorbelegt (Mitarbeiter und Tag). Nur ein Mausweg: per Tastatur und Screenreader gibt es „Abwesenheit eintragen“.
+                          <Link
+                            href={`${base}&new=1&employee=${e.id}&date=${key}`}
+                            tabIndex={-1}
+                            aria-hidden
+                            className="block h-full min-h-(--tap-row) w-full rounded-sm hover:bg-accent-subtle"
+                            title={t("employees.absenceEnterFor", { name: employeeName(e), date: date(d) })}
                           />
                         ) : null}
                       </td>
@@ -167,10 +195,10 @@ export default async function AbsencesPage({
                 return (
                   <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                     <span className="flex flex-wrap items-center gap-2">
-                      <Link href={`/employees/${a.employeeId}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                      <TextLink href={`/employees/${a.employeeId}`} className="font-medium text-inherit no-underline hover:underline">
                         {employeeName(a.employee)}
-                      </Link>
-                      <Badge tone={TYPE_TONE[type]}>{type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}</Badge>
+                      </TextLink>
+                      <StatusBadge tone={ABSENCE_TONE[type]}>{type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}</StatusBadge>
                       <span className="tabular text-ink-muted">
                         {date(a.startDate)}
                         {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""} · {tp("employees.workdays", workdaysBetween(a.startDate, a.endDate))}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { RefreshCw } from "lucide-react";
-import { Alert, Badge, Card, DefinitionList, PageHeader } from "@/components/ui/layout";
+import { Alert, Badge, Card, DefinitionList, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Markdown } from "@/components/ui/markdown";
 import { getI18n } from "@/i18n/server";
@@ -47,7 +48,7 @@ export default async function UpdatesPage() {
               },
               {
                 label: t("updates.current.mode"),
-                value: enabled ? <Badge tone="success">{t("updates.current.enabled")}</Badge> : <Badge>{t("updates.current.disabled")}</Badge>,
+                value: enabled ? <StatusBadge tone="success">{t("updates.current.enabled")}</StatusBadge> : <Badge>{t("updates.current.disabled")}</Badge>,
               },
             ]}
           />

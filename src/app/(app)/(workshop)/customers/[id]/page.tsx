@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Disc3, Pencil, Plus } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
@@ -142,7 +143,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                         <span className="ml-2">{a.title}</span>
                         {a.vehicle ? <span className="ml-2 font-mono text-ink-muted">{a.vehicle.plate}</span> : null}
                       </Link>
-                      <Badge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</Badge>
+                      <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
                     </li>
                   ))}
                 </ul>
@@ -156,7 +157,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <DefinitionList
               items={[
                 { label: t("customers.fields.phone"), value: customer.phone },
-                { label: t("customers.fields.email"), value: customer.email ? <a className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a> : null },
+                { label: t("customers.fields.email"), value: customer.email ? <TextLink external href={`mailto:${customer.email}`}>{customer.email}</TextLink> : null },
                 { label: t("customers.fields.address"), value: address },
                 { label: t("common.notes"), value: customer.notes },
               ]}

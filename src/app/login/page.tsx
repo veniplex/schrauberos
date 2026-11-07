@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Wrench } from "lucide-react";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
@@ -8,7 +7,7 @@ import { getSession } from "@/server/auth/session";
 import { safeNext } from "@/lib/safe-next";
 import { getWorkshop } from "@/server/workshop";
 import { LoginForm } from "./login-form";
-import { Card } from "@/components/ui/layout";
+import { Card, TextLink } from "@/components/ui/layout";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -42,9 +41,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h2 className="mb-4 text-base font-semibold">{t("auth.signIn")}</h2>
           <LoginForm next={safeNext(next)} />
           <p className="mt-4 text-center text-sm">
-            <Link href="/login/recover" className="text-accent-text underline-offset-2 inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+            <TextLink href="/login/recover">
               {t("recovery.link")}
-            </Link>
+            </TextLink>
           </p>
         </Card>
       </div>

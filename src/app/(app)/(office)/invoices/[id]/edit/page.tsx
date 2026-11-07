@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PageHeader } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { toDateInput } from "@/lib/dates";
 import { customerDisplayName } from "@/modules/workshop/customers/public";

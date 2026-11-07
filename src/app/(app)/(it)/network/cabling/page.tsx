@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import clsx from "clsx";
-import Link from "next/link";
 import { ArrowRight, Trash2 } from "lucide-react";
-import { Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { Card, EmptyState, TextLink } from "@/components/ui/layout";
+import { DataTable } from "@/components/ui/data-table";
+import { Pagination } from "@/components/ui/pagination";
+import { TabNav } from "@/components/ui/tab-nav";
+import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -17,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const TABS = ["connections", "locations"] as const;
 
-export default async function CablingPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function CablingPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string }> }) {
   const session = await requirePermission("network.view");
   const [{ t, tp }, sp] = await Promise.all([getI18n(), searchParams]);
   const tab = (TABS as readonly string[]).includes(sp.tab ?? "") ? (sp.tab as (typeof TABS)[number]) : "connections";
@@ -26,91 +29,93 @@ export default async function CablingPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title={t("network.cablingTitle")} description={t("network.cablingDescription")} />
-      <nav aria-label={t("network.cablingTitle")} className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line">
-        {TABS.map((id) => (
-          <Link
-            key={id}
-            href={`/network/cabling?tab=${id}`}
-            aria-current={tab === id ? "page" : undefined}
-            className={clsx(
-              "-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium",
-              tab === id ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink",
-            )}
-          >
-            {t(`network.tabs.${id}`)}
-          </Link>
-        ))}
-      </nav>
+      <PageHeader title={t("network.cablingTitle")} description={t("network.cablingDescription")} help="it.network" />
+      <TabNav label={t("network.cablingTitle")} items={TABS.map((id) => ({ href: `/network/cabling?tab=${id}`, label: t(`network.tabs.${id}`), active: tab === id }))} />
 
-      {tab === "connections" ? <ConnectionsTab canEdit={canEdit} canDelete={canDelete} /> : <LocationsTab canEdit={canEdit} canDelete={canDelete} tp={tp} />}
+      {tab === "connections" ? <ConnectionsTab canEdit={canEdit} canDelete={canDelete} pageParam={sp.page} /> : <LocationsTab canEdit={canEdit} canDelete={canDelete} tp={tp} />}
     </>
   );
 }
 
-async function ConnectionsTab({ canEdit, canDelete }: { canEdit: boolean; canDelete: boolean }) {
+async function ConnectionsTab({ canEdit, canDelete, pageParam }: { canEdit: boolean; canDelete: boolean; pageParam?: string }) {
   const { t, tp } = await getI18n();
-  const [connections, devices] = await Promise.all([
-    db.netConnection.findMany({ include: { from: true, to: true }, orderBy: [{ from: { name: "asc" } }, { fromPort: "asc" }] }),
-    db.netDevice.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-  ]);
+  const list = parseListParams({ page: pageParam }, { sorts: [], sort: "from" });
+  const [total, devices] = await Promise.all([db.netConnection.count(), db.netDevice.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })]);
+  const page = clampPage(list.page, total, list.pageSize);
+  const connections = await db.netConnection.findMany({ include: { from: true, to: true }, orderBy: [{ from: { name: "asc" } }, { fromPort: "asc" }], ...pageWindow(page, list.pageSize) });
+  const links = listLinks("/network/cabling", { tab: "connections" }, list, { sort: "from", dir: "asc" });
   return (
     <div className="flex flex-col gap-5">
-      <Card title={t("network.sections.cableList")} padded={false}>
-        {connections.length === 0 ? (
-          <EmptyState title={t("network.connectionsEmpty")} hint={t("network.connectionsEmptyHint")} />
-        ) : (
-          <>
-            <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">{tp("network.connectionsCount", connections.length)}</p>
-            <Table className="min-w-[44rem]">
-                <thead>
-                  <tr>
-                    <th>{t("network.fields.fromDevice")}</th>
-                    <th aria-hidden />
-                    <th>{t("network.fields.toDevice")}</th>
-                    <th>{t("network.cols.cable")}</th>
-                    {canDelete ? <th className="w-12" aria-label={t("common.actions")} /> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {connections.map((c) => (
-                    <tr key={c.id}>
-                      <td>
-                        <Link href={`/network/devices/${c.from.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                          {c.from.name}
-                        </Link>
-                        {c.fromPort ? <span className="ml-2 font-mono text-[13px] text-ink-muted">{c.fromPort}</span> : null}
-                      </td>
-                      <td className="text-ink-muted">
-                        <ArrowRight className="size-4" aria-hidden />
-                      </td>
-                      <td>
-                        <Link href={`/network/devices/${c.to.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                          {c.to.name}
-                        </Link>
-                        {c.toPort ? <span className="ml-2 font-mono text-[13px] text-ink-muted">{c.toPort}</span> : null}
-                      </td>
-                      <td className="text-sm">
-                        {c.cableLabel ?? <span className="text-ink-muted">–</span>}
-                        {c.notes ? <div className="text-xs text-ink-muted">{c.notes}</div> : null}
-                      </td>
-                      {canDelete ? (
-                        <td>
-                          <form action={deleteConnection}>
-                            <input type="hidden" name="id" value={c.id} />
-                            <ConfirmSubmitButton message={t("network.connectionDeleteConfirm")} label={t("common.delete")}>
-                              <Trash2 className="size-3.5" aria-hidden />
-                            </ConfirmSubmitButton>
-                          </form>
-                        </td>
-                      ) : null}
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-          </>
-        )}
-      </Card>
+      <section aria-labelledby="cable-list-title">
+        <h2 id="cable-list-title" className="mb-2 text-sm font-semibold">
+          {t("network.sections.cableList")}
+        </h2>
+        <DataTable
+          caption={t("network.sections.cableList")}
+          rows={connections}
+          rowKey={(c) => c.id}
+          minWidth="44rem"
+          summary={tp("network.connectionsCount", total)}
+          footer={<Pagination page={page} pageSize={list.pageSize} total={total} hrefFor={links.pageHref} />}
+          empty={<EmptyState title={t("network.connectionsEmpty")} hint={t("network.connectionsEmptyHint")} />}
+          columns={[
+            {
+              id: "from",
+              header: t("network.fields.fromDevice"),
+              priority: "primary",
+              cell: (c) => (
+                <>
+                  <TextLink href={`/network/devices/${c.from.id}`} className="font-medium text-inherit no-underline hover:underline">
+                    {c.from.name}
+                  </TextLink>
+                  {c.fromPort ? <span className="ml-2 font-mono text-[13px] text-ink-muted">{c.fromPort}</span> : null}
+                </>
+              ),
+            },
+            {
+              id: "to",
+              header: t("network.fields.toDevice"),
+              cell: (c) => (
+                <>
+                  <ArrowRight className="mr-2 inline size-4 text-ink-muted max-md:hidden" aria-hidden />
+                  <TextLink href={`/network/devices/${c.to.id}`} className="font-medium text-inherit no-underline hover:underline">
+                    {c.to.name}
+                  </TextLink>
+                  {c.toPort ? <span className="ml-2 font-mono text-[13px] text-ink-muted">{c.toPort}</span> : null}
+                </>
+              ),
+            },
+            {
+              id: "cable",
+              header: t("network.cols.cable"),
+              cell: (c) => (
+                <div className="text-sm">
+                  {c.cableLabel ?? <span className="text-ink-muted">–</span>}
+                  {c.notes ? <div className="text-xs text-ink-muted">{c.notes}</div> : null}
+                </div>
+              ),
+            },
+            ...(canDelete
+              ? [
+                  {
+                    id: "actions",
+                    header: t("common.actions"),
+                    hideHeader: true,
+                    align: "end" as const,
+                    cell: (c: { id: string }) => (
+                      <form action={deleteConnection}>
+                        <input type="hidden" name="id" value={c.id} />
+                        <ConfirmSubmitButton message={t("network.connectionDeleteConfirm")} label={t("common.delete")}>
+                          <Trash2 className="size-3.5" aria-hidden />
+                        </ConfirmSubmitButton>
+                      </form>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </section>
 
       {canEdit ? (
         <Card title={t("network.sections.connectionNew")}>

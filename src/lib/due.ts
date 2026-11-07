@@ -1,3 +1,5 @@
+import type { StatusTone } from "@/lib/status-tone";
+
 export type DueState = "expired" | "soon" | "ok";
 
 /** Fälligkeit: abgelaufen, läuft in den nächsten `soonDays` Tagen ab, oder in Ordnung. null = kein Datum. */
@@ -8,4 +10,4 @@ export function dueState(until: Date | null | undefined, soonDays = 60, now = ne
 }
 
 /** Fälligkeits-Zustand -> Badge-Farbe. */
-export const DUE_TONE = { expired: "danger", soon: "warning", ok: "neutral" } as const;
+export const DUE_TONE: Record<DueState, StatusTone> = { expired: "danger", soon: "warning", ok: "neutral" };

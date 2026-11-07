@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 export type SegmentOption<T extends string> = { value: T; label: ReactNode; /** Zugänglicher Name, wenn `label` nur ein Symbol ist */ title?: string };
@@ -39,5 +40,31 @@ export function SegmentedControl<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+export type SegmentLink = { href: string; label: ReactNode; active: boolean };
+
+/**
+ * Wie `SegmentedControl`, aber jede Option ist ein Link (Auswahl über die Adresse: Filter einer Liste, Ansicht). Die aktive trägt `aria-current="true"`.
+ * Für „entweder – oder“ mit wenigen Werten; mehrere unabhängige Filter bleiben Chips (`ChipLink`).
+ */
+export function SegmentedLinks({ label, options, className }: { label: string; options: SegmentLink[]; className?: string }) {
+  return (
+    <nav aria-label={label} className={clsx("inline-flex max-w-full gap-0.5 overflow-x-auto rounded-md bg-surface-2 p-0.5", className)}>
+      {options.map((o, i) => (
+        <Link
+          key={i}
+          href={o.href}
+          aria-current={o.active ? "true" : undefined}
+          className={clsx(
+            "relative grid min-h-(--tap-sm) min-w-(--tap-sm) place-items-center whitespace-nowrap rounded-sm px-3 text-sm font-medium transition-colors",
+            o.active ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink",
+          )}
+        >
+          {o.label}
+        </Link>
+      ))}
+    </nav>
   );
 }

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import clsx from "clsx";
-import Link from "next/link";
 import { ShieldCheck, Trash2 } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { Card, EmptyState, StatusBadge } from "@/components/ui/layout";
+import { DataTable } from "@/components/ui/data-table";
+import { TabNav } from "@/components/ui/tab-nav";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
@@ -41,73 +42,67 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
   });
   const allEmployees = canEdit ? await db.employee.findMany({ where: { active: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }) : [];
 
-  const tab = (href: string, label: string, active: boolean) => (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={clsx("-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium", active ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink")}
-    >
-      {label}
-    </Link>
-  );
-
   return (
     <>
-      <PageHeader title={t("fleet.title")} description={t("fleet.licenseDescription")} />
-      <nav className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line" aria-label={t("fleet.title")}>
-        {tab("/fleet", t("fleet.tabs.vehicles"), false)}
-        {tab("/fleet/licenses", t("fleet.tabs.licenses"), true)}
-      </nav>
+      <PageHeader title={t("fleet.title")} description={t("fleet.licenseDescription")} help="office.fleet" />
+      <TabNav
+        label={t("fleet.title")}
+        items={[
+          { href: "/fleet", label: t("fleet.tabs.vehicles"), active: false },
+          { href: "/fleet/licenses", label: t("fleet.tabs.licenses"), active: true },
+        ]}
+      />
 
-      <Card title={t("fleet.tabs.licenses")} padded={false}>
-        {rows.length === 0 ? (
-          <EmptyState title={t("fleet.noDrivers")} hint={t("fleet.noDriversHint")} />
-        ) : (
-          <Table className="min-w-[44rem]">
-              <thead>
-                <tr>
-                  <th>{t("fleet.fields.driver")}</th>
-                  <th>{t("fleet.cols.vehicles")}</th>
-                  <th>{t("fleet.cols.lastCheck")}</th>
-                  <th>{t("fleet.cols.nextCheck")}</th>
-                  {canEdit ? <th className="w-40" aria-label={t("common.actions")} /> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ d, last, state }) => (
-                  <tr key={d.id}>
-                    <td>
-                      <Link href={`/employees/${d.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                        {employeeName(d)}
-                      </Link>
-                    </td>
-                    <td className="font-mono text-[13px]">{d.fleetVehicles.map((v) => v.plate).join(", ")}</td>
-                    <td className="text-sm tabular">
-                      {last ? (
-                        <>
-                          {date(last.checkedAt)}
-                          <div className="text-xs text-ink-muted">{[last.method, last.checkedByName].filter(Boolean).join(" · ")}</div>
-                        </>
-                      ) : (
-                        <span className="text-ink-muted">–</span>
-                      )}
-                    </td>
-                    <td>
-                      {last ? <Badge tone={state ? DUE_TONE[state] : "neutral"}>{date(last.nextDue)}</Badge> : <Badge tone="danger">{t("fleet.neverChecked")}</Badge>}
-                    </td>
-                    {canEdit ? (
-                      <td className="text-right">
-                        <LinkButton size="sm" href={`/fleet/licenses?check=${d.id}`}>
-                          <ShieldCheck className="size-3.5" aria-hidden /> {t("fleet.checkNow")}
-                        </LinkButton>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-        )}
-      </Card>
+      <DataTable
+        caption={t("fleet.tabs.licenses")}
+        rows={rows}
+        rowKey={({ d }) => d.id}
+        rowHref={({ d }) => `/employees/${d.id}`}
+        minWidth="44rem"
+        empty={
+          <Card title={t("fleet.tabs.licenses")} padded={false}>
+            <EmptyState title={t("fleet.noDrivers")} hint={t("fleet.noDriversHint")} />
+          </Card>
+        }
+        columns={[
+          { id: "driver", header: t("fleet.fields.driver"), priority: "primary", cell: ({ d }) => employeeName(d) },
+          { id: "vehicles", header: t("fleet.cols.vehicles"), cell: ({ d }) => <span className="font-mono text-[13px]">{d.fleetVehicles.map((v) => v.plate).join(", ")}</span> },
+          {
+            id: "last",
+            header: t("fleet.cols.lastCheck"),
+            cell: ({ last }) =>
+              last ? (
+                <div className="text-sm tabular">
+                  {date(last.checkedAt)}
+                  <div className="text-xs text-ink-muted">{[last.method, last.checkedByName].filter(Boolean).join(" · ")}</div>
+                </div>
+              ) : (
+                <span className="text-ink-muted">–</span>
+              ),
+          },
+          {
+            id: "next",
+            header: t("fleet.cols.nextCheck"),
+            cell: ({ last, state }) =>
+              last ? <StatusBadge tone={state ? DUE_TONE[state] : "neutral"}>{date(last.nextDue)}</StatusBadge> : <StatusBadge tone="danger">{t("fleet.neverChecked")}</StatusBadge>,
+          },
+          ...(canEdit
+            ? [
+                {
+                  id: "actions",
+                  header: t("common.actions"),
+                  hideHeader: true,
+                  align: "end" as const,
+                  cell: ({ d }: { d: { id: string } }) => (
+                    <LinkButton size="sm" href={`/fleet/licenses?check=${d.id}`}>
+                      <ShieldCheck className="size-3.5" aria-hidden /> {t("fleet.checkNow")}
+                    </LinkButton>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
 
       {drivers.some((d) => d.licenseChecks.length > 1) ? (
         <div className="mt-5">

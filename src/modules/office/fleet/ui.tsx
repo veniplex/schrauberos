@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/layout";
+import { StatusBadge } from "@/components/ui/layout";
 import { DUE_TONE } from "@/lib/due";
 import type { FleetDue } from "@/modules/office/fleet/domain";
 import type { Translator } from "@/i18n/translate";
@@ -16,8 +16,8 @@ export function DueBadge({ due, i18n }: { due: FleetDue; i18n: Translator }) {
         ? date(due.date)
         : "";
   return (
-    <Badge tone={DUE_TONE[due.state]}>
+    <StatusBadge tone={DUE_TONE[due.state]}>
       {label} · {detail}
-    </Badge>
+    </StatusBadge>
   );
 }

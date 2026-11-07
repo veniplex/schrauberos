@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
-import { Badge, CardLink, PageHeader } from "@/components/ui/layout";
+import { Badge, CardLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -27,6 +28,7 @@ export default async function RolesPage() {
       <PageHeader
         title={t("roles.title")}
         description={t("roles.description")}
+        help="admin.roles"
         actions={
           <LinkButton href="/admin/roles/new" variant="primary">
             <Plus className="size-4" aria-hidden /> {t("roles.new")}
@@ -42,7 +44,7 @@ export default async function RolesPage() {
                 {r.isAdmin ? <Badge tone="accent">{t("roles.adminBadge")}</Badge> : null}
                 {hasAdminOnlyRights([toRights(r)]) ? (
                   <span title={t("roles.adminRightsHint")}>
-                    <Badge tone="warning">{t("roles.adminRightsBadge")}</Badge>
+                    <StatusBadge tone="warning">{t("roles.adminRightsBadge")}</StatusBadge>
                   </span>
                 ) : null}
               </div>

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { History, Pencil, Pin, PinOff } from "lucide-react";
-import { Badge, Card, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, TextLink } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { markdownHeadings } from "@/lib/slug";
@@ -42,9 +42,9 @@ export default async function DocPage({ params }: { params: Promise<{ area: stri
         }
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <Link href={base} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+            <TextLink href={base}>
               {t(`docs.areas.${area}.title`)}
-            </Link>
+            </TextLink>
             {page.category ? <Badge>{page.category.name}</Badge> : null}
             <span>{t("docs.updated", { date: date(page.updatedAt), who: page.updatedByName ?? "–" })}</span>
           </span>
@@ -75,7 +75,7 @@ export default async function DocPage({ params }: { params: Promise<{ area: stri
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_14rem]">
         <Card as="article" className="min-w-0">
-          {page.content.trim() ? <Markdown source={page.content} /> : <p className="text-sm text-ink-muted">{t("docs.emptyPage")}</p>}
+          {page.content.trim() ? <Markdown source={page.content} taskLabels={{ done: t("common.taskDone"), open: t("common.taskOpen") }} /> : <p className="text-sm text-ink-muted">{t("docs.emptyPage")}</p>}
         </Card>
         {toc.length > 1 ? (
           <nav aria-label={t("docs.toc")} className="hidden xl:block">

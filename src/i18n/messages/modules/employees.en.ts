@@ -35,6 +35,8 @@ export const employeesEn: typeof employeesDe = {
   vacationNote: "Mon–Fri are counted; public holidays are not deducted.",
   absencesTitle: "Absences",
   absencesDescription: "Vacation, sickness and training of all employees at a glance per month.",
+  absenceAbbr: { vacation: "V", sick: "S", training: "T", other: "O", masked: "A" },
+  absenceEnterFor: "Record absence: {name}, {date}",
   legend: "Legend",
   absencesInMonth: "Entries this month ({count})",
   noAbsencesMonth: "No absences this month.",

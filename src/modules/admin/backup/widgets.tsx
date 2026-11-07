@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Alert, Card } from "@/components/ui/layout";
+import { Alert, Card, TextLink } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import type { WidgetDef } from "@/modules/types";
 import { listBackups } from "@/server/backup/core";
@@ -14,12 +13,12 @@ export async function BackupWidget() {
   const failing = autoBackupFailing(job, last?.createdAt ?? null);
 
   return (
-    <Card
+    <Card headingLevel={3}
       title={t("backup.widget.title")}
       actions={
-        <Link href="/admin/backup" className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center text-sm text-accent-text hover:underline">
+        <TextLink href="/admin/backup" className="text-sm">
           {t("backup.widget.open")}
-        </Link>
+        </TextLink>
       }
     >
       <div className="flex flex-col gap-3">

@@ -187,7 +187,7 @@ export function DocEditor({
         />
         {tab === "preview" ? (
           <div className="min-h-[26rem] bg-surface p-5">
-            {content.trim() ? <Markdown source={content} /> : <p className="text-sm text-ink-muted">{t("docs.previewEmpty")}</p>}
+            {content.trim() ? <Markdown source={content} taskLabels={{ done: t("common.taskDone"), open: t("common.taskOpen") }} /> : <p className="text-sm text-ink-muted">{t("docs.previewEmpty")}</p>}
           </div>
         ) : null}
       </div>

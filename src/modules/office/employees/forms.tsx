@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Checkbox, Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
@@ -159,6 +160,13 @@ export function AbsenceForm({
   closeHref: string;
 }) {
   const { t, td } = useI18n();
+  const [start, setStart] = useState(initialDate);
+  const [end, setEnd] = useState(initialDate);
+  // „Bis“ zieht „Von“ nach: Wer den Beginn verschiebt, meint meist denselben Tag oder einen späteren Zeitraum – das Ende folgt, solange es nicht bewusst später gesetzt wurde
+  const moveStart = (value: string) => {
+    setEnd((current) => (current === "" || current < value || current === start ? value : current));
+    setStart(value);
+  };
   return (
     <Form action={saveAbsence} className="flex flex-col gap-4">
       <input type="hidden" name="returnTo" value={returnTo} />
@@ -185,10 +193,10 @@ export function AbsenceForm({
           </Select>
         </Field>
         <Field label={t("employees.fields.from")} htmlFor="startDate" name="startDate" required>
-          <Input id="startDate" name="startDate" type="date" defaultValue={initialDate} required />
+          <Input id="startDate" name="startDate" type="date" value={start} onChange={(e) => moveStart(e.target.value)} required />
         </Field>
         <Field label={t("employees.fields.to")} htmlFor="endDate" name="endDate" hint={t("employees.fields.toHint")} required>
-          <Input id="endDate" name="endDate" type="date" defaultValue={initialDate} required />
+          <Input id="endDate" name="endDate" type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} required />
         </Field>
       </div>
       <Field label={t("common.notes")} htmlFor="note">

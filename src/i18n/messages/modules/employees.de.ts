@@ -34,6 +34,8 @@ export const employeesDe = {
   vacationNote: "Gezählt werden Mo–Fr; Feiertage werden nicht abgezogen.",
   absencesTitle: "Abwesenheiten",
   absencesDescription: "Urlaub, Krankheit und Schulungen aller Mitarbeiter im Monatsüberblick.",
+  absenceAbbr: { vacation: "U", sick: "K", training: "S", other: "X", masked: "A" },
+  absenceEnterFor: "Abwesenheit eintragen: {name}, {date}",
   legend: "Legende",
   absencesInMonth: "Einträge in diesem Monat ({count})",
   noAbsencesMonth: "Keine Abwesenheiten in diesem Monat.",

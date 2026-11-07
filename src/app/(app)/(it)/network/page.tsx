@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, Card, CardLink, ChipLink, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, ChipLink, EmptyState, StatusBadge, StatCard } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
+import { DUE_TONE } from "@/lib/due";
 import { getI18n } from "@/i18n/server";
 import { warrantyState } from "@/modules/it/network/domain";
 import { DEVICE_TYPES } from "@/modules/it/network/constants";
@@ -42,12 +44,7 @@ export default async function NetworkOverviewPage() {
 
   const byType = DEVICE_TYPES.map((type) => ({ type, n: devices.filter((d) => d.type === type && d.status !== "retired").length })).filter((x) => x.n > 0);
 
-  const stat = (href: string, value: number, label: string) => (
-    <CardLink href={href}>
-      <p className="text-3xl font-semibold tabular">{value}</p>
-      <p className="mt-1 text-sm text-ink-muted">{label}</p>
-    </CardLink>
-  );
+  const stat = (href: string, value: number, label: string) => <StatCard href={href} value={value} label={label} />;
 
   return (
     <>
@@ -118,9 +115,9 @@ export default async function NetworkOverviewPage() {
                         <span className="block truncate text-sm font-medium">{d.name}</span>
                         <span className="text-xs text-ink-muted">{td(`enums.deviceType.${d.type}`, d.type)}</span>
                       </span>
-                      <Badge tone={state === "expired" ? "danger" : "warning"}>
+                      <StatusBadge tone={state ? DUE_TONE[state] : "neutral"}>
                         {state === "expired" ? t("network.warranty.expired") : t("network.warranty.soon")} · {date(d.warrantyUntil!)}
-                      </Badge>
+                      </StatusBadge>
                     </Link>
                   </li>
                 );

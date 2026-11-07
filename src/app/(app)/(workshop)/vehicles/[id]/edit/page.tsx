@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PageHeader, Plate } from "@/components/ui/layout";
+import { Plate } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";

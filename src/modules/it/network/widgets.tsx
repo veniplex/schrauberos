@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState } from "@/components/ui/layout";
+import { Badge, Card, EmptyState, TextLink } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import { checkDevices } from "./queries";
@@ -24,16 +24,16 @@ export async function NetworkStatusWidget() {
   const problems = devices.filter((d) => ["offline", "degraded"].includes(checks.get(d.id)?.state ?? ""));
 
   return (
-    <Card
+    <Card headingLevel={3}
       title={
         <span className="flex items-center gap-2">
           {t("network.widgets.statusTitle")} <Badge tone="info">{t("network.demoBadge")}</Badge>
         </span>
       }
       actions={
-        <Link href="/network" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+        <TextLink href="/network" className="text-sm">
           {t("common.showAll")}
-        </Link>
+        </TextLink>
       }
       padded={false}
     >

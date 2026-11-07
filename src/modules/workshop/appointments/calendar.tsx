@@ -2,9 +2,9 @@ import clsx from "clsx";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { addDays, getISOWeek, isSameDay, startOfDay, startOfWeek } from "date-fns";
-import { Check } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { STATUS_TONE } from "./status-tone";
-import { Badge, Card, EmptyState, Plate, Table } from "@/components/ui/layout";
+import { Card, EmptyState, Plate, Table, StatusBadge } from "@/components/ui/layout";
 import type { Translator } from "@/i18n/translate";
 import { isHexColor } from "@/lib/color";
 import { toDateInput } from "@/lib/dates";
@@ -54,13 +54,13 @@ export function CalendarToolbar({ i18n, view, date, canCreate }: Pick<Ctx, "i18n
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-1">
         <LinkButton size="icon" href={calendarHref(view, addDays(date, -step))} aria-label={t("common.previous")}>
-          ‹
+          <ChevronLeft className="size-4" aria-hidden />
         </LinkButton>
         <LinkButton href={calendarHref(view, startOfDay(new Date()))}>
           {t("common.today")}
         </LinkButton>
         <LinkButton size="icon" href={calendarHref(view, addDays(date, step))} aria-label={t("common.next")}>
-          ›
+          <ChevronRight className="size-4" aria-hidden />
         </LinkButton>
       </div>
       <h2 className="min-w-0 flex-1 text-base font-semibold tabular">{label}</h2>
@@ -383,7 +383,7 @@ export function ListView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
                     <td className="text-ink-muted">{a.bay?.name}</td>
                     <td className="text-ink-muted">{a.assignee?.name}</td>
                     <td className="text-right">
-                      <Badge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</Badge>
+                      <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
                     </td>
                   </tr>
                 ))}

@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState } from "@/components/ui/layout";
+import { Card, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
-import { invoiceTotals, paymentState } from "@/modules/office/invoices/domain";
+import { startOfDay } from "date-fns";
+import type { InvoiceTotals } from "@/modules/office/invoices/domain";
+import { invoiceSums } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";
 import { db } from "@/server/db";
 import type { WidgetDef } from "@/modules/types";
@@ -12,16 +14,19 @@ export async function InvoicesWidget() {
   const { t, tp, date, locale } = await getI18n();
   const eur = (c: number) => formatCents(c, INTL_LOCALE[locale]);
 
-  const open = await db.invoice.findMany({
-    where: { status: "open" },
-    select: { id: true, direction: true, number: true, partyName: true, dueDate: true, grossCents: true, status: true },
-    orderBy: { dueDate: "asc" },
-  });
-  const incoming = invoiceTotals(open.filter((i) => i.direction === "incoming"));
-  const outgoing = invoiceTotals(open.filter((i) => i.direction === "outgoing"));
-  const overdue = open.filter((i) => paymentState(i) === "overdue").slice(0, 5);
+  // Summen von der Datenbank gerechnet (aggregate), nicht über geladene Zeilen; geladen werden nur die fünf ältesten überfälligen
+  const [incoming, outgoing, overdue] = await Promise.all([
+    invoiceSums({ direction: "incoming" }),
+    invoiceSums({ direction: "outgoing" }),
+    db.invoice.findMany({
+      where: { status: "open", dueDate: { lt: startOfDay(new Date()) } },
+      select: { id: true, number: true, partyName: true, dueDate: true, grossCents: true },
+      orderBy: { dueDate: "asc" },
+      take: 5,
+    }),
+  ]);
 
-  const col = (label: string, tot: ReturnType<typeof invoiceTotals>, href: string) => (
+  const col = (label: string, tot: InvoiceTotals, href: string) => (
     <Link href={href} className="block px-5 py-4 hover:bg-surface-hover">
       <p className="text-xs text-ink-muted">{label}</p>
       <p className="mt-0.5 text-xl font-semibold tabular">{eur(tot.openCents)}</p>
@@ -33,7 +38,7 @@ export async function InvoicesWidget() {
   );
 
   return (
-    <Card title={t("invoices.widgets.title")} actions={<Link href="/invoices" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">{t("common.showAll")}</Link>} padded={false}>
+    <Card headingLevel={3} title={t("invoices.widgets.title")} actions={<TextLink href="/invoices" className="text-sm">{t("common.showAll")}</TextLink>} padded={false}>
       <div className="grid grid-cols-2 divide-x divide-line border-b border-line">
         {col(t("invoices.widgets.toPay"), incoming, "/invoices?dir=incoming&status=open")}
         {col(t("invoices.widgets.toReceive"), outgoing, "/invoices?dir=outgoing&status=open")}
@@ -51,7 +56,7 @@ export async function InvoicesWidget() {
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-0.5">
                   <span className="tabular font-medium">{eur(i.grossCents)}</span>
-                  <Badge tone="danger">{t("invoices.widgets.dueSince", { date: date(i.dueDate!) })}</Badge>
+                  <StatusBadge tone="danger">{t("invoices.widgets.dueSince", { date: date(i.dueDate!) })}</StatusBadge>
                 </span>
               </Link>
             </li>

@@ -13,9 +13,9 @@ function textOf(node: ReactNode): string {
 /**
  * Rendert Markdown (GitHub-Variante: Tabellen, Aufgabenlisten, durchgestrichen).
  * Sicherheit: react-markdown gibt kein rohes HTML aus und entschärft gefährliche URLs (javascript: usw.).
- * Funktioniert in Server- und Client-Komponenten (Vorschau im Editor).
+ * Funktioniert in Server- und Client-Komponenten (Vorschau im Editor). `taskLabels`: Namen für die Kästchen von Aufgabenlisten („erledigt“/„offen“).
  */
-export function Markdown({ source }: { source: string }) {
+export function Markdown({ source, taskLabels }: { source: string; taskLabels?: { done: string; open: string } }) {
   return (
     <div className="md">
       <ReactMarkdown
@@ -37,6 +37,9 @@ export function Markdown({ source }: { source: string }) {
               <table>{children}</table>
             </div>
           ),
+          // Kästchen einer Aufgabenliste (nur Anzeige): ohne Name wären sie ein unbeschriftetes Formularfeld; der Zustand wird angesagt, der Text der Aufgabe folgt direkt dahinter
+          input: ({ type, checked }: ComponentPropsWithoutRef<"input">) =>
+            type === "checkbox" ? <input type="checkbox" checked={Boolean(checked)} disabled readOnly aria-label={taskLabels ? (checked ? taskLabels.done : taskLabels.open) : undefined} /> : null,
           // eslint-disable-next-line @next/next/no-img-element -- Bilder kommen aus der geschützten Datenbank
           img: ({ src, alt }) => (typeof src === "string" ? <img src={src} alt={alt ?? ""} loading="lazy" /> : null),
         }}

@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { addDays, startOfDay } from "date-fns";
-import { Badge, Card, EmptyState, Plate } from "@/components/ui/layout";
+import { Card, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { toDateInput } from "@/lib/dates";
@@ -16,12 +15,12 @@ export async function TodayAppointmentsWidget() {
   const open = events.filter((a) => a.status !== "cancelled" && a.status !== "no_show");
 
   return (
-    <Card
+    <Card headingLevel={3}
       title={t("appointments.widgets.todayTitle")}
       actions={
-        <Link href={`/appointments?view=day&date=${toDateInput(today)}`} className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+        <TextLink href={`/appointments?view=day&date=${toDateInput(today)}`} className="text-sm">
           {t("appointments.widgets.toCalendar")}
-        </Link>
+        </TextLink>
       }
       padded={false}
     >
@@ -45,7 +44,7 @@ export async function TodayAppointmentsWidget() {
                     {[a.vehicle ? customerDisplayName(a.vehicle.customer) : "", a.bay?.name, a.assignee?.name].filter(Boolean).join(" · ")}
                   </p>
                 </div>
-                <Badge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</Badge>
+                <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
               </li>
             ))}
           </ul>

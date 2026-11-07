@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Disc3, Pencil, Repeat } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
@@ -131,7 +132,7 @@ export default async function VehiclePage({
                         <span className="tabular font-medium">{date(a.startsAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                         <span className="ml-2">{a.title}</span>
                       </Link>
-                      <Badge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</Badge>
+                      <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
                     </li>
                   ))}
                 </ul>
@@ -144,9 +145,9 @@ export default async function VehiclePage({
           <Card title={t("vehicles.fields.owner")}>
             <p className="font-medium">
               {vehicle.customer ? (
-                <Link href={`/customers/${vehicle.customer.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                <TextLink href={`/customers/${vehicle.customer.id}`}>
                   {customerDisplayName(vehicle.customer)}
-                </Link>
+                </TextLink>
               ) : (
                 <span className="text-ink-muted">{t("vehicles.noOwner")}</span>
               )}

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Pencil } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader, Plate } from "@/components/ui/layout";
+import { Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
@@ -14,6 +15,8 @@ import { db } from "@/server/db";
 import { deleteTireSet, setTireSetStatus } from "@/modules/workshop/tires/actions";
 import { HealthBadge, SeasonBadge } from "@/modules/workshop/tires/ui";
 import { STATUS_TONE } from "@/modules/workshop/appointments/public";
+import { TIRE_SET_STATUS_TONE } from "@/modules/workshop/tires/status-tone";
+import type { TireSetStatus } from "@/modules/workshop/tires/constants";
 import { toDateInput } from "@/lib/dates";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -94,7 +97,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
           <span className="flex flex-wrap items-center gap-2">
             <SeasonBadge season={set.season} td={td} />
             <span className="tabular">{formatTireSize(set)}</span>
-            <Badge tone={set.status === "stored" ? "info" : "neutral"}>{td(`enums.tireSetStatus.${set.status}`, set.status)}</Badge>
+            <StatusBadge tone={TIRE_SET_STATUS_TONE[set.status as TireSetStatus] ?? "neutral"}>{td(`enums.tireSetStatus.${set.status}`, set.status)}</StatusBadge>
             <HealthBadge health={overall.health} t={t} />
           </span>
         }
@@ -137,7 +140,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
                       <span className="tabular font-medium">{date(a.startsAt, { dateStyle: "medium", timeStyle: "short" })}</span>
                       <span className="ml-2">{a.title}</span>
                     </Link>
-                    <Badge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</Badge>
+                    <StatusBadge tone={STATUS_TONE[a.status as keyof typeof STATUS_TONE] ?? "neutral"}>{td(`enums.appointmentStatus.${a.status}`, a.status)}</StatusBadge>
                   </li>
                 ))}
               </ul>
@@ -162,18 +165,18 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
               {!set.vehicle.customer ? (
                 <span className="text-ink-muted">{t("vehicles.noOwner")}</span>
               ) : session.can("customers.view") ? (
-                <Link href={`/customers/${set.vehicle.customer.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                <TextLink href={`/customers/${set.vehicle.customer.id}`}>
                   {customerDisplayName(set.vehicle.customer)}
-                </Link>
+                </TextLink>
               ) : (
                 customerDisplayName(set.vehicle.customer)
               )}
             </p>
             <p className="mt-1 text-sm">
               {session.can("vehicles.view") ? (
-                <Link href={`/vehicles/${set.vehicle.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                <TextLink href={`/vehicles/${set.vehicle.id}`}>
                   {[set.vehicle.make, set.vehicle.model].filter(Boolean).join(" ") || set.vehicle.plate}
-                </Link>
+                </TextLink>
               ) : (
                 <span className="text-ink-muted">{[set.vehicle.make, set.vehicle.model].filter(Boolean).join(" ")}</span>
               )}

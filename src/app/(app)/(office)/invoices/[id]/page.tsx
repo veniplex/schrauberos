@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download, ExternalLink, Pencil } from "lucide-react";
-import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, TextLink } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
@@ -128,9 +128,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 {
                   label: outgoing ? t("invoices.fields.recipient") : t("invoices.fields.supplier"),
                   value: inv.customer && session.can("customers.view") ? (
-                    <Link href={`/customers/${inv.customer.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                    <TextLink href={`/customers/${inv.customer.id}`}>
                       {customerDisplayName(inv.customer)}
-                    </Link>
+                    </TextLink>
                   ) : (
                     inv.partyName
                   ),

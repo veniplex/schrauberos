@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
 import { Menu, MenuLink } from "@/components/ui/menu";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Table, TextLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
+import { DUE_TONE } from "@/lib/due";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
@@ -131,9 +133,9 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         <td className="text-sm">{ip.hostname ?? <span className="text-ink-muted">–</span>}</td>
                         <td className="font-mono text-[13px]">{ip.mac ?? <span className="font-sans text-ink-muted">–</span>}</td>
                         <td className="text-sm">
-                          <Link href={`/network/ip/${ip.subnetId}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                          <TextLink href={`/network/ip/${ip.subnetId}`}>
                             {ip.subnet.name}
-                          </Link>
+                          </TextLink>
                         </td>
                       </tr>
                     ))}
@@ -211,10 +213,10 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                 {
                   label: t("network.fields.warrantyUntil"),
                   value: device.warrantyUntil ? (
-                    <Badge tone={w === "expired" ? "danger" : w === "soon" ? "warning" : "neutral"}>
+                    <StatusBadge tone={w ? DUE_TONE[w] : "neutral"}>
                       {date(device.warrantyUntil)}
                       {w === "expired" ? ` · ${t("network.warranty.expired")}` : w === "soon" ? ` · ${t("network.warranty.soon")}` : ""}
-                    </Badge>
+                    </StatusBadge>
                   ) : null,
                 },
                 { label: t("common.notes"), value: device.notes },

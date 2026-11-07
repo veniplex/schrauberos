@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Table, TextLink, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
+import { IP_KIND_TONE } from "@/modules/it/network/status-tone";
+import type { IpKind } from "@/modules/it/network/constants";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { UrlModal } from "@/components/ui/modal";
@@ -104,13 +107,13 @@ export default async function SubnetPage({
                           )}
                         </td>
                         <td>
-                          <Badge tone={ip.kind === "gateway" ? "accent" : "neutral"}>{td(`enums.ipKind.${ip.kind}`, ip.kind)}</Badge>
+                          <StatusBadge tone={IP_KIND_TONE[ip.kind as IpKind] ?? "neutral"}>{td(`enums.ipKind.${ip.kind}`, ip.kind)}</StatusBadge>
                         </td>
                         <td className="text-sm">
                           {ip.device ? (
-                            <Link href={`/network/devices/${ip.device.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                            <TextLink href={`/network/devices/${ip.device.id}`}>
                               {ip.device.name}
-                            </Link>
+                            </TextLink>
                           ) : (
                             <span className="text-ink-muted">–</span>
                           )}
@@ -150,9 +153,9 @@ export default async function SubnetPage({
                   <li key={r.from} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
                     <span className="font-mono text-[13px]">{r.count === 1 ? r.from : `${r.from} – ${r.to}`}</span>
                     {canEdit ? (
-                      <Link href={`${base}?new=1&address=${r.from}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                      <TextLink href={`${base}?new=1&address=${r.from}`}>
                         {t("network.useAddress")}
-                      </Link>
+                      </TextLink>
                     ) : null}
                   </li>
                 ))}

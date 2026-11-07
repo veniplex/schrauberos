@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Disc3 } from "lucide-react";
 import { Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
+import { Alert } from "@/components/ui/layout";
 import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { useI18n } from "@/i18n/client";
@@ -76,10 +77,9 @@ export function AppointmentForm({
         {initial.tireSet ? <input type="hidden" name="tireSetId" value={initial.tireSet.id} /> : null}
 
         {initial.tireSet ? (
-          <p className="flex items-center gap-2 rounded-md bg-info-bg px-3 py-2 text-sm text-info-ink">
-            <Disc3 className="size-4 shrink-0" aria-hidden />
-            <span>{t("appointments.linkedTireSet", { set: initial.tireSet.label })}</span>
-          </p>
+          <Alert tone="info" live={false} className="px-3 py-2" icon={<Disc3 className="mt-0.5 size-4 shrink-0" aria-hidden />}>
+            {t("appointments.linkedTireSet", { set: initial.tireSet.label })}
+          </Alert>
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">

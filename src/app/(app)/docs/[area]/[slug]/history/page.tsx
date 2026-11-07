@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
+import { Badge, Card, EmptyState, TextLink } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
@@ -39,9 +40,9 @@ export default async function DocHistoryPage({
       <PageHeader
         title={t("docs.history")}
         description={
-          <Link href={base} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+          <TextLink href={base}>
             {page.title}
-          </Link>
+          </TextLink>
         }
       />
       <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
@@ -79,7 +80,7 @@ export default async function DocHistoryPage({
                 ) : null
               }
             >
-              {selected.content.trim() ? <Markdown source={selected.content} /> : <p className="text-sm text-ink-muted">{t("docs.emptyPage")}</p>}
+              {selected.content.trim() ? <Markdown source={selected.content} taskLabels={{ done: t("common.taskDone"), open: t("common.taskOpen") }} /> : <p className="text-sm text-ink-muted">{t("docs.emptyPage")}</p>}
             </Card>
           ) : (
             <Card as="div" padded={false}>

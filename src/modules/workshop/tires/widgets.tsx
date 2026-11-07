@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, EmptyState, Plate } from "@/components/ui/layout";
+import { Card, EmptyState, Plate, TextLink } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { getSession } from "@/server/auth/session";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
@@ -19,12 +19,12 @@ export async function TireAttentionWidget() {
     .sort(bySeverity);
 
   return (
-    <Card
+    <Card headingLevel={3}
       title={t("tires.widgets.attentionTitle")}
       actions={
-        <Link href="/tires?attention=1" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+        <TextLink href="/tires?attention=1" className="text-sm">
           {t("common.showAll")}
-        </Link>
+        </TextLink>
       }
       padded={false}
     >
@@ -64,12 +64,12 @@ export async function TireSwapWidget() {
   const sets = (await listTireSets({ status: "stored" })).filter((s) => s.swapDue);
 
   return (
-    <Card
+    <Card headingLevel={3}
       title={t("tires.widgets.swapTitle")}
       actions={
-        <Link href="/tires?swap=1" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+        <TextLink href="/tires?swap=1" className="text-sm">
           {t("common.showAll")}
-        </Link>
+        </TextLink>
       }
       padded={false}
     >

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Checkbox, Field, Form, FormActions, Input } from "@/components/ui/form";
 import { Button } from "@/components/ui/buttons";
-import { Card } from "@/components/ui/layout";
+import { Alert, Card } from "@/components/ui/layout";
 import { togglePermission, toggleGroupPermissions } from "@/lib/role-mask";
 import { useI18n } from "@/i18n/client";
 import { saveRole } from "./actions";
@@ -53,7 +53,7 @@ export function RoleForm({
       </Card>
 
       {initial.isAdmin ? (
-        <p className="rounded-md bg-info-bg px-3.5 py-2.5 text-sm text-info-ink">{t("roles.adminNotice")}</p>
+        <Alert tone="info">{t("roles.adminNotice")}</Alert>
       ) : (
         <div className="flex flex-col gap-6">
           {sections.map((section) => (

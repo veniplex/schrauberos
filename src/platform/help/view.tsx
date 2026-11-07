@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SubmitButton } from "@/components/ui/buttons";
 import { Input } from "@/components/ui/form";
-import { Card, EmptyState, NavLink, PageHeader } from "@/components/ui/layout";
+import { Card, EmptyState, NavLink, TextLink } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { Markdown } from "@/components/ui/markdown";
 import { getI18n } from "@/i18n/server";
 import type { HelpGroup } from "@/modules/help";
@@ -65,7 +65,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
             <Card as="article" className="min-w-0">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{current.section.title}</p>
               <h2 className="mb-4 text-xl font-semibold">{current.page.title}</h2>
-              <Markdown source={current.page.body} />
+              <Markdown source={current.page.body} taskLabels={{ done: t("common.taskDone"), open: t("common.taskOpen") }} />
             </Card>
 
             {current.page.headings.length > 0 ? (
@@ -92,9 +92,9 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
               <ul className="flex flex-col gap-3">
                 {hits.map((hit) => (
                   <li key={hit.id}>
-                    <Link href={`/help/${hit.id}`} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center font-medium text-accent-text hover:underline">
+                    <TextLink href={`/help/${hit.id}`} className="font-medium">
                       {hit.page.title}
-                    </Link>
+                    </TextLink>
                     <span className="ml-2 text-sm text-ink-muted">{hit.section.title}</span>
                   </li>
                 ))}

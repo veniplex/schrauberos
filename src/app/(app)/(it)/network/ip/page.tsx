@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
+import { Badge, Card, EmptyState } from "@/components/ui/layout";
+import { DataTable } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
@@ -29,6 +30,7 @@ export default async function IpamPage() {
       <PageHeader
         title={t("network.ipamTitle")}
         description={t("network.ipamDescription")}
+        help="it.network"
         actions={
           canEdit ? (
             <LinkButton href="/network/ip/new" variant="primary">
@@ -39,52 +41,44 @@ export default async function IpamPage() {
       />
 
       <div className="flex flex-col gap-5">
-        <Card title={t("network.sections.subnets")} padded={false}>
-          {subnets.length === 0 ? (
-            <EmptyState title={t("network.subnetsEmpty")} hint={t("network.subnetsEmptyHint")} />
-          ) : (
-            <Table className="min-w-[44rem]">
-                <thead>
-                  <tr>
-                    <th>{t("network.cols.subnet")}</th>
-                    <th>{t("network.fields.cidr")}</th>
-                    <th>VLAN</th>
-                    <th>{t("network.fields.gateway")}</th>
-                    <th className="min-w-44">{t("network.cols.utilization")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subnets.map((s) => {
-                    const hosts = parseCidr(s.cidr)?.hosts ?? 0;
-                    const used = s._count.ips;
-                    const pct = hosts ? Math.min(100, Math.round((used / hosts) * 100)) : 0;
-                    return (
-                      <tr key={s.id} className="row-link">
-                        <td>
-                          <Link href={`/network/ip/${s.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                            {s.name}
-                          </Link>
-                        </td>
-                        <td className="font-mono text-[13px]">{s.cidr}</td>
-                        <td>{s.vlan ? <Badge tone="info">VLAN {s.vlan.vlanId}</Badge> : <span className="text-ink-muted">–</span>}</td>
-                        <td className="font-mono text-[13px]">{s.gateway ?? <span className="font-sans text-ink-muted">–</span>}</td>
-                        <td>
-                          <div className="flex items-center gap-3">
-                            <div className="h-2 w-28 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`${pct} %`}>
-                              <div className={`h-full ${pct > 90 ? "bg-danger-ink" : pct > 75 ? "bg-warning-ink" : "bg-accent"}`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-xs text-ink-muted tabular">
-                              {number(used)} / {number(hosts)}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-          )}
-        </Card>
+        <section aria-labelledby="subnets-title">
+          <h2 id="subnets-title" className="mb-2 text-sm font-semibold">
+            {t("network.sections.subnets")}
+          </h2>
+          <DataTable
+            caption={t("network.sections.subnets")}
+            rows={subnets}
+            rowKey={(s) => s.id}
+            rowHref={(s) => `/network/ip/${s.id}`}
+            minWidth="44rem"
+            empty={<EmptyState title={t("network.subnetsEmpty")} hint={t("network.subnetsEmptyHint")} />}
+            columns={[
+              { id: "name", header: t("network.cols.subnet"), priority: "primary", cell: (s) => s.name },
+              { id: "cidr", header: t("network.fields.cidr"), cell: (s) => <span className="font-mono text-[13px]">{s.cidr}</span> },
+              { id: "vlan", header: "VLAN", cell: (s) => (s.vlan ? <Badge tone="info">VLAN {s.vlan.vlanId}</Badge> : <span className="text-ink-muted">–</span>) },
+              { id: "gateway", header: t("network.fields.gateway"), cell: (s) => <span className="font-mono text-[13px]">{s.gateway ?? <span className="font-sans text-ink-muted">–</span>}</span> },
+              {
+                id: "utilization",
+                header: t("network.cols.utilization"),
+                cell: (s) => {
+                  const hosts = parseCidr(s.cidr)?.hosts ?? 0;
+                  const used = s._count.ips;
+                  const pct = hosts ? Math.min(100, Math.round((used / hosts) * 100)) : 0;
+                  return (
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-28 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`${pct} %`}>
+                        <div className={`h-full ${pct > 90 ? "bg-danger-ink" : pct > 75 ? "bg-warning-ink" : "bg-accent"}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs text-ink-muted tabular">
+                        {number(used)} / {number(hosts)}
+                      </span>
+                    </div>
+                  );
+                },
+              },
+            ]}
+          />
+        </section>
 
         <Card title={t("network.sections.vlans")} padded={false}>
           <p className="px-5 pt-3 text-sm text-ink-muted">{t("network.vlansHint")}</p>

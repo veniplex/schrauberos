@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Alert, PageHeader } from "@/components/ui/layout";
+import { Alert, TextLink } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
@@ -42,9 +42,9 @@ export default async function EditUserPage({ params, searchParams }: { params: P
             <span>{user.username}</span>
             {user.employee ? (
               session.can("employees.view") ? (
-                <Link href={`/employees/${user.employee.id}`} className="text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
+                <TextLink href={`/employees/${user.employee.id}`}>
                   {t("users.linkedEmployee", { name: `${user.employee.firstName} ${user.employee.lastName}` })}
-                </Link>
+                </TextLink>
               ) : (
                 <span>{t("users.linkedEmployee", { name: `${user.employee.firstName} ${user.employee.lastName}` })}</span>
               )

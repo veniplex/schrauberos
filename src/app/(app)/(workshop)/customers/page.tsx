@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Plus, Search } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader, Plate, Table } from "@/components/ui/layout";
+import { Badge, EmptyState, Plate } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
+import { DataTable } from "@/components/ui/data-table";
+import { Pagination } from "@/components/ui/pagination";
+import type { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/i18n/server";
+import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
 import { customerDisplayName } from "@/modules/workshop/customers/domain";
 import { normalizePlate } from "@/lib/plate";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
+import { contains, searchWhere } from "@/server/search";
 import { Input } from "@/components/ui/form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,39 +20,41 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("nav.customers") };
 }
 
-const LIMIT = 100;
+const SORTS = ["name", "city"] as const;
+const DEFAULT = { sort: "name", dir: "asc" } as const;
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; dir?: string; page?: string }> }) {
   const session = await requirePermission("customers.view");
   const [{ t, tp }, sp] = await Promise.all([getI18n(), searchParams]);
   const q = (sp.q ?? "").trim();
   const plate = normalizePlate(q);
+  const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT });
 
-  const where = q
-    ? {
-        OR: [
-          { lastName: contains(q) },
-          { firstName: contains(q) },
-          { company: contains(q) },
-          { customerNumber: contains(q) },
-          { city: contains(q) },
-          { phone: contains(q) },
-          ...(plate ? [{ vehicles: { some: { plateNorm: { contains: plate } } } }] : []),
-        ],
-      }
-    : {};
+  // Wörterbuch pro Berechtigung: Kennzeichen nur durchsuchbar, wer Fahrzeuge sehen darf
+  const where =
+    searchWhere<Prisma.CustomerWhereInput>(q, session.can, [
+      { where: (term) => ({ lastName: contains(term) }) },
+      { where: (term) => ({ firstName: contains(term) }) },
+      { where: (term) => ({ company: contains(term) }) },
+      { where: (term) => ({ customerNumber: contains(term) }) },
+      { where: (term) => ({ city: contains(term) }) },
+      { where: (term) => ({ phone: contains(term) }) },
+      { permission: "vehicles.view", where: () => (plate ? { vehicles: { some: { plateNorm: { contains: plate } } } } : { id: "" }) },
+    ]) ?? {};
 
-  const [customers, total] = await Promise.all([
-    db.customer.findMany({ where, include: { vehicles: { orderBy: { plateNorm: "asc" } } }, orderBy: { lastName: "asc" }, take: LIMIT }),
-    db.customer.count({ where }),
-  ]);
+  const total = await db.customer.count({ where });
+  const page = clampPage(list.page, total, list.pageSize);
+  const orderBy = list.sort === "city" ? [{ city: list.dir }, { lastName: "asc" as const }] : [{ lastName: list.dir }, { firstName: list.dir }, { company: list.dir }];
+  const customers = await db.customer.findMany({ where, include: { vehicles: { orderBy: { plateNorm: "asc" } } }, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("customers.edit");
+  const links = listLinks("/customers", { q: q || undefined }, list, DEFAULT);
 
   return (
     <>
       <PageHeader
         title={t("customers.title")}
         description={t("customers.description")}
+        help="workshop.customers"
         actions={
           canEdit ? (
             <LinkButton href="/customers/new" variant="primary">
@@ -58,58 +64,58 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <form method="get" className="mb-5 max-w-lg">
+      <form method="get" role="search" className="mb-5 max-w-lg">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
           <Input name="q" defaultValue={q} className="pl-9" placeholder={t("customers.searchPlaceholder")} aria-label={t("common.search")} />
         </div>
       </form>
 
-      <Card padded={false} className="overflow-hidden">
-        {customers.length === 0 ? (
-          <EmptyState title={t("customers.empty")} hint={q ? t("common.noResults") : t("customers.emptyHint")} />
-        ) : (
-          <>
-            <p className="border-b border-line px-4 py-2 text-sm text-ink-muted">
-              {tp("customers.count", total)}
-              {total > LIMIT ? ` · ${t("common.limited", { limit: LIMIT })}` : ""}
-            </p>
-            <Table className="min-w-[40rem]">
-                <thead>
-                  <tr>
-                    <th>{t("customers.cols.name")}</th>
-                    <th>{t("customers.cols.contact")}</th>
-                    <th>{t("customers.cols.vehicles")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((c) => (
-                    <tr key={c.id} className="row-link">
-                      <td>
-                        <Link href={`/customers/${c.id}`} className="font-medium inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">
-                          {customerDisplayName(c)}
-                        </Link>
-                        <div className="flex items-center gap-2 text-xs text-ink-muted">
-                          {c.customerNumber ? <span className="tabular">#{c.customerNumber}</span> : null}
-                          {c.externalSource ? <Badge tone="info">{c.externalSource === "werbas" ? "Werbas" : c.externalSource}</Badge> : null}
-                        </div>
-                      </td>
-                      <td className="text-sm">
-                        <div>{c.phone}</div>
-                        <div className="text-ink-muted">{[c.zip, c.city].filter(Boolean).join(" ")}</div>
-                      </td>
-                      <td>
-                        <div className="flex flex-wrap gap-1.5">
-                          {c.vehicles.length ? c.vehicles.map((v) => <Plate key={v.id}>{v.plate}</Plate>) : <span className="text-ink-muted">–</span>}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-          </>
-        )}
-      </Card>
+      <DataTable
+        caption={t("customers.title")}
+        rows={customers}
+        rowKey={(c) => c.id}
+        rowHref={(c) => `/customers/${c.id}`}
+        sort={{ key: list.sort, dir: list.dir }}
+        sortHref={links.sortHref}
+        summary={tp("customers.count", total)}
+        footer={<Pagination page={page} pageSize={list.pageSize} total={total} hrefFor={links.pageHref} />}
+        empty={<EmptyState title={t("customers.empty")} hint={q ? t("common.noResults") : t("customers.emptyHint")} />}
+        columns={[
+          {
+            id: "name",
+            header: t("customers.cols.name"),
+            priority: "primary",
+            sort: "name",
+            cell: (c) => customerDisplayName(c),
+            sub: (c) =>
+              c.customerNumber || c.externalSource ? (
+                <span className="flex items-center gap-2">
+                  {c.customerNumber ? <span className="tabular">#{c.customerNumber}</span> : null}
+                  {c.externalSource ? <Badge tone="info">{c.externalSource === "werbas" ? "Werbas" : c.externalSource}</Badge> : null}
+                </span>
+              ) : null,
+          },
+          {
+            id: "contact",
+            header: t("customers.cols.contact"),
+            sort: "city",
+            cell: (c) => (
+              <div className="text-sm">
+                <div>{c.phone}</div>
+                <div className="text-ink-muted">{[c.zip, c.city].filter(Boolean).join(" ")}</div>
+              </div>
+            ),
+          },
+          {
+            id: "vehicles",
+            header: t("customers.cols.vehicles"),
+            cell: (c) => (
+              <div className="flex flex-wrap gap-1.5">{c.vehicles.length ? c.vehicles.map((v) => <Plate key={v.id}>{v.plate}</Plate>) : <span className="text-ink-muted">–</span>}</div>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }

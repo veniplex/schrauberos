@@ -33,7 +33,7 @@ export function UserMenu({
       block={!compact}
       placement={compact ? "down" : "up"}
       align={compact ? "end" : "start"}
-      label={name}
+      label={compact ? name : undefined}
       trigger={
         compact ? (
           <UserRound className="size-4 shrink-0" aria-hidden />

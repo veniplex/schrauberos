@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Alert, Badge, Card, PageHeader } from "@/components/ui/layout";
+import { Alert, Badge, Card, StatusBadge } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { SubmitSwitch } from "@/components/ui/switch";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
@@ -7,13 +8,13 @@ import { FEATURES, MODULES, featureById, featuresOfModule } from "@/modules/cata
 import { dependentsOf, featureKey, featureStatus, moduleOn as isModuleOn, type FeatureStatus } from "@/modules/catalog-logic";
 import { getOverrides } from "@/modules/features";
 import { setEnabled } from "@/modules/admin/modules/actions";
+import { FEATURE_STATE_TONE } from "@/modules/admin/modules/status-tone";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return { title: t("modules.title") };
 }
 
-const TONE = { on: "success", off: "neutral", "module-off": "neutral", blocked: "warning" } as const;
 const LABEL = { on: "modules.status.on", off: "modules.status.off", "module-off": "modules.status.moduleOff", blocked: "modules.status.blocked" } as const;
 
 export default async function ModulesPage() {
@@ -60,7 +61,7 @@ export default async function ModulesPage() {
                   <Badge>{t("modules.required")}</Badge>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <Badge tone={moduleOn ? "success" : "neutral"}>{moduleOn ? t("modules.status.on") : t("modules.status.off")}</Badge>
+                    <StatusBadge tone={moduleOn ? "success" : "neutral"}>{moduleOn ? t("modules.status.on") : t("modules.status.off")}</StatusBadge>
                     {toggle(m.id, moduleOn, t("modules.moduleSwitch", { name: t(m.nameKey) }), t("modules.confirmOffModule", { name: t(m.nameKey) }))}
                   </div>
                 )}
@@ -79,7 +80,7 @@ export default async function ModulesPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-sm font-medium">{t(f.nameKey)}</h3>
-                          <Badge tone={TONE[status.state]}>{t(LABEL[status.state])}</Badge>
+                          <StatusBadge tone={FEATURE_STATE_TONE[status.state]}>{t(LABEL[status.state])}</StatusBadge>
                           {required ? <Badge>{t("modules.required")}</Badge> : null}
                         </div>
                         <p className="mt-0.5 text-sm text-ink-muted">{t(f.descriptionKey)}</p>

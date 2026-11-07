@@ -1,9 +1,8 @@
-import { Badge } from "@/components/ui/layout";
+import { StatusBadge } from "@/components/ui/layout";
 import type { PaymentState } from "@/modules/office/invoices/domain";
+import { PAYMENT_TONE } from "@/modules/office/invoices/status-tone";
 import type { Translator } from "@/i18n/translate";
 
-const TONE = { open: "info", overdue: "danger", paid: "success", cancelled: "neutral" } as const;
-
 export function PaymentBadge({ state, t }: { state: PaymentState; t: Translator["t"] }) {
-  return <Badge tone={TONE[state]}>{t(`invoices.payment.${state}`)}</Badge>;
+  return <StatusBadge tone={PAYMENT_TONE[state]}>{t(`invoices.payment.${state}`)}</StatusBadge>;
 }

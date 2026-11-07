@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { addDays, startOfDay } from "date-fns";
-import { Badge, Card, EmptyState } from "@/components/ui/layout";
+import { Badge, Card, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { employeeName, visibleAbsenceType } from "@/modules/office/employees/domain";
@@ -30,7 +30,7 @@ export async function EmployeesWidget() {
   ]);
 
   return (
-    <Card title={t("employees.widgets.title")} actions={<Link href="/employees/absences" className="text-sm text-accent-text inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center hover:underline">{t("nav.absences")}</Link>} padded={false}>
+    <Card headingLevel={3} title={t("employees.widgets.title")} actions={<TextLink href="/employees/absences" className="text-sm">{t("nav.absences")}</TextLink>} padded={false}>
       <h3 className="px-5 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("employees.widgets.absentToday")}</h3>
       {absent.length === 0 ? (
         <p className="px-5 py-3 text-sm text-ink-muted">{t("employees.widgets.nobodyAbsent")}</p>
@@ -66,9 +66,9 @@ export async function EmployeesWidget() {
                     <span className="block truncate font-medium">{q.name}</span>
                     <span className="text-xs text-ink-muted">{employeeName(q.employee)}</span>
                   </span>
-                  <Badge tone={state ? DUE_TONE[state] : "neutral"}>
+                  <StatusBadge tone={state ? DUE_TONE[state] : "neutral"}>
                     {state === "expired" ? t("employees.expired") : t("employees.validUntil")} {date(q.expiresAt!)}
-                  </Badge>
+                  </StatusBadge>
                 </Link>
               </li>
             );

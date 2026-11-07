@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PageHeader } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";

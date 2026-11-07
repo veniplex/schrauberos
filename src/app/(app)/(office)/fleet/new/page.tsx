@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageHeader } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { employeeName } from "@/modules/office/employees/public";
 import { requirePermission } from "@/server/auth/session";

@@ -1,4 +1,5 @@
-import { Alert, Card, PageHeader } from "@/components/ui/layout";
+import { Alert, Card } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { REINSTALL_TEXT } from "@/lib/reinstall-text";
 
 /**

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Alert, Card, PageHeader } from "@/components/ui/layout";
+import { Alert, Card } from "@/components/ui/layout";
+import { PageHeader } from "@/components/ui/page-header";
 import { LocaleSwitch, ThemeSwitch } from "@/components/shell/switches";
 import { getI18n, getLocale, getTheme } from "@/i18n/server";
 import { requireSession } from "@/server/auth/session";

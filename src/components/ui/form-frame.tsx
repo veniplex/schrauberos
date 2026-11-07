@@ -339,7 +339,7 @@ export function FormErrorSummary() {
 
   if (names.length === 0) return null;
   return (
-    <div ref={root} role="alert" tabIndex={-1} data-form-errors className="w-full basis-full rounded-md bg-danger-bg px-3.5 py-3 text-sm text-danger-ink outline-offset-2">
+    <Alert tone="danger" ref={root} tabIndex={-1} data-form-errors className="w-full basis-full py-3 outline-offset-2">
       <p className="font-medium">{tp("common.errorSummary", names.length)}</p>
       <ul className="mt-1 list-disc pl-5">
         {names.map((name) => (
@@ -362,7 +362,7 @@ export function FormErrorSummary() {
           </li>
         ))}
       </ul>
-    </div>
+    </Alert>
   );
 }
 
@@ -373,16 +373,16 @@ export function FormMessage({ state }: { state?: FormState }) {
   if (!s) return null;
   if (s.error) {
     return (
-      <p role="alert" className={clsx("rounded-md px-3 py-2 text-sm", s.network ? "bg-warning-bg text-warning-ink" : "bg-danger-bg text-danger-ink")}>
+      <Alert tone={s.network ? "warning" : "danger"} role="alert" className="px-3 py-2">
         {s.error}
-      </p>
+      </Alert>
     );
   }
   if (!context && s.ok && s.message) {
     return (
-      <p role="status" className="rounded-md bg-success-bg px-3 py-2 text-sm text-success-ink">
+      <Alert tone="success" className="px-3 py-2">
         {s.message}
-      </p>
+      </Alert>
     );
   }
   return null;

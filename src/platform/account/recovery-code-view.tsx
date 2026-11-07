@@ -66,9 +66,9 @@ export function RecoveryCodeView({
         </div>
         <Checkbox label={t("recovery.saved")} checked={saved} onChange={(e) => setSaved(e.target.checked)} />
         {failed ? (
-          <p role="alert" className="rounded-md bg-danger-bg px-3 py-2 text-sm text-danger-ink">
+          <Alert tone="danger" className="px-3 py-2">
             {t("recovery.confirmFailed")}
-          </p>
+          </Alert>
         ) : null}
         <div>
           <Button variant="primary" disabled={!saved || busy} aria-busy={busy || undefined} onClick={proceed}>
