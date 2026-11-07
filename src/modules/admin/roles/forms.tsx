@@ -42,7 +42,7 @@ export function RoleForm({
         </>
       ) : null}
       <Card>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("roles.fields.name")} htmlFor="name" name="name" required>
             <Input id="name" name="name" defaultValue={initial.name} maxLength={60} required />
           </Field>
@@ -61,7 +61,7 @@ export function RoleForm({
               <h2 id={`perm-module-${section.moduleId}`} className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                 {section.moduleName}
               </h2>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {section.groups.map((group) => {
                   const keys = group.keys.map((k) => k.key);
                   const free = keys.filter((k) => !locked.has(k));

@@ -22,6 +22,8 @@
   --surface-hover: light-dark(oklch(95% 0.006 255), oklch(27% 0.016 255));
   --line: light-dark(oklch(90.5% 0.006 255), oklch(31% 0.015 255));
   --line-strong: light-dark(oklch(80% 0.01 255), oklch(42% 0.018 255));
+  /* Rand von Bedienelementen (Eingabefelder, Knöpfe mit Rand): mindestens 3 : 1 gegen die Fläche (WCAG 1.4.11) – `--line-strong` ist nur Trennlinie */
+  --control-border: light-dark(oklch(64% 0.012 255), oklch(56% 0.015 255));
   --overlay: light-dark(oklch(20% 0.02 255 / 0.45), oklch(5% 0.01 255 / 0.65));
 
   /* Text */
@@ -48,6 +50,27 @@
   --danger-bg: light-dark(oklch(95% 0.03 27), oklch(29% 0.07 27));
   --info-ink: light-dark(oklch(42% 0.12 250), oklch(82% 0.09 250));
   --info-bg: light-dark(oklch(95% 0.03 250), oklch(28% 0.05 250));
+
+  /* Diagrammfarben (kategorial): je Reihe eine Farbe, in dieser Reihenfolge verwenden. Alle mindestens 3 : 1 gegen die Fläche (Hell und Dunkel), für Farbfehlsichtigkeit
+     (Protanopie, Deuteranopie, Tritanopie) geprüft unterscheidbar – bei mehr als 6 Reihen oder wenn die Farbe allein tragen müsste, zusätzlich beschriften (tokens.test.ts).
+     6 ist das neutrale „Sonstige“. */
+  --chart-1: light-dark(oklch(52% 0.19 258), oklch(70% 0.15 258));
+  --chart-2: light-dark(oklch(66% 0.16 58), oklch(78% 0.15 62));
+  --chart-3: light-dark(oklch(58% 0.1 190), oklch(76% 0.11 190));
+  --chart-4: light-dark(oklch(46% 0.18 315), oklch(66% 0.17 315));
+  --chart-5: light-dark(oklch(60% 0.21 15), oklch(72% 0.17 15));
+  --chart-6: light-dark(oklch(38% 0.02 255), oklch(90% 0.01 255));
+
+  /* Typografie: Schriftgrößen der Anwendung (Tailwind-`text-*` zeigt darauf) und Symbolgrößen (`size-(--icon)`) */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.5rem;
+  --icon-sm: 0.875rem;
+  --icon: 1rem;
+  --icon-lg: 1.25rem;
 
   /* Radien */
   --r-sm: 4px;

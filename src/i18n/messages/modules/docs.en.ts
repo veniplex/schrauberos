@@ -10,6 +10,7 @@ export const docsEn: typeof docsDe = {
   pin: "Pin",
   unpin: "Unpin",
   pinned: "Pinned",
+  chapters: "Chapters",
   allPages: "All pages",
   noCategory: "No chapter",
   manageCategories: "Manage chapters",

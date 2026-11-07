@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
 import { Menu, MenuLink } from "@/components/ui/menu";
-import { Badge, Card, DefinitionList, EmptyState, Table, TextLink, StatusBadge } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Table, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { DUE_TONE } from "@/lib/due";
 import { LinkButton } from "@/components/ui/buttons";
@@ -59,6 +59,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   return (
     <>
       <PageHeader
+        back={{ href: "/network/devices", label: t("nav.devices") }} help="it.network"
         title={device.name}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -81,7 +82,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
         </div>
       ) : null}
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="flex flex-col gap-5 md:col-span-2">
           <Card
             title={t("network.sections.ips")}
@@ -117,7 +118,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             {ips.length === 0 ? (
               <EmptyState title={t("network.noIps")} />
             ) : (
-              <Table className="min-w-[32rem]">
+              <Table caption={t("network.sections.ips")} className="min-w-[32rem]">
                   <thead>
                     <tr>
                       <th>{t("network.cols.address")}</th>
@@ -173,7 +174,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             {links.length === 0 ? (
               <EmptyState title={t("network.noConnections")} />
             ) : (
-              <Table className="min-w-[32rem]">
+              <Table caption={t("network.sections.connections")} className="min-w-[32rem]">
                   <thead>
                     <tr>
                       <th>{t("network.cols.port")}</th>
@@ -225,10 +226,12 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
           </Card>
 
           {session.can("network.delete") ? (
-            <form action={deleteDevice}>
-              <input type="hidden" name="id" value={device.id} />
-              <ConfirmSubmitButton message={t("network.devicesDeleteConfirm", { name: device.name })}>{t("network.devicesDelete")}</ConfirmSubmitButton>
-            </form>
+            <DangerZone title={t("common.dangerZone")}>
+              <form action={deleteDevice}>
+                <input type="hidden" name="id" value={device.id} />
+                <ConfirmSubmitButton message={t("network.devicesDeleteConfirm", { name: device.name })}>{t("network.devicesDelete")}</ConfirmSubmitButton>
+              </form>
+            </DangerZone>
           ) : null}
         </div>
       </div>

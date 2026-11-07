@@ -232,7 +232,7 @@ export function Checkbox({
 
 /** Farbauswahl. */
 export function ColorInput({ className, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
-  return <input {...props} type="color" className={clsx("h-(--tap) w-14 cursor-pointer rounded-md border border-line-strong bg-surface p-1", className)} />;
+  return <input {...props} type="color" className={clsx("h-(--tap) w-14 cursor-pointer rounded-md border border-control bg-surface p-1", className)} />;
 }
 
 const MEGABYTE = 1024 * 1024;
@@ -265,7 +265,7 @@ export function FileInput({ className, maxBytes = 10 * MEGABYTE, onReject, onCha
             onReject?.(tooBig);
           } else onChange?.(event);
         }}
-        className={clsx("block min-h-(--tap) w-full text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:bg-surface-hover", className)}
+        className={clsx("block min-h-(--tap) w-full text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-control file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:bg-surface-hover", className)}
       />
       {tooLarge ? (
         <p id={errorId} role="alert" className="field-error">

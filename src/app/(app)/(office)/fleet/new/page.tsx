@@ -16,7 +16,7 @@ export default async function NewFleetVehiclePage() {
   const [{ t }, employees] = await Promise.all([getI18n(), db.employee.findMany({ where: { active: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] })]);
   return (
     <>
-      <PageHeader title={t("fleet.new")} />
+      <PageHeader back={{ href: "/fleet", label: t("nav.fleet") }} help="office.fleet" title={t("fleet.new")} />
       <FleetForm
         cancelHref="/fleet"
         drivers={employees.map((e) => ({ id: e.id, name: employeeName(e) }))}

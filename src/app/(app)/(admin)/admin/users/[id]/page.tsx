@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Alert, TextLink } from "@/components/ui/layout";
+import { Alert, TextLink, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -36,6 +36,7 @@ export default async function EditUserPage({ params, searchParams }: { params: P
   return (
     <>
       <PageHeader
+        back={{ href: "/admin/users", label: t("nav.users") }} help="admin.users"
         title={user.name}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -81,10 +82,12 @@ export default async function EditUserPage({ params, searchParams }: { params: P
           isSelf={isSelf}
         /> : null}
         {!isSelf && !readOnly ? (
-          <form action={deleteUser} className="max-w-3xl">
-            <input type="hidden" name="id" value={user.id} />
-            <ConfirmSubmitButton message={t("users.confirmDelete", { name: user.name })}>{t("users.delete")}</ConfirmSubmitButton>
-          </form>
+          <DangerZone title={t("common.dangerZone")} className="max-w-3xl">
+            <form action={deleteUser}>
+              <input type="hidden" name="id" value={user.id} />
+              <ConfirmSubmitButton message={t("users.confirmDelete", { name: user.name })}>{t("users.delete")}</ConfirmSubmitButton>
+            </form>
+          </DangerZone>
         ) : null}
       </div>
     </>

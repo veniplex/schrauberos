@@ -88,6 +88,7 @@ export const de = {
     scrollHint: "Seitlich wischen für weitere Spalten",
     total: "Gesamt",
     backTo: "Zurück zu {target}",
+    dangerZone: "Gefahrenbereich",
     taskDone: "erledigt",
     taskOpen: "offen",
     errors: {
@@ -381,6 +382,7 @@ export const de = {
       accent: "Akzentfarbe",
       accentCustom: "Eigene Farbe wählen",
       accentHint: "Wird für Buttons, Markierungen und das Logo-Symbol verwendet. Die Textfarbe passt sich automatisch an.",
+      accentLowContrast: "Diese Farbe ist als Schriftfarbe (Links, aktive Reiter) schwer lesbar. Buttons funktionieren, aber eine dunklere oder kräftigere Farbe liest sich besser.",
       hours: "Öffnungszeiten",
       closed: "Geschlossen",
       from: "von",

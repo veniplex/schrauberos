@@ -15,7 +15,7 @@ export default async function NewDevicePage() {
   const [{ t }, locations] = await Promise.all([getI18n(), db.netLocation.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] })]);
   return (
     <>
-      <PageHeader title={t("network.devicesNew")} />
+      <PageHeader back={{ href: "/network/devices", label: t("nav.devices") }} help="it.network" title={t("network.devicesNew")} />
       <DeviceForm
         cancelHref="/network/devices"
         locations={locations}

@@ -23,7 +23,7 @@ export default async function NewRolePage({ searchParams }: { searchParams: Prom
   const copied = source ? (source.isAdmin ? [...ALL_PERMISSIONS] : source.permissions.map((p) => p.permission)).filter((p) => !locked.includes(p)) : [];
   return (
     <>
-      <PageHeader title={t("roles.new")} />
+      <PageHeader back={{ href: "/admin/roles", label: t("nav.roles") }} help="admin.roles" title={t("roles.new")} />
       <RoleForm
         sections={sections}
         lockedPermissions={locked}

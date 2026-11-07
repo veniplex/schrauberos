@@ -28,7 +28,7 @@ export default async function EditEmployeePage({ params }: { params: Promise<{ i
 
   return (
     <>
-      <PageHeader title={t("employees.edit")} description={employeeName(e)} />
+      <PageHeader breadcrumbs={[{ href: "/employees", label: t("nav.employees") }, { href: `/employees/${e.id}`, label: employeeName(e) }]} help="office.employees" title={t("employees.edit")} description={employeeName(e)} />
       <EmployeeForm
         cancelHref={`/employees/${e.id}`}
         users={users}

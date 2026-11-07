@@ -21,7 +21,7 @@ export default async function NewUserPage() {
   ]);
   return (
     <>
-      <PageHeader title={t("users.new")} />
+      <PageHeader back={{ href: "/admin/users", label: t("nav.users") }} help="admin.users" title={t("users.new")} />
       <UserForm
         initial={{ username: "", name: "", email: "", active: true, mustChangePassword: true, roleIds: [], authSource: "local" }}
         roles={roles.map((r) => ({ id: r.id, name: r.name, description: r.description, isAdmin: r.isAdmin }))}

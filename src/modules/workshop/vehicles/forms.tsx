@@ -29,7 +29,7 @@ export function VehicleForm({ initial, cancelHref }: { initial: VehicleFormValue
           <input type="hidden" name="version" value={initial.version ?? ""} />
         </>
       ) : null}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("vehicles.fields.plate")} htmlFor="plate" name="plate" required>
           <Input id="plate" name="plate" defaultValue={initial.plate} className="font-mono uppercase" placeholder="B-AB 1234" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
         </Field>
@@ -68,7 +68,7 @@ export function TransferForm({ vehicleId, today, closeHref }: { vehicleId: strin
       <Field label={t("vehicles.fields.newOwner")} name="newCustomerId" hint={t("vehicles.fields.newOwnerHint")}>
         <SearchCombobox endpoint="/api/customers/search" name="newCustomerId" placeholder={t("customers.searchPlaceholder")} />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("vehicles.fields.transferDate")} htmlFor="date" name="date" required>
           <Input id="date" name="date" type="date" defaultValue={today} required />
         </Field>

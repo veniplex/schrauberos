@@ -50,7 +50,7 @@ export function SubmitSwitch({
         <span
           aria-hidden
           className={clsx(
-            "relative inline-flex h-6 w-11 items-center rounded-full border border-line-strong transition-colors group-hover:border-ink-muted",
+            "relative inline-flex h-6 w-11 items-center rounded-full border border-control transition-colors group-hover:border-ink-muted",
             checked ? "bg-accent" : "bg-surface-2",
           )}
         >

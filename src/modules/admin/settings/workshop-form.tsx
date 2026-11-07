@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Checkbox, ColorPicker, Field, FileInput, Form, FormActions, FormFieldError, Input, Select } from "@/components/ui/form";
-import { Card } from "@/components/ui/layout";
-import { ACCENT_PRESETS } from "@/lib/color";
+import { Alert, Card } from "@/components/ui/layout";
+import { ACCENT_PRESETS, isHexColor } from "@/lib/color";
+import { accentTextContrast } from "@/lib/color-contrast";
 import { WEEKDAYS } from "@/lib/constants";
 import type { OpeningHours } from "@/lib/opening-hours";
 import { useI18n } from "@/i18n/client";
@@ -28,12 +29,15 @@ export type WorkshopFormInitial = {
 export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInitial; timezones: string[] }) {
   const { t } = useI18n();
   const [accent, setAccent] = useState(initial.accentColor);
+  // Eine frei gewählte Farbe kann als Textfarbe (Links, Reiter) zu blass sein: warnen, wenn der Kontrast unter 4,5 : 1 fällt
+  const contrast = isHexColor(accent) ? accentTextContrast(accent) : null;
+  const lowContrast = contrast !== null && Math.min(contrast.light, contrast.dark) < 4.5;
   const [closed, setClosed] = useState(() => Object.fromEntries(WEEKDAYS.map((d) => [d, initial.hours[d] === null])));
 
   return (
     <Form action={saveWorkshop} encType="multipart/form-data" className="flex max-w-4xl flex-col gap-5">
       <Card title={t("settings.workshop.identity")}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("settings.workshop.name")} htmlFor="name" name="name" required>
             <Input id="name" name="name" defaultValue={initial.name} maxLength={80} required />
           </Field>
@@ -64,7 +68,7 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
       </Card>
 
       <Card title={t("settings.workshop.branding")}>
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <Field label={t("settings.workshop.logo")} name="logo" hint={t("settings.workshop.logoHint")}>
             <div className="flex items-center gap-4">
               {initial.logoDataUrl ? (
@@ -84,6 +88,7 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
           <Field label={t("settings.workshop.accent")} name="accentColor" hint={t("settings.workshop.accentHint")} group>
             <ColorPicker name="accentColor" value={accent} presets={ACCENT_PRESETS} onChange={setAccent} customLabel={t("settings.workshop.accentCustom")} />
           </Field>
+          {lowContrast ? <Alert tone="warning">{t("settings.workshop.accentLowContrast")}</Alert> : null}
         </div>
       </Card>
 

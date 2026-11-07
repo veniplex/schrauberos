@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Alert } from "@/components/ui/layout";
+import { Alert, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -37,6 +37,7 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader
+        back={{ href: "/admin/roles", label: t("nav.roles") }} help="admin.roles"
         title={role.name}
         description={tp("roles.userCount", role._count.users)}
         actions={
@@ -61,10 +62,12 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
           }}
         /> : null}
         {canDelete ? (
-          <form action={deleteRole} className="max-w-4xl">
-            <input type="hidden" name="id" value={role.id} />
-            <ConfirmSubmitButton message={t("roles.confirmDelete")}>{t("roles.delete")}</ConfirmSubmitButton>
-          </form>
+          <DangerZone title={t("common.dangerZone")} className="max-w-4xl">
+            <form action={deleteRole}>
+              <input type="hidden" name="id" value={role.id} />
+              <ConfirmSubmitButton message={t("roles.confirmDelete")}>{t("roles.delete")}</ConfirmSubmitButton>
+            </form>
+          </DangerZone>
         ) : null}
       </div>
     </>

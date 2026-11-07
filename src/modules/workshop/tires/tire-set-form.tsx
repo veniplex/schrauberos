@@ -90,7 +90,7 @@ export function TireSetForm({
       </Card>
 
       <Card title={t("tires.sections.set")}>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label={t("tires.fields.season")} htmlFor="season" required>
             <Select id="season" name="season" defaultValue={initial.season}>
               {TIRE_SEASONS.map((s) => (
@@ -148,7 +148,7 @@ export function TireSetForm({
         }
       >
         <p className="mb-3 text-sm text-ink-muted">{t("tires.dotHint")}</p>
-        <Table className="min-w-[34rem]">
+        <Table caption={t("tires.sections.tires")} className="min-w-[34rem]">
             <thead>
               <tr>
                 <th>{t("tires.fields.position")}</th>
@@ -210,7 +210,7 @@ export function TireSetForm({
       </Card>
 
       <Card title={t("tires.sections.storage")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("common.status")} htmlFor="status">
             <Select id="status" name="status" defaultValue={initial.status}>
               {TIRE_SET_STATUSES.map((s) => (

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import clsx from "clsx";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { TabNav } from "@/components/ui/tab-nav";
 import { getI18n } from "@/i18n/server";
 import { settingsTabsFor } from "@/modules/registry";
 import { requireSession } from "@/server/auth/session";
@@ -23,22 +22,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
+      {/* ohne `help`: Die Reiter haben verschiedene Rechte, das Hilfekapitel „Einstellungen“ aber nur settings.manage */}
       <PageHeader title={t("settings.title")} description={t("settings.description")} />
-      <nav aria-label={t("settings.title")} className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.id}
-            href={`/settings?tab=${tab.id}`}
-            aria-current={active?.id === tab.id ? "page" : undefined}
-            className={clsx(
-              "-mb-px inline-flex min-h-(--tap) items-center whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium",
-              active?.id === tab.id ? "border-accent text-accent-text" : "border-transparent text-ink-muted hover:text-ink",
-            )}
-          >
-            {t(tab.labelKey)}
-          </Link>
-        ))}
-      </nav>
+      <TabNav label={t("settings.title")} items={tabs.map((tab) => ({ href: `/settings?tab=${tab.id}`, label: t(tab.labelKey), active: active?.id === tab.id }))} />
       {active ? <active.Component /> : null}
     </>
   );

@@ -30,7 +30,7 @@ export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormVal
           <input type="hidden" name="version" value={initial.version ?? ""} />
         </>
       ) : null}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("customers.fields.firstName")} htmlFor="firstName" name="firstName">
           <Input id="firstName" name="firstName" defaultValue={initial.firstName} autoComplete="off" />
         </Field>
@@ -50,7 +50,7 @@ export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormVal
           <Input id="email" name="email" type="email" defaultValue={initial.email} autoComplete="off" />
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-[1fr_8rem_1fr]">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_8rem_1fr]">
         <Field label={t("customers.fields.street")} htmlFor="street">
           <Input id="street" name="street" defaultValue={initial.street} autoComplete="off" />
         </Field>

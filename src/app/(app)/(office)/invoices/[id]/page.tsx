@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Download, ExternalLink, Pencil } from "lucide-react";
-import { Badge, Card, DefinitionList, TextLink } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, TextLink, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -44,6 +44,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   return (
     <>
       <PageHeader
+        back={{ href: "/invoices", label: t("nav.invoices") }} help="office.invoices"
         title={
           <span className="flex flex-wrap items-center gap-3">
             <span className="font-mono">{inv.number}</span>
@@ -79,7 +80,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         }
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="md:col-span-2">
           <Card title={t("invoices.sections.file")} padded={false}>
             {inv.file ? (
@@ -146,10 +147,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </Card>
 
           {session.can("invoices.delete") ? (
-            <form action={deleteInvoice}>
-              <input type="hidden" name="id" value={inv.id} />
-              <ConfirmSubmitButton message={t("invoices.confirmDelete", { number: inv.number })}>{t("invoices.delete")}</ConfirmSubmitButton>
-            </form>
+            <DangerZone title={t("common.dangerZone")}>
+              <form action={deleteInvoice}>
+                <input type="hidden" name="id" value={inv.id} />
+                <ConfirmSubmitButton message={t("invoices.confirmDelete", { number: inv.number })}>{t("invoices.delete")}</ConfirmSubmitButton>
+              </form>
+            </DangerZone>
           ) : null}
         </div>
       </div>

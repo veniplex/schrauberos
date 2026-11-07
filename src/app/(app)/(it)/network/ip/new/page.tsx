@@ -15,7 +15,7 @@ export default async function NewSubnetPage() {
   const [{ t }, vlans] = await Promise.all([getI18n(), db.netVlan.findMany({ orderBy: { vlanId: "asc" } })]);
   return (
     <>
-      <PageHeader title={t("network.subnetNew")} />
+      <PageHeader back={{ href: "/network/ip", label: t("nav.ipam") }} help="it.network" title={t("network.subnetNew")} />
       <SubnetForm
         cancelHref="/network/ip"
         vlans={vlans}

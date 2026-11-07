@@ -17,7 +17,7 @@ export default async function NewDocPage({ params, searchParams }: { params: Pro
 
   return (
     <>
-      <PageHeader title={t("docs.new")} description={t(`docs.areas.${area}.title`)} />
+      <PageHeader back={{ href: `/docs/${area}`, label: t(`docs.areas.${area}.title`) }} title={t("docs.new")} description={t(`docs.areas.${area}.title`)} />
       <DocEditor
         area={area}
         categories={categories}

@@ -19,7 +19,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader title={direction === "incoming" ? t("invoices.newIncoming") : t("invoices.newOutgoing")} />
+      <PageHeader back={{ href: `/invoices?dir=${direction}`, label: t("nav.invoices") }} help="office.invoices" title={direction === "incoming" ? t("invoices.newIncoming") : t("invoices.newOutgoing")} />
       <InvoiceForm
         canPickCustomer={session.features.has("workshop.customers")}
         cancelHref={`/invoices?dir=${direction}`}

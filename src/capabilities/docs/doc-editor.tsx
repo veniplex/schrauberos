@@ -114,7 +114,7 @@ export function DocEditor({
       <input type="hidden" name="area" value={area} />
       {(DOC_AREAS_WITH_PASSWORD_HINT as readonly string[]).includes(area) ? <Alert tone="warning">{t("docs.noPasswordsHint")}</Alert> : null}
 
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
         <Field label={t("docs.fields.title")} htmlFor="title" name="title" required>
           <Input id="title" name="title" defaultValue={initial.title} maxLength={120} required autoComplete="off" />
         </Field>
@@ -131,7 +131,7 @@ export function DocEditor({
       </div>
 
       {/* Fokusring am Rahmen: Die Textfläche selbst hat keinen (er würde vom overflow-hidden abgeschnitten) */}
-      <div className="overflow-hidden rounded-lg border border-line-strong focus-within:border-accent-text focus-within:ring-2 focus-within:ring-accent-text">
+      <div className="overflow-hidden rounded-lg border border-control focus-within:border-accent-text focus-within:ring-2 focus-within:ring-accent-text">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-2 py-1">
           <div className="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label={t("docs.toolbar")}>
             <ToolButton label={t("docs.tools.bold")} Icon={Bold} onClick={() => apply((v, s, e) => wrap(v, s, e, "**", "**", t("docs.tools.boldText")))} />

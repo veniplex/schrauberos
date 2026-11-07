@@ -23,7 +23,7 @@ export default async function EditTireSetPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <PageHeader title={t("tires.edit")} description={`${set.vehicle.plate}`} />
+      <PageHeader breadcrumbs={[{ href: "/tires", label: t("nav.tires") }, { href: `/tires/${set.id}`, label: set.vehicle.plate }]} help="workshop.tires" title={t("tires.edit")} description={`${set.vehicle.plate}`} />
       <TireSetForm
         initial={editTireSetInitial(set)}
         locations={locations.map((l) => l.storageLocation!).sort()}

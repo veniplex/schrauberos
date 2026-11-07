@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Pencil } from "lucide-react";
-import { Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -87,6 +87,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
   return (
     <>
       <PageHeader
+        back={{ href: "/tires", label: t("nav.tires") }} help="workshop.tires"
         title={
           <span className="flex flex-wrap items-center gap-3">
             <Plate>{set.vehicle.plate}</Plate>
@@ -117,7 +118,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
         }
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="flex flex-col gap-5 md:col-span-2">
           <Card title={t("tires.sections.tires")}>
             <div className="grid grid-cols-2 gap-3">{GRID.map(tile)}</div>
@@ -184,7 +185,7 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
             {set.vehicle.customer?.phone ? <p className="mt-1 text-sm">{set.vehicle.customer.phone}</p> : null}
           </Card>
 
-          {canEdit || session.can("tires.delete") ? (
+          {canEdit ? (
             <Card title={t("common.actions")}>
               <div className="flex flex-wrap gap-2">
                 {canEdit && set.status === "stored" ? (
@@ -208,14 +209,17 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
                     <ConfirmSubmitButton message={t("tires.actions.disposeConfirm")} variant="secondary">{t("tires.actions.dispose")}</ConfirmSubmitButton>
                   </form>
                 ) : null}
-                {session.can("tires.delete") ? (
-                  <form action={deleteTireSet}>
-                    <input type="hidden" name="id" value={set.id} />
-                    <ConfirmSubmitButton message={t("tires.actions.deleteConfirm")}>{t("common.delete")}</ConfirmSubmitButton>
-                  </form>
-                ) : null}
               </div>
             </Card>
+          ) : null}
+
+          {session.can("tires.delete") ? (
+            <DangerZone title={t("common.dangerZone")}>
+              <form action={deleteTireSet}>
+                <input type="hidden" name="id" value={set.id} />
+                <ConfirmSubmitButton message={t("tires.actions.deleteConfirm")}>{t("common.delete")}</ConfirmSubmitButton>
+              </form>
+            </DangerZone>
           ) : null}
         </div>
       </div>

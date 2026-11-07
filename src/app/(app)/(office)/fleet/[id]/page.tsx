@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, Plate, Table, TextLink, StatusBadge } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, Table, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -56,6 +56,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
   return (
     <>
       <PageHeader
+        back={{ href: "/fleet", label: t("nav.fleet") }} help="office.fleet"
         title={
           <span className="flex flex-wrap items-center gap-3">
             <Plate>{v.plate}</Plate>
@@ -77,7 +78,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
         }
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="flex flex-col gap-5 md:col-span-2">
           <Card title={t("fleet.sections.duesNow")}>
             {dues.length === 0 ? (
@@ -95,7 +96,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
             {v.mileage.length === 0 ? (
               <EmptyState title={t("fleet.noMileage")} />
             ) : (
-              <Table scrollClassName="max-h-72 overflow-auto">
+              <Table caption={t("fleet.sections.mileage")} scrollClassName="max-h-72 overflow-auto">
                   <tbody>
                     {v.mileage.map((m) => (
                       <tr key={m.id}>
@@ -146,7 +147,7 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
                     ))}
                   </span>
                 </div>
-                <Table scrollClassName="max-h-72 overflow-auto">
+                <Table caption={t("fleet.sections.costs")} scrollClassName="max-h-72 overflow-auto">
                     <tbody>
                       {v.costs.map((c) => (
                         <tr key={c.id}>
@@ -227,10 +228,12 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
           </Card>
 
           {session.can("fleet.delete") ? (
-            <form action={deleteFleetVehicle}>
-              <input type="hidden" name="id" value={v.id} />
-              <ConfirmSubmitButton message={t("fleet.confirmDelete", { plate: v.plate })}>{t("fleet.delete")}</ConfirmSubmitButton>
-            </form>
+            <DangerZone title={t("common.dangerZone")}>
+              <form action={deleteFleetVehicle}>
+                <input type="hidden" name="id" value={v.id} />
+                <ConfirmSubmitButton message={t("fleet.confirmDelete", { plate: v.plate })}>{t("fleet.delete")}</ConfirmSubmitButton>
+              </form>
+            </DangerZone>
           ) : null}
         </div>
       </div>

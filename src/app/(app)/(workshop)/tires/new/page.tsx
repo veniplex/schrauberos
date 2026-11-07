@@ -21,7 +21,7 @@ export default async function NewTireSetPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader title={t("tires.new")} description={t("tires.newDescription")} />
+      <PageHeader back={{ href: "/tires", label: t("nav.tires") }} help="workshop.tires" title={t("tires.new")} description={t("tires.newDescription")} />
       <TireSetForm
         initial={newTireSetInitial(vehicle)}
         locations={locations.map((l) => l.storageLocation!).sort()}

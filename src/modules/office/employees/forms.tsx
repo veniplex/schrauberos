@@ -53,7 +53,7 @@ export function EmployeeForm({
       ) : null}
 
       <Card title={t("employees.sections.person")}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("employees.fields.firstName")} htmlFor="firstName" name="firstName" required>
             <Input id="firstName" name="firstName" defaultValue={initial.firstName} maxLength={60} required autoComplete="off" />
           </Field>
@@ -82,7 +82,7 @@ export function EmployeeForm({
       </Card>
 
       <Card title={t("employees.sections.contact")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("customers.fields.email")} htmlFor="email" name="email">
             <Input id="email" name="email" type="email" defaultValue={initial.email} autoComplete="off" />
           </Field>
@@ -96,7 +96,7 @@ export function EmployeeForm({
       </Card>
 
       <Card title={t("employees.sections.employment")}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("employees.fields.hireDate")} htmlFor="hireDate">
             <Input id="hireDate" name="hireDate" type="date" defaultValue={initial.hireDate} />
           </Field>
@@ -123,7 +123,7 @@ export function EmployeeForm({
       {canSensitive ? (
         <Card title={t("employees.sections.emergency")}>
           <p className="mb-3 text-sm text-ink-muted">{t("employees.sensitiveHint")}</p>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label={t("employees.fields.emergencyName")} htmlFor="emergencyName">
               <Input id="emergencyName" name="emergencyName" data-no-draft defaultValue={initial.emergencyName} maxLength={80} autoComplete="off" />
             </Field>
@@ -170,7 +170,7 @@ export function AbsenceForm({
   return (
     <Form action={saveAbsence} className="flex flex-col gap-4">
       <input type="hidden" name="returnTo" value={returnTo} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("employees.title")} htmlFor="employeeId" name="employeeId" required>
           <Select id="employeeId" name="employeeId" defaultValue={initialEmployeeId} required>
             <option value="" disabled>

@@ -13,7 +13,7 @@ export function TireSettingsForm({ initial }: { initial: TireRules }) {
     <Form action={saveTireSettings} className="flex max-w-4xl flex-col gap-5">
       <Card title={t("tires.settings.title")}>
         <p className="mb-4 text-sm text-ink-muted">{t("tires.settings.hint")}</p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label={t("tires.settings.treadWarn")} htmlFor="treadWarnMm" name="treadWarnMm">
             <Input id="treadWarnMm" name="treadWarnMm" type="number" step="0.1" min={1} max={10} defaultValue={initial.treadWarnMm} />
           </Field>

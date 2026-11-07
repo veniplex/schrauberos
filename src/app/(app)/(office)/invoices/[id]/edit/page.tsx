@@ -27,7 +27,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <PageHeader title={t("invoices.edit")} description={<span className="font-mono">{inv.number}</span>} />
+      <PageHeader breadcrumbs={[{ href: "/invoices", label: t("nav.invoices") }, { href: `/invoices/${inv.id}`, label: inv.number }]} help="office.invoices" title={t("invoices.edit")} description={<span className="font-mono">{inv.number}</span>} />
       <InvoiceForm
         canPickCustomer={session.features.has("workshop.customers")}
         cancelHref={`/invoices/${inv.id}`}

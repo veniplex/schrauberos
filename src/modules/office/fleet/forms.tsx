@@ -46,7 +46,7 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
       ) : null}
 
       <Card title={t("fleet.sections.vehicle")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("vehicles.fields.plate")} htmlFor="plate" name="plate" required>
             <Input id="plate" name="plate" defaultValue={initial.plate} className="font-mono uppercase" placeholder="B-FW 100" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
           </Field>
@@ -101,7 +101,7 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
       </Card>
 
       <Card title={t("fleet.sections.dues")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("fleet.fields.huDue")} htmlFor="huDue">
             <Input id="huDue" name="huDue" type="date" defaultValue={initial.huDue} />
           </Field>
@@ -115,7 +115,7 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
       </Card>
 
       <Card title={t("fleet.sections.contracts")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("fleet.fields.insuranceCompany")} htmlFor="insuranceCompany">
             <Input id="insuranceCompany" name="insuranceCompany" defaultValue={initial.insuranceCompany} maxLength={80} />
           </Field>
@@ -206,7 +206,7 @@ export function LicenseCheckForm({
   const { t } = useI18n();
   return (
     <Form action={saveLicenseCheck} className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("fleet.fields.driver")} htmlFor="employeeId" name="employeeId" required>
           <Select id="employeeId" name="employeeId" defaultValue={initialEmployeeId} required>
             <option value="" disabled>

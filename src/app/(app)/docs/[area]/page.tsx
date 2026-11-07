@@ -6,7 +6,9 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { SearchInput } from "@/components/ui/form";
 import { Button, LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
+import { Pagination } from "@/components/ui/pagination";
 import { getI18n } from "@/i18n/server";
+import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
 import { requireDocArea, visibleChapters, visiblePages } from "@/capabilities/docs/access";
@@ -25,11 +27,23 @@ function snippet(md: string, max = 150) {
   return text.length > max ? `${text.slice(0, max).trimEnd()} …` : text;
 }
 
-export default async function DocsIndexPage({ params, searchParams }: { params: Promise<{ area: string }>; searchParams: Promise<{ q?: string; cat?: string }> }) {
+export default async function DocsIndexPage({ params, searchParams }: { params: Promise<{ area: string }>; searchParams: Promise<{ q?: string; cat?: string; page?: string }> }) {
   const [{ area: areaParam }, sp] = await Promise.all([params, searchParams]);
   const { area, session, canEdit } = await requireDocArea(areaParam);
   const { t, tp, date } = await getI18n();
   const q = (sp.q ?? "").trim();
+  const list = parseListParams(sp, { sorts: [], sort: "title", pageSize: 20 });
+  // Was die Anmeldung lesen darf, bestimmt `visiblePages` – Suche und Zählung sehen nur diese Seiten
+  const where = {
+    area,
+    AND: [
+      visiblePages(session, area),
+      sp.cat === "none" ? { categoryId: null } : sp.cat ? { categoryId: sp.cat } : {},
+      q ? { OR: [{ title: contains(q) }, { content: contains(q) }] } : {},
+    ],
+  };
+  const matching = await db.docPage.count({ where });
+  const page = clampPage(list.page, matching, list.pageSize);
 
   const [categories, pages, roles] = await Promise.all([
     db.docCategory.findMany({
@@ -37,40 +51,17 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       include: { _count: { select: { pages: true } }, roles: { select: { roleId: true } } },
     }),
-    db.docPage.findMany({
-      where: {
-        area,
-        AND: [
-          visiblePages(session, area),
-          sp.cat === "none" ? { categoryId: null } : sp.cat ? { categoryId: sp.cat } : {},
-          q ? { OR: [{ title: contains(q) }, { content: contains(q) }] } : {},
-        ],
-      },
-      include: { category: true },
-      orderBy: [{ pinned: "desc" }, { title: "asc" }],
-    }),
+    db.docPage.findMany({ where, include: { category: true }, orderBy: [{ pinned: "desc" }, { title: "asc" }], ...pageWindow(page, list.pageSize) }),
     // Administratoren sehen ohnehin alles – nur die übrigen Rollen lassen sich für ein Kapitel auswählen
     canEdit ? db.role.findMany({ where: { isAdmin: false }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : [],
   ]);
   const total = categories.reduce((n, c) => n + c._count.pages, 0);
   const base = `/docs/${area}`;
+  const links = listLinks(base, { q: q || undefined, cat: sp.cat }, list, { sort: "title", dir: "asc" });
 
-  return (
+  // Die Kapitel: ab lg als Spalte neben der Liste, darunter einklappbar (sonst schiebt die lange Liste den Inhalt weit nach unten)
+  const chapters = (
     <>
-      <PageHeader
-        title={t(`docs.areas.${area}.title`)}
-        description={t(`docs.areas.${area}.description`)}
-        actions={
-          canEdit ? (
-            <LinkButton href={`${base}/new${sp.cat && sp.cat !== "none" ? `?cat=${sp.cat}` : ""}`} variant="primary">
-              <Plus className="size-4" aria-hidden /> {t("docs.new")}
-            </LinkButton>
-          ) : null
-        }
-      />
-
-      <div className="grid gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-1">
           <NavLink href={base} active={!sp.cat}>
             {t("docs.allPages")}
           </NavLink>
@@ -118,7 +109,28 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
             </Disclosure>
           ) : null}
           <p className="mt-2 px-3 text-xs text-ink-muted">{tp("docs.count", total)}</p>
-        </aside>
+    </>
+  );
+
+  return (
+    <>
+      <PageHeader
+        title={t(`docs.areas.${area}.title`)}
+        description={t(`docs.areas.${area}.description`)}
+        actions={
+          canEdit ? (
+            <LinkButton href={`${base}/new${sp.cat && sp.cat !== "none" ? `?cat=${sp.cat}` : ""}`} variant="primary">
+              <Plus className="size-4" aria-hidden /> {t("docs.new")}
+            </LinkButton>
+          ) : null
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
+        <Disclosure title={t("docs.chapters")} className="lg:hidden">
+          <div className="mt-2 flex flex-col gap-1">{chapters}</div>
+        </Disclosure>
+        <aside className="hidden flex-col gap-1 lg:flex">{chapters}</aside>
 
         <div className="min-w-0">
           <form method="get" role="search" className="mb-4">
@@ -149,6 +161,9 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
               ))}
             </ul>
           )}
+          <Card as="div" padded={false} className="mt-3 empty:hidden">
+            <Pagination page={page} pageSize={list.pageSize} total={matching} hrefFor={links.pageHref} />
+          </Card>
         </div>
       </div>
     </>

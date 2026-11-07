@@ -73,6 +73,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
   return (
     <>
       <PageHeader
+        help="workshop.appointments"
         title={i18n.t("appointments.title")}
         description={i18n.t("appointments.description")}
         actions={

@@ -24,7 +24,7 @@ export default async function EditDevicePage({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <PageHeader title={t("network.devicesEdit")} description={device.name} />
+      <PageHeader breadcrumbs={[{ href: "/network/devices", label: t("nav.devices") }, { href: `/network/devices/${device.id}`, label: device.name }]} help="it.network" title={t("network.devicesEdit")} description={device.name} />
       <DeviceForm
         cancelHref={`/network/devices/${device.id}`}
         locations={locations}

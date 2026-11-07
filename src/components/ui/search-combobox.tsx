@@ -110,7 +110,7 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
 
   if (selected) {
     return (
-      <div role="group" aria-labelledby={field?.labelId} aria-describedby={field?.describedBy} className="flex items-center justify-between gap-3 rounded-md border border-line-strong bg-surface-2 px-3 py-1.5">
+      <div role="group" aria-labelledby={field?.labelId} aria-describedby={field?.describedBy} className="flex items-center justify-between gap-3 rounded-md border border-control bg-surface-2 px-3 py-1.5">
         <input type="hidden" name={name} value={selected.id} />
         {renderSelected ? (
           <div className="min-w-0 text-sm">{renderSelected(selected)}</div>

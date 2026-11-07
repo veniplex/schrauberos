@@ -7,6 +7,7 @@ import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteSubnet } from "@/modules/it/network/actions";
 import { SubnetForm } from "@/modules/it/network/forms";
+import { DangerZone } from "@/components/ui/layout";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -24,7 +25,7 @@ export default async function EditSubnetPage({ params }: { params: Promise<{ sub
 
   return (
     <>
-      <PageHeader title={t("network.subnetEdit")} description={`${subnet.name} · ${subnet.cidr}`} />
+      <PageHeader breadcrumbs={[{ href: "/network/ip", label: t("nav.ipam") }, { href: `/network/ip/${subnet.id}`, label: subnet.name }]} help="it.network" title={t("network.subnetEdit")} description={`${subnet.name} · ${subnet.cidr}`} />
       <div className="flex flex-col gap-4">
         <SubnetForm
           cancelHref={`/network/ip/${subnet.id}`}
@@ -42,10 +43,12 @@ export default async function EditSubnetPage({ params }: { params: Promise<{ sub
           }}
         />
         {session.can("network.delete") ? (
-          <form action={deleteSubnet} className="max-w-3xl">
-            <input type="hidden" name="id" value={subnet.id} />
-            <ConfirmSubmitButton message={t("network.subnetDeleteConfirm", { count: subnet._count.ips })}>{t("network.subnetDelete")}</ConfirmSubmitButton>
-          </form>
+          <DangerZone title={t("common.dangerZone")} className="max-w-3xl">
+            <form action={deleteSubnet}>
+              <input type="hidden" name="id" value={subnet.id} />
+              <ConfirmSubmitButton message={t("network.subnetDeleteConfirm", { count: subnet._count.ips })}>{t("network.subnetDelete")}</ConfirmSubmitButton>
+            </form>
+          </DangerZone>
         ) : null}
       </div>
     </>

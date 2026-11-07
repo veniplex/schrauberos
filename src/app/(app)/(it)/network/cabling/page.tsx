@@ -29,7 +29,7 @@ export default async function CablingPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title={t("network.cablingTitle")} description={t("network.cablingDescription")} help="it.network" />
+      <PageHeader back={{ href: "/network", label: t("nav.network") }} title={t("network.cablingTitle")} description={t("network.cablingDescription")} help="it.network" />
       <TabNav label={t("network.cablingTitle")} items={TABS.map((id) => ({ href: `/network/cabling?tab=${id}`, label: t(`network.tabs.${id}`), active: tab === id }))} />
 
       {tab === "connections" ? <ConnectionsTab canEdit={canEdit} canDelete={canDelete} pageParam={sp.page} /> : <LocationsTab canEdit={canEdit} canDelete={canDelete} tp={tp} />}

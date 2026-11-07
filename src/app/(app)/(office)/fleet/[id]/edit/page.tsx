@@ -28,7 +28,7 @@ export default async function EditFleetVehiclePage({ params }: { params: Promise
 
   return (
     <>
-      <PageHeader title={t("fleet.edit")} description={<Plate>{v.plate}</Plate>} />
+      <PageHeader breadcrumbs={[{ href: "/fleet", label: t("nav.fleet") }, { href: `/fleet/${v.id}`, label: v.plate }]} help="office.fleet" title={t("fleet.edit")} description={<Plate>{v.plate}</Plate>} />
       <FleetForm
         cancelHref={`/fleet/${v.id}`}
         drivers={employees.map((e) => ({ id: e.id, name: employeeName(e) }))}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Disc3, Pencil, Repeat } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -53,6 +53,7 @@ export default async function VehiclePage({
   return (
     <>
       <PageHeader
+        back={{ href: "/vehicles", label: t("nav.vehicles") }} help="workshop.vehicles"
         title={
           <span className="flex flex-wrap items-center gap-3">
             <Plate>{vehicle.plate}</Plate>
@@ -74,7 +75,7 @@ export default async function VehiclePage({
         }
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="flex flex-col gap-5 md:col-span-2">
           {session.can("tires.view") ? (
             <Card
@@ -185,10 +186,12 @@ export default async function VehiclePage({
           </Card>
 
           {session.can("vehicles.delete") ? (
-            <form action={deleteVehicle}>
-              <input type="hidden" name="id" value={vehicle.id} />
-              <ConfirmSubmitButton message={`${t("vehicles.confirmDelete")}${vehicle._count.appointments > 0 ? ` ${tp("vehicles.confirmDeleteAppointments", vehicle._count.appointments)}` : ""}`}>{t("vehicles.delete")}</ConfirmSubmitButton>
-            </form>
+            <DangerZone title={t("common.dangerZone")}>
+              <form action={deleteVehicle}>
+                <input type="hidden" name="id" value={vehicle.id} />
+                <ConfirmSubmitButton message={`${t("vehicles.confirmDelete")}${vehicle._count.appointments > 0 ? ` ${tp("vehicles.confirmDeleteAppointments", vehicle._count.appointments)}` : ""}`}>{t("vehicles.delete")}</ConfirmSubmitButton>
+              </form>
+            </DangerZone>
           ) : null}
         </div>
       </div>

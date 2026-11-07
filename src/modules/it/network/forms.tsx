@@ -61,7 +61,7 @@ export function ConnectionForm({ devices }: { devices: Array<{ id: string; name:
   );
   return (
     <Form action={saveConnection} className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_8rem]">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_8rem]">
         {deviceSelect("fromDeviceId", t("network.fields.fromDevice"))}
         <Field label={t("network.fields.port")} htmlFor="fromPort" name="fromPort">
           <Input id="fromPort" name="fromPort" placeholder="24" maxLength={30} className="font-mono" />
@@ -71,7 +71,7 @@ export function ConnectionForm({ devices }: { devices: Array<{ id: string; name:
           <Input id="toPort" name="toPort" placeholder="1" maxLength={30} className="font-mono" />
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("network.fields.cableLabel")} htmlFor="cableLabel">
           <Input id="cableLabel" name="cableLabel" maxLength={60} placeholder="K-0142" />
         </Field>
@@ -111,7 +111,7 @@ export function SubnetForm({
   return (
     <FormCard action={saveSubnet} className="max-w-3xl">
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("network.fields.subnetName")} htmlFor="name" name="name" required>
           <Input id="name" name="name" defaultValue={initial.name} maxLength={80} required autoComplete="off" />
         </Field>
@@ -184,7 +184,7 @@ export function IpForm({
       {initial.id ? <input type="hidden" name="version" value={initial.version ?? ""} /> : null}
       <input type="hidden" name="subnetId" value={initial.subnetId} />
       <input type="hidden" name="returnTo" value={returnTo} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("network.cols.address")} htmlFor="address" name="address" hint={cidr} required>
           <Input id="address" name="address" defaultValue={initial.address} className="font-mono" autoComplete="off" required inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Field>

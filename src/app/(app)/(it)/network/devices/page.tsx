@@ -70,6 +70,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader
+        back={{ href: "/network", label: t("nav.network") }}
         title={t("network.devicesTitle")}
         description={t("network.devicesDescription")}
         help="it.network"

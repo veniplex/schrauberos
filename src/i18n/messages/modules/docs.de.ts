@@ -8,6 +8,7 @@ export const docsDe = {
   pin: "Anheften",
   unpin: "Lösen",
   pinned: "Angeheftet",
+  chapters: "Kapitel",
   allPages: "Alle Seiten",
   noCategory: "Ohne Kapitel",
   manageCategories: "Kapitel verwalten",

@@ -48,7 +48,7 @@ export default async function NetworkOverviewPage() {
 
   return (
     <>
-      <PageHeader title={t("network.title")} description={t("network.description")} />
+      <PageHeader help="it.network" title={t("network.title")} description={t("network.description")} />
 
       <div className="mb-5">
         <DemoNotice t={t} />
@@ -62,7 +62,7 @@ export default async function NetworkOverviewPage() {
         {stat("/network/cabling", connectionCount, t("network.stats.connections"))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card
           title={
             <span className="flex items-center gap-2">

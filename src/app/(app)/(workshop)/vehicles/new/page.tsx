@@ -18,7 +18,7 @@ export default async function NewVehiclePage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader title={t("vehicles.new")} />
+      <PageHeader back={{ href: "/vehicles", label: t("nav.vehicles") }} help="workshop.vehicles" title={t("vehicles.new")} />
       <div className="max-w-2xl">
         <VehicleForm
           cancelHref={customer ? `/customers/${customer.id}` : "/vehicles"}

@@ -14,7 +14,7 @@ export default async function NewCustomerPage() {
   const { t } = await getI18n();
   return (
     <>
-      <PageHeader title={t("customers.new")} />
+      <PageHeader back={{ href: "/customers", label: t("nav.customers") }} help="workshop.customers" title={t("customers.new")} />
       <div className="max-w-3xl">
         <CustomerForm
           cancelHref="/customers"

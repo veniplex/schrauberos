@@ -11,7 +11,7 @@ export function CalendarSettingsForm({ initial }: { initial: { dayStartHour: num
   return (
     <Form action={saveAppointmentSettings}>
       <Card title={t("appointments.settings.calendar")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("appointments.settings.dayStart")} htmlFor="dayStartHour" name="dayStartHour">
             <Input id="dayStartHour" name="dayStartHour" type="number" min={0} max={23} defaultValue={initial.dayStartHour} />
           </Field>

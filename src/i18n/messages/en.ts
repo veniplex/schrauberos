@@ -88,6 +88,7 @@ export const en: Messages = {
     scrollHint: "Swipe sideways for more columns",
     total: "Total",
     backTo: "Back to {target}",
+    dangerZone: "Danger zone",
     taskDone: "done",
     taskOpen: "open",
     errors: {
@@ -381,6 +382,7 @@ export const en: Messages = {
       accent: "Accent colour",
       accentCustom: "Pick a custom colour",
       accentHint: "Used for buttons, highlights and the logo symbol. Text colour adapts automatically.",
+      accentLowContrast: "This colour is hard to read as text (links, active tabs). Buttons work, but a darker or stronger colour reads better.",
       hours: "Opening hours",
       closed: "Closed",
       from: "from",

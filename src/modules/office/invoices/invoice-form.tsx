@@ -62,7 +62,7 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
       <input type="hidden" name="direction" value={initial.direction} />
 
       <Card title={outgoing ? t("invoices.sections.outgoing") : t("invoices.sections.incoming")}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("invoices.fields.number")} htmlFor="number" name="number" required>
             <Input id="number" name="number" defaultValue={initial.number} maxLength={60} required autoComplete="off" className="font-mono" />
           </Field>
@@ -84,7 +84,7 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
       </Card>
 
       <Card title={t("invoices.sections.amounts")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("invoices.fields.net")} htmlFor="net" name="net">
             <Input id="net" name="net" inputMode="decimal" value={amounts.net} onChange={(e) => changeAmount("net", e.target.value)} placeholder="0,00" />
           </Field>
@@ -107,7 +107,7 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
           </Field>
         </div>
         <p className="mt-2 text-xs text-ink-muted">{t("invoices.fields.amountHint")}</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("common.status")} htmlFor="status">
             <Select id="status" name="status" defaultValue={initial.status}>
               {INVOICE_STATUSES.map((s) => (
@@ -124,7 +124,7 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
       </Card>
 
       <Card title={t("invoices.sections.more")}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("invoices.fields.category")} htmlFor="category">
             <Input id="category" name="category" list="invoice-categories" defaultValue={initial.category} maxLength={60} autoComplete="off" />
             <datalist id="invoice-categories">

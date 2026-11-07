@@ -35,7 +35,7 @@ export default async function UpdatesPage() {
 
   return (
     <>
-      <PageHeader title={t("updates.title")} description={t("updates.description")} />
+      <PageHeader help="admin.updates" title={t("updates.title")} description={t("updates.description")} />
       <div className="flex max-w-3xl flex-col gap-5">
         <Card title={t("updates.current.title")}>
           <DefinitionList

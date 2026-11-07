@@ -24,7 +24,7 @@ export function BackupPlanForm({ initial, limits }: { initial: { enabled: boolea
         <p className="mb-4 text-sm text-ink-muted">{t("backup.retention.intro")}</p>
         <div className="flex flex-col gap-5">
           {BACKUP_KINDS.map((kind) => (
-            <div key={kind} className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr_1fr] sm:items-start">
+            <div key={kind} className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,12rem)_1fr_1fr] sm:items-start">
               <p className="pt-2 text-sm font-medium">{td(`backup.kinds.${kind}`, kind)}</p>
               <Field label={t("backup.retention.keep")} htmlFor={`keep_${kind}`} name={`keep_${kind}`} required>
                 <Input id={`keep_${kind}`} name={`keep_${kind}`} type="number" required min={0} max={limits.keep} defaultValue={initial.retention[kind].keep} />

@@ -28,6 +28,7 @@ export default async function IpamPage() {
   return (
     <>
       <PageHeader
+        back={{ href: "/network", label: t("nav.network") }}
         title={t("network.ipamTitle")}
         description={t("network.ipamDescription")}
         help="it.network"

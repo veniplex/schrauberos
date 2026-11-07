@@ -47,7 +47,7 @@ export function DeviceForm({
       ) : null}
 
       <Card title={t("network.sections.device")}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("network.fields.name")} htmlFor="name" name="name" required hint={t("network.fields.nameHint")}>
             <Input id="name" name="name" defaultValue={initial.name} maxLength={80} required autoComplete="off" />
           </Field>
@@ -87,7 +87,7 @@ export function DeviceForm({
       </Card>
 
       <Card title={t("network.sections.placement")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("network.fields.location")} htmlFor="locationId">
             <Select id="locationId" name="locationId" defaultValue={initial.locationId}>
               <option value="">{t("common.none")}</option>
@@ -108,7 +108,7 @@ export function DeviceForm({
       </Card>
 
       <Card title={t("network.sections.lifecycle")}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("network.fields.purchaseDate")} htmlFor="purchaseDate">
             <Input id="purchaseDate" name="purchaseDate" type="date" defaultValue={initial.purchaseDate} />
           </Field>

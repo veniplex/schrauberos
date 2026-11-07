@@ -41,7 +41,7 @@ export default async function ModulesPage() {
 
   return (
     <>
-      <PageHeader title={t("modules.title")} description={t("modules.description")} />
+      <PageHeader help="admin.modules" title={t("modules.title")} description={t("modules.description")} />
       <div className="flex max-w-4xl flex-col gap-6">
         <Alert tone="info">{t("modules.platformNote")}</Alert>
         {/* Die Verwaltung gehört zur Plattform (Pflichtmodul) und ist nicht schaltbar – hier nur die schaltbaren Module */}

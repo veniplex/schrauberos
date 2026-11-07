@@ -40,7 +40,7 @@ export default async function DashboardPage() {
               <h2 id={`module-${m.id}`} className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                 {t(m.nameKey)}
               </h2>
-              <div className="grid gap-5 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {list.map(({ id, span, Component }) => (
                   <div key={id} className={clsx("min-w-0", span === 2 && "lg:col-span-2")}>
                     <WidgetBoundary>

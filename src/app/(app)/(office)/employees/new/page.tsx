@@ -19,7 +19,7 @@ export default async function NewEmployeePage() {
   ]);
   return (
     <>
-      <PageHeader title={t("employees.new")} />
+      <PageHeader back={{ href: "/employees", label: t("nav.employees") }} help="office.employees" title={t("employees.new")} />
       <EmployeeForm
         cancelHref="/employees"
         users={users}

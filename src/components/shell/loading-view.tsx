@@ -10,7 +10,7 @@ export function LoadingView() {
   return (
     <div aria-busy="true">
       <Skeleton className="mb-6 h-8 w-64 max-w-full" />
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Skeleton className="h-48" />
         <Skeleton className="h-48" />
         <Skeleton className="h-48 lg:col-span-2" />

@@ -269,6 +269,19 @@ export function CardLink({ className, children, ...props }: ComponentProps<typeo
   );
 }
 
+/**
+ * Gefahrenbereich am Ende einer Detailseite: das unwiderrufliche Löschen (`ConfirmSubmitButton`) steht abgesetzt von den gewöhnlichen Aktionen, mit eigener Überschrift und – wenn nötig –
+ * einem Satz, warum oder wann das nicht geht (`children` ist dann Text statt Formular).
+ */
+export function DangerZone({ title, children, className }: { title: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <section className={clsx("min-w-0 rounded-lg border border-danger-ink/40 p-4", className)}>
+      <h2 className="mb-3 text-sm font-semibold text-danger-ink">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 /** Platzhalter für noch ladende Inhalte (Ladeseiten, Widgets). Nur dekorativ – die Ladeseite sagt „Wird geladen“ selbst an. */
 export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={clsx("animate-pulse rounded-md bg-surface-2", className)} />;

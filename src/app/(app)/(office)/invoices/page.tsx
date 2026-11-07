@@ -100,7 +100,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       />
       <TabNav label={t("invoices.title")} items={INVOICE_DIRECTIONS.map((value) => ({ href: tabHref(value), label: t(`invoices.tabs.${value}`), active: direction === value }))} />
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label={direction === "incoming" ? t("invoices.stats.toPay") : t("invoices.stats.toReceive")} value={eur(totals.openCents)} sub={tp("invoices.stats.count", totals.openCount)} />
         <StatCard label={t("invoices.stats.overdue")} value={eur(totals.overdueCents)} sub={tp("invoices.stats.count", totals.overdueCount)} tone={totals.overdueCents > 0 ? "danger" : undefined} />
         <StatCard label={direction === "incoming" ? t("invoices.stats.paid") : t("invoices.stats.received")} value={eur(totals.paidCents)} sub={year ? String(year) : t("invoices.allYears")} />

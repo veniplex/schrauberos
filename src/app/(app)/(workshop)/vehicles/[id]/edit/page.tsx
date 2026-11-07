@@ -21,7 +21,7 @@ export default async function EditVehiclePage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <PageHeader title={t("vehicles.edit")} description={<Plate>{v.plate}</Plate>} />
+      <PageHeader breadcrumbs={[{ href: "/vehicles", label: t("nav.vehicles") }, { href: `/vehicles/${v.id}`, label: v.plate }]} help="workshop.vehicles" title={t("vehicles.edit")} description={<Plate>{v.plate}</Plate>} />
       <div className="max-w-2xl">
         <VehicleForm
           cancelHref={`/vehicles/${v.id}`}

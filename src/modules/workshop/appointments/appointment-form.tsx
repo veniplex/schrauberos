@@ -82,7 +82,7 @@ export function AppointmentForm({
           </Alert>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("appointments.fields.type")} htmlFor="typeId">
             <Select id="typeId" name="typeId" value={typeId} onChange={(e) => onTypeChange(e.target.value)}>
               <option value="">{t("common.none")}</option>
@@ -102,7 +102,7 @@ export function AppointmentForm({
           <VehiclePicker initial={initial.vehicle} canCreate={canCreateVehicle} />
         </Field>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("appointments.fields.date")} htmlFor="date" name="date" required>
             <Input id="date" name="date" type="date" defaultValue={initial.date} required />
           </Field>
@@ -125,7 +125,7 @@ export function AppointmentForm({
           </Field>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("appointments.fields.bay")} htmlFor="bayId" name="bayId">
             <Select id="bayId" name="bayId" defaultValue={initial.bayId}>
               <option value="">{t("common.none")}</option>

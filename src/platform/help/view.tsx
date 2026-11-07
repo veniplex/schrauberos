@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/form";
 import { Card, EmptyState, NavLink, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { Markdown } from "@/components/ui/markdown";
+import { PageToc } from "@/components/ui/toc";
 import { getI18n } from "@/i18n/server";
 import type { HelpGroup } from "@/modules/help";
 import { platformTopics, readHelpPage, type HelpPage, type HelpTopicRef } from "./docs";
@@ -54,7 +55,7 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
         <SubmitButton variant="secondary">{t("common.search")}</SubmitButton>
       </form>
 
-      <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_14rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_14rem]">
         <Disclosure title={t("help.contents")} className="lg:hidden">
           <div className="mt-3">{nav}</div>
         </Disclosure>
@@ -65,23 +66,11 @@ export async function HelpView({ groups, topicId, query }: { groups: HelpGroup[]
             <Card as="article" className="min-w-0">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{current.section.title}</p>
               <h2 className="mb-4 text-xl font-semibold">{current.page.title}</h2>
+              {current.page.headings.length > 1 ? <PageToc title={t("help.onThisPage")} items={current.page.headings} placement="inline" /> : null}
               <Markdown source={current.page.body} taskLabels={{ done: t("common.taskDone"), open: t("common.taskOpen") }} />
             </Card>
 
-            {current.page.headings.length > 0 ? (
-              <aside className="hidden xl:block">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("help.onThisPage")}</p>
-                <ul className="sticky top-6 flex flex-col gap-1 text-sm">
-                  {current.page.headings.map((h) => (
-                    <li key={h.id} className={h.level === 3 ? "pl-3" : undefined}>
-                      <a href={`#${h.id}`} className="text-ink-muted hover:text-ink">
-                        {h.text}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </aside>
-            ) : null}
+            {current.page.headings.length > 1 ? <PageToc title={t("help.onThisPage")} items={current.page.headings} placement="aside" /> : null}
           </>
         ) : (
           <Card className="min-w-0 xl:col-span-2" aria-label={t("help.results")}>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Card, EmptyState, TextLink } from "@/components/ui/layout";
+import { Badge, Card, EmptyState } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
@@ -38,14 +38,10 @@ export default async function DocHistoryPage({
   return (
     <>
       <PageHeader
+        breadcrumbs={[{ href: `/docs/${area}`, label: t(`docs.areas.${area}.title`) }, { href: base, label: page.title }]}
         title={t("docs.history")}
-        description={
-          <TextLink href={base}>
-            {page.title}
-          </TextLink>
-        }
       />
-      <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
         <Card title={t("docs.versions", { count: page.versions.length })} padded={false}>
           {page.versions.length === 0 ? (
             <EmptyState title={t("docs.noVersions")} />

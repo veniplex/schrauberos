@@ -57,6 +57,7 @@ export default async function SubnetPage({
   return (
     <>
       <PageHeader
+        back={{ href: "/network/ip", label: t("nav.ipam") }} help="it.network"
         title={subnet.name}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -78,13 +79,13 @@ export default async function SubnetPage({
         }
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="md:col-span-2">
           <Card title={t("network.sections.addresses", { count: ips.length })} padded={false}>
             {ips.length === 0 ? (
               <EmptyState title={t("network.ipsEmpty")} />
             ) : (
-              <Table className="min-w-[40rem]">
+              <Table caption={t("network.sections.addresses", { count: ips.length })} className="min-w-[40rem]">
                   <thead>
                     <tr>
                       <th>{t("network.cols.address")}</th>

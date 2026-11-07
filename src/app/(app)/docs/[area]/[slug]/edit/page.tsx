@@ -8,6 +8,7 @@ import { requireDocEdit } from "@/capabilities/docs/access";
 import { deleteDocPage } from "@/capabilities/docs/actions";
 import { DocEditor } from "@/capabilities/docs/doc-editor";
 import { versionOf } from "@/lib/concurrency";
+import { DangerZone } from "@/components/ui/layout";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -26,7 +27,7 @@ export default async function EditDocPage({ params }: { params: Promise<{ area: 
 
   return (
     <>
-      <PageHeader title={t("docs.edit")} description={page.title} />
+      <PageHeader breadcrumbs={[{ href: `/docs/${area}`, label: t(`docs.areas.${area}.title`) }, { href: `/docs/${area}/${page.slug}`, label: page.title }]} title={t("docs.edit")} description={page.title} />
       <div className="flex flex-col gap-4">
         <DocEditor
           key={page.id}
@@ -35,11 +36,13 @@ export default async function EditDocPage({ params }: { params: Promise<{ area: 
           cancelHref={`/docs/${area}/${page.slug}`}
           initial={{ id: page.id, version: versionOf(page), title: page.title, categoryId: page.categoryId ?? "", content: page.content, pinned: page.pinned }}
         />
-        <form action={deleteDocPage} className="border-t border-line pt-4">
-          <input type="hidden" name="area" value={area} />
-          <input type="hidden" name="id" value={page.id} />
-          <ConfirmSubmitButton message={t("docs.confirmDelete", { title: page.title })}>{t("docs.delete")}</ConfirmSubmitButton>
-        </form>
+        <DangerZone title={t("common.dangerZone")}>
+          <form action={deleteDocPage}>
+            <input type="hidden" name="area" value={area} />
+            <input type="hidden" name="id" value={page.id} />
+            <ConfirmSubmitButton message={t("docs.confirmDelete", { title: page.title })}>{t("docs.delete")}</ConfirmSubmitButton>
+          </form>
+        </DangerZone>
       </div>
     </>
   );

@@ -9,6 +9,19 @@
   --color-surface-hover: var(--surface-hover);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-control: var(--control-border);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --text-xs: var(--fs-xs);
+  --text-sm: var(--fs-sm);
+  --text-base: var(--fs-base);
+  --text-lg: var(--fs-lg);
+  --text-xl: var(--fs-xl);
+  --text-2xl: var(--fs-2xl);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-accent: var(--accent);
@@ -43,7 +56,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--ff-sans);
-  font-size: 15px;
+  font-size: var(--fs-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -97,7 +110,7 @@ h1, h2, h3, h4 {
     @apply bg-accent-hover;
   }
   .btn-secondary {
-    @apply border-line-strong bg-surface text-ink;
+    @apply border-control bg-surface text-ink;
   }
   .btn-secondary:hover:not(:disabled) {
     @apply bg-surface-hover;
@@ -109,7 +122,7 @@ h1, h2, h3, h4 {
     @apply bg-surface-hover text-ink;
   }
   .btn-danger {
-    @apply border-line-strong bg-surface text-danger-ink;
+    @apply border-control bg-surface text-danger-ink;
   }
   .btn-danger:hover:not(:disabled) {
     @apply bg-danger-bg;
@@ -132,15 +145,16 @@ h1, h2, h3, h4 {
     @apply mt-1 text-xs text-danger-ink;
   }
   .input {
-    @apply block w-full min-h-(--tap) rounded-md border border-line-strong bg-surface px-3 py-1.5 text-ink;
+    @apply block w-full min-h-(--tap) rounded-md border border-control bg-surface px-3 py-1.5 text-ink;
     font-size: var(--input-font);
     transition: border-color var(--dur-fast) var(--ease-out);
   }
+  /* Platzhalter: volle `ink-muted`-Farbe (6 : 1) – mit Deckkraft fiele er unter 4,5 : 1 */
   .input::placeholder {
-    @apply text-ink-muted/70;
+    @apply text-ink-muted;
   }
   .input:hover:not(:disabled) {
-    border-color: color-mix(in oklab, var(--line-strong) 60%, var(--ink));
+    border-color: color-mix(in oklab, var(--control-border) 60%, var(--ink));
   }
   .input:focus-visible {
     outline-offset: 0;

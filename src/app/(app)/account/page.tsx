@@ -32,7 +32,7 @@ export default async function AccountPage() {
           </div>
         ) : null}
       </div>
-      <div className="grid max-w-5xl gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 max-w-5xl gap-5 lg:grid-cols-2">
         {!forced ? (
           <div className="contents print:hidden">
             <Card title={t("account.profile")}>

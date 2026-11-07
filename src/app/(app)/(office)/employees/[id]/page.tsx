@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Pencil, Trash2 } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -49,6 +49,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader
+        back={{ href: "/employees", label: t("nav.employees") }} help="office.employees"
         title={employeeName(e)}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -66,7 +67,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
         }
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="flex flex-col gap-5 md:col-span-2">
           <Card
             title={t("employees.sections.absences")}
@@ -205,10 +206,12 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           ) : null}
 
           {session.can("employees.delete") ? (
-            <form action={deleteEmployee}>
-              <input type="hidden" name="id" value={e.id} />
-              <ConfirmSubmitButton message={t("employees.confirmDelete", { name: employeeName(e) })}>{t("employees.delete")}</ConfirmSubmitButton>
-            </form>
+            <DangerZone title={t("common.dangerZone")}>
+              <form action={deleteEmployee}>
+                <input type="hidden" name="id" value={e.id} />
+                <ConfirmSubmitButton message={t("employees.confirmDelete", { name: employeeName(e) })}>{t("employees.delete")}</ConfirmSubmitButton>
+              </form>
+            </DangerZone>
           ) : null}
         </div>
       </div>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Disc3, Pencil, Plus } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -47,6 +47,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader
+        back={{ href: "/customers", label: t("nav.customers") }} help="workshop.customers"
         title={customerDisplayName(customer)}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -63,7 +64,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         }
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="flex flex-col gap-5 md:col-span-2">
           {canVehicles ? (
           <Card
@@ -163,13 +164,17 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               ]}
             />
           </Card>
-          {canDelete && customerHasLinks(customer._count) ? (
-            <p className="text-sm text-ink-muted">{t("customers.deleteBlocked", { vehicles: customer._count.vehicles, ownerships: customer._count.ownerships, invoices: customer._count.invoices })}</p>
-          ) : canDelete ? (
+          {canDelete ? (
+            <DangerZone title={t("common.dangerZone")}>
+              {customerHasLinks(customer._count) ? (
+                <p className="text-sm text-ink-muted">{t("customers.deleteBlocked", { vehicles: customer._count.vehicles, ownerships: customer._count.ownerships, invoices: customer._count.invoices })}</p>
+              ) : (
             <form action={deleteCustomer}>
               <input type="hidden" name="id" value={customer.id} />
               <ConfirmSubmitButton message={`${t("customers.confirmDelete")}${customer._count.appointments > 0 ? ` ${tp("customers.confirmDeleteAppointments", customer._count.appointments)}` : ""}`}>{t("customers.delete")}</ConfirmSubmitButton>
             </form>
+              )}
+            </DangerZone>
           ) : null}
         </div>
       </div>
