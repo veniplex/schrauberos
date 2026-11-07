@@ -647,7 +647,7 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
   eingebaute Version ist die Vertrauensbasis und wird nicht geprüft) und startet dessen Launcher. Exit-Code 42 des Launchers = neu prüfen und auswählen — **jeder** Neustart der App geht über den Starter; stürzt der Launcher einer installierten
   Version zweimal kurz hintereinander ab, nimmt er die eingebaute Version und vermerkt das in `<DATA_DIR>/app/launcher-crash`. Besteht eine Version die Prüfung nicht, schreibt er einen Marker (`verify-failed`/`inconclusive`) und startet die eingebaute
   Version. Er beantwortet auch den Docker-Healthcheck (`/bootstrap --healthcheck`).
-  *Stand Teil 1 des Pakets:* Die TypeScript-Seite (Formate, Referenzprüfer, Launcher, Installer, Pipeline) steht; der C-Prüfer im Starter, `BASE_VERSION` 4 und die Starter-Tests folgen in Teil 2.
+  *Stand:* Beide Teile des Pakets P1b-6 sind umgesetzt: die TypeScript-Seite (Formate, Referenzprüfer, Launcher, Installer, Pipeline) und der C-Prüfer im Starter (`docker/verify.c`, `docker/bootstrap.c`, vendortes Monocypher) samt `BASE_VERSION` 4 und den nativen Tests (`docker/test`, `npm run native:test`).
 * **Launcher:** startet nur die App seiner eigenen Version — **genau einmal je Aufruf** —, spielt vorgemerkte Datenbank-Wiederherstellungen ein und macht
   Rückfälle (frische Version nicht gesund → Zeiger auf die Vorversion + Code 42; wiederhergestellte Datenbank nicht gesund →
   vorherige zurück + Code 42). Eine installierte Version verwirft sich selbst, wenn die eingebaute neuer ist (neues Image gezogen). Der Launcher der eingebauten Version wertet die Marker des Starters aus und
@@ -666,7 +666,7 @@ Vom Host kommt nur der Kernel. Gestartet wird über den mitgelieferten Lader
   Wer die laufende Anwendung kompromittiert, kann den eingebauten Code nicht ändern. Der Smoke-Test der Pipeline prüft Besitzer, Modus-Bits, Dateiliste und Start (`scripts/smoke-image.sh`).
 * **Zustand:** `<DATA_DIR>/app/state.json` (+ Zeiger `active`); reine, getestete Logik in `src/lib/updates` (`state.ts`, `store.ts`,
   `restore.ts`). `writeState` schreibt immer auch den Zeiger.
-* `docker/BASE_VERSION` nur erhöhen, wenn sich der Vertrag des Starters ändert (Zeiger-Format, Exit-Codes, Aufruf der Laufzeit)
+* `docker/BASE_VERSION` (aktuell **4**: neue Pflichtdateien im Paket, jeder Neustart geht über den Starter) nur erhöhen, wenn sich der Vertrag des Starters ändert (Zeiger-Format, Exit-Codes, Aufruf der Laufzeit)
   oder die Architektur wechselt – solche Releases bieten kein Web-Update, sondern verlangen ein neues Image.
 
 ### Update-Ablauf (Funktion `admin.updates`)
@@ -693,7 +693,7 @@ keine Betriebseinstellung. Das Paket wird mit `lib/archive.ts` entpackt (Abschni
 
 Der Starter (`/bootstrap`, PID 1, im Image, `root`-eigen, nicht per Web-Update erneuerbar) startet eine **installierte** Version nur, wenn sie genau dem entspricht, was der Release-Schlüssel signiert hat.
 Code, den die App (uid 1000) nach `/data/app/versions/…` schreibt, überlebt damit **keinen Neustart** des Containers und keinen Neustart der App. **Dieser Abschnitt ist die Spezifikation** für Prüfer und
-Starter in C (Teil 2 des Pakets): Der TypeScript-Referenzprüfer (`src/lib/updates/seal.ts`, `tree.ts`) und der **Goldkorpus** (`src/lib/updates/testdata/anchor/cases.json`) legen Format und Urteile fest.
+Starter in C (`docker/verify.c`, `docker/bootstrap.c`): Der TypeScript-Referenzprüfer (`src/lib/updates/seal.ts`, `tree.ts`) und der **Goldkorpus** (`src/lib/updates/testdata/anchor/cases.json`) legen Format und Urteile fest; der C-Prüfer urteilt auf allen Fällen des Korpus und auf zehntausenden mutierten Eingaben gleich (Exit-Code, Grund, Pfad; `docker/test`).
 
 #### Vertrauenskette und Grenzen
 
@@ -774,7 +774,10 @@ signing-key <64 Hex>\n  endorsement <236 Hex: die 118 Bytes der Beglaubigungs-Au
   `endorsement-invalid`, `endorsement-expired`, `endorsement-other-key`, `endorsement-for-release-key`).
 
 **Beglaubigung, Format 2** (118 Bytes, `src/lib/updates/keychain.ts`): `schrauberos-endorsement 2\n` `key <64 Hex>\n` `valid-until <JJJJ-MM-TT>\n`. Der Prüfer **parst nicht**, sondern baut die Bytes aus `signing-key` und dem
-Datum (10 Bytes ab Offset 107 der Aussage; echtes Kalenderdatum) nach und vergleicht. Die Wurzel signiert `"schrauberos-release-key-endorsement-v2\n"` + Aussage. **Der Starter prüft den Ablauf nicht** (eine ordentlich
+Datum (10 Bytes ab Offset 107 der Aussage; echtes Kalenderdatum im gregorianischen Kalender, Jahre 0000–9999, von Hand gerechnet wie in `isCalendarDate`) nach und vergleicht.
+**Kodierung der Ed25519-Punkte:** `R` der Signatur und der Schlüssel müssen kanonisch kodiert sein (RFC 8032, 5.1.3: `y < 2^255 - 19`, und bei `x = 0` kein gesetztes Vorzeichenbit). Monocypher lässt nicht-kanonische Kodierungen von `R` und `A`
+bewusst zu (Wycheproof tcId 151); `sos_ed25519_check` weist sie vorher ab, damit eine Signatur genau eine gültige Kodierung hat. Punkte kleiner Ordnung als Schlüssel sind ohne Bedeutung: die Schlüssel sind einkompiliert oder
+vom Wurzelschlüssel beglaubigt, nie frei wählbar. Die Wurzel signiert `"schrauberos-release-key-endorsement-v2\n"` + Aussage. **Der Starter prüft den Ablauf nicht** (eine ordentlich
 installierte Version würde nach dem Stichtag sonst still auf eine ältere zurückfallen, ohne Sicherheitsgewinn gegen Diebstahl); nur `--check-expiry JJJJ-MM-TT` prüft ihn (Installer/App/Echtprobe; gültig bis zum Ende des Tages UTC).
 Das Manifest wird mit dem Kontext `"schrauberos-manifest-v1\n"` + Manifest signiert (Domänentrennung zu Siegel und Beglaubigung). PEM ↔ roh: Ed25519-SPKI mit dem Präfix `302a300506032b6570032100`.
 
@@ -783,12 +786,12 @@ die Update-Seite warnt 90 Tage vor Ablauf. Widerruf eines beglaubigten Schlüsse
 
 #### Prüfablauf, Fehlercodes und Klassen
 
-`/bootstrap --verify DIR [--expect-version V] [--no-floor] [--check-expiry JJJJ-MM-TT]` (Teil 2) prüft in dieser Reihenfolge; der Referenzprüfer ist `verifyVersion` in `src/lib/updates/seal.ts`:
+`/bootstrap --verify DIR [--expect-version V] [--no-floor] [--check-expiry JJJJ-MM-TT]` prüft in dieser Reihenfolge; der Referenzprüfer ist `verifyVersion` in `src/lib/updates/seal.ts`:
 
-1. **Vorfahren:** in `DIR/..`, `DIR/../..` … bis einschließlich `$DATA_DIR` (nur wenn `DIR` darunter liegt) darf es keinen Eintrag `node_modules` geben (`fstatat`, jede Art) → **18**.
-2. **Untergrenze:** der Ordnername muss `x.y.z` sein (sonst 12); `exceedsFloor(version, FLOOR)` – gleich oder darunter → **19** (`floor`). Mit `--no-floor` nur gemeldet. `FLOOR` = eingebaute Version
+1. **Vorfahren:** in `DIR/..`, `DIR/../..` … bis einschließlich `$DATA_DIR` (nur wenn `DIR` darunter liegt) darf es keinen Eintrag `node_modules` geben (`fstatat`, jede Art) → **18**. `$DATA_DIR` ist die Umgebungsvariable (Standard `/data`); ein Pfad unterhalb davon mit `.`-, `..`- oder leeren Teilen ist ein Aufruffehler (2). Die Kette wird ab `$DATA_DIR` mit `openat(O_NOFOLLOW)` geöffnet: ein Link oder fehlender Ordner auf dem Weg ist Code 10 (`dir-not-directory`, `dir-missing`).
+2. **Untergrenze:** der Ordnername bzw. `--expect-version` muss `x.y.z` sein – streng wie `version` im Siegel: keine führenden Nullen, höchstens 9 Ziffern je Zahl, keine Vorabversion (sonst 12, `folder-name`); `exceedsFloor(version, FLOOR)` – gleich oder darunter → **19** (`floor`). Mit `--no-floor` nur gemeldet. `FLOOR` = eingebaute Version
    (Tripel + Vorabflag aus `scripts/gen-trust-header.mjs`; `0.2.0` liegt über `0.2.0-dev.x`). Der Vergleich in C ist nur `exceedsFloor` in Zahlen — die SemVer-Logik bleibt einmal in TypeScript (`semver.ts`, Differentialtest).
-3. **Siegel:** `SOS-SEAL` regulär (nicht Link, nicht FIFO), ≤ 8 KiB, → Form, Signatur, Kette (Code 10/11). Dann `version == Ordnername/--expect-version` (**12**), `base == SOS_BASE` und `arch == SOS_ARCH` (**19**, `base`/`arch`).
+3. **Siegel:** Der Versionsordner selbst, `SOS-SEAL` und `SOS-TREE` tragen kein Setuid/Setgid/Sticky (16, `setid`; die beiden Dateien stehen nicht in der Liste, der Ordner auch nicht). `SOS-SEAL` regulär (nicht Link, nicht FIFO), ≤ 8 KiB, → Form, Signatur, Kette (Code 10/11). Dann `version == Ordnername/--expect-version` (**12**), `base == SOS_BASE` und `arch == SOS_ARCH` (**19**, `base`/`arch`).
 4. **Liste:** `SOS-TREE` regulär, `st_size == tree-size`, SHA-512 == `tree-sha512` (sonst **13**), erst dann parsen (Format, Sortierung, Eltern, Links; sonst 13), `tree-entries`/`tree-bytes` müssen stimmen (13).
 5. **Baum (Mengengleichheit):** jeder Eintrag der Liste existiert mit gleichem Typ; Dateien: Größe, SHA-512 (über denselben geöffneten Dateideskriptor, gelesene Bytes == Größe), Ausführbit (nur `x`-markierte müssen `x` haben; zusätzliche
    Ausführbits sind gleichgültig — Bind-Mounts mit festen Modi), kein Setuid/Setgid/Sticky; Symlinks: `readlinkat` gleich Ziel. Jeder vorhandene Name (auch versteckte Dateien, leere Ordner, Sockets/FIFOs) steht in der Liste, sonst
@@ -824,27 +827,45 @@ die Update-Seite warnt 90 Tage vor Ablauf. Widerruf eines beglaubigten Schlüsse
 `inconclusive` (`<Version>\n<signal|timeout|io|fork|other>\n`), `verify-ok` (vom Starter nach Erfolg: `<Version>\n<Dateien>\n<Bytes>\n<ms>\n<Unix-Sekunden>\n`; die Update-Seite zeigt „zuletzt geprüft“), `launcher-crash` (unverändert),
 `incompatible` (vom Launcher: `<Version>\n<Anzahl>\n`), `integrity-reported` (der App: Merker des einmaligen Audit-Eintrags `system.integrityFailed`). Lesen: nur reguläre Dateien, ≤ 4 KiB, nicht blockierend (`readSmallFile`).
 
-#### Starter (Teil 2): Pflichtenheft
+#### Starter: Umsetzung (Teil 2)
 
-* **Zeiger** `<DATA_DIR>/app/active` streng: exakt `<DATA_DIR ohne Schrägstrich am Ende>/app/versions/<x.y.z>` (Ziffern ohne führende Nullen, ≤ 9 Stellen je Teil), eine Zeile; alles andere → eingebaute Version **ohne** Marker.
-  Öffnen mit `O_NONBLOCK|O_NOFOLLOW` + `S_ISREG` + Größenobergrenze (kein `mkfifo`-Aussperren).
-* **Prüfung im Kindprozess** (`fork`): Ein Speicherfehler im Prüfer darf den Start der eingebauten Version nie verhindern. Im Kind zuerst Signale auf `SIG_DFL` (`TERM`/`INT`/`HUP`/`QUIT`/`ALRM`), Signalmaske leeren, `alarm(300)`,
-  `PR_SET_NO_NEW_PRIVS`, `RLIMIT_CORE=0`, `PR_SET_PDEATHSIG`; Signale um `fork` + Zuweisung von `child` blockieren; `terminating` vor dem Launcherstart prüfen (heute geht ein SIGTERM zwischen zwei Durchläufen verloren).
-  `docker stop` bricht eine laufende Prüfung in < 1 s ab; Exit 0 = ok, 10–16/18 = negativ, 19 = veraltet, alles andere unklar. `prctl(PR_SET_DUMPABLE, 0)` im Starter.
-* **Ruhezustand:** Geprüft wird nur, wenn kein anderer Code der App läuft. Der Starter setzt `PR_SET_CHILD_SUBREAPER` und tötet vor jeder erneuten Prüfung **seine Nachfahren** (Suche über `/proc` nach `ppid == getpid()`;
-  `SIGKILL`, `waitpid(-1, WNOHANG)` bis `ECHILD`, bis 10 s; **nie** `kill(-1)`: das träfe `docker exec` und den Healthcheck). PID-1-unabhängig (Compose `init: true`/tini). Bleibt etwas übrig → „unklar“ für diesen Durchlauf (fail closed),
-  keine stille Ausnahme; ist weder PID 1 noch Subreaper-Wirkung gegeben, eine Warnzeile „Ruhezustand nicht erzwingbar“.
-* **Absturzfenster** (zwei Abstürze derselben Version innerhalb von 30 s → eingebaute Version): an der **Laufzeit des Launchers** festmachen, nicht an der Prüfzeit.
-* **Untergrenze** `FLOOR` = eingebaute Version (`SOS_FLOOR_*`), `docker/MIN_VERSION` entfällt. **`docker/BASE_VERSION` 3 → 4** (neue Pflichtdateien, Neustart immer über den Starter). Statisch mit `-fstack-protector-strong -D_FORTIFY_SOURCE=2
-  -static-pie -Wl,-z,relro,-z,now -Wformat=2 -Wconversion -Wshadow -Wall -Wextra -Werror`, `-O2`.
-* **Krypto:** vendortes Monocypher (Ed25519 + SHA-512), Version/Quelle/Prüfsummen festschreiben (Test unter `src/`, damit `npm test` ihn findet, `-text` in `.gitattributes`); RFC-8032-Vektoren, NIST-SHA-512-Vektoren, Wycheproof-Fälle
-  (S ≥ L, Kleine-Ordnung-Punkte, nicht-kanonische R/A), Differentialtest gegen `node:crypto`. Parser: überlaufgeprüfte Dezimalleser; pro Verzeichnis höchstens so viele Einträge puffern, wie die Liste dafür kennt + 1; `st_dev` darf sich im Baum
-  nicht ändern.
-* **Weitere Schnittstellen:** `--print-keys` (Zeilen `root <16 Hex>` / `release <16 Hex>`: erste 16 Hexziffern von SHA-256 über den rohen Schlüssel — `gen-trust-header.mjs --print-fingerprints` liefert die erwarteten Werte), `--verify DIR …` wie oben,
-  `--healthcheck` (unverändert). Header `docker/trust-keys.h` (Bau-Artefakt aus `scripts/gen-trust-header.mjs`): `SOS_BASE`, `SOS_ARCH`, `SOS_BUILTIN_VERSION`, `SOS_FLOOR_MAJOR/MINOR/PATCH/PRERELEASE`, `SOS_TAG_BUILD`, `SOS_ROOT_KEY[32]`,
-  `SOS_RELEASE_KEY[32]`, Fingerabdrücke. Testbinary mit den Testschlüsseln (`testdata/anchor/test-keys.ts`; `cases.json` → `trust.*`): Ein Tag-Build bricht ab, wenn ein Testschlüssel einkompiliert würde.
-* **Abnahme:** `cases.json` (alle Fälle: gleicher Exit-Code und gleicher Pfad wie der Referenzprüfer; `docker/test/run.mjs` legt die Fälle mit `materializeCorpusCase` als echte Verzeichnisse an), Mutationstest wie `anchor-corpus.test.ts`,
-  ASAN/UBSAN-Build, Fuzz-Ziele (Siegel, Liste, strukturierte Bäume), Differentialtest der Parser gegen die TS-Referenz, PID-Namespace-Test, `docker stop` während der Prüfung, Stufen L2/L3 der Teststrategie.
+Ein Binary, `/bootstrap`: Auswahl und Schleife (`docker/bootstrap.c`), Prüfer (`docker/verify.c`, derselbe Code läuft als `--verify` und im Prüfkind), vendortes Monocypher (`docker/vendor/monocypher`) und der generierte Header
+`docker/trust-keys.h`. Gebaut im Dockerfile (Stufe `bootstrap-build`) statisch als `static-pie` mit `-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wl,-z,relro,-z,now -Wall -Wextra -Wformat=2 -Wconversion -Wshadow -Werror` für den eigenen Code
+(die vendorte Bibliothek ohne `-Wconversion`), `-DSOS_PRODUCTION=1` verbietet die Test-Konstanten des Quelltexts (`SOS_BUILTIN_DIR`, `SOS_VERIFY_TIMEOUT_SECONDS`, `SOS_QUIESCE_MILLIS`, `SOS_CRASH_WINDOW_SECONDS`, `SOS_FUZZ_NO_SIGNATURE`).
+
+* **Zeiger** `<DATA_DIR>/app/active` streng: exakt `<DATA_DIR ohne Schrägstrich am Ende>/app/versions/<x.y.z>` (Ziffern ohne führende Nullen, ≤ 9 Stellen je Teil), eine Zeile (ein einzelnes Zeilenende am Ende ist erlaubt), höchstens 4 KiB,
+  keine Steuerzeichen; alles andere – auch eine leere Datei, ein Verzeichnis, ein Link, eine FIFO, eine nicht vorhandene Version – bedeutet eingebaute Version **ohne** Marker. Geöffnet wird mit `O_NONBLOCK|O_NOFOLLOW` + `S_ISREG` (kein `mkfifo`-Aussperren).
+  Der Starter ändert den Zeiger nie (zustandslos); die Vorversion-Logik liegt im Launcher der eingebauten Version.
+* **Prüfung im Kindprozess** (`fork`): Ein Speicherfehler im Prüfer darf den Start der eingebauten Version nie verhindern. Die Signale `TERM/INT/HUP/QUIT` sind um `fork` und die Zuweisung von `child` blockiert; im Kind zuerst `SIG_DFL` für
+  `TERM/INT/HUP/QUIT/ALRM` und leere Signalmaske, dann `alarm(300)`, `PR_SET_PDEATHSIG` (mit Gegenprobe auf `getppid()`), `PR_SET_NO_NEW_PRIVS`, `RLIMIT_CORE=0`. Das Ergebnis kommt als Exit-Code und – nur zur Anzeige, der Starter schreibt alle
+  Dateien selbst und bereinigt Texte erneut – als kleiner Bericht über eine Pipe. Klassen: 0 ok · 10–16/18 negativ · 19 veraltet · alles andere (Signal, `SIGALRM` = `timeout`, 17, Fremdcodes) unklar. Nach einem Stoppsignal (`terminating`) gibt es weder
+  Befund noch Marker, und kein Launcher startet mehr; `docker stop` bricht eine Prüfung in < 1 s ab (getestet bis in den Container, `docker/test` Stufen `starter`, `pidns`, `l3`). `prctl(PR_SET_DUMPABLE, 0)` und `RLIMIT_CORE=0` schon im Starter.
+* **Ruhezustand:** Geprüft wird nur, wenn kein anderer Code der App läuft. Der Starter ist Subreaper (`PR_SET_CHILD_SUBREAPER`) oder PID 1 und beendet vor **jeder** Prüfung seine Nachfahren: `/proc` nach `ppid == getpid()` durchsuchen, `SIGKILL`,
+  `waitpid(-1, WNOHANG)` bis `ECHILD`, höchstens 10 s – **nie** `kill(-1)` (das träfe `docker exec` und den Healthcheck; getestet: ein fremder Prozess überlebt). Bleibt nach 10 s etwas übrig: Marker `inconclusive` (`other`) und die eingebaute Version
+  für diesen Durchlauf (fail closed). Ist die Zusicherung gar nicht erzwingbar (weder PID 1 noch Subreaper, oder `/proc` nicht lesbar), steht die Warnzeile „Ruhezustand nicht erzwingbar“ im Log und die eingebaute Version läuft – ohne Marker, denn das ist eine
+  Eigenschaft der Umgebung, kein Befund über die Version (der Launcher der eingebauten Version lässt den Zustand dann unverändert).
+* **Absturzfenster:** Ein Launcher einer installierten Version, der kürzer als 30 s lebt und abstürzt (Exit ≠ 0, ≠ 42), zählt; der zweite solche Absturz derselben Version in Folge → Marker `launcher-crash`, eingebaute Version (`force_builtin`). Maßgeblich ist
+  die **Laufzeit des Launchers**, nicht die Prüfzeit. `force_builtin` endet, wenn der Launcher der eingebauten Version `RESTART_EXIT_CODE` (42) meldet: dann entscheidet der Zeiger wieder. Exit-Code 19 hat keinen Marker; Exit 78 (zu alter Rückfall) gibt der
+  Starter der eingebauten Version weiter wie jeden anderen Exit-Code.
+* **Marker** (`<DATA_DIR>/app/`, vom Starter über `unlink` + `O_CREAT|O_EXCL|O_NOFOLLOW|O_NONBLOCK` geschrieben, nie über einen untergeschobenen Link oder eine FIFO): `verify-failed`, `inconclusive`, `verify-ok`, `launcher-crash` (Formate siehe oben).
+* **Untergrenze** `FLOOR` = eingebaute Version (`SOS_FLOOR_*`), `docker/MIN_VERSION` entfällt. Der Vergleich in C ist nur `exceedsFloor` in Zahlen (`semver.test.ts` hält ihn gegen `compareVersions`).
+* **Krypto:** Monocypher **4.0.3** (BSD-2-Clause oder CC0), Quelle und Prüfsummen gegen Tarball **und** Git-Tag belegt (`docker/vendor/monocypher/SOURCE.md`, `SHA256SUMS`; `src/lib/updates/vendor-monocypher.test.ts` läuft in `npm test`; `-text` in `.gitattributes`).
+  Getestet (`docker/test/crypto-test.c`): RFC 8032 (alle fünf Vektoren, dazu jede Ein-Bit-Änderung der Signatur), NIST CAVP SHA-512 (257 Kurz- und Langnachrichten, jeweils auch in ungleichen Stücken über die Blockgrenzen 111/112/113/127/128/129),
+  eine Million „a“, **Wycheproof** (210 Fälle: alle gültigen akzeptiert, alle ungültigen abgelehnt – S ≥ L, Formbarkeit, nicht-kanonische Kodierung –, die 29 „acceptable“-Fälle mit Punkten kleiner/gemischter Ordnung als Schlüssel werden akzeptiert),
+  und ein **Differentialtest gegen `node:crypto`** (6 000 deterministische Fälle: gültige Signaturen, Bitänderungen in Signatur, Nachricht und Schlüssel, S + L, gesetztes Bit 255). Ergebnis: ein Fund (Wycheproof tcId 151 – `R` mit `y = 1` und gesetztem
+  Vorzeichenbit wurde akzeptiert, Monocypher erlaubt nicht-kanonische Kodierungen bewusst) → `sos_ed25519_check` weist nicht-kanonische `R`/`A` ab; danach 0 Abweichungen.
+* **Parser:** überlaufgeprüfte Dezimalleser (längenbegrenzt, kein `sscanf`/`strtoul`); alle Obergrenzen kommen aus dem **signierten** Siegel und gelten vor jeder Allokation; je Ordner wird nichts gepuffert (jeder Name wird einzeln per Binärsuche gegen die Liste
+  geprüft und in einer Bitliste abgehakt – höchstens „Listeneinträge + 1“ gelesene Namen, dann Abbruch beim ersten Fremdnamen); `st_dev` darf sich im Baum nicht ändern (16, `device`); Pfade in Logs und Markern sind von Steuerzeichen, ungültigem UTF-8 und U+FFFD
+  befreit und auf 200 Bytes gekürzt.
+* **Schnittstellen:** `--print-keys` (Zeilen `root <16 Hex>` / `release <16 Hex>`: Fingerabdrücke aus dem Header; ein Test vergleicht sie mit SHA-256 über die einkompilierten Schlüsselbytes), `--verify DIR …` wie oben (Aufruffehler → Code 2 mit JSON-Zeile),
+  `--healthcheck` (unverändert). Header `docker/trust-keys.h` (Bau-Artefakt aus `scripts/gen-trust-header.mjs`): `SOS_BASE`, `SOS_ARCH`, `SOS_BUILTIN_VERSION`, `SOS_FLOOR_MAJOR/MINOR/PATCH/PRERELEASE`, `SOS_TAG_BUILD`, `SOS_ROOT_KEY[32]`, `SOS_RELEASE_KEY[32]`,
+  Fingerabdrücke. Test-Binaries tragen die Testschlüssel (`docker/test/gen-test-header.mjs`; Dockerfile-Ziel `runner-test`); ein Tag-Build bricht ab, wenn ein Testschlüssel einkompiliert würde.
+* **Tests (Stufe L2, `npm run native:test` = `node docker/test/run.mjs`; Linux oder WSL mit gcc/clang, Node ≥ 24):** `crypto` (oben) · `corpus` (alle Fälle von `cases.json` als echte Verzeichnisse: gleiches Urteil wie im Korpus **und** wie der Referenzprüfer auf demselben
+  Verzeichnis – Exit-Code, Grund, Pfad) · `mutation` (jede Bitänderung und Kürzung des Siegels, ein Raster über die Liste, jede Datei und jeder Eintrag einzeln verändert/verlängert/gekürzt/ersetzt/entfernt/mit Setid versehen, Fremdeinträge in jedem Ordner,
+  `node_modules` in jedem Vorfahren: nie „ok“, gleiches Urteil wie die Referenz) · `parser` (Differentialtest der Parser: gültig signierte, mutierte Siegel-Rümpfe und Listen) · `asan` (dieselben Läufe unter AddressSanitizer, UBSan und LeakSanitizer) · `starter` (Schleife mit einer
+  Attrappe als Launcher: Zeiger, Klassen, Marker, Neustart über 42, Absturzfenster, Signale auch in der Prüfung, Ruhezustand, geerbte Signalmaske) · `pidns` (der Starter als PID 1 in `unshare -rpf`) · `fuzz` (libFuzzer: Siegel-Parser, Listen-Parser, Verzeichnislauf mit Orakel;
+  `--fuzz-seconds N`) · `l3` (ein winziger `FROM scratch`-Container nur mit Starter und Attrappe: `docker stop`, `docker exec` überlebt, `--init`, gehärtete Optionen, Betriebsbenutzer 1000) · `measure` (Durchsatz und Prüfzeit). `npm test` führt `crypto` und `corpus` aus,
+  wenn ein Compiler da ist (`src/lib/updates/native-starter.test.ts`; in der CI mit `REQUIRE_NATIVE=1` ein Fehler, wenn nicht). Die Stufe mit der echten App ist `scripts/smoke-anchor.sh` (Image mit Testschlüsseln, Ziel `runner-test`).
 
 #### Launcher, Installer, Update-Seite
 
@@ -854,7 +875,7 @@ die Update-Seite warnt 90 Tage vor Ablauf. Widerruf eines beglaubigten Schlüsse
   oder eingebaute App, gelesen aus `prisma/migrations`) nicht kennt, startet der Launcher die App **nicht**: Meldung im Container-Log (DE/EN, „Image aktualisieren“), Marker `incompatible`, Exit 78. Die Rücknahme eines frischen, unbestätigten
   Updates bleibt der vorgesehene Weg (Migrationen sind additiv zur Vorversion). Ist die Datenbank nicht lesbar, gibt es kein Urteil (kein Start wird verhindert, den die App selbst prüft).
 * **Installer** (`modules/admin/updates/install.ts`): Release-Siegel wird schon beim Prüfen des Releases verifiziert (vor dem Paket-Download) und mit dem Manifest abgeglichen; nach dem Entpacken: Siegel ablegen, **dieselbe Prüfung wie der Starter**
-  (`verify.ts`, einspritzbar: heute Referenzprüfer, Teil 2 ruft `/bootstrap --verify --expect-version V --check-expiry <heute>`) → bei Befund wird nichts aktiviert (`badTree`, `sealExpired`; 19 → `notNewer`/`needsImage`); dann `fsync` über den Baum,
+  (`verify.ts`: im Image ruft der Installer `/bootstrap --verify <Ordner> --expect-version V --check-expiry <heute>` auf – `lib/updates/starter-verify.ts` wertet Exit-Code und JSON-Zeile aus, alles Unlesbare ist 17 –, ohne `/bootstrap` (Entwicklung, Tests) prüft der Referenzprüfer; einspritzbar) → bei Befund wird nichts aktiviert (`badTree`, `sealExpired`; 19 → `notNewer`/`needsImage`); dann `fsync` über den Baum,
   **Schreibschutz** (`a-w`, Ordner 0555), erst danach `rename` und `writeState`. Löschen schreibgeschützter Bäume nur über `removeTreeSync` (`lib/updates/fs-tree.ts`). **Reparatur** = dieselbe Version erneut installieren.
 * **Schlüssel nur aus dem Build** (`release-key.ts`): keine Umgebungsvariable überschreibt sie (weder App noch Starter); Forks tragen ihre Schlüssel dort ein. Tests ersetzen sie über `setTrustAnchorsForTest` (wirft bei `NODE_ENV=production`).
 * **Das Paketverzeichnis ist zur Laufzeit schreibgeschützt:** Die App schreibt nur nach `/data` und `/tmp`. `next.config.ts`: `images.unoptimized` (sonst legt das unauthentifizierte `/_next/image` Dateien unter `.next/cache/images` ab und
@@ -867,17 +888,33 @@ die Update-Seite warnt 90 Tage vor Ablauf. Widerruf eines beglaubigten Schlüsse
 * **Job `release`** (Umgebung `release`): Paket auspacken → `make-seal.mjs` (prüft Baum ↔ Liste, signiert) → `make-release.mjs` → **Echtprobe** (`scripts/real-trial.sh`: Produktions-Image per Digest, `--print-keys` gegen die erwarteten
   Fingerabdrücke, Testschlüssel-Negativprobe, `--verify … --no-floor --check-expiry`, drei Manipulationen) → Release als **Entwurf** → `docker buildx imagetools create` für `X.Y.Z`, `X.Y`, `latest` (Vorabversionen nur den vollen Namen) → Entwurf veröffentlichen.
   Fehlt dem Image der Prüfer, scheitert die Echtprobe (fail closed). **Generalprobe** (`workflow_dispatch` `rehearsal`): nur Testschlüssel, kein Secret (`scripts/rehearse-release.mjs`); `check_signing_key`: Schlüsselpaar-Konsistenz in der Umgebung `release`.
+* **Job `native`** (jeder Lauf, vor `publish`): alle nativen Stufen des C-Prüfers (`docker/test/run.mjs …`, auch der winzige Container und ein Fuzz-Kurzlauf), mit `REQUIRE_NATIVE=1`. **Dockerfile:** `trust` und `bootstrap-build` brauchen kein `npm ci` (nur Node bzw. gcc); das Ziel `runner-test` ist dasselbe Image mit dem Starter, der die **Testschlüssel** trägt (`trust-test`, `docker/test/gen-test-header.mjs`; bricht bei Tag-Builds ab). Bei Versions-Tags baut `publish` es aus dem Cache und führt `scripts/smoke-anchor.sh` aus (Gutfall, gehärtet, sieben Manipulationen, veraltete Version, Neustart nach Manipulation, Nachprüfung der laufenden Kopie auf Schreibzugriffe der App).
 * **Smoke-Test** (`scripts/smoke-image.sh`): zusätzlich Modus-Bits unter `/app` (kein `g+w`/`o+w`, kein Setid/Sticky), `SOS-TREE` vorhanden und gegen den Baum geprüft.
 
 #### Befunde der Bestandsaufnahme (WP1, statisch)
 
 * Das Paket besteht aus `.next/standalone` (Server, `node_modules`, `.next` ohne `cache`), `.next/static`, `public`, `docs`, `prisma/migrations`, `version.json`, `launcher.mjs` und `runtime/` (Node, glibc, libstdc++, nss, Lader). Ein veralteter lokaler
-  Standalone-Build hat 3 046 Dateien, 630 Ordner, 47 MB (ohne `runtime/`; darunter 74 `.map`-Dateien); Schätzung für das Paket: 200–300 MB, 4 000–10 000 Dateien. **Echte Zahlen am Image messen (Teil 2).**
+  Standalone-Build hat 3 046 Dateien, 630 Ordner, 47 MB (ohne `runtime/`; darunter 74 `.map`-Dateien); Schätzung für das Paket: 200–300 MB, 4 000–10 000 Dateien. **Echte Zahlen am Image messen** (Messwerte des Prüfers siehe unten, „Messwerte“; das Paket selbst wird erst mit dem ersten Tag-Image messbar).
 * `sharp` samt `@img` liegt im Standalone-`node_modules`, obwohl die Bildoptimierung aus ist (`images.unoptimized`): eine Baumdiät (Entfernen) ist ein möglicher Nebennutzen, kein Muss.
 * **Laufzeit-Schreibpfade im Code:** `/data` (Datenbank, `files`, `backups`, `restore`, `app/`, `secret.key`, `setup-token`, `secret-reset`), `/tmp` (SQLite-Temp, Uploads). Im Paketverzeichnis schrieb nur Next selbst
   (`.next/cache/images` bei `/_next/image`, `.next/cache/fetch-cache`, ISR-Rückschreiben bei `isrFlushToDisk`) — die ersten beiden sind abgeschaltet (`images.unoptimized`, `isrFlushToDisk: false`), `fetch-cache` ist nicht gemessen. Weitere Kandidaten in Teil 2 am
   laufenden Container messen (`lockDistDir`, Coredumps mit relativem `core_pattern`, SQLite-Temp-Rückfall auf `.` bei unbeschreibbarem `/tmp`): Nachlaufprüfung gegen die **installierte** Kopie (uid 1000) nach der Routen-Inventur.
 * `@opentelemetry/api` ist nicht im Bundle (Next lädt es optional per `require` in `try`): die Vorfahrenregel (Code 18) ist die Absicherung gegen das Nachladen aus `/data/app/versions/node_modules` & Co.
+
+#### Messwerte und Fuzz-Ergebnis des Prüfers (2026-11-07)
+
+Gemessen auf einem Ryzen 9 5900 (WSL2/Kali, gcc 15.2, ext4 auf virtueller Platte, `node docker/test/run.mjs measure`), also die schnelle Klasse A – für Mini-PC/NAS/Raspberry Pi gibt es **keine** Messung, nur die Schätzungen aus dem Entwurf:
+
+* **SHA-512** (Monocypher 4.0.3, portables C, `-O2`, 256-KiB-Blöcke): **427 / 466 / 441 MB/s** in drei Läufen; OpenSSL über `node:crypto` zum Vergleich 1 033 MB/s. Der Starter nutzt das portable C (kein Assembler, keine Abhängigkeit); ein Wechsel des Hashes ist nach dem Entwurf erst
+  bei verfehltem Budget sinnvoll (Reihenfolge: Baumdiät, parallele Leser, BLAKE2b).
+* **Prüfzeit** an einem synthetischen Testbaum (9 361 Einträge, 250 MiB, Dateigrößen logarithmisch von 30 Byte bis ≈ 1,6 MB, wie ein Next-Standalone-Paket): **warm 0,66 s (≈ 395 MB/s)**, „kalt“ **2,3 s (≈ 110 MB/s)**. „Kalt“ heißt: die Seiten aller Dateien per
+  `posix_fadvise(DONTNEED)` aus dem Seiten-Cache geworfen (ohne Root); ein Cache des Hypervisors/der virtuellen Platte darunter bleibt, echte kalte Magnetplatten oder SD-Karten sind deutlich langsamer. Ein echtes Paket wird erst mit dem ersten Tag-Image messbar.
+* **Binary:** 953 KB (Debian-bookworm-gcc, `static-pie`, gestrippt, mit statischer glibc und Monocypher); `BIND_NOW` und `GNU_RELRO` gesetzt (das Dockerfile prüft es).
+* **libFuzzer** (clang 21, AddressSanitizer + UBSan, je 90 s, deterministische Saaten aus dem Goldkorpus): Siegel-Parser (ohne Signaturprüfung, damit der Parser dahinter erreichbar ist) **20,0 Mio.** Ausführungen, Listen-Parser **8,9 Mio.**, Verzeichnislauf mit Orakel (strukturierte Bäume
+  samt Mutation; erwartet 0 bzw. 14/15/16) **0,39 Mio.** – **keine Funde** im Prüfer. Der einzige Fund des ersten Laufs lag im Testharness (ein Eintrag namens `SOS-SEAL` im Wurzelordner kollidierte mit dem Siegel, das der Harness selbst anlegt) und ist behoben.
+  Kurzläufe gehören in jede CI (`--fuzz-seconds 30`), lange Läufe (Stunden) vor der Veröffentlichung von 0.2.0.
+* **Gefunden und behoben während der Umsetzung:** (1) Wycheproof tcId 151 (nicht-kanonisches `R` wurde von Monocypher akzeptiert) → `sos_ed25519_check`; (2) Setuid/Setgid/Sticky an `SOS-SEAL`, `SOS-TREE` und am Versionsordner selbst wurden weder vom Referenzprüfer noch von C erkannt (Mutationstest) → Code 16 `setid`
+  in beiden, drei neue Fälle im Goldkorpus; (3) `extra-file-long-name` im Korpus (300 Zeichen) ließ sich unter Linux nicht anlegen (`NAME_MAX` 255) → 250 Zeichen; (4) `isCalendarDate` rechnete Jahre unter 100 falsch (`Date.UTC`) → von Hand gerechnet, in TypeScript und C gleich.
 
 ### Backups und Wiederherstellung (Funktion `admin.backup`)
 
@@ -1056,7 +1093,7 @@ Fake-Browser, `server-only`/`next/cache` sind leer). Der zu testende Code wird *
 `env.signIn()`, `form({...})` und `redirectOf(() => action(...))` bilden Formulare und Sitzungen nach (Beispiele: `src/modules/admin/users/actions.test.ts`,
 `src/server/auth/login.test.ts`). Der **Aktions-Rahmen** hat einen generierten Berechtigungs-Matrixtest (`src/server/operations/matrix.test.ts`) und Architekturregeln (`architecture.test.ts`: jede Action benutzt `defineAction`, `run` bleibt transportneutral). Außerdem: Fachlogik (`*.test.ts` neben dem Code), Aktivierungslogik, Katalog (gültige Abhängigkeiten, eindeutige Rechte,
 Übersetzungen vorhanden), Architekturregeln, Migrations-Läufer (inkl. Verträglichkeit mit der Prisma-CLI), Backups/Restore (echte
-SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle. **Starter-Vertrauensanker:** `src/lib/updates/{tree,seal,keychain,markers,compat,fs-tree}.test.ts`, der Goldkorpus (`anchor-corpus.test.ts` gegen `testdata/anchor/cases.json`, erzeugt mit `npm run anchor:corpus`, `npm run anchor:corpus:check` prüft die Aktualität; Mutationstests mit Bitflips und Abschneiden), die Pipeline-Skripte als Kindprozesse (`anchor-scripts.test.ts`, Generalprobe `npm run anchor:rehearse`), Launcher (`src/launcher/launcher.test.ts`) und Installer (`install.test.ts`). Tests, die Ausführbit, Setuid oder Symlinks brauchen, laufen nur unter Linux (Windows: übersprungen); die Linux-Pipeline führt sie aus. Die nativen Tests des C-Prüfers (Teil 2) laufen mit `REQUIRE_NATIVE=1` in der CI als Fehler, wenn der Compiler fehlt.
+SQLite-Dateien), Dateispeicher, optimistische Sperre und gleichzeitige Buchungen gegen eine echte Datenbank, Update-Zustand und Rückfälle. **Starter-Vertrauensanker:** `src/lib/updates/{tree,seal,keychain,markers,compat,fs-tree}.test.ts`, der Goldkorpus (`anchor-corpus.test.ts` gegen `testdata/anchor/cases.json`, erzeugt mit `npm run anchor:corpus`, `npm run anchor:corpus:check` prüft die Aktualität; Mutationstests mit Bitflips und Abschneiden), die Pipeline-Skripte als Kindprozesse (`anchor-scripts.test.ts`, Generalprobe `npm run anchor:rehearse`), Launcher (`src/launcher/launcher.test.ts`) und Installer (`install.test.ts`). Tests, die Ausführbit, Setuid oder Symlinks brauchen, laufen nur unter Linux (Windows: übersprungen); die Linux-Pipeline führt sie aus. **Der C-Prüfer** (`docker/verify.c`, `docker/bootstrap.c`): `npm run native:test` (= `node docker/test/run.mjs`, Stufen und Inhalt im Abschnitt „Starter: Umsetzung“; unter Windows spiegelt es das Repository nach WSL, braucht dort gcc/clang, Node ≥ 24, rsync) und `npm run native:test -- fuzz --fuzz-seconds 60`; im regulären `npm test` laufen davon die Stufen `crypto` und `corpus` (`native-starter.test.ts`, nur unter Linux mit Compiler), die CI-Stufe „native“ führt alle aus (mit `REQUIRE_NATIVE=1`: ein fehlender Compiler ist ein Fehler). Der Prüfaufruf des Installers (`starter-verify.test.ts`) und die vendorte Bibliothek (`vendor-monocypher.test.ts`) laufen überall.
 **Komponententests** rendern wirklich (`src/test/dom.ts`: `components/ui/data-table.test.ts` für `DataTable`/`Pagination`/`FilterBar` – Server-Komponenten werden aufgerufen und ihr Ergebnis im DOM gerendert; happy-dom + `react-dom/client`; `installDom()`, `mount()`, `act()`; `src/test/router.ts` liefert `usePathname`/`useRouter` für Komponenten, die sie brauchen): Fokus und Referenzen der Eingabebausteine (`components/ui/form.test.ts`), Formular-Rahmen (`form-frame.test.ts`: Eingabe bleibt bei Fehlern, Fehlerzusammenfassung, Netzwerkfehler, Entwurf; `form-draft.test.ts`: Entwurf bei gesteuerten, abhängigen und nachrückenden Feldern und der Kundenauswahl, Lebensdauer (Fehler/Erfolg/Weiterleitung), Bindung an den Benutzer, Vorbelegung, Enter, Navigationsbremse, Toast-Hub), `ConfirmDialog`/`SubmitSwitch`, `SearchCombobox`, `Menu`, die Navigation und Schnellsuche (`components/shell/sidebar.test.ts`, `quick-search.test.ts`), die Fehlergrenze der
 Dashboard-Bausteine (`components/shell/widget-boundary.test.ts`), Status- und Fehlerseiten (`components/ui/status.test.ts`, `components/shell/error-view.test.ts`). Quelltext-Muster-Tests gelten nur für echte Architekturregeln, nicht für Verhalten.
 
