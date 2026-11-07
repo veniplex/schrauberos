@@ -25,7 +25,9 @@ async function login(roleInput: { isAdmin?: boolean; permissions?: readonly stri
 }
 const admin = () => login({ isAdmin: true });
 async function unmountView() {
-  await unmountView();
+  const current = view;
+  view = null;
+  await current?.unmount();
 }
 async function render(node: ReactNode) {
   const { I18nProvider } = await import("@/i18n/client");

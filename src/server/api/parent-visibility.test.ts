@@ -21,10 +21,11 @@ let O: { id: string }; // Auftrag von C
 let TS: { id: string };
 let AP: { id: string; updatedAt: Date };
 
+type Body = { data?: unknown; fields?: Record<string, unknown> };
 const call = async (method: string, path: string, body?: unknown) => {
   const r = await router.handleApiRequest(apiRequest(method, path, { token, body, headers: { "idempotency-key": Math.random().toString(36).slice(2) } }));
   const text = await r.text();
-  return { status: r.status, json: text ? (JSON.parse(text) as Record<string, any>) : {} };
+  return { status: r.status, json: (text ? JSON.parse(text) : {}) as Body };
 };
 const upload = async (ownerType: string, ownerId: string) => {
   const form = new FormData();
@@ -95,7 +96,7 @@ describe("Neue Verknüpfungen mit eingeschränkten Kunden", () => {
     const invoiceControl = await call("POST", "/invoices", { ...invoice, number: "R-2", customerId: N.id });
     assert.equal(invoiceControl.status, 201, JSON.stringify(invoiceControl.json));
     assert.ok([404, 422].includes((await call("POST", "/time-entries/start", { orderId: O.id })).status));
-    const timeControl = await call("POST", "/time-entries/start", { orderId: control.json.data.id });
+    const timeControl = await call("POST", "/time-entries/start", { orderId: (control.json.data as { id: string }).id });
     assert.equal(timeControl.status, 201, JSON.stringify(timeControl.json));
     assert.equal(await upload("vehicle", V.id), 404);
     assert.equal(await upload("order", O.id), 404);
