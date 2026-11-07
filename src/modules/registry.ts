@@ -1,6 +1,7 @@
 import type { MessageKey } from "@/i18n/translate";
 import type { AppSession } from "@/server/auth/session";
 import { FEATURES, MODULES, fullFeatureId, isPermission, type FeatureId, type ModuleId } from "./catalog";
+import { withTimeout } from "@/lib/with-timeout";
 import type { IconName } from "./define";
 import type { SearchHit, SearchProviderDef, SettingsTabDef, WidgetDef } from "./types";
 
@@ -96,18 +97,22 @@ export function searchProvidersFor(session: AppSession): SearchProviderDef[] {
   return ALL_SEARCH_PROVIDERS.filter((p) => session.features.has(p.feature) && session.can(p.permission)).sort((a, b) => a.order - b.order);
 }
 
+/** Wie lange ein Suchanbieter höchstens braucht (die Abfrage läuft danach weiter, ihr Ergebnis wird verworfen). */
+export const SEARCH_PROVIDER_TIMEOUT_MS = 3000;
+
 export type SearchGroup = { id: string; groupKey: MessageKey; hits: SearchHit[] };
 
 /**
  * Schnellsuche über alle Anbieter der Sitzung. Jeder Anbieter läuft für sich: ein Fehler (oder zu langsame Abfrage) eines Anbieters nimmt die Treffer der anderen nicht mit.
  * Die Plattform ruft nur diese Funktion auf und kennt keine Funktion; Rechte und Sichtbarkeit je Treffer sind Sache des Anbieters.
  */
-export async function searchFor(session: AppSession, query: string, limit = 5): Promise<SearchGroup[]> {
+export async function searchFor(session: AppSession, query: string, limit = 5, timeoutMs = SEARCH_PROVIDER_TIMEOUT_MS): Promise<SearchGroup[]> {
   const providers = searchProvidersFor(session);
   const results = await Promise.all(
     providers.map(async (provider): Promise<SearchGroup> => {
       try {
-        return { id: provider.id, groupKey: provider.groupKey, hits: await provider.search(query, { session, limit }) };
+        // zu langsam (große Tabelle, ungeindexiertes Feld): ohne Treffer statt die ganze Suche aufzuhalten
+        return { id: provider.id, groupKey: provider.groupKey, hits: await withTimeout(provider.search(query, { session, limit }), timeoutMs, []) };
       } catch {
         return { id: provider.id, groupKey: provider.groupKey, hits: [] };
       }

@@ -80,6 +80,8 @@ describe("Verhalten", () => {
   };
 
   beforeEach(async () => {
+    await env.db.appointment.deleteMany();
+    await env.db.employee.deleteMany();
     await env.db.docPage.deleteMany();
     await env.db.docCategory.deleteMany();
     await env.db.invoice.deleteMany();
@@ -139,6 +141,48 @@ describe("Verhalten", () => {
     await as(["handbook.view"], { roleIds: [secretRole.id] });
     hits = (await get("Suchtest")).body.groups.find((g) => g.id === "handbook")?.hits.map((h) => h.title).sort() ?? [];
     assert.deepEqual(hits, ["Geheime Suchtest-Seite", "Offene Suchtest-Seite"]);
+  });
+
+  it("LIKE-Platzhalter im Suchtext treffen nicht alles: `%%`, `__` und `%` finden nichts; ein Begriff mit `%` sucht den Rest", async () => {
+    await as(["customers.view"]);
+    for (const wildcard of ["%%", "__", "%_%", "%%%"]) assert.deepEqual((await get(wildcard)).body.groups, [], wildcard);
+    assert.deepEqual((await get("Such%test")).body.groups.map((g) => g.id), ["customers"], "% entfällt, der Rest („Suchtest“) wird gesucht");
+  });
+
+  it("lange Textfelder (Inhalt der Dokumentation, Notizen der Termine) werden erst ab drei Zeichen durchsucht; der Titel immer", async () => {
+    await env.db.docPage.create({ data: { area: "handbook", slug: "inhalt", title: "Seite ohne Fund", content: "Ein Satz mit Zebrastreifen darin." } });
+    const customer = await env.db.customer.findFirstOrThrow();
+    await env.db.appointment.create({ data: { title: "Reifenwechsel", notes: "Kunde wartet im Cafe", startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), customerId: customer.id } });
+    await as(["handbook.view", "appointments.view"]);
+    const ids = async (q: string) => (await get(q)).body.groups.map((g) => g.id).sort();
+    assert.deepEqual(await ids("Ze"), [], "zwei Zeichen: kein Volltext");
+    assert.deepEqual(await ids("Zeb"), ["handbook"]);
+    assert.deepEqual(await ids("Ca"), []);
+    assert.deepEqual(await ids("Caf"), ["appointments"]);
+    assert.deepEqual(await ids("Re"), ["appointments"], "der Titel („Reifenwechsel“) wird auch mit zwei Zeichen gefunden");
+  });
+
+  it("Termine werden auch über den Halter des Fahrzeugs gefunden; Mitarbeiter: nur aktive", async () => {
+    const holder = await env.db.customer.create({ data: { lastName: "Haltermann" } });
+    const vehicle = await env.db.vehicle.create({ data: { plate: "K AB 1", plateNorm: "KAB1", customerId: holder.id } });
+    await env.db.appointment.create({ data: { title: "Inspektion", startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), vehicleId: vehicle.id } });
+    await env.db.employee.createMany({ data: [{ firstName: "Aktiv", lastName: "Sucher", active: true }, { firstName: "Ehemalig", lastName: "Sucher", active: false }] });
+    await as(["appointments.view", "employees.view"]);
+    const { body } = await get("Haltermann");
+    assert.deepEqual(body.groups.map((g) => g.id), ["appointments"], "über den Halter des Fahrzeugs");
+    const staff = (await get("Sucher")).body.groups.find((g) => g.id === "employees")?.hits.map((h) => h.title) ?? [];
+    assert.equal(staff.length, 1);
+    assert.match(staff[0], /Aktiv/);
+  });
+
+  it("je Benutzer höchstens 40 Anfragen in zehn Sekunden: danach 429 mit Retry-After; andere Benutzer sind nicht betroffen", async () => {
+    await as(["customers.view"]);
+    for (let i = 0; i < 40; i++) assert.equal((await get("Suchtest")).status, 200);
+    const limited = await route.GET({ nextUrl: new URL("http://localhost/api/search?q=Suchtest") } as never);
+    assert.equal(limited.status, 429);
+    assert.ok(Number(limited.headers.get("Retry-After")) >= 1);
+    await as(["customers.view"]); // anderer Benutzer
+    assert.equal((await get("Suchtest")).status, 200);
   });
 
   it("das Neu-Menü bietet nur Einträge aktiver Funktionen mit passendem Recht", async () => {

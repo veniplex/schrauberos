@@ -2,10 +2,10 @@ import "server-only";
 import { toDateInput } from "@/lib/dates";
 import { normalizePlate } from "@/lib/plate";
 import { db } from "@/server/db";
-import { contains } from "@/server/search";
+import { contains, FULLTEXT_MIN_LENGTH } from "@/server/search";
 import type { SearchProviderDef } from "@/modules/types";
 
-/** Schnellsuche: Termine nach Titel, Notizen, Kennzeichen und Kundenname; der Treffer öffnet den Termin im Kalender an seinem Tag. */
+/** Schnellsuche: Termine nach Titel, Notizen (ab 3 Zeichen), Kennzeichen und Kundenname (auch der Halter des Fahrzeugs); der Treffer öffnet den Termin im Kalender an seinem Tag. */
 export const searchProviders: SearchProviderDef[] = [
   {
     id: "appointments",
@@ -19,10 +19,12 @@ export const searchProviders: SearchProviderDef[] = [
         where: {
           OR: [
             { title: contains(q) },
-            { notes: contains(q) },
+            ...(q.length >= FULLTEXT_MIN_LENGTH ? [{ notes: contains(q) }] : []),
             ...(plate ? [{ vehicle: { plateNorm: { contains: plate } } }] : []),
             { customer: { lastName: contains(q) } },
             { customer: { company: contains(q) } },
+            { vehicle: { customer: { lastName: contains(q) } } },
+            { vehicle: { customer: { company: contains(q) } } },
           ],
         },
         orderBy: { startsAt: "desc" },

@@ -5,10 +5,19 @@ import type { Permission } from "@/modules/catalog";
  * Teilstring-Suche (SQL LIKE). SQLite unterscheidet dabei bei ASCII-Buchstaben nicht zwischen Groß- und Kleinschreibung;
  * bei Umlauten schon („MÜLLER“ findet „Müller“ nicht, „müller“ schon). Zentral gekapselt, damit sich das an einer Stelle
  * verbessern lässt (z. B. über normalisierte Suchspalten).
+ *
+ * **LIKE-Platzhalter:** Prisma maskiert `%` und `_` im Suchtext unter SQLite nicht (`%%` und `__` träfen jede Zeile, `a_b` auch „axb“; per Test belegt). Eine Maskierung
+ * (`ESCAPE`) gibt es über Prisma nicht; deshalb: `%` entfällt aus dem Suchtext, `_` bleibt (trifft höchstens mehr, nie weniger als gemeint), und ein Suchtext aus nichts als
+ * Platzhaltern findet **nichts** statt alles.
  */
-export function contains(value: string) {
-  return { contains: value };
+export function contains(value: string): { contains: string } | { in: string[] } {
+  const term = value.replace(/%/g, "");
+  if (term.replace(/_/g, "").length === 0) return { in: [] };
+  return { contains: term };
 }
+
+/** Ab dieser Länge des Suchtextes werden lange Textfelder (Inhalt von Dokumentationsseiten, Termin-Notizen) durchsucht: kürzere Begriffe träfen fast alles und kosten bei jedem Tastendruck einen Durchlauf über den ganzen Text. */
+export const FULLTEXT_MIN_LENGTH = 3;
 
 /** Ein durchsuchbares Feld einer Liste. `permission`: nur wer dieses Recht hat, darf darin suchen (sonst ließe die Trefferliste Rückschlüsse auf verborgene Daten zu). */
 export type SearchField<W> = { permission?: Permission; where: (term: string) => W };
