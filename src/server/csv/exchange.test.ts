@@ -686,6 +686,22 @@ describe("Rechte und Standardrollen", () => {
     }
   });
 
+  it("die Import-Operationen prüfen das Recht selbst (auch ohne die Route): ohne Recht verboten, nichts geschrieben, nichts protokolliert", async () => {
+    const { IMPORTS } = await import("@/modules/exchange");
+    const all = (await import("@/modules/catalog")).ALL_PERMISSIONS;
+    const { getSession } = await import("@/server/auth/session");
+    for (const def of IMPORTS) {
+      await as(all.filter((p) => p !== def.permission));
+      const session = (await getSession())!;
+      const outcome = await def.operation.execute(session, { bytes: new TextEncoder().encode("Nachname;Kennzeichen;Saison;Art;Rechnungsnummer\nX;B AB 1;Winter;Eingang;1"), allowDuplicates: false, skipErrors: true });
+      assert.equal(outcome.ok, false, def.id);
+      assert.equal(!outcome.ok && outcome.failure.code, "forbidden", def.id);
+    }
+    assert.equal(await env.db.customer.count(), 0);
+    assert.equal(await env.db.vehicle.count(), 0);
+    assert.equal(await env.db.auditLog.count({ where: { action: { endsWith: ".import" } } }), 0);
+  });
+
   it("Administratoren haben beides über „Alle Rechte“", async () => {
     await env.db.customer.create({ data: { lastName: "A" } });
     await as([], { admin: true });
