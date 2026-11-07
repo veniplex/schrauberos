@@ -195,8 +195,9 @@ describe("Zustellung", () => {
 
     // Der Prüfcode der Doku-Seite ist Referenz: ausgeführt akzeptiert er die Anfrage und lehnt Wiederholungen mit altem Zeitstempel ab
     const { NODE_VERIFY } = await import("@/modules/admin/api/docs-examples");
-    const source = NODE_VERIFY.replace(/^import .*$/m, "const { createHmac, timingSafeEqual } = require(\"node:crypto\");").replace("export function", "function");
-    const verify = new Function("require", `${source}\nreturn verifyWebhook;`)(require) as (s: string[], h: Record<string, string>, b: string) => boolean;
+    const source = NODE_VERIFY.replace(/^import .*$/m, "").replace("export function", "function");
+    const verify = new Function("createHmac", "timingSafeEqual", "Buffer", `${source}
+return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h: Record<string, string>, b: string) => boolean;
     const headers = Object.fromEntries(Object.entries(request.headers).map(([k, v]) => [k, String(v)]));
     assert.equal(verify([secret], headers, request.body), true);
     assert.equal(verify([secret], { ...headers, "x-webhook-timestamp": String(Math.floor(now.getTime() / 1000) - 3600) }, request.body), false, "Wiederholung mit altem Zeitstempel");

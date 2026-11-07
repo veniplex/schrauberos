@@ -25,6 +25,7 @@ import { help as settings } from "./admin/settings/help";
 import { help as modules } from "./admin/modules/help";
 import { help as backup } from "./admin/backup/help";
 import { help as mail } from "./admin/mail/help";
+import { help as apiAdmin } from "./admin/api/help";
 import { help as updates } from "./admin/updates/help";
 import { help as audit } from "./admin/audit/help";
 import { help as system } from "./admin/system/help";
@@ -57,6 +58,7 @@ export const ALL_HELP_TOPICS: readonly HelpTopicDef[] = [
   ...modules,
   ...backup,
   ...mail,
+  ...apiAdmin,
   ...updates,
   ...audit,
   ...system,

@@ -16,6 +16,7 @@ import { seeds as fleet } from "./office/fleet/seed";
 import { seeds as network } from "./it/network/seed";
 import { seeds as itDocs } from "./it/docs/seed";
 import { seeds as manual } from "./handbook/manual/seed";
+import { seeds as apiAdmin } from "./admin/api/seed";
 
 /**
  * Composition Root der Start- und Beispieldaten: Jede Funktion mit Grunddaten oder Demo-Daten meldet sie in ihrer `seed.ts` (`seeds`) an, hier werden sie eingesammelt
@@ -38,4 +39,5 @@ export const ALL_SEEDS: readonly SeedDef[] = [
   ...network,
   ...itDocs,
   ...manual,
+  ...apiAdmin,
 ].sort((a, b) => a.order - b.order);

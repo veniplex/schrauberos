@@ -38,7 +38,7 @@ export async function startFakeWebhook(options: FakeWebhookOptions = {}): Promis
     });
   });
   const sockets = new Set<import("node:net").Socket>();
-  server.on("connection", (socket) => {
+  server.on("connection", (socket: import("node:net").Socket) => {
     sockets.add(socket);
     socket.once("close", () => sockets.delete(socket));
   });

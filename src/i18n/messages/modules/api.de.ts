@@ -160,6 +160,7 @@ export const apiDe = {
       allowPrivateHint: "Nur nötig für ein Ziel mit privater Adresse (10.x.x.x, 172.16–31.x.x, 192.168.x.x); nur dann ist auch http erlaubt. Öffentliche Ziele brauchen das nicht.",
       events: "Ereignisse",
       eventsIntro: "Nur diese Ereignisse werden gemeldet. Es gibt nur Ereignisse aktiver Funktionen; sensible Bereiche (Mitarbeiter, Zeiterfassung, Verwaltung) melden nichts.",
+      noEvents: "Zurzeit meldet keine eingeschaltete Funktion Ereignisse. Unter „Module & Funktionen“ lassen sich z. B. Aufträge oder Angebote & Rechnungen einschalten.",
       state: "Zustand",
       enabled: "Eingeschaltet",
       enabledHint: "Ausgeschaltet werden neue Ereignisse bis zu 14 Tage zurückgestellt und beim Einschalten nachgeholt.",
@@ -291,6 +292,9 @@ export const apiDe = {
     },
     endpoints: {
       title: "Endpunkte",
+      back: "← Alle Ressourcen",
+      count: "Endpunkte: {count}",
+      resourceIntro: "* kennzeichnet Pflichtfelder. Das erforderliche Recht gilt für Token und Besitzer.",
       intro: "Endpunkte der aktiven Funktionen ({count}). * kennzeichnet Pflichtfelder. Das erforderliche Recht gilt für Token und Besitzer.",
     },
     endpoint: {

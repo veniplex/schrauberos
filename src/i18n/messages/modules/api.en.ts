@@ -162,6 +162,7 @@ export const apiEn: typeof apiDe = {
       allowPrivateHint: "Only needed for a target with a private address (10.x.x.x, 172.16–31.x.x, 192.168.x.x); only then is http allowed too. Public targets do not need it.",
       events: "Events",
       eventsIntro: "Only these events are reported. Only events of active features exist; sensitive areas (employees, time tracking, administration) report nothing.",
+      noEvents: "No switched-on feature reports events at the moment. Under “Modules & features” e.g. orders or quotes & invoicing can be switched on.",
       state: "State",
       enabled: "Switched on",
       enabledHint: "While switched off, new events are held back for up to 14 days and delivered when switched on.",
@@ -293,6 +294,9 @@ export const apiEn: typeof apiDe = {
     },
     endpoints: {
       title: "Endpoints",
+      back: "← All resources",
+      count: "Endpoints: {count}",
+      resourceIntro: "* marks required fields. The required right applies to token and owner.",
       intro: "Endpoints of the active features ({count}). * marks required fields. The required right applies to token and owner.",
     },
     endpoint: {
