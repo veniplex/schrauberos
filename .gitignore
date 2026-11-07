@@ -58,3 +58,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /e2e/.auth/
+
+# Bau-Artefakt des Starters (scripts/gen-trust-header.mjs)
+/docker/trust-keys.h

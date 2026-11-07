@@ -6,11 +6,10 @@
 // Anwendern. Liegt release-keys.json im Repository, wird sie dem Release beigelegt (die App merkt sich die Beglaubigungen).
 import { createHash, createPublicKey, sign, verify } from "node:crypto";
 import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { parseEndorsements, rootKeyProblem, trustedReleaseKeys } from "../src/lib/updates/keychain.ts";
+import { basename, resolve } from "node:path";
+import { manifestSignedBytes, parseEndorsements, trustedReleaseKeys } from "../src/lib/updates/keychain.ts";
+import { assertOwnRootKey, endorsementsFile, readTrustAnchors } from "./lib/trust.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const arg = (name) => {
   const i = args.indexOf(name);
@@ -37,29 +36,19 @@ const manifest = {
   size: statSync(archive).size,
 };
 const bytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
-const signature = sign(null, bytes, privateKey);
+// Signiert wird Kontext ("schrauberos-manifest-v1" + Zeilenumbruch) + Manifest: eine Manifest-Signatur ist nie mit einer Beglaubigung oder einem Siegel verwechselbar
+const signed = manifestSignedBytes(bytes);
+const signature = sign(null, signed, privateKey);
 
-// RELEASE_KEY_FILE: nur für Tests (Pfad zu einer Kopie von release-key.ts)
-const source = readFileSync(process.env.RELEASE_KEY_FILE ?? resolve(root, "src/modules/admin/updates/release-key.ts"), "utf8");
-const keyOf = (name) => new RegExp(`${name}\\s*=\\s*\`(-----BEGIN PUBLIC KEY-----[\\s\\S]*?-----END PUBLIC KEY-----\\n?)\``).exec(source)?.[1];
-const publicPem = keyOf("RELEASE_PUBLIC_KEY");
-if (!publicPem) throw new Error("Öffentlicher Schlüssel in release-key.ts nicht gefunden.");
 // Kein stilles Zurückfallen: Ist ROOT_PUBLIC_KEY noch eine Zuweisung `= RELEASE_PUBLIC_KEY` (oder dasselbe PEM), schützt die Kette nicht –
 // wer das GitHub-Secret hat, könnte zugleich beglaubigen. Der Tag-Build bricht dann ab, bis ein eigener Offline-Wurzelschlüssel eingetragen ist.
-const rootPem = keyOf("ROOT_PUBLIC_KEY");
-const problem = rootKeyProblem(publicPem, rootPem);
-if (problem) {
-  throw new Error(
-    (problem === "root-missing"
-      ? "ROOT_PUBLIC_KEY in release-key.ts ist kein eigener Schlüssel (steht noch als Zuweisung an RELEASE_PUBLIC_KEY)."
-      : "ROOT_PUBLIC_KEY ist derselbe Schlüssel wie RELEASE_PUBLIC_KEY.") +
-      " Release abgebrochen: zuerst einen eigenen Wurzelschlüssel offline erzeugen und seinen öffentlichen Teil als ROOT_PUBLIC_KEY eintragen (README, „Schlüsselkette“).",
-  );
-}
-const keysFile = resolve(root, "release-keys.json");
+const anchors = readTrustAnchors();
+assertOwnRootKey(anchors);
+const { releasePem: publicPem, rootPem } = anchors;
+const keysFile = endorsementsFile();
 const endorsements = existsSync(keysFile) ? parseEndorsements(JSON.parse(readFileSync(keysFile, "utf8"))) : [];
 const trusted = trustedReleaseKeys({ root: rootPem, builtIn: [publicPem], endorsements });
-if (!trusted.some((pem) => verify(null, bytes, createPublicKey(pem), signature))) {
+if (!trusted.some((pem) => verify(null, signed, createPublicKey(pem), signature))) {
   throw new Error("Die Signatur passt weder zum eingebauten Release-Schlüssel noch zu einem beglaubigten – falsches RELEASE_SIGNING_KEY oder fehlende Beglaubigung (release-keys.json)?");
 }
 if (endorsements.length) copyFileSync(keysFile, resolve(out, "release-keys.json"));
