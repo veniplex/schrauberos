@@ -2,13 +2,13 @@
 
 import { formObject, safeReturn } from "@/lib/forms";
 import { defineAction } from "@/server/operations";
-import { deleteAbsenceOperation, deleteEmployeeOperation, deleteQualificationOperation, saveAbsenceOperation, saveEmployeeOperation, saveQualificationOperation } from "./operations";
+import { deleteAbsenceOperation, deleteEmployeeOperation, deleteQualificationOperation, saveAbsenceOperation, saveEmployeeOperation, saveEmployeeSettingsOperation, saveQualificationOperation } from "./operations";
 
 const refreshPaths = ["/employees", "/employees/absences", "/fleet", "/admin/users", "/"];
 const refresh = (employeeId?: string | null) => [...refreshPaths, ...(employeeId ? [`/employees/${employeeId}`] : [])];
 
 export const saveEmployee = defineAction(saveEmployeeOperation, {
-  form: (fd) => ({ ...formObject(fd), active: fd.get("active") === "on" }),
+  form: (fd) => ({ ...formObject(fd), active: fd.get("active") === "on", workWeekdays: fd.getAll("workWeekdays") }),
   revalidate: ({ id }) => refresh(id),
   redirect: ({ id }) => `/employees/${id}`,
 });
@@ -28,6 +28,13 @@ export const deleteAbsence = defineAction(deleteAbsenceOperation, {
   redirectOnError: (formData) => safeReturn(String(formData.get("returnTo") ?? ""), "/employees", "/employees/absences"),
 });
 
-export const saveQualification = defineAction(saveQualificationOperation, { form: formObject, revalidate: (_data, input) => refresh(input.employeeId), message: "common.saved" });
+export const saveQualification = defineAction(saveQualificationOperation, {
+  form: formObject,
+  revalidate: (_data, input) => refresh(input.employeeId),
+  redirect: (_data, input) => (input.id ? `/employees/${input.employeeId}` : undefined),
+  message: "common.saved",
+});
+
+export const saveEmployeeSettings = defineAction(saveEmployeeSettingsOperation, { form: formObject, revalidate: [["/", "layout"]], message: "common.saved" });
 
 export const deleteQualification = defineAction(deleteQualificationOperation, { revalidate: ({ employeeId }) => refresh(employeeId), message: "common.deleted" });

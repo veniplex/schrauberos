@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Pencil, Trash2 } from "lucide-react";
+import { monthKeyOf } from "@/lib/zone";
 import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
-import { currentYear } from "@/lib/dates";
+import { currentYear, toDateInput } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
 import { getHolidays } from "@/server/holidays";
-import { employeeName, workdaysBetween, workdaysWithinKeys } from "@/modules/office/employees/domain";
-import { employeeTitle, getEmployeeDetail } from "@/modules/office/employees/queries";
+import { employeeName, workdaysBetween } from "@/modules/office/employees/domain";
+import { employeeTitle, getEmployeeDetail, getQualificationForEdit, getVacationBalance } from "@/modules/office/employees/queries";
+import { VacationSummary } from "@/modules/office/employees/vacation-summary";
+import { parseWorkWeekdays } from "@/modules/office/employees/work-pattern";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { deleteAbsence, deleteEmployee, deleteQualification } from "@/modules/office/employees/actions";
 import { QualificationForm } from "@/modules/office/employees/forms";
@@ -24,9 +27,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 
-export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmployeePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ editQualification?: string }> }) {
   const session = await requirePermission("employees.view");
-  const [{ id }, i18n] = await Promise.all([params, getI18n()]);
+  const [{ id }, sp, i18n] = await Promise.all([params, searchParams, getI18n()]);
   const { t, tp, td, date, number } = i18n;
   const holidays = await getHolidays();
   const canEdit = session.can("employees.edit");
@@ -36,7 +39,10 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   const e = await getEmployeeDetail(session, id);
   if (!e) notFound();
 
-  const vacationUsed = e.absences.filter((a) => a.type === "vacation").reduce((n, a) => n + workdaysWithinKeys(a, `${year}-01-01`, `${year}-12-31`, holidays), 0);
+  // Urlaubsstand: Anspruch (anteilig im Ein-/Austrittsjahr), Übertrag, genommen (alle Urlaubseinträge des Jahres, nicht nur die angezeigten), Rest
+  const balance = e.vacationDaysPerYear != null || e.vacationCarryYear != null ? await getVacationBalance(session, id, year) : null;
+  const pattern = parseWorkWeekdays(e.workWeekdays);
+  const editingQualification = canEdit && sp.editQualification ? await getQualificationForEdit(session, sp.editQualification) : null;
   const returnTo = `/employees/${e.id}`;
 
   return (
@@ -73,19 +79,14 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
               ) : null
             }
           >
-            {e.vacationDaysPerYear != null ? (
-              <p className="border-b border-line px-5 py-3 text-sm">
-                {t("employees.vacationSummary", { year, used: number(vacationUsed), total: e.vacationDaysPerYear, left: number(e.vacationDaysPerYear - vacationUsed) })}
-                <span className="block text-xs text-ink-muted">{t("employees.vacationNote")}</span>
-              </p>
-            ) : null}
+            {balance ? <VacationSummary balance={balance} workWeekdays={e.workWeekdays} /> : null}
             {e.absences.length === 0 ? (
               <EmptyState title={t("employees.noAbsences")} />
             ) : (
               <ul className="divide-y divide-line">
                 {e.absences.map((a) => {
                   const type = a.type;
-                  const days = workdaysBetween(a.startDate, a.endDate, holidays);
+                  const days = workdaysBetween(a.startDate, a.endDate, holidays, undefined, pattern);
                   return (
                     <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                       <span className="flex flex-wrap items-center gap-2">
@@ -98,13 +99,18 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                         {a.note && type !== "masked" && type !== "sick" ? <span className="text-ink-muted">{a.note}</span> : null}
                       </span>
                       {canEdit && a.type !== "masked" ? (
-                        <form action={deleteAbsence}>
-                          <input type="hidden" name="id" value={a.id} />
-                          <input type="hidden" name="returnTo" value={returnTo} />
-                          <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} target={date(a.startDate)} label={t("common.delete")}>
-                            <Trash2 className="size-3.5" aria-hidden />
-                          </ConfirmSubmitButton>
-                        </form>
+                        <span className="flex items-center gap-1">
+                          <LinkButton size="icon-sm" href={`/employees/absences?month=${monthKeyOf(a.startDate)}&edit=${a.id}`} aria-label={`${t("common.edit")}: ${date(a.startDate)}`} title={t("common.edit")}>
+                            <Pencil className="size-3.5" aria-hidden />
+                          </LinkButton>
+                          <form action={deleteAbsence}>
+                            <input type="hidden" name="id" value={a.id} />
+                            <input type="hidden" name="returnTo" value={returnTo} />
+                            <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} target={date(a.startDate)} label={t("common.delete")}>
+                              <Trash2 className="size-3.5" aria-hidden />
+                            </ConfirmSubmitButton>
+                          </form>
+                        </span>
                       ) : null}
                     </li>
                   );
@@ -132,12 +138,17 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                           <span className="text-ink-muted">{t("employees.noExpiry")}</span>
                         )}
                         {canEdit ? (
-                          <form action={deleteQualification}>
-                            <input type="hidden" name="id" value={q.id} />
-                            <ConfirmSubmitButton message={t("employees.qualificationDeleteConfirm")} target={q.name} label={t("common.delete")}>
-                              <Trash2 className="size-3.5" aria-hidden />
-                            </ConfirmSubmitButton>
-                          </form>
+                          <span className="flex items-center gap-1">
+                            <LinkButton size="icon-sm" href={`/employees/${e.id}?editQualification=${q.id}`} aria-label={`${t("common.edit")}: ${q.name}`} title={t("common.edit")}>
+                              <Pencil className="size-3.5" aria-hidden />
+                            </LinkButton>
+                            <form action={deleteQualification}>
+                              <input type="hidden" name="id" value={q.id} />
+                              <ConfirmSubmitButton message={t("employees.qualificationDeleteConfirm")} target={q.name} label={t("common.delete")}>
+                                <Trash2 className="size-3.5" aria-hidden />
+                              </ConfirmSubmitButton>
+                            </form>
+                          </span>
                         ) : null}
                       </span>
                     </li>
@@ -147,7 +158,26 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             )}
             {canEdit ? (
               <div className="border-t border-line px-5 py-4">
-                <QualificationForm employeeId={e.id} />
+                {editingQualification && editingQualification.employeeId === e.id ? (
+                  <>
+                    <p className="mb-3 text-sm font-medium">{t("employees.qualificationEdit")}</p>
+                    <QualificationForm
+                      key={editingQualification.id}
+                      employeeId={e.id}
+                      cancelHref={returnTo}
+                      edit={{
+                        id: editingQualification.id,
+                        version: editingQualification.version,
+                        name: editingQualification.name,
+                        issuedAt: editingQualification.issuedAt ? toDateInput(editingQualification.issuedAt) : "",
+                        expiresAt: editingQualification.expiresAt ? toDateInput(editingQualification.expiresAt) : "",
+                        note: editingQualification.note ?? "",
+                      }}
+                    />
+                  </>
+                ) : (
+                  <QualificationForm employeeId={e.id} />
+                )}
               </div>
             ) : null}
           </Card>

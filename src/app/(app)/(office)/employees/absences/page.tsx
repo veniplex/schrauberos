@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import clsx from "clsx";
 import Link from "next/link";
-import { CalendarPlus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { Card, EmptyState, StatusBadge, Table, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
@@ -12,7 +12,8 @@ import { isCalendarDay, nowDate, parseMonthParam, toDateInput, todayInput } from
 import { addMonths, eachDayOfInterval, endOfMonth, getDate, getDay, isSameDay, monthKeyOf, startOfDay } from "@/lib/zone";
 import { getHolidays } from "@/server/holidays";
 import { employeeName, workdaysBetween } from "@/modules/office/employees/domain";
-import { absencesOverlapping, activeEmployees } from "@/modules/office/employees/queries";
+import { absencesOverlapping, activeEmployees, getAbsenceForEdit, staffWorkPatterns } from "@/modules/office/employees/queries";
+import { parseWorkWeekdays } from "@/modules/office/employees/work-pattern";
 import { requirePermission } from "@/server/auth/session";
 import { deleteAbsence } from "@/modules/office/employees/actions";
 import { AbsenceForm } from "@/modules/office/employees/forms";
@@ -35,7 +36,7 @@ const CELL = {
 export default async function AbsencesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; new?: string; employee?: string; date?: string }>;
+  searchParams: Promise<{ month?: string; new?: string; employee?: string; date?: string; edit?: string }>;
 }) {
   const session = await requirePermission("employees.view");
   const [sp, i18n] = await Promise.all([searchParams, getI18n()]);
@@ -50,10 +51,13 @@ export default async function AbsencesPage({
   const monthKey = monthKeyOf(monthStart);
   const base = `/employees/absences?month=${monthKey}`;
 
-  const [employees, absences] = await Promise.all([
+  const [employees, absences, patterns, editing] = await Promise.all([
     activeEmployees(),
     // Krankheit ohne `employees.sensitive`: Art und Anmerkung werden gar nicht gelesen (type = "masked")
     absencesOverlapping(session, monthStart, monthEnd),
+    // Arbeitstage-Muster (Teilzeit): freie Tage der Person erscheinen im Raster wie das Wochenende
+    staffWorkPatterns(session),
+    canEdit && sp.edit ? getAbsenceForEdit(session, sp.edit) : null,
   ]);
   const today = nowDate();
 
@@ -149,7 +153,7 @@ export default async function AbsencesPage({
                   </th>
                   {days.map((d) => {
                     const a = covering(e.id, d);
-                    const weekend = getDay(d) === 0 || getDay(d) === 6;
+                    const weekend = !parseWorkWeekdays(patterns.get(e.id)).has(getDay(d));
                     const type = a ? a.type : null;
                     const label = type ? (type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)) : "";
                     const key = toDateInput(d);
@@ -201,17 +205,22 @@ export default async function AbsencesPage({
                       <StatusBadge tone={ABSENCE_TONE[type]}>{type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}</StatusBadge>
                       <span className="tabular text-ink-muted">
                         {date(a.startDate)}
-                        {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""} · {tp("employees.workdays", workdaysBetween(a.startDate, a.endDate, holidays), { count: number(workdaysBetween(a.startDate, a.endDate, holidays)) })}
+                        {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""} · {tp("employees.workdays", workdaysBetween(a.startDate, a.endDate, holidays, undefined, parseWorkWeekdays(a.employee.workWeekdays)), { count: number(workdaysBetween(a.startDate, a.endDate, holidays, undefined, parseWorkWeekdays(a.employee.workWeekdays))) })}
                       </span>
                     </span>
                     {canEdit && a.type !== "masked" ? (
-                      <form action={deleteAbsence}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="returnTo" value={base} />
-                        <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} target={`${employeeName(a.employee)}, ${date(a.startDate)}`} label={t("common.delete")}>
-                          <Trash2 className="size-3.5" aria-hidden />
-                        </ConfirmSubmitButton>
-                      </form>
+                      <span className="flex items-center gap-1">
+                        <LinkButton size="icon-sm" href={`${base}&edit=${a.id}`} aria-label={`${t("common.edit")}: ${employeeName(a.employee)}, ${date(a.startDate)}`} title={t("common.edit")}>
+                          <Pencil className="size-3.5" aria-hidden />
+                        </LinkButton>
+                        <form action={deleteAbsence}>
+                          <input type="hidden" name="id" value={a.id} />
+                          <input type="hidden" name="returnTo" value={base} />
+                          <ConfirmSubmitButton message={t("employees.absenceDeleteConfirm")} target={`${employeeName(a.employee)}, ${date(a.startDate)}`} label={t("common.delete")}>
+                            <Trash2 className="size-3.5" aria-hidden />
+                          </ConfirmSubmitButton>
+                        </form>
+                      </span>
                     ) : null}
                   </li>
                 );
@@ -221,7 +230,21 @@ export default async function AbsencesPage({
         </Card>
       </div>
 
-      {canEdit && sp.new ? (
+      {editing ? (
+        <UrlModal key={editing.id} title={t("employees.absenceEdit")} closeHref={base}>
+          <AbsenceForm
+            employees={employees.map((e) => ({ id: e.id, name: employeeName(e) }))}
+            initialEmployeeId={editing.employeeId}
+            initialDate={toDateInput(editing.startDate)}
+            canSensitive={sensitive}
+            returnTo={base}
+            closeHref={base}
+            edit={{ id: editing.id, version: editing.version, type: editing.type, startDate: toDateInput(editing.startDate), endDate: toDateInput(editing.endDate), note: editing.note ?? "" }}
+          />
+        </UrlModal>
+      ) : null}
+
+      {canEdit && sp.new && !editing ? (
         <UrlModal key={`${sp.employee ?? ""}-${sp.date ?? ""}`} title={t("employees.absenceNew")} closeHref={base}>
           <AbsenceForm
             employees={employees.map((e) => ({ id: e.id, name: employeeName(e) }))}

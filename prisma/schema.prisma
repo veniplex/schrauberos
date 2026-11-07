@@ -624,6 +624,11 @@ model Employee {
   leaveDate           DateTime?
   active              Boolean   @default(true)
   vacationDaysPerYear Int?
+  // Arbeitstage der Woche (Teilzeit, P4b-4): Wochentage 0 = Sonntag … 6 = Samstag, kommagetrennt, aufsteigend; Standard Montag bis Freitag. Abwesenheits-Arbeitstage zählen nur diese Tage (ohne Feiertage).
+  workWeekdays        String    @default("1,2,3,4,5")
+  // Manuell erfasster Resturlaub aus dem Vorjahr zu Beginn des Jahres vacationCarryYear (z. B. beim Start mit der Anwendung); ab da rechnet die Anwendung den Übertrag selbst
+  vacationCarryYear   Int?
+  vacationCarryDays   Float?
   notes               String?
   // besonders schützenswerte Daten (Recht employees.sensitive)
   emergencyName       String?
@@ -653,6 +658,8 @@ model Absence {
   endDate    DateTime
   note       String?
   createdAt  DateTime @default(now())
+  // Version für gleichzeitiges Bearbeiten (P4b-4)
+  updatedAt  DateTime @default(now()) @updatedAt
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
@@ -667,11 +674,21 @@ model Qualification {
   issuedAt   DateTime?
   expiresAt  DateTime?
   note       String?
+  // Version für gleichzeitiges Bearbeiten (P4b-4)
+  updatedAt  DateTime  @default(now()) @updatedAt
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([expiresAt])
+}
+
+// Einstellungen der Mitarbeiterverwaltung (Singleton): Stichtag, an dem der Resturlaub des Vorjahres verfällt (Standard 31.03.)
+model EmployeeSettings {
+  id                 String   @id @default("default")
+  vacationCarryMonth Int      @default(3)
+  vacationCarryDay   Int      @default(31)
+  updatedAt          DateTime @updatedAt
 }
 
 // ───────────── Fuhrpark (Firmenfahrzeuge) ─────────────

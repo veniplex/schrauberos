@@ -18,15 +18,17 @@ POST /customers/{id}/unarchive customers.unarchive customers.edit
 GET /employee-absences employee-absences.list employees.view query=employeeId,type,from,to sort=startDate,endDate,createdAt
 POST /employee-absences employee-absences.create employees.edit body=employeeId,type,startDate,endDate,note
 GET /employee-absences/{id} employee-absences.get employees.view
+PATCH /employee-absences/{id} employee-absences.update employees.edit body=type,startDate,endDate,note
 DELETE /employee-absences/{id} employee-absences.delete employees.edit
 GET /employee-qualifications employee-qualifications.list employees.view query=employeeId sort=name,expiresAt
 POST /employee-qualifications employee-qualifications.create employees.edit body=employeeId,name,issuedAt,expiresAt,note
 GET /employee-qualifications/{id} employee-qualifications.get employees.view
+PATCH /employee-qualifications/{id} employee-qualifications.update employees.edit body=name,issuedAt,expiresAt,note
 DELETE /employee-qualifications/{id} employee-qualifications.delete employees.edit
 GET /employees employees.list employees.view query=q,department,active sort=lastName,firstName,createdAt,updatedAt
-POST /employees employees.create employees.edit body=firstName,lastName,personnelNumber,jobTitle,department,email,phone,mobile,hireDate,leaveDate,active,vacationDaysPerYear,notes
+POST /employees employees.create employees.edit body=firstName,lastName,personnelNumber,jobTitle,department,email,phone,mobile,hireDate,leaveDate,active,vacationDaysPerYear,workWeekdays,vacationCarryYear,vacationCarryDays,notes
 GET /employees/{id} employees.get employees.view
-PATCH /employees/{id} employees.update employees.edit body=firstName,lastName,personnelNumber,jobTitle,department,email,phone,mobile,hireDate,leaveDate,active,vacationDaysPerYear,notes
+PATCH /employees/{id} employees.update employees.edit body=firstName,lastName,personnelNumber,jobTitle,department,email,phone,mobile,hireDate,leaveDate,active,vacationDaysPerYear,workWeekdays,vacationCarryYear,vacationCarryDays,notes
 DELETE /employees/{id} employees.delete employees.delete
 GET /fleet-costs fleet-costs.list fleet.view query=fleetVehicleId,category sort=date,amountCents
 POST /fleet-costs fleet-costs.create fleet.edit body=fleetVehicleId,date,category,amountCents,km,note

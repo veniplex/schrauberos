@@ -442,6 +442,9 @@ CREATE TABLE "Employee" (
     "leaveDate" DATETIME,
     "active" BOOLEAN NOT NULL DEFAULT true,
     "vacationDaysPerYear" INTEGER,
+    "workWeekdays" TEXT NOT NULL DEFAULT '1,2,3,4,5',
+    "vacationCarryYear" INTEGER,
+    "vacationCarryDays" REAL,
     "notes" TEXT,
     "emergencyName" TEXT,
     "emergencyPhone" TEXT,
@@ -461,6 +464,7 @@ CREATE TABLE "Absence" (
     "endDate" DATETIME NOT NULL,
     "note" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Absence_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -472,7 +476,16 @@ CREATE TABLE "Qualification" (
     "issuedAt" DATETIME,
     "expiresAt" DATETIME,
     "note" TEXT,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Qualification_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "EmployeeSettings" (
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "vacationCarryMonth" INTEGER NOT NULL DEFAULT 3,
+    "vacationCarryDay" INTEGER NOT NULL DEFAULT 31,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable

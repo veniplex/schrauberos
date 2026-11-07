@@ -11,16 +11,16 @@ import type { AbsenceHints } from "./absence-overlap";
  * Krankheit bleibt ohne `employees.sensitive` maskiert: Der Server liefert dann nur den Zeitraum, die Liste nennt „abwesend“. Fehlt die Antwort (offline), fehlt nur der Hinweis.
  * Gilt auch für die Vorbelegung aus dem Abwesenheitsraster (Zelle anklicken): die Abfrage läuft schon beim Öffnen.
  */
-export function AbsenceHintList({ employeeId, type, start, end }: { employeeId: string; type: string; start: string; end: string }) {
+export function AbsenceHintList({ employeeId, type, start, end, excludeId }: { employeeId: string; type: string; start: string; end: string; /** beim Bearbeiten: die Abwesenheit selbst ist kein Hinweis */ excludeId?: string }) {
   const { t, td, date } = useI18n();
-  const key = employeeId && start && end && end >= start ? [employeeId, type, start, end].join("|") : "";
+  const key = employeeId && start && end && end >= start ? [employeeId, type, start, end, excludeId ?? ""].join("|") : "";
   const [result, setResult] = useState<{ key: string; hints: AbsenceHints } | null>(null);
 
   useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch(`/api/employees/absence-hints?${new URLSearchParams({ employeeId, type, start, end })}`, { signal: controller.signal })
+      fetch(`/api/employees/absence-hints?${new URLSearchParams({ employeeId, type, start, end, ...(excludeId ? { exclude: excludeId } : {}) })}`, { signal: controller.signal })
         .then((response) => (response.ok ? (response.json() as Promise<AbsenceHints>) : null))
         .then((hints) => {
           if (hints) setResult({ key, hints });
@@ -31,7 +31,7 @@ export function AbsenceHintList({ employeeId, type, start, end }: { employeeId: 
       clearTimeout(timer);
       controller.abort();
     };
-  }, [key, employeeId, type, start, end]);
+  }, [key, employeeId, type, start, end, excludeId]);
 
   const hints = result?.key === key ? result.hints : null;
   const day = (value: string) => date(`${value}T12:00:00Z`, { dateStyle: "medium", timeZone: "UTC" });

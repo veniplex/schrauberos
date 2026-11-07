@@ -3,9 +3,15 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { Viewer } from "@/modules/types";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
-import { endOfDayIn, startOfDayIn } from "@/lib/dates";
+import { versionOf } from "@/lib/concurrency";
+import { endOfDayIn, startOfDayIn, todayInput } from "@/lib/dates";
+import { dayKey } from "@/lib/zone";
+import { getHolidays } from "@/server/holidays";
 import { absenceHints, type AbsenceHints, type PlannedAbsence } from "./absence-overlap";
 import { ABSENCE_TYPES, employeeName, type AbsenceType } from "./domain";
+import { getEmployeeRules } from "./settings";
+import { vacationBalance, type VacationBalance } from "./vacation";
+import { parseWorkWeekdays } from "./work-pattern";
 
 /**
  * Lesezugriffe der Funktion „Mitarbeiter“ – **der einzige Ort**, an dem Seiten, Dashboard-Bausteine und andere Funktionen Mitarbeiterdaten aus der Datenbank holen
@@ -32,6 +38,9 @@ const BASE = {
   leaveDate: true,
   active: true,
   vacationDaysPerYear: true,
+  workWeekdays: true,
+  vacationCarryYear: true,
+  vacationCarryDays: true,
   notes: true,
   userId: true,
   createdAt: true,
@@ -45,14 +54,14 @@ export const employeeBaseSelect = BASE;
 const EMERGENCY = { emergencyName: true, emergencyPhone: true, emergencyRelation: true } as const satisfies Prisma.EmployeeSelect;
 
 const NAME = { id: true, firstName: true, lastName: true } as const satisfies Prisma.EmployeeSelect;
-const EMPLOYEE_NAME = { employee: { select: { firstName: true, lastName: true } } } as const;
+const EMPLOYEE_NAME = { employee: { select: { firstName: true, lastName: true, workWeekdays: true } } } as const;
 
 export type Emergency = { name: string | null; phone: string | null; relation: string | null };
 export type EmployeeName = { id: string; firstName: string; lastName: string };
 
 /** Abwesenheit, wie der Betrachter sie sehen darf: Krankheit ohne `employees.sensitive` ist `masked`, ohne Anmerkung. */
-export type AbsenceView = { id: string; employeeId: string; type: AbsenceType | "masked"; startDate: Date; endDate: Date; note: string | null };
-export type AbsenceWithEmployee = AbsenceView & { employee: { firstName: string; lastName: string } };
+export type AbsenceView = { id: string; employeeId: string; type: AbsenceType | "masked"; startDate: Date; endDate: Date; note: string | null; /** Version zum Bearbeiten (null bei verdeckter Krankheit: nicht bearbeitbar) */ version: string | null };
+export type AbsenceWithEmployee = AbsenceView & { employee: { firstName: string; lastName: string; workWeekdays: string } };
 
 const knownType = (type: string): AbsenceType => ((ABSENCE_TYPES as readonly string[]).includes(type) ? (type as AbsenceType) : "other");
 
@@ -104,6 +113,13 @@ export async function activeEmployees(): Promise<EmployeeName[]> {
   return db.employee.findMany({ where: { active: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }], select: NAME });
 }
 
+/** Arbeitstage-Muster (Teilzeit) der aktiven Mitarbeiter: Kennung → gespeicherte Wochentage (`work-pattern.ts`) – für das Monatsraster der Abwesenheiten. */
+export async function staffWorkPatterns(viewer: Viewer): Promise<Map<string, string>> {
+  requireView(viewer);
+  const rows = await db.employee.findMany({ where: { active: true }, select: { id: true, workWeekdays: true } });
+  return new Map(rows.map((r) => [r.id, r.workWeekdays]));
+}
+
 /** Konten, die einem Mitarbeiter zugeordnet werden können: aktive ohne Mitarbeiter, dazu das bisherige Konto dieses Mitarbeiters (`currentUserId`). */
 export async function linkableAccounts(viewer: Viewer, currentUserId?: string | null): Promise<Array<{ id: string; name: string; username: string }>> {
   requireAccess(viewer);
@@ -134,9 +150,65 @@ export async function getEmployeeDetail(viewer: Viewer, id: string) {
   const [user, absences, qualifications] = await Promise.all([
     base.userId ? db.user.findUnique({ where: { id: base.userId }, select: { id: true, name: true, username: true, active: true } }) : null,
     readAbsences(viewer, { employeeId: id }, { order: "startDesc", take: 20 }),
-    db.qualification.findMany({ where: { employeeId: id }, orderBy: [{ expiresAt: "asc" }, { name: "asc" }], select: { id: true, employeeId: true, name: true, issuedAt: true, expiresAt: true, note: true } }),
+    db.qualification.findMany({ where: { employeeId: id }, orderBy: [{ expiresAt: "asc" }, { name: "asc" }], select: { id: true, employeeId: true, name: true, issuedAt: true, expiresAt: true, note: true, updatedAt: true } }),
   ]);
-  return { ...base, user, absences: absences.map((a) => ({ id: a.id, employeeId: a.employeeId, type: a.type, startDate: a.startDate, endDate: a.endDate, note: a.note }) satisfies AbsenceView), qualifications };
+  return {
+    ...base,
+    user,
+    absences: absences.map((a) => ({ id: a.id, employeeId: a.employeeId, type: a.type, startDate: a.startDate, endDate: a.endDate, note: a.note, version: a.version }) satisfies AbsenceView),
+    qualifications,
+  };
+}
+
+/**
+ * Urlaubsstand eines Mitarbeiters für ein Jahr (Anspruch, Übertrag, genommen, Rest; `vacation.ts`). Liest die Urlaubseinträge (Art „Urlaub“, nie sensibel) bis zu sechs Jahre zurück,
+ * die Feiertage der Werkstatt und den Verfall-Stichtag aus den Einstellungen. `null`, wenn es die Person nicht gibt.
+ */
+export async function getVacationBalance(viewer: Viewer, employeeId: string, year: number): Promise<VacationBalance | null> {
+  requireView(viewer);
+  const [employee, rules, holidays] = await Promise.all([
+    db.employee.findUnique({
+      where: { id: employeeId },
+      select: { hireDate: true, leaveDate: true, vacationDaysPerYear: true, workWeekdays: true, vacationCarryYear: true, vacationCarryDays: true, createdAt: true },
+    }),
+    getEmployeeRules(),
+    getHolidays(),
+  ]);
+  if (!employee) return null;
+  const vacations = await db.absence.findMany({
+    where: { employeeId, type: "vacation", endDate: { gte: startOfDayIn(`${year - 7}-01-01`) }, startDate: { lte: endOfDayIn(`${year}-12-31`) } },
+    select: { startDate: true, endDate: true },
+  });
+  return vacationBalance({
+    year,
+    daysPerYear: employee.vacationDaysPerYear,
+    hire: employee.hireDate ? dayKey(employee.hireDate) : null,
+    leave: employee.leaveDate ? dayKey(employee.leaveDate) : null,
+    carry: employee.vacationCarryYear != null && employee.vacationCarryDays != null ? { year: employee.vacationCarryYear, days: employee.vacationCarryDays } : null,
+    trackingStartYear: Number(dayKey(employee.createdAt).slice(0, 4)),
+    vacations: vacations.map((v) => ({ start: dayKey(v.startDate), end: dayKey(v.endDate) })),
+    holidays,
+    pattern: parseWorkWeekdays(employee.workWeekdays),
+    deadline: { month: rules.vacationCarryMonth, day: rules.vacationCarryDay },
+    today: todayInput(),
+  });
+}
+
+/** Eine Abwesenheit zum Bearbeiten; Krankheit nur mit `employees.sensitive` (sonst wird sie gar nicht gelesen: `null`). */
+export async function getAbsenceForEdit(viewer: Viewer, id: string) {
+  if (!viewer.can("employees.edit")) throw new Error("employees.edit fehlt");
+  const row = await db.absence.findFirst({
+    where: { id, ...(viewer.can(SENSITIVE) ? {} : { type: { not: "sick" } }) },
+    select: { id: true, employeeId: true, type: true, startDate: true, endDate: true, note: true, updatedAt: true },
+  });
+  return row ? { id: row.id, employeeId: row.employeeId, type: knownType(row.type), startDate: row.startDate, endDate: row.endDate, note: row.note, version: versionOf(row) } : null;
+}
+
+/** Eine Qualifikation zum Bearbeiten. */
+export async function getQualificationForEdit(viewer: Viewer, id: string) {
+  if (!viewer.can("employees.edit")) throw new Error("employees.edit fehlt");
+  const row = await db.qualification.findUnique({ where: { id }, select: { id: true, employeeId: true, name: true, issuedAt: true, expiresAt: true, note: true, updatedAt: true } });
+  return row ? { id: row.id, employeeId: row.employeeId, name: row.name, issuedAt: row.issuedAt, expiresAt: row.expiresAt, note: row.note, version: versionOf(row) } : null;
 }
 
 /* ───────────── Abwesenheiten ───────────── */
@@ -160,9 +232,9 @@ async function readAbsences(viewer: Viewer, where: Prisma.AbsenceWhereInput, opt
     where: sensitive ? where : { AND: [where, { type: { not: "sick" } }] },
     orderBy,
     take: opts.take,
-    select: { id: true, employeeId: true, type: true, startDate: true, endDate: true, note: true, ...EMPLOYEE_NAME },
+    select: { id: true, employeeId: true, type: true, startDate: true, endDate: true, note: true, updatedAt: true, ...EMPLOYEE_NAME },
   });
-  const rows: AbsenceWithEmployee[] = open.map((a) => ({ ...a, type: knownType(a.type) }));
+  const rows: AbsenceWithEmployee[] = open.map(({ updatedAt, ...a }) => ({ ...a, type: knownType(a.type), version: versionOf({ updatedAt }) }));
   if (sensitive) return rows;
   const hidden = await db.absence.findMany({
     where: { AND: [where, { type: "sick" }] },
@@ -170,7 +242,7 @@ async function readAbsences(viewer: Viewer, where: Prisma.AbsenceWhereInput, opt
     take: opts.take,
     select: { id: true, employeeId: true, startDate: true, endDate: true, ...EMPLOYEE_NAME },
   });
-  rows.push(...hidden.map((a): AbsenceWithEmployee => ({ ...a, type: "masked", note: null })));
+  rows.push(...hidden.map((a): AbsenceWithEmployee => ({ ...a, type: "masked", note: null, version: null })));
   rows.sort(compare[opts.order]);
   return opts.take != null ? rows.slice(0, opts.take) : rows;
 }
@@ -191,9 +263,13 @@ export async function absencesAround(viewer: Viewer, from: Date, to: Date): Prom
  * Hinweise zu einem geplanten Zeitraum (Überschneidungen derselben Person, exakte Dublette; `absence-overlap.ts`). Verlangt `employees.edit` (Formular „Abwesenheit eintragen“);
  * Krankheitszeilen kommen ohne Recht `employees.sensitive` nur als `masked` (ohne Art und Anmerkung) an, der Hinweis nennt dann bloß den Zeitraum.
  */
-export async function absenceHintsFor(viewer: Viewer, planned: PlannedAbsence & { employeeId: string }): Promise<AbsenceHints> {
+export async function absenceHintsFor(viewer: Viewer, planned: PlannedAbsence & { employeeId: string; /** beim Bearbeiten: diese Abwesenheit nicht mitzählen */ excludeId?: string }): Promise<AbsenceHints> {
   if (!viewer.can("employees.edit")) throw new Error("employees.edit fehlt");
-  const rows = await readAbsences(viewer, { employeeId: planned.employeeId, startDate: { lte: endOfDayIn(planned.end) }, endDate: { gte: startOfDayIn(planned.start) } }, { order: "startAsc", take: 50 });
+  const rows = await readAbsences(
+    viewer,
+    { employeeId: planned.employeeId, startDate: { lte: endOfDayIn(planned.end) }, endDate: { gte: startOfDayIn(planned.start) }, ...(planned.excludeId ? { id: { not: planned.excludeId } } : {}) },
+    { order: "startAsc", take: 50 },
+  );
   return absenceHints(planned, rows.map((r) => ({ type: r.type, startDate: r.startDate, endDate: r.endDate })));
 }
 

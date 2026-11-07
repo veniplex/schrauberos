@@ -17,7 +17,8 @@ async function demo(db: PrismaClient) {
     });
   const chef = await mk("Thomas", "Brandt", "management", "Geschäftsführer", { personnelNumber: "1001", emergencyName: "Karin Brandt", emergencyPhone: "0170 5550101", emergencyRelation: "Ehefrau" });
   const julia = await mk("Julia", "Wagner", "office", "Assistenz der Geschäftsführung", { personnelNumber: "1002" });
-  const petra = await mk("Petra", "Lehmann", "office", "Buchhaltung", { personnelNumber: "1003" });
+  // Teilzeit: Montag bis Donnerstag, 24 Urlaubstage (Arbeitstage dieser Person)
+  const petra = await mk("Petra", "Lehmann", "office", "Buchhaltung", { personnelNumber: "1003", workWeekdays: "1,2,3,4", vacationDaysPerYear: 24 });
   await mk("Ida", "Kaiser", "it", "Systemadministratorin", { personnelNumber: "1004", emergencyName: "Jonas Kaiser", emergencyPhone: "0171 5550102", emergencyRelation: "Bruder" });
   const tom = await mk("Tom", "Meyer", "workshop", "Kfz-Mechatroniker", { personnelNumber: "2001" });
   const sven = await mk("Sven", "Richter", "workshop", "Kfz-Mechatroniker", { personnelNumber: "2002" });

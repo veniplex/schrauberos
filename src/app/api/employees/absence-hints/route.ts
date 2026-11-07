@@ -14,6 +14,7 @@ const query = z.object({
   type: z.enum(ABSENCE_TYPES),
   start: z.string().refine(isCalendarDay),
   end: z.string().refine(isCalendarDay),
+  exclude: z.string().min(1).max(64).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -23,8 +24,8 @@ export async function GET(request: NextRequest) {
 
   const parsed = query.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success || parsed.data.end < parsed.data.start) return NextResponse.json({ error: "invalid" }, { status: 400 });
-  const { employeeId, type, start, end } = parsed.data;
+  const { employeeId, type, start, end, exclude } = parsed.data;
   // Eine Person ohne Krankheitsrecht trägt keine Krankheit ein; die Art bestimmt nur die Dublette
   if (type === "sick" && !session.can("employees.sensitive")) return NextResponse.json({ duplicate: false, overlaps: [] });
-  return NextResponse.json(await absenceHintsFor(session, { employeeId, type, start, end }));
+  return NextResponse.json(await absenceHintsFor(session, { employeeId, type, start, end, excludeId: exclude }));
 }

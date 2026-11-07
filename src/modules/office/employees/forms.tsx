@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Checkbox, Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { ABSENCE_TYPES, DEPARTMENTS } from "@/modules/office/employees/domain";
 import { useI18n } from "@/i18n/client";
+import { WEEKDAY_DISPLAY_ORDER } from "./work-pattern";
 import { endAfterStartChange } from "./absence-dates";
 import { AbsenceHintList } from "./absence-hints";
 import { saveAbsence, saveEmployee, saveQualification } from "./actions";
@@ -26,6 +27,11 @@ export type EmployeeFormInitial = {
   leaveDate: string;
   active: boolean;
   vacationDaysPerYear: string;
+  /** Arbeitstage der Woche (0 = Sonntag … 6 = Samstag) */
+  workWeekdays: number[];
+  /** Von Hand erfasster Resturlaub zu Beginn des Jahres */
+  vacationCarryYear: string;
+  vacationCarryDays: string;
   notes: string;
   emergencyName: string;
   emergencyPhone: string;
@@ -79,6 +85,25 @@ export function EmployeeForm({
           </Field>
           <Field label={t("employees.fields.vacationDays")} htmlFor="vacationDaysPerYear" name="vacationDaysPerYear" hint={t("employees.fields.vacationDaysHint")}>
             <Input id="vacationDaysPerYear" name="vacationDaysPerYear" type="number" min={0} max={60} defaultValue={initial.vacationDaysPerYear} />
+          </Field>
+        </div>
+      </Card>
+
+      <Card title={t("employees.sections.workTime")}>
+        <p className="mb-3 text-sm text-ink-muted">{t("employees.fields.workWeekdaysHint")}</p>
+        <Field label={t("employees.fields.workWeekdays")} name="workWeekdays" group>
+          <div className="flex flex-wrap gap-x-5">
+            {WEEKDAY_DISPLAY_ORDER.map((day) => (
+              <Checkbox key={day} name="workWeekdays" value={day} defaultChecked={initial.workWeekdays.includes(day)} label={t(`employees.weekdays.${day}`)} />
+            ))}
+          </div>
+        </Field>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label={t("employees.fields.carryYear")} htmlFor="vacationCarryYear" name="vacationCarryYear" hint={t("employees.fields.carryHint")}>
+            <Input id="vacationCarryYear" name="vacationCarryYear" type="number" min={2000} max={2100} inputMode="numeric" defaultValue={initial.vacationCarryYear} />
+          </Field>
+          <Field label={t("employees.fields.carryDays")} htmlFor="vacationCarryDays" name="vacationCarryDays">
+            <Input id="vacationCarryDays" name="vacationCarryDays" inputMode="decimal" defaultValue={initial.vacationCarryDays} placeholder="0" />
           </Field>
         </div>
       </Card>
@@ -146,6 +171,9 @@ export function EmployeeForm({
 
 /* ───────────── Abwesenheit (im Modal) ───────────── */
 
+/** Eine vorhandene Abwesenheit zum Bearbeiten (Zeitraum als `JJJJ-MM-TT`). */
+export type AbsenceEdit = { id: string; version: string; type: string; startDate: string; endDate: string; note: string };
+
 export function AbsenceForm({
   employees,
   initialEmployeeId,
@@ -153,6 +181,7 @@ export function AbsenceForm({
   canSensitive,
   returnTo,
   closeHref,
+  edit,
 }: {
   employees: Array<{ id: string; name: string }>;
   initialEmployeeId: string;
@@ -160,13 +189,14 @@ export function AbsenceForm({
   canSensitive: boolean;
   returnTo: string;
   closeHref: string;
+  edit?: AbsenceEdit;
 }) {
   const { t, td } = useI18n();
-  const [start, setStart] = useState(initialDate);
-  const [end, setEnd] = useState(initialDate);
+  const [start, setStart] = useState(edit?.startDate ?? initialDate);
+  const [end, setEnd] = useState(edit?.endDate ?? initialDate);
   // Person und Art steuern die Überschneidungshinweise (absence-hints.tsx)
   const [employeeId, setEmployeeId] = useState(initialEmployeeId);
-  const [type, setType] = useState("vacation");
+  const [type, setType] = useState(edit?.type ?? "vacation");
   // „Bis“ zieht „Von“ nach (absence-dates.ts)
   const moveStart = (value: string) => {
     setEnd((current) => endAfterStartChange(current, start, value));
@@ -175,9 +205,17 @@ export function AbsenceForm({
   return (
     <Form action={saveAbsence} className="flex flex-col gap-4">
       <input type="hidden" name="returnTo" value={returnTo} />
+      {edit ? (
+        <>
+          <input type="hidden" name="id" value={edit.id} />
+          <input type="hidden" name="version" value={edit.version} />
+          {/* beim Bearbeiten bleibt die Person dieselbe (ein gesperrtes Feld würde nicht gesendet) */}
+          <input type="hidden" name="employeeId" value={employeeId} />
+        </>
+      ) : null}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("employees.title")} htmlFor="employeeId" name="employeeId" required>
-          <Select id="employeeId" name="employeeId" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
+          <Select id="employeeId" name={edit ? undefined : "employeeId"} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} disabled={!!edit} required>
             <option value="" disabled>
               {t("employees.fields.choose")}
             </option>
@@ -204,9 +242,9 @@ export function AbsenceForm({
           <Input id="endDate" name="endDate" type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} required />
         </Field>
       </div>
-      <AbsenceHintList employeeId={employeeId} type={type} start={start} end={end} />
+      <AbsenceHintList employeeId={employeeId} type={type} start={start} end={end} excludeId={edit?.id} />
       <Field label={t("common.notes")} htmlFor="note">
-        <Input id="note" name="note" maxLength={200} />
+        <Input id="note" name="note" maxLength={200} defaultValue={edit?.note} />
       </Field>
       <FormActions cancelHref={closeHref} />
     </Form>
@@ -215,21 +253,40 @@ export function AbsenceForm({
 
 /* ───────────── Qualifikation (Inline) ───────────── */
 
-export function QualificationForm({ employeeId }: { employeeId: string }) {
+/** Eine vorhandene Qualifikation zum Bearbeiten (Daten als `JJJJ-MM-TT`). */
+export type QualificationEdit = { id: string; version: string; name: string; issuedAt: string; expiresAt: string; note: string };
+
+export function QualificationForm({ employeeId, edit, cancelHref }: { employeeId: string; edit?: QualificationEdit; cancelHref?: string }) {
   const { t } = useI18n();
   return (
     <Form action={saveQualification} className="flex flex-wrap items-start gap-3">
       <input type="hidden" name="employeeId" value={employeeId} />
-      <Input name="name" placeholder={t("employees.fields.qualification")} aria-label={t("employees.fields.qualification")} className="min-w-48 flex-[2]" maxLength={100} required />
+      {edit ? (
+        <>
+          <input type="hidden" name="id" value={edit.id} />
+          <input type="hidden" name="version" value={edit.version} />
+        </>
+      ) : null}
+      <Input name="name" placeholder={t("employees.fields.qualification")} aria-label={t("employees.fields.qualification")} className="min-w-48 flex-[2]" maxLength={100} defaultValue={edit?.name} required />
       <Field label={t("employees.fields.issuedAt")} htmlFor="issuedAt" className="min-w-36 flex-1">
-        <Input id="issuedAt" name="issuedAt" type="date" />
+        <Input id="issuedAt" name="issuedAt" type="date" defaultValue={edit?.issuedAt} />
       </Field>
       <Field label={t("employees.fields.expiresAt")} htmlFor="expiresAt" name="expiresAt" className="min-w-36 flex-1">
-        <Input id="expiresAt" name="expiresAt" type="date" />
+        <Input id="expiresAt" name="expiresAt" type="date" defaultValue={edit?.expiresAt} />
       </Field>
+      {edit ? (
+        <Field label={t("common.notes")} htmlFor="qualificationNote" className="min-w-48 flex-[2]">
+          <Input id="qualificationNote" name="note" maxLength={200} defaultValue={edit.note} />
+        </Field>
+      ) : null}
       <SubmitButton size="sm" className="mt-5">
-        {t("common.add")}
+        {edit ? t("common.save") : t("common.add")}
       </SubmitButton>
+      {edit && cancelHref ? (
+        <LinkButton size="sm" href={cancelHref} className="mt-5">
+          {t("common.cancel")}
+        </LinkButton>
+      ) : null}
     </Form>
   );
 }

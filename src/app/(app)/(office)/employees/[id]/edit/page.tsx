@@ -5,6 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { toDateInput } from "@/lib/dates";
 import { employeeName } from "@/modules/office/employees/domain";
 import { getEmployeeForEdit, linkableAccounts } from "@/modules/office/employees/queries";
+import { workWeekdayList } from "@/modules/office/employees/work-pattern";
 import { requirePermission } from "@/server/auth/session";
 import { EmployeeForm } from "@/modules/office/employees/forms";
 import { versionOf } from "@/lib/concurrency";
@@ -45,6 +46,9 @@ export default async function EditEmployeePage({ params }: { params: Promise<{ i
           leaveDate: e.leaveDate ? toDateInput(e.leaveDate) : "",
           active: e.active,
           vacationDaysPerYear: e.vacationDaysPerYear != null ? String(e.vacationDaysPerYear) : "",
+          workWeekdays: workWeekdayList(e.workWeekdays),
+          vacationCarryYear: e.vacationCarryYear != null ? String(e.vacationCarryYear) : "",
+          vacationCarryDays: e.vacationCarryDays != null ? String(e.vacationCarryDays).replace(".", ",") : "",
           notes: e.notes ?? "",
           emergencyName: e.emergency?.name ?? "",
           emergencyPhone: e.emergency?.phone ?? "",

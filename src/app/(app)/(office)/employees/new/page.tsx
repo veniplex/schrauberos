@@ -26,7 +26,7 @@ export default async function NewEmployeePage() {
         canSensitive={session.can("employees.sensitive")}
         initial={{
           firstName: "", lastName: "", personnelNumber: "", jobTitle: "", department: "other", email: "", phone: "", mobile: "",
-          hireDate: "", leaveDate: "", active: true, vacationDaysPerYear: "30", notes: "", emergencyName: "", emergencyPhone: "",
+          hireDate: "", leaveDate: "", active: true, vacationDaysPerYear: "30", workWeekdays: [1, 2, 3, 4, 5], vacationCarryYear: "", vacationCarryDays: "", notes: "", emergencyName: "", emergencyPhone: "",
           emergencyRelation: "", userId: "",
         }}
       />

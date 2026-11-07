@@ -8,6 +8,7 @@ import { db } from "@/server/db";
 import { contains } from "@/server/search";
 import { ABSENCE_TYPES, DEPARTMENTS } from "./domain";
 import { employeeBaseSelect } from "./queries";
+import { workWeekdayList } from "./work-pattern";
 import {
   deleteAbsenceOperation,
   deleteEmployeeOperation,
@@ -38,6 +39,11 @@ const body = z.strictObject({
   leaveDate: optionalDate,
   active: z.boolean().optional(),
   vacationDaysPerYear: z.number().int().min(0).max(60).nullable().optional(),
+  /** Arbeitstage der Woche (0 = Sonntag … 6 = Samstag), mindestens einer; ohne Angabe Montag bis Freitag */
+  workWeekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
+  /** Von Hand erfasster Resturlaub zu Beginn des Jahres `vacationCarryYear` (beide Angaben zusammen) */
+  vacationCarryYear: z.number().int().min(2000).max(2100).nullable().optional(),
+  vacationCarryDays: z.number().min(0).max(366).nullable().optional(),
   notes: text(2000),
 });
 
@@ -56,11 +62,13 @@ const item = z.object({
   leaveDate: nullableString,
   active: z.boolean(),
   vacationDaysPerYear: z.number().int().nullable(),
+  workWeekdays: z.array(z.number().int()),
+  vacationCarryYear: z.number().int().nullable(),
+  vacationCarryDays: z.number().nullable(),
   notes: nullableString,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
-
 
 export const employeeEndpoints = defineResource({
   feature: "office.employees",
@@ -89,6 +97,9 @@ export const employeeEndpoints = defineResource({
     leaveDate: dayOrNull(e.leaveDate),
     active: e.active,
     vacationDaysPerYear: e.vacationDaysPerYear,
+    workWeekdays: workWeekdayList(e.workWeekdays),
+    vacationCarryYear: e.vacationCarryYear,
+    vacationCarryDays: e.vacationCarryDays,
     notes: e.notes,
     createdAt: iso(e.createdAt),
     updatedAt: iso(e.updatedAt),
@@ -106,7 +117,7 @@ export const employeeEndpoints = defineResource({
       { key: "firstName", dir: "asc" },
     ],
   },
-  create: { permission: "employees.edit", operation: saveEmployeeOperation, body, toInput: (b) => ({ ...b, active: b.active ?? true }) },
+  create: { permission: "employees.edit", operation: saveEmployeeOperation, body, toInput: (b) => ({ ...b, active: b.active ?? true, workWeekdays: b.workWeekdays ?? [1, 2, 3, 4, 5] }) },
   update: {
     permission: "employees.edit",
     operation: saveEmployeeOperation,
@@ -123,6 +134,9 @@ export const employeeEndpoints = defineResource({
       leaveDate: dayOrNull(e.leaveDate),
       active: e.active,
       vacationDaysPerYear: e.vacationDaysPerYear,
+      workWeekdays: workWeekdayList(e.workWeekdays),
+      vacationCarryYear: e.vacationCarryYear,
+      vacationCarryDays: e.vacationCarryDays,
       notes: e.notes,
     }),
     // die Verknüpfung zum Benutzerkonto bleibt unangetastet (sie ist nicht Teil der API)
@@ -144,6 +158,7 @@ const absenceBody = z.strictObject({
 
 const absenceItem = z.object({
   id: z.string(),
+  version: z.string(),
   employeeId: z.string(),
   type: z.enum(["vacation", "training", "other"]),
   startDate: z.string(),
@@ -164,8 +179,10 @@ export const absenceEndpoints = defineResource({
   scope: { type: { not: "sick" } },
   visible: (a) => a.type !== "sick",
   item: absenceItem,
+  version: versionOf,
   toItem: (a): z.input<typeof absenceItem> => ({
     id: a.id,
+    version: versionOf(a),
     employeeId: a.employeeId,
     type: a.type === "vacation" || a.type === "training" ? a.type : "other",
     startDate: dayOrNull(a.startDate)!,
@@ -186,6 +203,14 @@ export const absenceEndpoints = defineResource({
     defaultSort: [{ key: "startDate", dir: "desc" }],
   },
   create: { permission: "employees.edit", operation: saveAbsenceOperation, body: absenceBody, toInput: (b) => b },
+  update: {
+    permission: "employees.edit",
+    operation: saveAbsenceOperation,
+    // die Person bleibt dieselbe (die Operation lehnt einen Wechsel ab)
+    body: absenceBody.omit({ employeeId: true }).partial(),
+    current: (a) => ({ type: a.type, startDate: dayOrNull(a.startDate), endDate: dayOrNull(a.endDate), note: a.note }),
+    toInput: (merged, { id, version, row }) => ({ ...merged, employeeId: row?.employeeId, id, version }),
+  },
   remove: { permission: "employees.edit", operation: deleteAbsenceOperation },
 });
 
@@ -201,6 +226,7 @@ const qualificationBody = z.strictObject({
 
 const qualificationItem = z.object({
   id: z.string(),
+  version: z.string(),
   employeeId: z.string(),
   name: z.string(),
   issuedAt: nullableString,
@@ -217,7 +243,8 @@ export const qualificationEndpoints = defineResource({
   read: "employees.view",
   model: db.qualification as unknown as Delegate<Qualification>,
   item: qualificationItem,
-  toItem: (q): z.input<typeof qualificationItem> => ({ id: q.id, employeeId: q.employeeId, name: q.name, issuedAt: dayOrNull(q.issuedAt), expiresAt: dayOrNull(q.expiresAt), note: q.note }),
+  version: versionOf,
+  toItem: (q): z.input<typeof qualificationItem> => ({ id: q.id, version: versionOf(q), employeeId: q.employeeId, name: q.name, issuedAt: dayOrNull(q.issuedAt), expiresAt: dayOrNull(q.expiresAt), note: q.note }),
   list: {
     filters: z.strictObject({ employeeId: z.string().max(64).optional() }),
     where: ({ employeeId }) => (employeeId ? { employeeId } : {}),
@@ -225,6 +252,13 @@ export const qualificationEndpoints = defineResource({
     defaultSort: [{ key: "name", dir: "asc" }],
   },
   create: { permission: "employees.edit", operation: saveQualificationOperation, body: qualificationBody, toInput: (b) => b },
+  update: {
+    permission: "employees.edit",
+    operation: saveQualificationOperation,
+    body: qualificationBody.omit({ employeeId: true }).partial(),
+    current: (q) => ({ name: q.name, issuedAt: dayOrNull(q.issuedAt), expiresAt: dayOrNull(q.expiresAt), note: q.note }),
+    toInput: (merged, { id, version, row }) => ({ ...merged, employeeId: row?.employeeId, id, version }),
+  },
   remove: { permission: "employees.edit", operation: deleteQualificationOperation },
 });
 

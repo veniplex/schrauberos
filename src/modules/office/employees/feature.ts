@@ -19,8 +19,11 @@ export const employeesFeature = defineFeature({
     "employee.sensitiveUpdate",
     "employee.delete",
     "employee.absenceCreate",
+    "employee.absenceUpdate",
     "employee.absenceDelete",
     "employee.qualificationCreate",
+    "employee.qualificationUpdate",
     "employee.qualificationDelete",
+    "settings.employees",
   ],
 });
