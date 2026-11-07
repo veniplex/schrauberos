@@ -4,6 +4,7 @@ import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { NextRequest } from "next/server";
 import { ALL_PERMISSIONS, FEATURES, featureOfPermission } from "@/modules/catalog";
+import { startupState } from "@/server/startup-state";
 import { createTestEnv, form, NotFoundSignal, RedirectSignal, type TestEnv } from "@/test/harness";
 
 /**
@@ -45,6 +46,7 @@ let seq = 0;
 
 before(async () => {
   env = await createTestEnv();
+  startupState().status = "ready"; // frisch gestartet ist der Zustand „starting“ (die Upload-Route sperrt dann mit 503)
   process.env.UPDATE_API_URL = "http://127.0.0.1:9"; // Update-Prüfung scheitert sofort, kein Netzwerk
   const actionFiles = walk(SRC, (n) => /\.tsx?$/.test(n) && !/\.test\./.test(n)).filter((f) => /\bdefineAction\(/.test(readFileSync(f, "utf8")) && !f.includes(`${path.sep}operations${path.sep}`));
   for (const file of actionFiles) {
