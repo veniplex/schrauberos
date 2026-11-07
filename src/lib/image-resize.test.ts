@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ImageError, prepareImage, sniffImage, type ImageEngine, type OutputType, type Raster } from "./image-resize";
+import { ImageError, imageSize, prepareImage, sniffImage, type ImageEngine, type OutputType, type Raster } from "./image-resize";
 
 /**
  * Die Entscheidungen des Foto-Bausteins (was wird verkleinert, was bleibt, welches Format) mit einer Fake-Engine: Das Dekodieren liefert vorgegebene Maße, das Kodieren eine
@@ -48,6 +48,51 @@ const jpegHead = () => bytes([0xff, 0xd8, 0xff, 0xe0], new Array(20).fill(0));
 const pngHead = (colorType: number, extra: Uint8Array = new Uint8Array()) =>
   bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], [0, 0, 0, 13], "IHDR", [0, 0, 0x0f, 0xa0, 0, 0, 0x0b, 0xb8, 8, colorType, 0, 0, 0], [0, 0, 0, 0], extra);
 const webpHead = (chunk: "VP8X" | "VP8L" | "VP8 ", payload: number[]) => bytes("RIFF", [0, 0, 0, 0], "WEBP", chunk, [10, 0, 0, 0], payload, new Array(10).fill(0));
+
+describe("Pixelobergrenze (ZP5-14)", () => {
+  const be32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+  /** PNG-Kopf mit beliebigen Maßen */
+  const pngSized = (width: number, height: number) => bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], [0, 0, 0, 13], "IHDR", be32(width), be32(height), [8, 2, 0, 0, 0], [0, 0, 0, 0]);
+  /** JPEG: großer APP1-Abschnitt (EXIF) vor dem Rahmenkopf, dann SOF0 mit den Maßen */
+  const jpegSized = (width: number, height: number, app1 = 6000) => bytes([0xff, 0xd8], [0xff, 0xe1, (app1 + 2) >> 8, (app1 + 2) & 255], new Array(app1).fill(0), [0xff, 0xc0, 0, 17, 8, height >> 8, height & 255, width >> 8, width & 255, 3], new Array(20).fill(0));
+  const webpX = (width: number, height: number) => webpHead("VP8X", [0, 0, 0, 0, (width - 1) & 255, ((width - 1) >> 8) & 255, ((width - 1) >> 16) & 255, (height - 1) & 255, ((height - 1) >> 8) & 255, ((height - 1) >> 16) & 255]);
+
+  it("liest die Maße aus PNG, JPEG (auch hinter großen EXIF-Abschnitten) und WebP (VP8X)", () => {
+    assert.deepEqual(imageSize(pngSized(20000, 30000), "png"), { width: 20000, height: 30000 });
+    assert.deepEqual(imageSize(jpegSized(9000, 7000), "jpeg"), { width: 9000, height: 7000 });
+    assert.deepEqual(imageSize(webpX(30000, 20000), "webp"), { width: 30000, height: 20000 });
+    assert.equal(imageSize(jpegHead(), "jpeg"), null, "ohne Rahmenkopf: unbekannt");
+    assert.equal(imageSize(bytes("kaputt"), "png"), null);
+  });
+
+  it("ein Bild über 100 Megapixel wird nicht dekodiert (unverändert); kleine und unbekannte Maße laufen wie bisher", async () => {
+    for (const [name, type, head] of [
+      ["riesig.png", "image/png", pngSized(20000, 20000)],
+      ["riesig.jpg", "image/jpeg", jpegSized(15000, 10000)],
+      ["riesig.webp", "image/webp", webpX(12000, 12000)],
+    ] as const) {
+      const file = fileOf(name, type, head, 3 * MB);
+      const { engine, decoded, calls } = fakeEngine({ width: 4000, height: 3000 });
+      const result = await prepareImage(file, engine);
+      assert.equal(result.file, file, name);
+      assert.equal(result.status, "unchanged");
+      assert.equal(decoded(), 0, `${name}: nicht dekodiert`);
+      assert.equal(calls.length, 0);
+    }
+    // gerade noch erlaubt (10000 × 10000 = 100 MP) und deutlich kleiner: wird dekodiert und verkleinert
+    for (const head of [pngSized(10000, 10000), jpegSized(4000, 3000)]) {
+      const { engine, decoded } = fakeEngine({ width: 4000, height: 3000 });
+      const result = await prepareImage(fileOf("a.img", head[0] === 0x89 ? "image/png" : "image/jpeg", head, 6 * MB), engine);
+      assert.equal(decoded(), 1);
+      assert.equal(result.status, "resized");
+    }
+    // die Grenze lässt sich einstellen
+    const strict = fakeEngine({ width: 4000, height: 3000 });
+    const ok = fileOf("b.jpg", "image/jpeg", jpegSized(4000, 3000), 6 * MB);
+    assert.equal((await prepareImage(ok, strict.engine, { maxPixels: 10_000_000 })).file, ok);
+    assert.equal(strict.decoded(), 0);
+  });
+});
 
 describe("prepareImage", () => {
   it("ein 6-MB-Handyfoto (4000 × 3000) wird auf 1600 px und unter 2 MB verkleinert, als JPEG mit Qualität 0,8", async () => {

@@ -10,6 +10,7 @@
  *  - GIF und animiertes WebP bleiben unverändert (ein Einzelbild würde die Animation und die Transparenz zerstören).
  *  - Was ohnehin klein genug ist, bleibt das Original: Ein Bild bis 1600 px wird nicht neu kodiert (Qualitätsverlust ohne Nutzen), und das Ergebnis ersetzt das Original
  *    nur, wenn es kleiner ist.
+ *  - Bilder über 100 Megapixel (aus dem Dateikopf gelesen) werden vor dem Dekodieren abgewiesen: unverändert (ZP5-14).
  *  - HEIC/HEIF, das der Browser nicht dekodieren kann (Chrome unter Android): `ImageError("heic")` – die Oberfläche erklärt, wie es als JPEG geht.
  *    Jedes andere Bild, das sich nicht dekodieren lässt, bleibt unverändert (der Server prüft die Datei ohnehin).
  */
@@ -93,6 +94,55 @@ async function readHead(file: Blob): Promise<Uint8Array> {
   return new Uint8Array(await file.slice(0, HEAD_BYTES).arrayBuffer());
 }
 
+/** Größte Pixelzahl, die der Browser zum Verkleinern dekodieren soll (100 Megapixel ≈ 400 MB Arbeitsspeicher): größere Bilder werden nicht angefasst (ZP5-14). */
+export const PHOTO_MAX_PIXELS = 100_000_000;
+
+const u16be = (b: Uint8Array, o: number) => (b[o] << 8) | b[o + 1];
+const u32be = (b: Uint8Array, o: number) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+
+/** JPEG: Abschnittsmarken der Reihe nach durchgehen, bis zum Rahmenkopf (SOF0–SOF15 außer DHT/JPG/DAC); `null`, wenn er nicht im gelesenen Anfang liegt. */
+function jpegSize(bytes: Uint8Array): { width: number; height: number } | null {
+  let pos = 2;
+  while (pos + 4 <= bytes.length) {
+    if (bytes[pos] !== 0xff) return null;
+    const marker = bytes[pos + 1];
+    if (marker === 0xff) {
+      pos += 1; // Füllbyte
+      continue;
+    }
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      pos += 2; // Marken ohne Länge
+      continue;
+    }
+    if (marker === 0xd9 || marker === 0xda) return null; // Ende / Bilddaten: kein Rahmenkopf davor gefunden
+    const length = u16be(bytes, pos + 2);
+    if (length < 2) return null;
+    const isFrame = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isFrame) return pos + 9 <= bytes.length ? { height: u16be(bytes, pos + 5), width: u16be(bytes, pos + 7) } : null;
+    pos += 2 + length;
+  }
+  return null;
+}
+
+/** Maße aus dem Dateianfang (PNG: IHDR, WebP: VP8X/VP8L/VP8, JPEG: Rahmenkopf); `null`, wenn sie sich daraus nicht lesen lassen. */
+export function imageSize(bytes: Uint8Array, kind: Kind): { width: number; height: number } | null {
+  if (kind === "png") return bytes.length >= 24 && ascii(bytes, 12, 16) === "IHDR" ? { width: u32be(bytes, 16), height: u32be(bytes, 20) } : null;
+  if (kind === "jpeg") return jpegSize(bytes);
+  if (kind === "webp" && bytes.length >= 30) {
+    const chunk = ascii(bytes, 12, 16);
+    if (chunk === "VP8X") return { width: 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16)), height: 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16)) };
+    if (chunk === "VP8L" && bytes[20] === 0x2f) {
+      const bits = (bytes[21] | (bytes[22] << 8) | (bytes[23] << 16) | (bytes[24] << 24)) >>> 0;
+      return { width: 1 + (bits & 0x3fff), height: 1 + ((bits >>> 14) & 0x3fff) };
+    }
+    if (chunk === "VP8 " && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) return { width: (bytes[26] | (bytes[27] << 8)) & 0x3fff, height: (bytes[28] | (bytes[29] << 8)) & 0x3fff };
+  }
+  return null;
+}
+
+/** Wie viele Bytes vom Anfang für die Maße gelesen werden (ein JPEG kann vor dem Rahmenkopf große EXIF-/Profil-Abschnitte haben). */
+const SIZE_BYTES = 512 * 1024;
+
 function renamed(name: string, extension: string) {
   const base = name.replace(/\.[^./\\]+$/, "") || "foto";
   return `${base}.${extension}`;
@@ -102,7 +152,7 @@ function renamed(name: string, extension: string) {
  * Bereitet eine gewählte Datei für den Upload vor. Gibt die Datei zurück, die gesendet werden soll (Original oder verkleinerte Fassung).
  * Wirft nur `ImageError`; jede andere Störung führt zum Original.
  */
-export async function prepareImage(file: File, engine: ImageEngine, options: { maxEdge?: number; quality?: number; maxBytes?: number } = {}): Promise<PreparedImage> {
+export async function prepareImage(file: File, engine: ImageEngine, options: { maxEdge?: number; quality?: number; maxBytes?: number; maxPixels?: number } = {}): Promise<PreparedImage> {
   const maxEdge = options.maxEdge ?? PHOTO_MAX_EDGE;
   const quality = options.quality ?? PHOTO_QUALITY;
   const unchanged: PreparedImage = { file, status: "unchanged" };
@@ -114,6 +164,11 @@ export async function prepareImage(file: File, engine: ImageEngine, options: { m
   const kind: Kind = sniffed !== "other" ? sniffed : kindOfType(file.type) !== "other" ? kindOfType(file.type) : named;
   if (kind === "other") return unchanged; // PDF, XML, SVG …
   if (kind === "gif") return unchanged;
+
+  // Pixelobergrenze **vor** dem Dekodieren: ein kleines PNG/JPEG kann Zehntausende Pixel je Kante deklarieren und beim Dekodieren den Speicher füllen. Zu große Bilder werden nicht angefasst
+  // (der Server prüft Größe und Art ohnehin); lassen sich die Maße nicht lesen, wird wie bisher dekodiert.
+  const size = imageSize(kind === "jpeg" ? new Uint8Array(await file.slice(0, SIZE_BYTES).arrayBuffer()) : head, kind);
+  if (size && size.width * size.height > (options.maxPixels ?? PHOTO_MAX_PIXELS)) return unchanged;
 
   let alpha = false;
   if (kind === "png") alpha = pngHasAlpha(head);
