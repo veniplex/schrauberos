@@ -4,6 +4,9 @@
  * bestätigen“; beide Ergebnisse haben dieselbe Form (`SignatureValue`) und werden mit `parseSignatureValue` serverseitig gelesen.
  */
 
+import { inspectPng } from "./png";
+import { checkUpload } from "./upload-sniff";
+
 export type Point = { x: number; y: number };
 
 /** Zeichenfläche. `line`/`dot` zeichnen in Fläche-Koordinaten (Punkte), `toPng` liefert die Fläche als Data-URL `data:image/png;base64,…`. */
@@ -19,6 +22,9 @@ export type SurfaceFactory = (width: number, height: number) => SignatureSurface
 
 export const SIGNATURE_WIDTH = 600;
 export const SIGNATURE_HEIGHT = 200;
+/** Größte Maße eines angenommenen PNG (Punkte): das Vierfache der Zeichenfläche (hochauflösende Bildschirme). Sie begrenzen den Speicher, den ein Dekoder (PDF) braucht. */
+export const SIGNATURE_MAX_WIDTH = SIGNATURE_WIDTH * 4;
+export const SIGNATURE_MAX_HEIGHT = SIGNATURE_HEIGHT * 4;
 /** Obergrenze des PNG (Bytes). Eine übliche Unterschrift hat 3–10 KB; die Grenze fängt Rauschen und missbräuchliche Eingaben. */
 export const SIGNATURE_MAX_BYTES = 48 * 1024;
 /** Weniger Tinte als diese Strichlänge (in Punkten) gilt als leer: ein versehentliches Antippen ist keine Unterschrift. */
@@ -134,10 +140,9 @@ export const TYPED_NAME_MAX = 80;
 
 export const serializeSignature = (value: SignatureValue | null): string => (value === null ? "" : value.kind === "drawn" ? value.dataUrl : `${TYPED_PREFIX}${value.name}`);
 
-const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
 /**
- * Liest den Wert aus dem Formularfeld **auf dem Server** (Fremdeingabe!): gezeichnet → echte PNG-Bytes (Magic Bytes, Größengrenze), getippt → bereinigter Name. `null` bei allem anderen.
+ * Liest den Wert aus dem Formularfeld **auf dem Server** (Fremdeingabe!): gezeichnet → echte PNG-Bytes (Größengrenze, Inhaltserkennung `checkUpload`, Struktur und Maße `inspectPng`: IHDR,
+ * Teilekette mit CRC bis IEND, keine Anhängsel), getippt → bereinigter Name. `null` bei allem anderen.
  * Der Aufrufer speichert die PNG-Bytes als Datei (`files.ts`), nie die Data-URL in der Datenbank.
  */
 export function parseSignatureValue(raw: string, options: { maxBytes?: number } = {}): { kind: "drawn"; png: Buffer } | { kind: "typed"; name: string } | null {
@@ -146,7 +151,9 @@ export function parseSignatureValue(raw: string, options: { maxBytes?: number } 
     const base64 = raw.slice(PNG_DATA_URL.length);
     if (base64.length > Math.ceil((maxBytes * 4) / 3) + 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) return null;
     const png = Buffer.from(base64, "base64");
-    if (png.length === 0 || png.length > maxBytes || !PNG_MAGIC.every((byte, i) => png[i] === byte)) return null;
+    if (png.length === 0 || png.length > maxBytes) return null;
+    if (!checkUpload(png, "image/png", ["image/png"]).ok) return null;
+    if (!inspectPng(png, { maxWidth: SIGNATURE_MAX_WIDTH, maxHeight: SIGNATURE_MAX_HEIGHT }).ok) return null;
     return { kind: "drawn", png };
   }
   if (raw.startsWith(TYPED_PREFIX)) {

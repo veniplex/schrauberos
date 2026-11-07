@@ -4,6 +4,7 @@ import { versionOf } from "@/lib/concurrency";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "@/generated/prisma/client";
 import { createTestEnv, type TestEnv } from "@/test/harness";
+import { makePng } from "@/test/png";
 import type { AppSession } from "@/server/auth/session";
 import type { OperationHookDef } from "@/server/operations/hooks";
 
@@ -423,7 +424,7 @@ describe("Befunde und Kundenfreigabe", () => {
 
   it("Unterschrift: gezeichnet wird als PNG-Datei abgelegt (nie in der Datenbank), getippt mit Bestätigung braucht keine Datei; Ungültiges lehnt ab", async () => {
     const { id } = await created();
-    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("fake-png-body")]).toString("base64");
+    const png = makePng(60, 20).toString("base64");
     const base = { id, amount: "50", reason: "Zusätzliche Reparatur", approverName: "Hans" };
     const drawn = await ops.approveOperation.execute(advisor, { ...base, method: "signature", signature: `data:image/png;base64,${png}` });
     assert.ok(drawn.ok);
@@ -438,12 +439,16 @@ describe("Befunde und Kundenfreigabe", () => {
     assert.ok(!missing.ok && missing.failure.fields?.signature);
     const notPng = await ops.approveOperation.execute(advisor, { ...base, method: "signature", signature: "data:image/png;base64,AAAA" });
     assert.ok(!notPng.ok);
+    // nur die Magic Bytes mit Müll dahinter ist kein PNG
+    const junk = Buffer.concat([makePng(60, 20).subarray(0, 8), Buffer.from("<script>alert(1)</script>GIF89a")]).toString("base64");
+    const fake = await ops.approveOperation.execute(advisor, { ...base, method: "signature", signature: `data:image/png;base64,${junk}` });
+    assert.ok(!fake.ok && fake.failure.fields?.signature);
     assert.equal(await env.db.orderApproval.count(), 2);
   });
 
   it("scheitert die Transaktion nach dem Ablegen der Unterschrift, wird die Datei wieder entfernt", async () => {
     const { id } = await created();
-    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("zweite")]).toString("base64");
+    const png = makePng(61, 20).toString("base64");
     hooks.setOperationHooksForTest([{ operation: "orders.approve", feature: "workshop.orders", run: () => { throw new Error("nein"); } }]);
     await assert.rejects(() => ops.approveOperation.execute(advisor, { id, amount: "10", reason: "r", approverName: "A", method: "signature", signature: `data:image/png;base64,${png}` }));
     hooks.setOperationHooksForTest(null);

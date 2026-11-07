@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { act, installDom, type MountedView, type TestDom } from "@/test/dom";
 import { byText, click, mountI18n, plain, type } from "@/test/ui";
 import { PNG_DATA_URL, parseSignatureValue, type SignatureSurface } from "@/lib/signature";
+import { makePng } from "@/test/png";
 import { takeSnapshot } from "./form-draft";
 
 /**
@@ -23,7 +24,7 @@ afterEach(async () => {
   view = null;
 });
 
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(30, 7)]);
+const PNG = makePng(30, 10);
 
 function fakeEngine() {
   const created: Array<SignatureSurface & { ops: string[] }> = [];

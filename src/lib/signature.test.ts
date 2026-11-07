@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createSignaturePad, dataUrlBytes, MAX_POINTS, parseSignatureValue, PNG_DATA_URL, serializeSignature, type Point, type SignatureSurface } from "./signature";
+import { makePng, pngChunk, PNG_SIGNATURE } from "@/test/png";
 
 /** Attrappe einer Zeichenfläche: merkt sich die Zeichenbefehle; die „PNG-Größe“ wächst mit Fläche und Zahl der Befehle (wie ein echtes PNG). */
 function fakeSurface(width: number, height: number, bytesPerPixel = 0.05): SignatureSurface & { ops: string[] } {
@@ -143,7 +144,7 @@ describe("Unterschrift: PNG mit Größengrenze", () => {
 });
 
 describe("Unterschrift: Wert im Formular (Server liest Fremdeingabe)", () => {
-  const png = (extra = 0) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(40 + extra, 1)]);
+  const png = (extra = 0) => makePng(8, 4, { extra });
 
   it("serializeSignature ↔ parseSignatureValue", () => {
     const dataUrl = PNG_DATA_URL + png().toString("base64");
@@ -164,6 +165,21 @@ describe("Unterschrift: Wert im Formular (Server liest Fremdeingabe)", () => {
     assert.ok(parseSignatureValue(PNG_DATA_URL + png(60_000).toString("base64"), { maxBytes: 100_000 }));
     assert.equal(parseSignatureValue(""), null);
     assert.equal(parseSignatureValue("irgendwas"), null);
+  });
+
+  it("Magic Bytes allein oder mit Müll dahinter sind kein PNG (Struktur, CRC, Maße, keine Anhängsel)", () => {
+    const url = (bytes: Buffer) => PNG_DATA_URL + bytes.toString("base64");
+    assert.equal(parseSignatureValue(url(PNG_SIGNATURE)), null);
+    assert.equal(parseSignatureValue(url(Buffer.concat([PNG_SIGNATURE, Buffer.alloc(40, 1)]))), null);
+    assert.equal(parseSignatureValue(url(Buffer.concat([PNG_SIGNATURE, Buffer.from("<script>alert(1)</script>GIF89a")]))), null);
+    assert.equal(parseSignatureValue(url(Buffer.concat([png(), Buffer.from("GIF89a<script>")]))), null, "Anhängsel hinter IEND");
+    assert.equal(parseSignatureValue(url(makePng(8, 4, { ihdr: { width: 30_000, height: 30_000 } }))), null, "riesige deklarierte Fläche");
+    assert.equal(parseSignatureValue(url(makePng(2401, 10))), null, "breiter als das Vierfache der Zeichenfläche");
+    assert.ok(parseSignatureValue(url(makePng(2400, 800))), "Vierfache Zeichenfläche geht");
+    const broken = Buffer.from(png());
+    broken[broken.length - 20] ^= 0xff; // CRC des IDAT-Teils
+    assert.equal(parseSignatureValue(url(broken)), null);
+    assert.ok(pngChunk("IEND").length === 12);
   });
 
   it("getippter Name: Steuerzeichen und Umkehrzeichen raus, leer oder zu lang abgelehnt", () => {
