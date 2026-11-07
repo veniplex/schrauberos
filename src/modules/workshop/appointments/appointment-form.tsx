@@ -5,10 +5,12 @@ import { Disc3 } from "lucide-react";
 import { Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Alert } from "@/components/ui/layout";
+import { SearchCombobox, type SearchOption } from "@/components/ui/search-combobox";
 import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { useI18n } from "@/i18n/client";
 import { createAppointment, deleteAppointment, updateAppointment } from "./actions";
+import { AppointmentHintList } from "./appointment-hints";
 
 export type AppointmentFormInitial = {
   id?: string;
@@ -19,6 +21,8 @@ export type AppointmentFormInitial = {
   bayId: string;
   assigneeId: string;
   vehicle: VehicleOption | null;
+  /** Kunde ohne Fahrzeug (Termin direkt für einen Kunden) */
+  customer: SearchOption | null;
   tireSet: { id: string; label: string } | null;
   date: string;
   time: string;
@@ -53,6 +57,11 @@ export function AppointmentForm({
   const [typeId, setTypeId] = useState(initial.typeId);
   const [title, setTitle] = useState(initial.title);
   const [duration, setDuration] = useState(initial.duration);
+  // Zeit, Zuständiger und Fahrzeug steuern die Hinweisliste und den Kunden
+  const [date, setDate] = useState(initial.date);
+  const [time, setTime] = useState(initial.time);
+  const [assigneeId, setAssigneeId] = useState(initial.assigneeId);
+  const [vehicle, setVehicle] = useState<VehicleOption | null>(initial.vehicle);
 
   function onTypeChange(id: string) {
     const prev = options.types.find((x) => x.id === typeId);
@@ -99,16 +108,27 @@ export function AppointmentForm({
         </div>
 
         <Field label={t("appointments.fields.vehicle")} name="vehicleId" hint={t("appointments.fields.vehicleHint")}>
-          <VehiclePicker initial={initial.vehicle} canCreate={canCreateVehicle} />
+          <VehiclePicker initial={initial.vehicle} canCreate={canCreateVehicle} onChange={setVehicle} />
         </Field>
+
+        {/* Hat das Fahrzeug einen Halter, ist er der Kunde des Termins; sonst lässt sich ein Kunde direkt wählen (auch ganz ohne Fahrzeug) */}
+        {vehicle?.customer ? (
+          <Field label={t("appointments.fields.customer")} hint={t("appointments.fields.customerOfVehicle")}>
+            <p className="text-sm">{vehicle.customer}</p>
+          </Field>
+        ) : (
+          <Field label={t("appointments.fields.customer")} name="customerId" hint={t("appointments.fields.customerHint")}>
+            <SearchCombobox endpoint="/api/customers/search" name="customerId" initial={initial.customer} placeholder={t("customers.searchPlaceholder")} />
+          </Field>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("appointments.fields.date")} htmlFor="date" name="date" required>
-            <Input id="date" name="date" type="date" defaultValue={initial.date} required />
+            <Input id="date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
           </Field>
           <Field label={t("appointments.fields.time")} htmlFor="time" name="time" required>
             {/* 5-Minuten-Schritte: bestehende Termine dürfen auch außerhalb des Kalenderrasters liegen */}
-            <Input id="time" name="time" type="time" step={300} defaultValue={initial.time} required />
+            <Input id="time" name="time" type="time" step={300} value={time} onChange={(e) => setTime(e.target.value)} required />
           </Field>
           <Field label={t("appointments.fields.duration")} htmlFor="duration" name="duration" required>
             <Input
@@ -137,7 +157,7 @@ export function AppointmentForm({
             </Select>
           </Field>
           <Field label={t("appointments.fields.assignee")} htmlFor="assigneeId">
-            <Select id="assigneeId" name="assigneeId" defaultValue={initial.assigneeId}>
+            <Select id="assigneeId" name="assigneeId" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
               <option value="">{t("common.none")}</option>
               {options.users.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -156,6 +176,8 @@ export function AppointmentForm({
             </Select>
           </Field>
         </div>
+
+        <AppointmentHintList id={initial.id} date={date} time={time} duration={duration} assigneeId={assigneeId} vehicleId={vehicle?.id ?? ""} />
 
         <Field label={t("common.notes")} htmlFor="notes" name="notes">
           <Textarea id="notes" name="notes" defaultValue={initial.notes} maxLength={2000} />

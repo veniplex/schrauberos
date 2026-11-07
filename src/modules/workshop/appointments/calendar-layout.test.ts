@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { describe, test } from "node:test";
-import { assignLanes, eventSpan, initialSlot, moveSlot } from "./calendar-layout";
+import { afterEach, describe, test } from "node:test";
+import { resetWorkshopZone, setWorkshopZone, instantOf } from "@/lib/zone";
+import { assignLanes, eventSpan, eventSpanOnDay, initialSlot, moveSlot, overlapsDay } from "./calendar-layout";
 
 type Ev = { id: string; s: number; e: number };
 const range = (x: Ev): [number, number] => [x.s, x.e];
@@ -85,5 +86,56 @@ describe("initialSlot", () => {
   });
   test("heute nicht sichtbar: erstes Zeitfenster der ersten Spalte", () => {
     assert.deepEqual(initialSlot({ days, now: new Date(2030, 5, 9, 10), startMin: 8 * 60, slotMinutes: 30, rows: 20 }), { col: 0, row: 0 });
+  });
+});
+
+describe("Termine über Mitternacht (P4b-1)", () => {
+  afterEach(() => resetWorkshopZone());
+  const berlin = (month: number, day: number, hour: number, minute = 0) => {
+    setWorkshopZone("Europe/Berlin");
+    return instantOf(2030, month, day, hour, minute, 0, 0, "Europe/Berlin");
+  };
+
+  test("ein Termin 22:00–02:00 gehört zu beiden Tagen, nicht zum übernächsten", () => {
+    const a = { startsAt: berlin(5, 5, 22), endsAt: berlin(5, 6, 2) };
+    assert.equal(overlapsDay(a, "2030-05-05"), true);
+    assert.equal(overlapsDay(a, "2030-05-06"), true);
+    assert.equal(overlapsDay(a, "2030-05-04"), false);
+    assert.equal(overlapsDay(a, "2030-05-07"), false);
+  });
+
+  test("ein Termin bis genau 00:00 Uhr gehört nicht zum Folgetag", () => {
+    const a = { startsAt: berlin(5, 5, 22), endsAt: berlin(5, 6, 0) };
+    assert.equal(overlapsDay(a, "2030-05-05"), true);
+    assert.equal(overlapsDay(a, "2030-05-06"), false);
+    assert.deepEqual(eventSpanOnDay(a.startsAt, a.endsAt, "2030-05-05", 30), [1320, 1440]);
+  });
+
+  test("Lage je Tag: am Starttag bis 24:00, am Folgetag ab 0:00 bis zum Ende; ein kurzer Rest ist mindestens einen Rasterschritt hoch", () => {
+    const start = berlin(5, 5, 22);
+    assert.deepEqual(eventSpanOnDay(start, berlin(5, 6, 2), "2030-05-05", 30), [1320, 1440]);
+    assert.deepEqual(eventSpanOnDay(start, berlin(5, 6, 2), "2030-05-06", 30), [0, 120]);
+    assert.deepEqual(eventSpanOnDay(start, berlin(5, 6, 0, 5), "2030-05-06", 30), [0, 30]);
+  });
+
+  test("über drei Tage: der mittlere Tag ist ganz belegt", () => {
+    const a = { startsAt: berlin(5, 5, 20), endsAt: berlin(5, 7, 8) };
+    assert.deepEqual(eventSpanOnDay(a.startsAt, a.endsAt, "2030-05-06", 30), [0, 1440]);
+    assert.equal(overlapsDay(a, "2030-05-06"), true);
+  });
+
+  test("Sommerzeit-Nacht: 30.3. 22:00 bis 31.3. 09:00 Ortszeit (Tag mit 23 Stunden) endet am Folgetag um 9:00 der Wanduhr", () => {
+    const start = berlin(3, 30, 22);
+    const end = berlin(3, 31, 9);
+    assert.equal((end.getTime() - start.getTime()) / 3_600_000, 10, "zehn echte Stunden, elf auf der Wanduhr");
+    assert.deepEqual(eventSpanOnDay(start, end, "2030-03-31", 30), [0, 540]);
+    assert.deepEqual(eventSpanOnDay(start, end, "2030-03-30", 30), [1320, 1440]);
+  });
+
+  test("Rückstellnacht: 26.10. 22:00 bis 27.10. 03:00 Ortszeit (Tag mit 25 Stunden)", () => {
+    const start = berlin(10, 26, 22);
+    const end = berlin(10, 27, 3);
+    assert.deepEqual(eventSpanOnDay(start, end, "2030-10-27", 30), [0, 180]);
+    assert.equal(overlapsDay({ startsAt: start, endsAt: end }, "2030-10-27"), true);
   });
 });

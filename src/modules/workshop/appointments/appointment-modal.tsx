@@ -10,7 +10,7 @@ import { toVehicleOption } from "@/modules/workshop/vehicles/public";
 import { AppointmentForm, type AppointmentFormInitial } from "./appointment-form";
 import { appointmentFormOptions } from "./queries";
 import { versionOf } from "@/lib/concurrency";
-import { customerNameSelect } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
 
 const toOption = toVehicleOption;
 
@@ -39,7 +39,7 @@ export async function AppointmentModal({
   if (params.edit) {
     const a = await db.appointment.findUnique({
       where: { id: params.edit },
-      include: { vehicle: { include: { customer: { select: customerNameSelect } } }, tireSet: { include: { vehicle: true } } },
+      include: { vehicle: { include: { customer: { select: customerNameSelect } } }, customer: { select: customerNameSelect }, tireSet: { include: { vehicle: true } } },
     });
     if (!a) notFound();
     initial = {
@@ -50,6 +50,7 @@ export async function AppointmentModal({
       bayId: a.bayId ?? "",
       assigneeId: a.assigneeId ?? "",
       vehicle: a.vehicle ? toOption(a.vehicle) : null,
+      customer: a.customer ? { id: a.customer.id, label: customerDisplayName(a.customer) } : null,
       tireSet: a.tireSet
         ? { id: a.tireSet.id, label: `${a.tireSet.vehicle.plate} · ${[a.tireSet.brand, formatTireSize(a.tireSet)].filter(Boolean).join(" ")}` }
         : null,
@@ -77,6 +78,7 @@ export async function AppointmentModal({
       bayId: params.bay ?? "",
       assigneeId: "",
       vehicle: vehicle ? toOption(vehicle) : null,
+      customer: null,
       tireSet: tireSet
         ? { id: tireSet.id, label: `${tireSet.vehicle.plate} · ${[tireSet.brand, formatTireSize(tireSet)].filter(Boolean).join(" ")}` }
         : null,

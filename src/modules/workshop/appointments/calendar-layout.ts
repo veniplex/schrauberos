@@ -1,4 +1,4 @@
-import { isSameDay, minutesOfDay } from "@/lib/zone";
+import { addDaysToKey, dayKey, isSameDay, minutesOfDay, startOfDay } from "@/lib/zone";
 
 export type Positioned<T> = { item: T; lane: number; lanes: number };
 
@@ -47,10 +47,26 @@ export { minutesOfDay };
  * Termine hintereinander überdecken sich nie. Endet ein Termin erst am Folgetag, reicht er bis Mitternacht.
  */
 export function eventSpan(startsAt: Date, endsAt: Date, minDuration: number): [start: number, end: number] {
-  const start = minutesOfDay(startsAt);
-  const sameDay = isSameDay(startsAt, endsAt);
-  const end = sameDay ? minutesOfDay(endsAt) : 24 * 60;
-  return [start, Math.max(end, start + Math.max(minDuration, 15))];
+  return eventSpanOnDay(startsAt, endsAt, startsAt, minDuration);
+}
+
+/** Überlappt der Termin diesen Kalendertag (Zone der Werkstatt)? Auch ein Termin, der gestern begonnen hat und heute endet, gehört zum Tag. */
+export function overlapsDay(a: { startsAt: Date; endsAt: Date }, day: Date | string): boolean {
+  const key = typeof day === "string" ? day : dayKey(day);
+  return a.startsAt < startOfDay(addDaysToKey(key, 1)) && a.endsAt > startOfDay(key);
+}
+
+/**
+ * Wie `eventSpan`, aber für einen bestimmten Tag: Ein Termin über Mitternacht reicht am Starttag bis 24:00 und beginnt am Folgetag bei 0:00 (Minuten der Wanduhr; am Tag der
+ * Zeitumstellung ist der Tag in Stunden 23 oder 25 lang, das Raster rechnet aber mit der Wanduhr). Auch ein kurzer Rest am Folgetag ist mindestens einen Rasterschritt hoch.
+ */
+export function eventSpanOnDay(startsAt: Date, endsAt: Date, day: Date | string, minDuration: number): [start: number, end: number] {
+  const key = typeof day === "string" ? day : dayKey(day);
+  const dayStart = startOfDay(key);
+  const nextStart = startOfDay(addDaysToKey(key, 1));
+  const start = startsAt <= dayStart ? 0 : minutesOfDay(startsAt);
+  const end = endsAt >= nextStart ? 24 * 60 : minutesOfDay(endsAt);
+  return [start, Math.min(24 * 60, Math.max(end, start + Math.max(minDuration, 15)))];
 }
 
 /** Anteil der Terminfarbe an der Fläche eines Blocks (Rest: die Kartenfläche). Je mehr, desto kräftiger – aber nur so viel, dass auch gedämpfter Text (`ink-muted`) bei jeder gewählten Farbe lesbar bleibt (Test `calendar-contrast.test.ts`). */

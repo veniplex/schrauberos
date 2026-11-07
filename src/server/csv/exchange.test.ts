@@ -25,6 +25,7 @@ beforeEach(async () => {
   await env.db.tire.deleteMany();
   await env.db.tireSet.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
+  await env.db.vehicleOwnership.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.invoice.deleteMany();
   await env.db.customer.deleteMany();
@@ -558,6 +559,7 @@ describe("Import: Fahrzeuge", () => {
     const out = await text(await exportCall("vehicles"));
     const select = { plate: true, make: true, vin: true, year: true, mileageKm: true, fuel: true, hsn: true, tsn: true, firstRegistration: true, inspectionDue: true, extraInspectionKind: true, extraInspectionDue: true, notes: true, customerId: true } as const;
     const before = await env.db.vehicle.findMany({ select });
+    await env.db.vehicleOwnership.deleteMany();
     await env.db.vehicleOwnership.deleteMany();
     await env.db.vehicle.deleteMany();
     assert.equal((await apply("vehicles", out)).status, 200);

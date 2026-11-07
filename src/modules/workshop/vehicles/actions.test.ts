@@ -13,6 +13,7 @@ before(async () => {
 after(() => env.cleanup());
 
 beforeEach(async () => {
+  await env.db.vehicleOwnership.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.customer.deleteMany();
   await env.db.auditLog.deleteMany();

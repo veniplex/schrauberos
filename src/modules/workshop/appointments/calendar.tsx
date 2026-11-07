@@ -11,9 +11,9 @@ import { isHexColor } from "@/lib/color";
 import { toDateInput } from "@/lib/dates";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { weekdayKey, type OpeningHours } from "@/lib/opening-hours";
-import { addDays, getDate, getHours, getISOWeek, getMinutes, instantOf, isSameDay, minutesOfDay, startOfDay, startOfWeek, wallOf } from "@/lib/zone";
+import { addDays, dayKey, getDate, getISOWeek, instantOf, isSameDay, minutesOfDay, startOfDay, startOfWeek, wallOf } from "@/lib/zone";
 import type { AppointmentRow } from "./queries";
-import { assignLanes, eventSpan, eventSurface, initialSlot } from "./calendar-layout";
+import { assignLanes, eventSpanOnDay, eventSurface, initialSlot, overlapsDay } from "./calendar-layout";
 import { quickStatusOptions } from "./domain";
 import { AppointmentQuickStatus } from "./appointment-quick-status";
 import { SlotGrid } from "./slot-grid";
@@ -71,7 +71,11 @@ function eventColor(a: AppointmentRow) {
   return a.type && isHexColor(a.type.color) ? a.type.color : "var(--accent)";
 }
 const customerOf = (a: AppointmentRow) => (a.vehicle ? customerDisplayName(a.vehicle.customer) : a.customer ? customerDisplayName(a.customer) : "");
-const timeRange = (i18n: Translator, a: AppointmentRow) => `${i18n.date(a.startsAt, { timeStyle: "short" })}–${i18n.date(a.endsAt, { timeStyle: "short" })}`;
+/** „08:00–09:30“; endet der Termin erst am Folgetag (nach Mitternacht), steht das dabei – ein Ende genau um 00:00 Uhr zählt noch zum Starttag. */
+const timeRange = (i18n: Translator, a: AppointmentRow) => {
+  const range = `${i18n.date(a.startsAt, { timeStyle: "short" })}–${i18n.date(a.endsAt, { timeStyle: "short" })}`;
+  return dayKey(new Date(a.endsAt.getTime() - 1)) === dayKey(a.startsAt) ? range : `${range} ${i18n.t("appointments.nextDay")}`;
+};
 const inactiveStatus = (a: AppointmentRow) => a.status === "cancelled" || a.status === "no_show";
 
 /* ───────────── Toolbar ───────────── */
@@ -189,12 +193,16 @@ type Column = {
   closed: boolean;
 };
 
-function visibleHours(ctx: Ctx, events: AppointmentRow[]) {
+/** Sichtbare Stunden: die des Kalenders, erweitert um das, was die Termine an ihrem jeweiligen Tag belegen (Termine über Mitternacht: am Starttag bis 24:00, am Folgetag ab 0:00). */
+function visibleHours(ctx: Ctx, columns: Column[]) {
   let start = ctx.dayStartHour;
   let end = ctx.dayEndHour;
-  for (const a of events) {
-    start = Math.min(start, getHours(a.startsAt));
-    end = Math.max(end, getHours(a.endsAt) + (getMinutes(a.endsAt) > 0 ? 1 : 0));
+  for (const column of columns) {
+    for (const a of column.events) {
+      const [s, e] = eventSpanOnDay(a.startsAt, a.endsAt, column.day, ctx.slotMinutes);
+      start = Math.min(start, Math.floor(s / 60));
+      end = Math.max(end, Math.ceil(e / 60));
+    }
   }
   return { startHour: Math.max(0, start), endHour: Math.min(24, Math.max(end, start + 1)) };
 }
@@ -220,7 +228,7 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
   const totalMin = endMin - startMin;
   const slots = Math.floor(totalMin / ctx.slotMinutes);
   const positioned = assignLanes(column.events, (a) => {
-    const [s, e] = eventSpan(a.startsAt, a.endsAt, ctx.slotMinutes);
+    const [s, e] = eventSpanOnDay(a.startsAt, a.endsAt, column.day, ctx.slotMinutes);
     return [Math.max(s, startMin), e];
   });
   const nowMin = minutesOfDay(ctx.now);
@@ -239,7 +247,7 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
       }}
     >
       {positioned.map(({ item: a, lane, lanes }) => {
-        const [s, e] = eventSpan(a.startsAt, a.endsAt, ctx.slotMinutes);
+        const [s, e] = eventSpanOnDay(a.startsAt, a.endsAt, column.day, ctx.slotMinutes);
         const spanStart = Math.max(s, startMin);
         return <AppointmentBlock key={a.id} a={a} ctx={ctx} startMin={startMin} spanStart={spanStart} spanEnd={Math.min(e, endMin)} lane={lane} lanes={lanes} />;
       })}
@@ -277,7 +285,7 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
 }
 
 function TimeGrid({ ctx, columns }: { ctx: Ctx; columns: Column[] }) {
-  const { startHour, endHour } = visibleHours(ctx, columns.flatMap((c) => c.events));
+  const { startHour, endHour } = visibleHours(ctx, columns);
   const rows = Math.floor(((endHour - startHour) * 60) / ctx.slotMinutes);
   const initial = initialSlot({ days: columns.map((c) => c.day), now: ctx.now, startMin: startHour * 60, slotMinutes: ctx.slotMinutes, rows });
   const scrollable = columns.length > MAX_FIT_COLUMNS;
@@ -408,9 +416,9 @@ function MobileAgenda({ ctx, events, view }: { ctx: Ctx; events: AppointmentRow[
   const { t, tp, date } = ctx.i18n;
   const monday = startOfWeek(ctx.date, { weekStartsOn: 1 });
   const week = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
-  const dayEvents = events.filter((a) => isSameDay(a.startsAt, ctx.date));
+  const dayEvents = events.filter((a) => overlapsDay(a, ctx.date));
   // Die Anzahl je Tag kennt nur die Wochenansicht (sie lädt die ganze Woche)
-  const counts = view === "week" ? week.map((d) => events.filter((a) => isSameDay(a.startsAt, d) && !inactiveStatus(a)).length) : undefined;
+  const counts = view === "week" ? week.map((d) => events.filter((a) => overlapsDay(a, d) && !inactiveStatus(a)).length) : undefined;
 
   return (
     <div>
@@ -440,14 +448,14 @@ function MobileAgenda({ ctx, events, view }: { ctx: Ctx; events: AppointmentRow[
 
 export function WeekView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }) {
   const monday = startOfWeek(ctx.date, { weekStartsOn: 1 });
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i)).filter((d) => ctx.hours[weekdayKey(d)] !== null || events.some((a) => isSameDay(a.startsAt, d)));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i)).filter((d) => ctx.hours[weekdayKey(d)] !== null || events.some((a) => overlapsDay(a, d)));
   const columns: Column[] = days.map((d) => {
     const today = isSameDay(d, ctx.now);
     return {
       key: d.toISOString(),
       day: d,
       label: ctx.i18n.date(d, { weekday: "long", day: "numeric", month: "long" }),
-      events: events.filter((a) => isSameDay(a.startsAt, d)),
+      events: events.filter((a) => overlapsDay(a, d)),
       closed: ctx.hours[weekdayKey(d)] === null,
       head: (
         <Link href={calendarHref("day", d)} className="block min-h-(--tap-row) px-2 py-2 text-center hover:bg-surface-hover">

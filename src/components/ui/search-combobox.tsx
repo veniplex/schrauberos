@@ -36,6 +36,7 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
   createHref,
   createLabel,
   createParam = "q",
+  onChange,
 }: {
   endpoint: string;
   name: string;
@@ -49,6 +50,8 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
   createHref?: string;
   createLabel?: string;
   createParam?: string;
+  /** Die Auswahl hat sich geändert (gewählt, entfernt, aus einem Entwurf wiederhergestellt) – für Formulare, die auf die Auswahl reagieren */
+  onChange?: (option: T | null) => void;
 }) {
   const { t, tp } = useI18n();
   const field = useField();
@@ -62,6 +65,10 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
   const abort = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const refocus = useRef(false);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
 
   useEffect(() => {
     const q = query.trim();
@@ -115,6 +122,7 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
         /* unlesbar: keine Auswahl */
       }
       setSelected(option);
+      onChangeRef.current?.(option);
       setQuery("");
       setResults([]);
       setStatus("idle");
@@ -127,6 +135,7 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
 
   function choose(option: T) {
     setSelected(option);
+    onChange?.(option);
     setQuery("");
     setResults([]);
     setStatus("idle");
@@ -153,6 +162,7 @@ export function SearchCombobox<T extends SearchOption = SearchOption>({
           onClick={() => {
             refocus.current = true;
             setSelected(null);
+            onChange?.(null);
           }}
         >
           <X className="size-4" aria-hidden />

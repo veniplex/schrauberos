@@ -23,6 +23,8 @@ const body = z.strictObject({
   title: z.string().trim().min(1).max(120),
   typeId: ref,
   vehicleId: ref,
+  /** Kunde direkt (auch ohne Fahrzeug); mit einem Fahrzeug gilt dessen Halter (ein anderer Kunde ist ein Fehler, 422 am Feld `customerId`) */
+  customerId: ref,
   bayId: ref,
   assigneeId: ref,
   tireSetId: ref,
@@ -131,6 +133,8 @@ export const appointmentEndpoints = defineResource({
       title: a.title,
       typeId: a.typeId,
       vehicleId: a.vehicleId,
+      // mit Fahrzeug gilt dessen Halter (wechselt das Fahrzeug, wechselt der Kunde mit)
+      customerId: a.vehicleId ? null : a.customerId,
       bayId: a.bayId,
       assigneeId: a.assigneeId,
       tireSetId: a.tireSetId,

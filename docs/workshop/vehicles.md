@@ -35,7 +35,7 @@ Fahrzeuge sind eigenständig und brauchen **keinen** Kunden. Erfasst werden Kenn
   **Erstzulassung** und **HSN/TSN** (4 und 3 Zeichen, Felder 2.1 und 2.2 der Zulassungsbescheinigung).
 * **Halter:** Auf der Fahrzeugseite steht der Name des Halters; seine **Telefonnummer** sehen nur Personen, die Kunden sehen dürfen (dasselbe gilt auf der Seite eines Reifensatzes).
 * **Halterwechsel:** Über „Halterwechsel“ (Datum, optional Notiz) wechselt der Halter. Die **Historie** bleibt sichtbar; Reifensätze
-  und Termine bleiben am Fahrzeug.
+  und Termine bleiben am Fahrzeug. **Offene Termine** des Fahrzeugs, die noch nicht vorbei sind (Geplant, Bestätigt, In Arbeit), bekommen ab dem Wechseltag den **neuen Halter**; erledigte, stornierte und vergangene Termine behalten den damaligen Kunden. Das Audit-Log nennt, wie viele Termine umgestellt wurden.
 
 ## Export und Import (CSV)
 

@@ -197,6 +197,15 @@ export async function absenceHintsFor(viewer: Viewer, planned: PlannedAbsence & 
   return absenceHints(planned, rows.map((r) => ({ type: r.type, startDate: r.startDate, endDate: r.endDate })));
 }
 
+/**
+ * Ist die Person (Benutzerkonto) an einem der Kalendertage `from`…`to` (`JJJJ-MM-TT`, einschließlich) abwesend? Für die Hinweise im Terminformular: Die Abfrage liest **nur die Zeiträume**,
+ * nie die Art oder die Anmerkung – Krankheit bleibt auch hier unsichtbar („abwesend“ ist alles, was andere Funktionen erfahren). Ohne Mitarbeiter-Eintrag zum Konto: nein.
+ */
+export async function userAbsentBetween(userId: string, from: string, to: string): Promise<boolean> {
+  const count = await db.absence.count({ where: { employee: { userId }, startDate: { lte: endOfDayIn(to) }, endDate: { gte: startOfDayIn(from) } } });
+  return count > 0;
+}
+
 /* ───────────── Qualifikationen ───────────── */
 
 /** Bald ablaufende oder abgelaufene Qualifikationen aktiver Mitarbeiter (Baustein), ohne Anmerkung. */

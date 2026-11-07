@@ -12,6 +12,8 @@ const appointmentInput = z.object({
   title: z.string().trim().min(1).max(120),
   typeId: z.string().optional(),
   vehicleId: z.string().optional(),
+  /** Kunde direkt (auch ohne Fahrzeug). Mit einem Fahrzeug, das einen Halter hat, gilt der Halter; ein anderer Kunde wäre ein Widerspruch. */
+  customerId: z.string().optional(),
   bayId: z.string().optional(),
   assigneeId: z.string().optional(),
   tireSetId: z.string().optional(),
@@ -31,13 +33,24 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
   if (!window) failField("date", "validation.invalid");
   const { startsAt, endsAt } = window;
 
-  const vehicle = d.vehicleId ? await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true } }) : null;
+  const vehicle = d.vehicleId ? await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true, archivedAt: true } }) : null;
   if (d.vehicleId && !vehicle) failField("vehicleId", "validation.invalid");
 
-  // Alle Verweise müssen existieren (statt eines Datenbankfehlers); Terminart, Arbeitsplatz und Mitarbeiter müssen aktiv sein –
+  // Alle Verweise müssen existieren (statt eines Datenbankfehlers); Terminart, Arbeitsplatz, Mitarbeiter, Fahrzeug und Kunde müssen aktiv (nicht archiviert) sein –
   // es sei denn, der bestehende Termin hat sie schon (dann bleibt der Wert unverändert möglich).
-  const current = d.id ? await tx.appointment.findUnique({ where: { id: d.id }, select: { typeId: true, bayId: true, assigneeId: true } }) : null;
+  const current = d.id ? await tx.appointment.findUnique({ where: { id: d.id }, select: { typeId: true, bayId: true, assigneeId: true, vehicleId: true, customerId: true } }) : null;
   if (d.id && !current) fail("notFound");
+  if (vehicle?.archivedAt && vehicle.id !== current?.vehicleId) failField("vehicleId", "validation.invalid");
+
+  // Kunde: Hat das Fahrzeug einen Halter, ist der Termin dessen Kunde (ein anderer wäre ein Widerspruch). Sonst gilt der gewählte Kunde – auch ohne Fahrzeug.
+  let customerId: string | null = vehicle?.customerId ?? null;
+  if (vehicle?.customerId) {
+    if (d.customerId && d.customerId !== vehicle.customerId) failField("customerId", "appointments.errors.customerMismatch");
+  } else if (d.customerId) {
+    const customer = await tx.customer.findFirst({ where: { id: d.customerId, OR: [{ archivedAt: null }, { id: current?.customerId ?? "" }] }, select: { id: true } });
+    if (!customer) failField("customerId", "validation.invalid");
+    customerId = customer.id;
+  }
   if (d.typeId && d.typeId !== current?.typeId && !(await tx.appointmentType.findFirst({ where: { id: d.typeId, active: true }, select: { id: true } }))) failField("typeId", "validation.invalid");
   if (d.bayId && d.bayId !== current?.bayId && !(await tx.bay.findFirst({ where: { id: d.bayId, active: true }, select: { id: true } }))) failField("bayId", "validation.invalid");
   if (d.assigneeId && d.assigneeId !== current?.assigneeId && !(await tx.user.findFirst({ where: { id: d.assigneeId, active: true }, select: { id: true } }))) failField("assigneeId", "validation.invalid");
@@ -70,7 +83,7 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
     bayId: d.bayId ?? null,
     assigneeId: d.assigneeId ?? null,
     vehicleId: vehicle?.id ?? null,
-    customerId: vehicle?.customerId ?? null,
+    customerId,
     tireSetId: d.tireSetId ?? null,
   };
   let id: string;

@@ -289,6 +289,9 @@ export type HolidayCalendar = {
   readonly config: HolidayConfig;
 };
 
+/** Was die Berechnungen von Feiertagen brauchen: nur das Nachschlagen eines Tages (Arbeitstage, Hinweise); ohne Angabe sind Feiertage Arbeitstage. */
+export type HolidayLookup = Pick<HolidayCalendar, "on">;
+
 export function createHolidayCalendar(config: HolidayConfig): HolidayCalendar {
   const years = new Map<number, Map<string, Holiday>>();
   const year = (y: number) => {

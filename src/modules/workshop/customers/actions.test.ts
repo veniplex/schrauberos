@@ -21,6 +21,7 @@ const lastFlash = () => {
 
 beforeEach(async () => {
   await env.db.invoice.deleteMany();
+  await env.db.vehicleOwnership.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.customer.deleteMany();
   await env.db.auditLog.deleteMany();

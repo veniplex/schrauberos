@@ -1,8 +1,5 @@
-import type { HolidayCalendar } from "@/lib/holidays";
+import type { HolidayLookup } from "@/lib/holidays";
 import { addDaysToKey, dayKey, daysBetweenKeys, weekdayOfKey, workshopZone } from "@/lib/zone";
-
-/** Was die Arbeitstage-Rechnung vom Feiertagskalender braucht (`getHolidays()` aus `@/server/holidays`); ohne Angabe sind Feiertage Arbeitstage. */
-export type HolidayLookup = Pick<HolidayCalendar, "on">;
 
 export const DEPARTMENTS = ["workshop", "office", "it", "management", "other"] as const;
 export type Department = (typeof DEPARTMENTS)[number];

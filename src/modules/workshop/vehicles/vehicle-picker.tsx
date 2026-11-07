@@ -17,12 +17,15 @@ export function VehiclePicker({
   invalid,
   required,
   canCreate,
+  onChange,
 }: {
   name?: string;
   initial?: VehicleOption | null;
   invalid?: boolean;
   required?: boolean;
   canCreate?: boolean;
+  /** Die Auswahl hat sich geändert (für Formulare, die darauf reagieren) */
+  onChange?: (option: VehicleOption | null) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -30,6 +33,7 @@ export function VehiclePicker({
       endpoint="/api/vehicles/search"
       name={name}
       initial={initial}
+      onChange={onChange}
       placeholder={t("vehicles.searchPlaceholder")}
       invalid={invalid}
       required={required}

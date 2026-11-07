@@ -3,9 +3,9 @@ GET /appointment-bays/{id} appointment-bays.get appointments.view
 GET /appointment-types appointment-types.list appointments.view sort=sortOrder,name
 GET /appointment-types/{id} appointment-types.get appointments.view
 GET /appointments appointments.list appointments.view query=from,to,status,bayId,vehicleId,customerId,assigneeId sort=startsAt,title,createdAt,updatedAt
-POST /appointments appointments.create appointments.create body=title,typeId,vehicleId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
+POST /appointments appointments.create appointments.create body=title,typeId,vehicleId,customerId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
 GET /appointments/{id} appointments.get appointments.view
-PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId,vehicleId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
+PATCH /appointments/{id} appointments.update appointments.edit body=title,typeId,vehicleId,customerId,bayId,assigneeId,tireSetId,date,time,durationMinutes,status,notes
 DELETE /appointments/{id} appointments.delete appointments.delete
 POST /appointments/{id}/status appointments.status appointments.edit body=status
 GET /customers customers.list customers.view query=q,city sort=lastName,customerNumber,city,createdAt,updatedAt

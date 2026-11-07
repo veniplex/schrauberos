@@ -37,6 +37,7 @@ type Parts = { WeekView: ComponentType<Record<string, unknown>>; DayView: Compon
 let bayId: string;
 beforeEach(async () => {
   await env.db.appointment.deleteMany();
+  await env.db.vehicleOwnership.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.bay.deleteMany();
   await env.db.appointmentType.deleteMany();

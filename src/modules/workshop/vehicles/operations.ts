@@ -1,4 +1,6 @@
 import { noon } from "@/lib/dates";
+import { startOfDay } from "@/lib/zone";
+import { followVehicleOwner } from "@/modules/workshop/appointments/public";
 import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
@@ -134,7 +136,7 @@ export const transferVehicleOperation = defineOperation({
   permission: "vehicles.edit",
   input: transferInput,
   audit: "vehicle.transfer",
-  run: async ({ input: d, tx, audit }) => {
+  run: async ({ input: d, principal, tx, audit }) => {
     const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId } });
     if (!vehicle) fail("notFound");
     const newId = d.newCustomerId ?? null;
@@ -145,8 +147,12 @@ export const transferVehicleOperation = defineOperation({
     await tx.vehicleOwnership.updateMany({ where: { vehicleId: vehicle.id, toDate: null }, data: { toDate: when } });
     if (newId) await tx.vehicleOwnership.create({ data: { vehicleId: vehicle.id, customerId: newId, fromDate: when, note: d.note ?? null } });
     await tx.vehicle.update({ where: { id: vehicle.id }, data: { customerId: newId } });
-    audit({ target: vehicle.plate, entityId: vehicle.id });
-    return { id: vehicle.id };
+    // Offene Termine des Fahrzeugs (noch nicht vorbei, ab dem Wechseltag) ziehen mit: weiche Abhängigkeit, nur bei aktiver Terminfunktion – in derselben Transaktion
+    const now = new Date();
+    const changeDay = startOfDay(d.date);
+    const followed = principal.features.has("workshop.appointments") ? await followVehicleOwner(tx, vehicle.id, newId, changeDay > now ? changeDay : now) : 0;
+    audit({ target: followed > 0 ? `${vehicle.plate} (${followed} Termine auf den neuen Halter umgestellt)` : vehicle.plate, entityId: vehicle.id });
+    return { id: vehicle.id, appointments: followed };
   },
 });
 

@@ -51,7 +51,8 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
   const to = addDays(from, view === "week" ? 7 : view === "day" ? 1 : 14);
 
   const [events, bays] = await Promise.all([
-    appointmentsBetween(from, to),
+    // Raster (Woche, Tag): auch Termine, die vor dem Zeitraum begonnen haben und über Mitternacht hineinreichen; die Liste zeigt jeden Termin an seinem Starttag
+    appointmentsBetween(from, to, { overlapping: view !== "list" }),
     db.bay.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
   ]);
 

@@ -87,6 +87,7 @@ describe("Verhalten", () => {
     await env.db.docPage.deleteMany();
     await env.db.docCategory.deleteMany();
     await env.db.invoice.deleteMany();
+    await env.db.vehicleOwnership.deleteMany();
     await env.db.vehicle.deleteMany();
     await env.db.customer.deleteMany();
     await env.db.featureSetting.deleteMany();

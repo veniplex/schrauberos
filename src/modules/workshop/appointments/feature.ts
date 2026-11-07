@@ -16,6 +16,6 @@ export const appointmentsFeature = defineFeature({
     // Ansicht statt Anlegen: erscheint nur als Schnellaktion der Übersicht (füllt bei Rollen ohne Anlegen-Rechte auf), nicht im „Neu“-Menü
     { id: "appointments.today", kind: "open", labelKey: "appointments.quick.today", href: "/appointments?view=day", icon: "calendar", permission: "appointments.view", order: 200 },
   ],
-  routes: ["appointments"],
+  routes: ["appointments", "api/appointments"],
   auditActions: ["appointment.create", "appointment.update", "appointment.status", "appointment.delete", "settings.appointments"],
 });
