@@ -15,7 +15,7 @@ ihre eigenen Einstellungen mit.
   ältere Einträge werden täglich gelöscht, Standard 730 Tage, mindestens 30; `0` = unbegrenzt (siehe Hilfe „Audit-Log“).
 * **Backups:** Zeitplan der automatischen Backups und die Aufbewahrung je Art von Backup (siehe Hilfe „Backups“).
 * **Updates:** Zugang für die Update-Prüfung (siehe Hilfe „Updates“).
-* **Termine** und **Reifenlager:** Kalender-Raster, Arbeitsplätze, Terminarten bzw. Ampel-Grenzwerte – beschrieben in der Hilfe
+* **Termine** und **Reifenlager:** Kalender-Raster, Arbeitsplätze, Terminarten bzw. Ampel-Grenzwerte und Winterfenster – beschrieben in der Hilfe
   der jeweiligen Funktion im Bereich Werkstatt. Den Reiter **Termine** sieht, wer das Recht „Arbeitsplätze, Terminarten und Kalender
   einrichten“ hat (auch ohne „Einstellungen verwalten“); er ist außerdem über die Schaltfläche im Terminkalender erreichbar.
 * Das Recht „Werkstatt-Einstellungen verwalten“ gehört zu den Rechten der Verwaltung und wird nur von Administratoren vergeben.
