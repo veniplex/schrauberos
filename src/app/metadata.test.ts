@@ -66,6 +66,15 @@ const cases: Case[] = [
     load: () => import("@/app/(app)/(it)/network/devices/[id]/page") as never,
   },
   {
+    name: "Dokumentationsseite (IT)",
+    permission: "docsIt.view",
+    seed: async (env) => {
+      await env.db.docPage.create({ data: { area: "it", slug: "geheim-seite", title: SECRET, content: "x" } });
+      return { area: "it", slug: "geheim-seite" };
+    },
+    load: () => import("@/app/(app)/docs/[area]/[slug]/page") as never,
+  },
+  {
     name: "Subnetz",
     permission: "network.view",
     seed: async (env) => ({ subnetId: (await env.db.netSubnet.create({ data: { name: SECRET, cidr: "10.9.8.0/24" } })).id }),

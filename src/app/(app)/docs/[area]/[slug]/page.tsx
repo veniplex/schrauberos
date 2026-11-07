@@ -8,16 +8,18 @@ import { getI18n } from "@/i18n/server";
 import { markdownHeadings } from "@/lib/slug";
 import { db } from "@/server/db";
 import { requireDocArea, visiblePages } from "@/capabilities/docs/access";
-import { isDocArea } from "@/capabilities/docs/areas";
-import { getSession } from "@/server/auth/session";
+import { DOC_PERMISSIONS, isDocArea } from "@/capabilities/docs/areas";
+import { sessionIfAllowed } from "@/server/auth/session";
 import { togglePin } from "@/capabilities/docs/actions";
 import { Markdown } from "@/components/ui/markdown";
 import { PageToc } from "@/components/ui/toc";
 
 export async function generateMetadata({ params }: { params: Promise<{ area: string; slug: string }> }): Promise<Metadata> {
   const { area, slug } = await params;
-  const session = await getSession();
-  if (!session || !isDocArea(area)) return {};
+  // Der Titel einer Seite steht sonst schon im ersten gestreamten HTML, bevor die Seite selbst ihr Recht prüft: nur mit dem Leserecht des Bereichs (ZP5-13)
+  if (!isDocArea(area)) return {};
+  const session = await sessionIfAllowed(DOC_PERMISSIONS[area].view);
+  if (!session) return {};
   const page = await db.docPage.findFirst({ where: { area, slug, ...visiblePages(session, area) }, select: { title: true } });
   return { title: page?.title };
 }
