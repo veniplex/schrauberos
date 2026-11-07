@@ -5,6 +5,7 @@ export const vehiclesDe = {
   },
   title: "Fahrzeuge",
   description: "Alle Fahrzeuge – unabhängig vom Kunden. Der Halter kann wechseln, Reifen und Termine bleiben am Fahrzeug.",
+  createNew: "Fahrzeug neu anlegen",
   searchPlaceholder: "Kennzeichen, Kunde oder Modell suchen …",
   searchList: "Kennzeichen, FIN, Modell oder Halter …",
   new: "Fahrzeug anlegen",

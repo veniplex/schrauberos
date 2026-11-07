@@ -37,11 +37,10 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({
-    results: vehicles.map((v) => ({
-      id: v.id,
-      plate: v.plate,
-      description: [v.make, v.model].filter(Boolean).join(" "),
-      customer: customerDisplayName(v.customer),
-    })),
+    results: vehicles.map((v) => {
+      const description = [v.make, v.model].filter(Boolean).join(" ");
+      const owner = v.customer ? customerDisplayName(v.customer) : "";
+      return { id: v.id, label: v.plate, sublabel: [description, owner].filter(Boolean).join(" · "), plate: v.plate, description, customer: customerDisplayName(v.customer) };
+    }),
   });
 }

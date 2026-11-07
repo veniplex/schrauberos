@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
+import { getSession } from "@/server/auth/session";
 import { getAppointmentSettings } from "./settings";
 import { toDateInput, toTimeInput } from "@/lib/dates";
 import { formatTireSize } from "@/modules/workshop/tires/public";
@@ -23,7 +24,14 @@ export async function AppointmentModal({
   closeHref: string;
   canDelete: boolean;
 }) {
-  const [{ t }, settings, options] = await Promise.all([getI18n(), getAppointmentSettings(), appointmentFormOptions()]);
+  const session = await getSession();
+  const assigneeId = params.edit ? ((await db.appointment.findUnique({ where: { id: params.edit }, select: { assigneeId: true } }))?.assigneeId ?? null) : null;
+  const [{ t }, settings, options] = await Promise.all([
+    getI18n(),
+    getAppointmentSettings(),
+    // „Zuständig“: Mitarbeiter statt aller Benutzerkonten, wenn die Funktion Mitarbeiter aktiv ist (weiche Abhängigkeit)
+    appointmentFormOptions({ employees: session?.features.has("office.employees") ?? false, assigneeId }),
+  ]);
 
   let initial: AppointmentFormInitial;
 
@@ -91,6 +99,7 @@ export async function AppointmentModal({
         returnTo={closeHref}
         closeHref={closeHref}
         canDelete={canDelete}
+        canCreateVehicle={session?.can("vehicles.edit") ?? false}
       />
     </UrlModal>
   );

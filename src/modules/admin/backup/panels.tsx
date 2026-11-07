@@ -1,52 +1,52 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
-import { Button, ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
+import { Button, SubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Alert } from "@/components/ui/layout";
-import type { ActionState } from "@/components/ui/form";
 import { createManualBackup, restoreBackup, runAutoBackupNow } from "./actions";
-import { FieldError, FileInput } from "@/components/ui/form";
+import { FileInput, Form, FormMessage } from "@/components/ui/form";
+import { useI18n } from "@/i18n/client";
 
 export function CreateBackupForm({ label }: { label: string }) {
-  const [state, action] = useActionState<ActionState, FormData>(createManualBackup, {});
   return (
-    <form action={action} className="flex flex-col gap-3">
-      {state.error ? <Alert tone="danger">{state.error}</Alert> : state.ok ? <Alert tone="success">{state.message}</Alert> : null}
+    <Form action={createManualBackup} className="flex flex-col gap-3">
+      <FormMessage />
       <div>
         <SubmitButton>{label}</SubmitButton>
       </div>
-    </form>
+    </Form>
   );
 }
 
 /** „Jetzt erneut versuchen“ in der Fehlermeldung des automatischen Backups. */
 export function RetryAutoBackupForm({ label }: { label: string }) {
-  const [state, action] = useActionState<ActionState, FormData>(runAutoBackupNow, {});
   return (
-    <form action={action} className="mt-3 flex flex-col gap-2">
-      {state.error ? <FieldError>{state.error}</FieldError> : null}
+    <Form action={runAutoBackupNow} className="mt-3 flex flex-col gap-2">
+      <FormMessage />
       <div>
         <SubmitButton variant="secondary" size="sm">
           {label}
         </SubmitButton>
       </div>
-    </form>
+    </Form>
   );
 }
 
 /** Wiederherstellen-Knopf einer Zeile (mit Rückfrage). */
 export function RestoreForm({ name, label, confirm }: { name: string; label: string; confirm: string }) {
-  const [state, action] = useActionState<ActionState, FormData>(restoreBackup, {});
+  const { t } = useI18n();
   return (
-    <form action={action}>
+    <Form action={restoreBackup}>
       <input type="hidden" name="name" value={name} />
-      <ConfirmSubmitButton message={confirm} variant="secondary" size="sm">
+      {/* Folgenreichste Aktion der Verwaltung: das Wort muss eingetippt werden */}
+      <ConfirmSubmitButton message={confirm} variant="secondary" size="sm" typeToConfirm={t("backup.list.restoreWord")}>
         {label}
       </ConfirmSubmitButton>
-      {state.error ? <FieldError className="mt-1">{state.error}</FieldError> : null}
-    </form>
+      <FormMessage />
+    </Form>
   );
 }
 

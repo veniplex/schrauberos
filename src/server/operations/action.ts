@@ -36,6 +36,11 @@ export type ActionOptions<I, R> = {
   revalidate?: Of<ReadonlyArray<string | readonly [string, "layout" | "page"]>, I, R>;
   /** Nach Erfolg weiterleiten (eine Funktion darf `undefined` liefern: dann bleibt es bei der Seite) */
   redirect?: Of<string | undefined, I, R>;
+  /**
+   * Weiterleitung bei der zweiten Absende-Aktion („Speichern und weiter“, Formularfeld `_next=1` von `FormActions`): hat Vorrang vor `redirect`. Liefert die Funktion
+   * `undefined`, gilt `redirect`. Das Feld `_next` kommt nie in die Eingabe der Operation.
+   */
+  redirectNext?: Of<string | undefined, I, R>;
   /** Erfolgsmeldung (Schlüssel): im Formularzustand `message`, sonst Flash. Weglassen, wenn die Zielseite selbst meldet (z. B. `?saved=`). */
   message?: Of<MessageKey, I, R>;
   /**
@@ -64,6 +69,9 @@ export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOp
   const action = async (first: ActionState | FormData, second?: FormData): Promise<ActionState | void> => {
     const formMode = first instanceof FormData;
     const formData = formMode ? first : second instanceof FormData ? second : new FormData();
+    // „Speichern und weiter“: Der Absender ist Transportsache und gehört nicht in die Eingabe
+    const wantsNext = formData.get("_next") === "1";
+    formData.delete("_next");
 
     // Anmeldung und Recht prüft jede Aktion selbst (Navigation und Proxy sind nur Komfort). Hängt das Recht von der Eingabe ab
     // (Dokumentationsbereich), wird zuerst nur das Formular umgeformt – nichts geprüft oder gespeichert.
@@ -100,7 +108,7 @@ export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOp
     }
     if (options.onSuccess) await options.onSuccess(data, input);
     const message = resolve(options.message, data, input);
-    const target = resolve(options.redirect, data, input);
+    const target = (wantsNext ? resolve(options.redirectNext, data, input) : undefined) ?? resolve(options.redirect, data, input);
     if (message && (formMode || target)) await setFlash({ tone: "success", key: message });
     if (target) redirect(target);
     if (formMode) return undefined;

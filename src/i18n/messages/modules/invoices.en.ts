@@ -63,6 +63,7 @@ export const invoicesEn: typeof invoicesDe = {
     net: "Net",
     vat: "VAT",
     gross: "Gross",
+    grossSuggested: "Suggested from net + VAT – you can overwrite it.",
     amountHint: "The gross amount is required. Net and VAT are optional (e.g. 1,234.56).",
     paidAt: "Paid on",
     paidAtHint: "Only for status “Paid” – empty = invoice date.",

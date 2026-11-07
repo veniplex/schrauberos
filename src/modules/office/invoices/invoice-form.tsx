@@ -1,13 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
-import { type ActionState, Checkbox, Field, FieldError, FieldHint, FileInput, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
-import { LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { useState } from "react";
+import { Checkbox, Field, FileInput, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { SearchCombobox, type SearchOption } from "@/components/ui/search-combobox";
-import { INVOICE_STATUSES } from "@/modules/office/invoices/domain";
+import { INVOICE_FILE_MAX_BYTES, INVOICE_STATUSES } from "@/modules/office/invoices/domain";
 import { useI18n } from "@/i18n/client";
+import { centsToInput, parseMoneyToCents } from "@/lib/money";
 import { saveInvoice } from "./actions";
+
+/** Brutto-Vorschlag aus Netto + MwSt. (Text im Eingabeformat, „“ wenn nicht berechenbar) */
+export function grossSuggestion(net: string, vat: string): string {
+  const n = parseMoneyToCents(net);
+  const v = vat.trim() === "" ? 0 : parseMoneyToCents(vat);
+  return n === null || v === null ? "" : centsToInput(n + v);
+}
 
 export type InvoiceFormInitial = {
   id?: string;
@@ -33,12 +40,19 @@ export type InvoiceFormInitial = {
 /** `canPickCustomer`: Kundenauswahl nur anbieten, wenn die Funktion „Kunden“ aktiv ist (weiche Abhängigkeit). */
 export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }: { initial: InvoiceFormInitial; categories: string[]; cancelHref: string; canPickCustomer: boolean }) {
   const { t, td, number } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveInvoice, {});
-  const err = state.fieldErrors ?? {};
   const outgoing = initial.direction === "outgoing";
+  // Brutto aus Netto + MwSt. vorschlagen – solange Brutto nicht selbst eingegeben wurde
+  const [amounts, setAmounts] = useState({ net: initial.net, vat: initial.vat, gross: initial.gross });
+  const [grossTouched, setGrossTouched] = useState(initial.gross !== "");
+  const suggested = grossSuggestion(amounts.net, amounts.vat);
+  const changeAmount = (field: "net" | "vat", value: string) => {
+    const next = { ...amounts, [field]: value };
+    const suggestion = grossSuggestion(next.net, next.vat);
+    setAmounts(!grossTouched && suggestion ? { ...next, gross: suggestion } : next);
+  };
 
   return (
-    <form action={action} className="flex max-w-4xl flex-col gap-5">
+    <Form action={saveInvoice} draftKey={`invoice:${initial.id ?? initial.direction}`} className="flex max-w-4xl flex-col gap-5">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -49,36 +63,47 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
 
       <Card title={outgoing ? t("invoices.sections.outgoing") : t("invoices.sections.incoming")}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("invoices.fields.number")} htmlFor="number" error={err.number} required>
-            <Input id="number" name="number" defaultValue={initial.number} invalid={!!err.number} maxLength={60} required autoComplete="off" className="font-mono" />
+          <Field label={t("invoices.fields.number")} htmlFor="number" name="number" required>
+            <Input id="number" name="number" defaultValue={initial.number} maxLength={60} required autoComplete="off" className="font-mono" />
           </Field>
-          <Field label={outgoing ? t("invoices.fields.recipient") : t("invoices.fields.supplier")} htmlFor="partyName" error={err.partyName} required>
-            <Input id="partyName" name="partyName" defaultValue={initial.partyName} invalid={!!err.partyName} maxLength={120} required autoComplete="off" />
+          <Field label={outgoing ? t("invoices.fields.recipient") : t("invoices.fields.supplier")} htmlFor="partyName" name="partyName" required>
+            <Input id="partyName" name="partyName" defaultValue={initial.partyName} maxLength={120} required autoComplete="off" />
           </Field>
           {outgoing && canPickCustomer ? (
-            <Field label={t("invoices.fields.customer")} error={err.customerId} hint={t("invoices.fields.customerHint")} className="sm:col-span-2">
-              <SearchCombobox endpoint="/api/customers/search" name="customerId" initial={initial.customer} placeholder={t("customers.searchPlaceholder")} invalid={!!err.customerId} />
+            <Field label={t("invoices.fields.customer")} name="customerId" hint={t("invoices.fields.customerHint")} className="sm:col-span-2">
+              <SearchCombobox endpoint="/api/customers/search" name="customerId" initial={initial.customer} placeholder={t("customers.searchPlaceholder")} />
             </Field>
           ) : null}
-          <Field label={t("invoices.fields.issueDate")} htmlFor="issueDate" error={err.issueDate} required>
-            <Input id="issueDate" name="issueDate" type="date" defaultValue={initial.issueDate} invalid={!!err.issueDate} required />
+          <Field label={t("invoices.fields.issueDate")} htmlFor="issueDate" name="issueDate" required>
+            <Input id="issueDate" name="issueDate" type="date" defaultValue={initial.issueDate} required />
           </Field>
-          <Field label={t("invoices.fields.dueDate")} htmlFor="dueDate" error={err.dueDate}>
-            <Input id="dueDate" name="dueDate" type="date" defaultValue={initial.dueDate} invalid={!!err.dueDate} />
+          <Field label={t("invoices.fields.dueDate")} htmlFor="dueDate" name="dueDate">
+            <Input id="dueDate" name="dueDate" type="date" defaultValue={initial.dueDate} />
           </Field>
         </div>
       </Card>
 
       <Card title={t("invoices.sections.amounts")}>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={t("invoices.fields.net")} htmlFor="net" error={err.net}>
-            <Input id="net" name="net" inputMode="decimal" defaultValue={initial.net} invalid={!!err.net} placeholder="0,00" />
+          <Field label={t("invoices.fields.net")} htmlFor="net" name="net">
+            <Input id="net" name="net" inputMode="decimal" value={amounts.net} onChange={(e) => changeAmount("net", e.target.value)} placeholder="0,00" />
           </Field>
-          <Field label={t("invoices.fields.vat")} htmlFor="vat" error={err.vat}>
-            <Input id="vat" name="vat" inputMode="decimal" defaultValue={initial.vat} invalid={!!err.vat} placeholder="0,00" />
+          <Field label={t("invoices.fields.vat")} htmlFor="vat" name="vat">
+            <Input id="vat" name="vat" inputMode="decimal" value={amounts.vat} onChange={(e) => changeAmount("vat", e.target.value)} placeholder="0,00" />
           </Field>
-          <Field label={t("invoices.fields.gross")} htmlFor="gross" error={err.gross} required>
-            <Input id="gross" name="gross" inputMode="decimal" defaultValue={initial.gross} invalid={!!err.gross} placeholder="0,00" required />
+          <Field label={t("invoices.fields.gross")} htmlFor="gross" name="gross" hint={!grossTouched && suggested ? t("invoices.fields.grossSuggested") : undefined} required>
+            <Input
+              id="gross"
+              name="gross"
+              inputMode="decimal"
+              value={amounts.gross}
+              onChange={(e) => {
+                setGrossTouched(e.target.value !== "");
+                setAmounts({ ...amounts, gross: e.target.value });
+              }}
+              placeholder="0,00"
+              required
+            />
           </Field>
         </div>
         <p className="mt-2 text-xs text-ink-muted">{t("invoices.fields.amountHint")}</p>
@@ -123,20 +148,15 @@ export function InvoiceForm({ initial, categories, cancelHref, canPickCustomer }
             {t("invoices.currentFile")}: <strong>{initial.file.name}</strong> <span className="text-ink-muted">({number(initial.file.size / 1024, { maximumFractionDigits: 0 })} KB)</span>
           </p>
         ) : null}
-        <FileInput name="file" accept="application/pdf,image/png,image/jpeg,image/webp,application/xml,text/xml,.xml" aria-label={t("invoices.sections.file")} />
-        {err.file ? <FieldError>{err.file}</FieldError> : <FieldHint>{initial.file ? t("invoices.fileReplaceHint") : t("invoices.fileHint")}</FieldHint>}
+        <Field label={t("invoices.sections.file")} name="file" hint={initial.file ? t("invoices.fileReplaceHint") : t("invoices.fileHint")}>
+          <FileInput name="file" accept="application/pdf,image/png,image/jpeg,image/webp,application/xml,text/xml,.xml" maxBytes={INVOICE_FILE_MAX_BYTES} />
+        </Field>
         {initial.file ? (
           <Checkbox name="removeFile" label={t("invoices.removeFile")} className="mt-3" />
         ) : null}
       </Card>
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={cancelHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={cancelHref} />
+    </Form>
   );
 }

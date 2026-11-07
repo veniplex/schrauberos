@@ -197,13 +197,81 @@ h1, h2, h3, h4 {
   }
 }
 
-/* <dialog> als Modal */
+/* <dialog> als Modal: dvh statt vh (mobile Browserleiste), der Hintergrund scrollt nicht mit (Sperre + overscroll), unter sm als Blatt am unteren Rand */
 dialog.modal {
-  @apply m-auto w-[min(92vw,44rem)] max-h-[90vh] overflow-y-auto rounded-lg border border-line bg-surface p-0 text-ink;
+  @apply m-auto w-[min(92vw,44rem)] max-h-[90dvh] overflow-y-auto overscroll-contain rounded-lg border border-line bg-surface p-0 text-ink;
   box-shadow: var(--sh-pop);
+}
+dialog.modal.confirm-dialog {
+  @apply w-[min(92vw,28rem)];
 }
 dialog.modal::backdrop {
   background: var(--overlay);
+}
+html:has(dialog[open]),
+html[data-scroll-lock] {
+  overflow: hidden;
+}
+@media (max-width: 639px) {
+  dialog.modal,
+  dialog.modal.confirm-dialog {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Aktionsleiste eines Formulars (FormActions): klebt am unteren Rand, solange das Formular länger als der Bildschirm ist; in der Dokumentfolge, nicht fixed */
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin-top: 0.25rem;
+  padding-block: 0.75rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+form.card > .form-actions {
+  margin-inline: -1.25rem;
+  margin-bottom: -1.25rem;
+  padding-inline: 1.25rem;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+/* Touch: Mit geöffneter Bildschirmtastatur (ein Feld hat den Fokus) rückt die Leiste in den Fluss und verdeckt nie ein Eingabefeld */
+@media (pointer: coarse) {
+  form:has(:is(input, textarea, select):focus) .form-actions {
+    position: static;
+  }
+}
+
+/* Toast (components/ui/toast.tsx): unten, über Safe-Area und – wenn vorhanden – über der Aktionsleiste eines Formulars */
+.toast-viewport {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom) + var(--toast-lift, 0px));
+  pointer-events: none;
+}
+.toast-viewport > * {
+  width: min(100%, 28rem);
+}
+html[data-form-actions] .toast-viewport {
+  --toast-lift: 4.5rem;
+}
+@media (min-width: 1024px) {
+  .toast-viewport {
+    align-items: flex-end;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

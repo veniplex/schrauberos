@@ -11,6 +11,7 @@ export const customersDe = {
   confirmDelete: "Kunde wirklich löschen? Seine Fahrzeuge bleiben ohne Halter erhalten.",
   confirmDeleteAppointments_one: "{count} Termin verliert die Zuordnung zum Kunden.",
   confirmDeleteAppointments_other: "{count} Termine verlieren die Zuordnung zum Kunden.",
+  saveAndAddVehicle: "Speichern und Fahrzeug anlegen",
   searchPlaceholder: "Name, Kundennummer, Ort, Telefon oder Kennzeichen …",
   empty: "Keine Kunden gefunden.",
   emptyHint: "Lege den ersten Kunden an.",

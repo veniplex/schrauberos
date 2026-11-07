@@ -1,6 +1,7 @@
 "use client";
 
 import { LogOut, UserRound } from "lucide-react";
+import { clearFormDrafts } from "@/components/ui/form";
 import { Menu, MenuHeader, MenuLink, MenuSubmit } from "@/components/ui/menu";
 import { useI18n } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
@@ -48,7 +49,7 @@ export function UserMenu({
       <MenuLink href="/account">
         <UserRound className="size-4" aria-hidden /> {t("nav.account")}
       </MenuLink>
-      <form action={logoutAction}>
+      <form action={logoutAction} onSubmit={() => clearFormDrafts()}>
         <MenuSubmit>
           <LogOut className="size-4" aria-hidden /> {t("auth.logout")}
         </MenuSubmit>

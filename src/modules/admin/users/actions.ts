@@ -21,7 +21,7 @@ const saveInput = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .regex(/^[a-z0-9._-]{2,40}$/),
+    .regex(/^[a-z0-9._-]{2,40}$/, { error: "validation.username" }),
   name: z.string().trim().min(1).max(120),
   email: z.string().email().max(200).optional(),
   password: z

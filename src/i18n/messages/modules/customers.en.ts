@@ -13,6 +13,7 @@ export const customersEn: typeof customersDe = {
   confirmDelete: "Really delete the customer? Their vehicles are kept without an owner.",
   confirmDeleteAppointments_one: "{count} appointment loses its link to the customer.",
   confirmDeleteAppointments_other: "{count} appointments lose their link to the customer.",
+  saveAndAddVehicle: "Save and add vehicle",
   searchPlaceholder: "Name, customer no., city, phone or plate …",
   empty: "No customers found.",
   emptyHint: "Add the first customer.",

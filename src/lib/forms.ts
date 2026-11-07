@@ -1,5 +1,6 @@
 import type { ZodError } from "zod";
 import type { Translator } from "@/i18n/translate";
+import { fieldMessages } from "./field-errors";
 
 /** FormData-Feld als getrimmter String; leer => undefined. */
 export function str(fd: FormData, name: string): string | undefined {
@@ -19,17 +20,9 @@ export function formObject(fd: FormData): Record<string, string> {
   return out;
 }
 
-/** Zod-Fehler -> { feldname: übersetzte Meldung }. */
+/** Zod-Fehler -> { feldname: übersetzte Meldung } (für die Aktionen vor der Sitzung: Anmeldung, Einrichtung, Notzugang). Abbildung: `fieldMessages`. */
 export function fieldErrors(error: ZodError, t: Translator["t"]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const key = String(issue.path[0] ?? "_");
-    if (out[key]) continue;
-    // Leere Felder werden vorab entfernt (formObject) -> fehlender Wert = Pflichtfeld
-    out[key] =
-      issue.code === "invalid_type" ? t("validation.required") : issue.code === "too_big" ? t("validation.tooLong") : t("validation.invalid");
-  }
-  return out;
+  return Object.fromEntries(Object.entries(fieldMessages(error)).map(([name, m]) => [name, t(m.key, m.params)]));
 }
 
 /** Nur interne Rücksprung-Pfade mit erwartetem Präfix zulassen. */

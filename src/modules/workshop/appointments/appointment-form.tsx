@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { Disc3 } from "lucide-react";
-import { Field, FormMessage, Input, Select, Textarea, type ActionState } from "@/components/ui/form";
-import { ConfirmSubmitButton, LinkButton, SubmitButton } from "@/components/ui/buttons";
-import { VehicleCombobox, type VehicleOption } from "@/modules/workshop/vehicles/public";
+import { Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
+import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { APPOINTMENT_STATUSES } from "@/modules/workshop/appointments/constants";
 import { useI18n } from "@/i18n/client";
 import { createAppointment, deleteAppointment, updateAppointment } from "./actions";
@@ -38,19 +38,20 @@ export function AppointmentForm({
   returnTo,
   closeHref,
   canDelete,
+  canCreateVehicle = false,
 }: {
   initial: AppointmentFormInitial;
   options: AppointmentFormOptions;
   returnTo: string;
   closeHref: string;
   canDelete: boolean;
+  /** Bei keinem Treffer in der Fahrzeugsuche „Fahrzeug neu anlegen“ anbieten */
+  canCreateVehicle?: boolean;
 }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(initial.id ? updateAppointment : createAppointment, {});
   const [typeId, setTypeId] = useState(initial.typeId);
   const [title, setTitle] = useState(initial.title);
   const [duration, setDuration] = useState(initial.duration);
-  const err = state.fieldErrors ?? {};
 
   function onTypeChange(id: string) {
     const prev = options.types.find((x) => x.id === typeId);
@@ -64,7 +65,7 @@ export function AppointmentForm({
 
   return (
     <div className="flex flex-col gap-5">
-      <form action={action} className="flex flex-col gap-4">
+      <Form action={initial.id ? updateAppointment : createAppointment} draftKey={`appointment:${initial.id ?? "new"}`} className="flex flex-col gap-4">
         {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -92,24 +93,24 @@ export function AppointmentForm({
               ))}
             </Select>
           </Field>
-          <Field label={t("appointments.fields.title")} htmlFor="title" error={err.title} required>
-            <Input id="title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} invalid={!!err.title} maxLength={120} />
+          <Field label={t("appointments.fields.title")} htmlFor="title" name="title" required>
+            <Input id="title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
           </Field>
         </div>
 
-        <Field label={t("appointments.fields.vehicle")} error={err.vehicleId} hint={t("appointments.fields.vehicleHint")}>
-          <VehicleCombobox initial={initial.vehicle} invalid={!!err.vehicleId} />
+        <Field label={t("appointments.fields.vehicle")} name="vehicleId" hint={t("appointments.fields.vehicleHint")}>
+          <VehiclePicker initial={initial.vehicle} canCreate={canCreateVehicle} />
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={t("appointments.fields.date")} htmlFor="date" error={err.date} required>
-            <Input id="date" name="date" type="date" defaultValue={initial.date} invalid={!!err.date} required />
+          <Field label={t("appointments.fields.date")} htmlFor="date" name="date" required>
+            <Input id="date" name="date" type="date" defaultValue={initial.date} required />
           </Field>
-          <Field label={t("appointments.fields.time")} htmlFor="time" error={err.time} required>
+          <Field label={t("appointments.fields.time")} htmlFor="time" name="time" required>
             {/* 5-Minuten-Schritte: bestehende Termine dürfen auch außerhalb des Kalenderrasters liegen */}
-            <Input id="time" name="time" type="time" step={300} defaultValue={initial.time} invalid={!!err.time} required />
+            <Input id="time" name="time" type="time" step={300} defaultValue={initial.time} required />
           </Field>
-          <Field label={t("appointments.fields.duration")} htmlFor="duration" error={err.duration} required>
+          <Field label={t("appointments.fields.duration")} htmlFor="duration" name="duration" required>
             <Input
               id="duration"
               name="duration"
@@ -119,15 +120,14 @@ export function AppointmentForm({
               step={5}
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
-              invalid={!!err.duration}
               required
             />
           </Field>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={t("appointments.fields.bay")} htmlFor="bayId" error={err.bayId}>
-            <Select id="bayId" name="bayId" defaultValue={initial.bayId} invalid={!!err.bayId}>
+          <Field label={t("appointments.fields.bay")} htmlFor="bayId" name="bayId">
+            <Select id="bayId" name="bayId" defaultValue={initial.bayId}>
               <option value="">{t("common.none")}</option>
               {options.bays.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -157,19 +157,12 @@ export function AppointmentForm({
           </Field>
         </div>
 
-        <Field label={t("common.notes")} htmlFor="notes" error={err.notes}>
+        <Field label={t("common.notes")} htmlFor="notes" name="notes">
           <Textarea id="notes" name="notes" defaultValue={initial.notes} maxLength={2000} />
         </Field>
 
-        <FormMessage state={state} />
-
-        <div className="flex justify-end gap-2">
-          <LinkButton href={closeHref}>
-            {t("common.cancel")}
-          </LinkButton>
-          <SubmitButton>{t("common.save")}</SubmitButton>
-        </div>
-      </form>
+        <FormActions cancelHref={closeHref} />
+      </Form>
 
       {initial.id && canDelete ? (
         <form action={deleteAppointment} className="border-t border-line pt-4">

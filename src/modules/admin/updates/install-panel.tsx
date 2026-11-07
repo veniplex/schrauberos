@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { ConfirmSubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Alert } from "@/components/ui/layout";
-import type { ActionState } from "@/components/ui/form";
+import { Form, FormMessage } from "@/components/ui/form";
 import { installUpdate } from "./actions";
 
 const POLL_MS = 2000;
@@ -12,17 +12,16 @@ const GIVE_UP_MS = 3 * 60 * 1000;
 
 /** Formular zum Installieren der angezeigten Version (mit Rückfrage). */
 export function InstallForm({ version, labels }: { version: string; labels: { button: string; confirm: string } }) {
-  const [state, action] = useActionState<ActionState, FormData>(installUpdate, {});
   return (
-    <form action={action} className="flex flex-col gap-3">
+    <Form action={installUpdate} className="flex flex-col gap-3">
       <input type="hidden" name="version" value={version} />
-      {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+      <FormMessage />
       <div>
         <ConfirmSubmitButton message={labels.confirm} variant="primary" size="md">
           {labels.button}
         </ConfirmSubmitButton>
       </div>
-    </form>
+    </Form>
   );
 }
 

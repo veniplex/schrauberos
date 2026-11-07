@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
-import { ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
+import { SubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Checkbox, ColorInput, Field, Input, Select } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";

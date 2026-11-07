@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { type ActionState, Checkbox, Field, FormMessage, Input } from "@/components/ui/form";
-import { Button, LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { useState } from "react";
+import { Checkbox, Field, Form, FormActions, Input } from "@/components/ui/form";
+import { Button } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { togglePermission, toggleGroupPermissions } from "@/lib/role-mask";
 import { useI18n } from "@/i18n/client";
@@ -26,9 +26,7 @@ export function RoleForm({
   lockedPermissions: string[];
 }) {
   const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveRole, {});
   const [selected, setSelected] = useState(() => new Set(initial.permissions));
-  const err = state.fieldErrors ?? {};
 
   const locked = new Set(lockedPermissions);
   // Regeln der Maske („Bearbeiten“ setzt „Ansehen“ …): src/lib/role-mask.ts, getestet
@@ -36,7 +34,7 @@ export function RoleForm({
   const toggleGroup = (keys: readonly string[], on: boolean) => setSelected((s) => toggleGroupPermissions(s, keys, on, locked));
 
   return (
-    <form action={action} className="flex max-w-4xl flex-col gap-5">
+    <Form action={saveRole} className="flex max-w-4xl flex-col gap-5">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -45,8 +43,8 @@ export function RoleForm({
       ) : null}
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("roles.fields.name")} htmlFor="name" error={err.name} required>
-            <Input id="name" name="name" defaultValue={initial.name} invalid={!!err.name} maxLength={60} required />
+          <Field label={t("roles.fields.name")} htmlFor="name" name="name" required>
+            <Input id="name" name="name" defaultValue={initial.name} maxLength={60} required />
           </Field>
           <Field label={t("roles.fields.description")} htmlFor="description">
             <Input id="description" name="description" defaultValue={initial.description} maxLength={300} />
@@ -107,13 +105,7 @@ export function RoleForm({
         </div>
       )}
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href="/admin/roles">
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref="/admin/roles" />
+    </Form>
   );
 }

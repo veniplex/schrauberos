@@ -19,7 +19,7 @@ export type TestDom = {
   close(): Promise<void>;
 };
 
-const GLOBALS = /^(HTML.*|SVG.*|Event|EventTarget|CustomEvent|MouseEvent|KeyboardEvent|FocusEvent|InputEvent|PointerEvent|UIEvent|Node|Element|Text|Comment|Document|DocumentFragment|MutationObserver|DOMException|ShadowRoot|CSSStyleDeclaration|DOMParser|Range|Selection|NodeFilter|Attr|NamedNodeMap|DOMTokenList)$/;
+const GLOBALS = /^(HTML.*|SVG.*|Event|EventTarget|CustomEvent|MouseEvent|KeyboardEvent|FocusEvent|InputEvent|PointerEvent|UIEvent|Node|Element|Text|Comment|Document|DocumentFragment|MutationObserver|DOMException|ShadowRoot|CSSStyleDeclaration|DOMParser|Range|Selection|NodeFilter|Attr|NamedNodeMap|DOMTokenList|FormData)$/;
 
 export function installDom(options: { width?: number; height?: number; coarsePointer?: boolean } = {}): TestDom {
   const window = new Window({ url: "http://localhost/", innerWidth: options.width ?? 1440, innerHeight: options.height ?? 900 });

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/layout";
-import { ConfirmSubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
 import { requireDocArea, visiblePages } from "@/capabilities/docs/access";

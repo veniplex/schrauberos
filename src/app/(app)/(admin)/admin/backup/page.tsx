@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Download, Trash2 } from "lucide-react";
 import { Alert, Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
-import { ConfirmSubmitButton, LinkButton } from "@/components/ui/buttons";
+import { LinkButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { readPending, readRestoreResult } from "@/lib/updates/restore";
 import { requirePermission } from "@/server/auth/session";

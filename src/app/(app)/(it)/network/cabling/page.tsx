@@ -3,7 +3,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import { ArrowRight, Trash2 } from "lucide-react";
 import { Card, EmptyState, PageHeader, Table } from "@/components/ui/layout";
-import { ConfirmSubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";

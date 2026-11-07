@@ -7,6 +7,7 @@ export const vehiclesEn: typeof vehiclesDe = {
   },
   title: "Vehicles",
   description: "All vehicles – independent of the customer. The owner can change; tyres and appointments stay with the vehicle.",
+  createNew: "Create new vehicle",
   searchPlaceholder: "Search plate, customer or model …",
   searchList: "Plate, VIN, model or owner …",
   new: "Add vehicle",

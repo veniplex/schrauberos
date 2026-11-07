@@ -23,7 +23,7 @@ const schema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .regex(/^[a-z0-9._-]{2,40}$/),
+    .regex(/^[a-z0-9._-]{2,40}$/, { error: "validation.username" }),
   password: z.string(),
   confirm: z.string(),
   timezone: z.string().max(60),

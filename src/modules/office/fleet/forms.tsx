@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState, useRef } from "react";
-import { type ActionState, Field, FieldError, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
-import { LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
+import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { COST_CATEGORIES, FLEET_STATUSES, FUEL_TYPES } from "@/modules/office/fleet/domain";
 import { useI18n } from "@/i18n/client";
@@ -37,10 +36,8 @@ export type FleetFormInitial = {
 
 export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetFormInitial; drivers: Array<{ id: string; name: string }>; cancelHref: string }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveFleetVehicle, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <form action={action} className="flex max-w-4xl flex-col gap-5">
+    <Form action={saveFleetVehicle} className="flex max-w-4xl flex-col gap-5">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -50,8 +47,8 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
 
       <Card title={t("fleet.sections.vehicle")}>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={t("vehicles.fields.plate")} htmlFor="plate" error={err.plate} required>
-            <Input id="plate" name="plate" defaultValue={initial.plate} invalid={!!err.plate} className="font-mono uppercase" placeholder="B-FW 100" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
+          <Field label={t("vehicles.fields.plate")} htmlFor="plate" name="plate" required>
+            <Input id="plate" name="plate" defaultValue={initial.plate} className="font-mono uppercase" placeholder="B-FW 100" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
           </Field>
           <Field label={t("vehicles.fields.make")} htmlFor="make">
             <Input id="make" name="make" defaultValue={initial.make} autoComplete="off" />
@@ -59,8 +56,8 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
           <Field label={t("vehicles.fields.model")} htmlFor="model">
             <Input id="model" name="model" defaultValue={initial.model} autoComplete="off" />
           </Field>
-          <Field label={t("vehicles.fields.year")} htmlFor="year" error={err.year}>
-            <Input id="year" name="year" type="number" defaultValue={initial.year} invalid={!!err.year} />
+          <Field label={t("vehicles.fields.year")} htmlFor="year" name="year">
+            <Input id="year" name="year" type="number" defaultValue={initial.year} />
           </Field>
           <Field label={t("fleet.fields.fuelType")} htmlFor="fuelType">
             <Select id="fuelType" name="fuelType" defaultValue={initial.fuelType}>
@@ -75,8 +72,8 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
           <Field label={t("fleet.fields.color")} htmlFor="color">
             <Input id="color" name="color" defaultValue={initial.color} maxLength={30} />
           </Field>
-          <Field label={t("vehicles.fields.vin")} htmlFor="vin" error={err.vin} hint={t("vehicles.fields.vinHint")} className="sm:col-span-2">
-            <Input id="vin" name="vin" defaultValue={initial.vin} invalid={!!err.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
+          <Field label={t("vehicles.fields.vin")} htmlFor="vin" name="vin" hint={t("vehicles.fields.vinHint")} className="sm:col-span-2">
+            <Input id="vin" name="vin" defaultValue={initial.vin} className="font-mono uppercase" maxLength={17} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
           </Field>
           <Field label={t("common.status")} htmlFor="status">
             <Select id="status" name="status" defaultValue={initial.status}>
@@ -87,8 +84,8 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
               ))}
             </Select>
           </Field>
-          <Field label={t("fleet.fields.driver")} htmlFor="driverId" error={err.driverId}>
-            <Select id="driverId" name="driverId" defaultValue={initial.driverId} invalid={!!err.driverId}>
+          <Field label={t("fleet.fields.driver")} htmlFor="driverId" name="driverId">
+            <Select id="driverId" name="driverId" defaultValue={initial.driverId}>
               <option value="">{t("fleet.noDriver")}</option>
               {drivers.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -111,8 +108,8 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
           <Field label={t("fleet.fields.serviceDue")} htmlFor="serviceDue">
             <Input id="serviceDue" name="serviceDue" type="date" defaultValue={initial.serviceDue} />
           </Field>
-          <Field label={t("fleet.fields.serviceDueKm")} htmlFor="serviceDueKm" error={err.serviceDueKm} hint={t("fleet.fields.serviceDueKmHint")}>
-            <Input id="serviceDueKm" name="serviceDueKm" type="number" min={0} defaultValue={initial.serviceDueKm} invalid={!!err.serviceDueKm} />
+          <Field label={t("fleet.fields.serviceDueKm")} htmlFor="serviceDueKm" name="serviceDueKm" hint={t("fleet.fields.serviceDueKmHint")}>
+            <Input id="serviceDueKm" name="serviceDueKm" type="number" min={0} defaultValue={initial.serviceDueKm} />
           </Field>
         </div>
       </Card>
@@ -134,8 +131,8 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
           <Field label={t("fleet.fields.leasingUntil")} htmlFor="leasingUntil">
             <Input id="leasingUntil" name="leasingUntil" type="date" defaultValue={initial.leasingUntil} />
           </Field>
-          <Field label={t("fleet.fields.leasingRate")} htmlFor="leasingRate" error={err.leasingRate} hint={t("fleet.fields.perMonth")}>
-            <Input id="leasingRate" name="leasingRate" inputMode="decimal" defaultValue={initial.leasingRate} invalid={!!err.leasingRate} placeholder="289,00" />
+          <Field label={t("fleet.fields.leasingRate")} htmlFor="leasingRate" name="leasingRate" hint={t("fleet.fields.perMonth")}>
+            <Input id="leasingRate" name="leasingRate" inputMode="decimal" defaultValue={initial.leasingRate} placeholder="289,00" />
           </Field>
           <Field label={t("fleet.fields.fuelCardNo")} htmlFor="fuelCardNo">
             <Input id="fuelCardNo" name="fuelCardNo" defaultValue={initial.fuelCardNo} maxLength={40} className="font-mono" />
@@ -146,14 +143,8 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
         </Field>
       </Card>
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={cancelHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={cancelHref} />
+    </Form>
   );
 }
 
@@ -161,26 +152,16 @@ export function FleetForm({ initial, drivers, cancelHref }: { initial: FleetForm
 
 export function MileageForm({ fleetVehicleId, today }: { fleetVehicleId: string; today: string }) {
   const { t } = useI18n();
-  const formRef = useRef<HTMLFormElement>(null);
-  const [state, action] = useActionState<ActionState, FormData>(async (prev, fd) => {
-    const result = await addMileage(prev, fd);
-    if (result.ok) formRef.current?.reset();
-    return result;
-  }, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <form ref={formRef} action={action} className="flex flex-wrap items-start gap-3">
+    <Form action={addMileage} className="flex flex-wrap items-start gap-3">
       <input type="hidden" name="fleetVehicleId" value={fleetVehicleId} />
       <Input name="date" type="date" defaultValue={today} aria-label={t("fleet.fields.date")} className="w-40" required />
-      <div>
-        <Input name="km" type="number" min={0} placeholder="km" aria-label={t("fleet.fields.km")} className="w-36" required invalid={!!err.km} />
-        {err.km ? <FieldError className="max-w-56">{err.km}</FieldError> : null}
-      </div>
+      <Input name="km" type="number" min={0} placeholder="km" aria-label={t("fleet.fields.km")} className="w-36" required />
       <Input name="note" placeholder={t("common.notes")} aria-label={t("common.notes")} className="min-w-32 flex-1" maxLength={100} />
       <SubmitButton size="sm" className="mt-0.5">
         {t("common.add")}
       </SubmitButton>
-    </form>
+    </Form>
   );
 }
 
@@ -188,15 +169,8 @@ export function MileageForm({ fleetVehicleId, today }: { fleetVehicleId: string;
 
 export function CostForm({ fleetVehicleId, today }: { fleetVehicleId: string; today: string }) {
   const { t, td } = useI18n();
-  const formRef = useRef<HTMLFormElement>(null);
-  const [state, action] = useActionState<ActionState, FormData>(async (prev, fd) => {
-    const result = await addCost(prev, fd);
-    if (result.ok) formRef.current?.reset();
-    return result;
-  }, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <form ref={formRef} action={action} className="flex flex-wrap items-start gap-3">
+    <Form action={addCost} className="flex flex-wrap items-start gap-3">
       <input type="hidden" name="fleetVehicleId" value={fleetVehicleId} />
       <Input name="date" type="date" defaultValue={today} aria-label={t("fleet.fields.date")} className="w-40" required />
       <Select name="category" defaultValue="fuel" aria-label={t("fleet.fields.category")} className="w-40">
@@ -206,16 +180,13 @@ export function CostForm({ fleetVehicleId, today }: { fleetVehicleId: string; to
           </option>
         ))}
       </Select>
-      <div>
-        <Input name="amount" inputMode="decimal" placeholder="0,00 €" aria-label={t("fleet.fields.amount")} className="w-32" required invalid={!!err.amount} />
-        {err.amount ? <FieldError className="max-w-40">{err.amount}</FieldError> : null}
-      </div>
+      <Input name="amount" inputMode="decimal" placeholder="0,00 €" aria-label={t("fleet.fields.amount")} className="w-32" required />
       <Input name="km" type="number" min={0} placeholder="km" aria-label={t("fleet.fields.km")} className="w-28" />
       <Input name="note" placeholder={t("common.notes")} aria-label={t("common.notes")} className="min-w-32 flex-1" maxLength={100} />
       <SubmitButton size="sm" className="mt-0.5">
         {t("common.add")}
       </SubmitButton>
-    </form>
+    </Form>
   );
 }
 
@@ -233,12 +204,10 @@ export function LicenseCheckForm({
   closeHref: string;
 }) {
   const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveLicenseCheck, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <Form action={saveLicenseCheck} className="flex flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("fleet.fields.driver")} htmlFor="employeeId" error={err.employeeId} required>
+        <Field label={t("fleet.fields.driver")} htmlFor="employeeId" name="employeeId" required>
           <Select id="employeeId" name="employeeId" defaultValue={initialEmployeeId} required>
             <option value="" disabled>
               {t("employees.fields.choose")}
@@ -250,7 +219,7 @@ export function LicenseCheckForm({
             ))}
           </Select>
         </Field>
-        <Field label={t("fleet.fields.checkedAt")} htmlFor="checkedAt" error={err.checkedAt} required>
+        <Field label={t("fleet.fields.checkedAt")} htmlFor="checkedAt" name="checkedAt" required>
           <Input id="checkedAt" name="checkedAt" type="date" defaultValue={today} required />
         </Field>
         <Field label={t("fleet.fields.method")} htmlFor="method" hint={t("fleet.fields.methodHint")}>
@@ -261,13 +230,7 @@ export function LicenseCheckForm({
         </Field>
       </div>
       <p className="text-sm text-ink-muted">{t("fleet.licenseNextHint")}</p>
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={closeHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={closeHref} />
+    </Form>
   );
 }

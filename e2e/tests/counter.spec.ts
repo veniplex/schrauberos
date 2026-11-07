@@ -9,20 +9,18 @@ test("Tresen: Kunde, Fahrzeug, Termin und Reifensatz anlegen", async ({ page }, 
   const unique = `${info.project.name}-${Date.now().toString(36)}`;
   const lastName = `Tresen-${unique}`;
   const plate = `B-T ${Math.floor(1000 + Math.random() * 8999)}`;
-  const save = () => page.getByRole("button", { name: "Speichern" }).click();
+  const save = () => page.getByRole("button", { name: "Speichern", exact: true }).click();
 
-  // 1. Kunde
+  // 1. Kunde – „Speichern und Fahrzeug anlegen“ führt direkt zum Fahrzeugformular, der neue Kunde ist als Halter vorbelegt
   await page.goto("/customers/new");
   await page.locator("#firstName").fill("Erika");
   await page.locator("#lastName").fill(lastName);
   await page.locator("#phone").fill("030 123456");
-  await save();
-  await page.waitForURL((url) => /^\/customers\/(?!new$)[^/]+$/.test(url.pathname));
-  const customerId = page.url().split("/").pop()!;
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(lastName);
+  await page.getByRole("button", { name: "Speichern und Fahrzeug anlegen" }).click();
+  await page.waitForURL((url) => url.pathname === "/vehicles/new" && url.searchParams.has("customer"));
+  await expect(page.getByText(lastName).first()).toBeVisible();
 
-  // 2. Fahrzeug (Kunde per Link vorbelegt, wie von der Kundenseite)
-  await page.goto(`/vehicles/new?customer=${customerId}`);
+  // 2. Fahrzeug
   await page.locator("#plate").fill(plate);
   await page.locator("#make").fill("VW");
   await page.locator("#model").fill("Golf VIII");

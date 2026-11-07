@@ -22,4 +22,4 @@ export const moneyCents = (invalidKey: string, max = 20) =>
     });
 
 /** Kalendertag als Text `JJJJ-MM-TT` (Formularfeld `type="date"`) – ein echter Tag (`isCalendarDay`), nicht nur die Form. Gilt für Formulare **und** API. */
-export const dateText = () => z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isCalendarDay);
+export const dateText = () => z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: "validation.date" }).refine(isCalendarDay, { error: "validation.date" });

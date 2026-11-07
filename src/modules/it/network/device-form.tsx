@@ -1,8 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
-import { type ActionState, Checkbox, Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
-import { LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Checkbox, Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { DEVICE_STATUSES, DEVICE_TYPES } from "@/modules/it/network/constants";
 import { useI18n } from "@/i18n/client";
@@ -38,11 +36,9 @@ export function DeviceForm({
   cancelHref: string;
 }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveDevice, {});
-  const err = state.fieldErrors ?? {};
 
   return (
-    <form action={action} className="flex max-w-4xl flex-col gap-5">
+    <Form action={saveDevice} className="flex max-w-4xl flex-col gap-5">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -52,8 +48,8 @@ export function DeviceForm({
 
       <Card title={t("network.sections.device")}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("network.fields.name")} htmlFor="name" error={err.name} required hint={t("network.fields.nameHint")}>
-            <Input id="name" name="name" defaultValue={initial.name} invalid={!!err.name} maxLength={80} required autoComplete="off" />
+          <Field label={t("network.fields.name")} htmlFor="name" name="name" required hint={t("network.fields.nameHint")}>
+            <Input id="name" name="name" defaultValue={initial.name} maxLength={80} required autoComplete="off" />
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label={t("network.fields.type")} htmlFor="type" required>
@@ -105,8 +101,8 @@ export function DeviceForm({
           <Field label={t("network.fields.rackInfo")} htmlFor="rackInfo" hint={t("network.fields.rackInfoHint")}>
             <Input id="rackInfo" name="rackInfo" defaultValue={initial.rackInfo} maxLength={80} autoComplete="off" />
           </Field>
-          <Field label={t("network.fields.portCount")} htmlFor="portCount" error={err.portCount} hint={t("network.fields.portCountHint")}>
-            <Input id="portCount" name="portCount" type="number" min={1} max={96} defaultValue={initial.portCount} invalid={!!err.portCount} />
+          <Field label={t("network.fields.portCount")} htmlFor="portCount" name="portCount" hint={t("network.fields.portCountHint")}>
+            <Input id="portCount" name="portCount" type="number" min={1} max={96} defaultValue={initial.portCount} />
           </Field>
         </div>
       </Card>
@@ -126,13 +122,7 @@ export function DeviceForm({
         </Field>
       </Card>
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={cancelHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={cancelHref} />
+    </Form>
   );
 }

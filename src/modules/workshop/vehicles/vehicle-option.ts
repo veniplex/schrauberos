@@ -1,5 +1,5 @@
 import { customerDisplayName } from "@/modules/workshop/customers/public";
-import type { VehicleOption } from "./vehicle-combobox";
+import type { VehicleOption } from "./vehicle-picker";
 
 type VehicleWithCustomer = {
   id: string;
@@ -11,10 +11,7 @@ type VehicleWithCustomer = {
 };
 
 export function toVehicleOption(v: VehicleWithCustomer): VehicleOption {
-  return {
-    id: v.id,
-    plate: v.plate,
-    description: [v.make, v.model].filter(Boolean).join(" "),
-    customer: v.customer ? customerDisplayName(v.customer) : "",
-  };
+  const description = [v.make, v.model].filter(Boolean).join(" ");
+  const customer = v.customer ? customerDisplayName(v.customer) : "";
+  return { id: v.id, label: v.plate, sublabel: [description, customer].filter(Boolean).join(" · "), plate: v.plate, description, customer };
 }

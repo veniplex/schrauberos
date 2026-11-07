@@ -1,5 +1,6 @@
 "use server";
 
+import { MAX_LOGO_BYTES } from "./limits";
 import { z } from "zod";
 import { isHexColor } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/constants";
@@ -13,7 +14,6 @@ import { defineAction, defineOperation, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
 
-const MAX_LOGO_BYTES = 200 * 1024;
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 
 const dayHours = z.object({ closed: z.boolean(), from: z.string(), to: z.string() });

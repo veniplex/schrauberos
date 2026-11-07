@@ -1,8 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
-import { type ActionState, Checkbox, Field, FieldLabel, FormCard, FormMessage, Input } from "@/components/ui/form";
-import { LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Checkbox, Field, FormActions, FormCard, Input } from "@/components/ui/form";
 import { useI18n } from "@/i18n/client";
 import { saveUser } from "./actions";
 
@@ -31,12 +29,10 @@ export function UserForm({
   isSelf: boolean;
 }) {
   const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveUser, {});
-  const err = state.fieldErrors ?? {};
   const external = initial.authSource !== "local";
 
   return (
-    <FormCard action={action} className="max-w-3xl">
+    <FormCard action={saveUser} className="max-w-3xl">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -45,14 +41,14 @@ export function UserForm({
         </>
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("users.fields.username")} htmlFor="username" error={err.username} hint={t("users.fields.usernameHint")} required>
-          <Input id="username" name={initial.id ? undefined : "username"} defaultValue={initial.username} disabled={!!initial.id} invalid={!!err.username} autoComplete="off" autoCapitalize="none" required />
+        <Field label={t("users.fields.username")} htmlFor="username" name="username" hint={t("users.fields.usernameHint")} required>
+          <Input id="username" name={initial.id ? undefined : "username"} defaultValue={initial.username} disabled={!!initial.id} autoComplete="off" autoCapitalize="none" required />
         </Field>
-        <Field label={t("users.fields.name")} htmlFor="name" error={err.name} required>
-          <Input id="name" name="name" defaultValue={initial.name} invalid={!!err.name} autoComplete="off" required />
+        <Field label={t("users.fields.name")} htmlFor="name" name="name" required>
+          <Input id="name" name="name" defaultValue={initial.name} autoComplete="off" required />
         </Field>
-        <Field label={t("users.fields.email")} htmlFor="email" error={err.email}>
-          <Input id="email" name="email" type="email" defaultValue={initial.email} invalid={!!err.email} autoComplete="off" />
+        <Field label={t("users.fields.email")} htmlFor="email" name="email">
+          <Input id="email" name="email" type="email" defaultValue={initial.email} autoComplete="off" />
         </Field>
         {external ? (
           <Field label={t("users.fields.authSource")}>
@@ -62,17 +58,16 @@ export function UserForm({
           <Field
             label={initial.id ? t("users.fields.passwordReset") : t("users.fields.password")}
             htmlFor="password"
-            error={err.password}
+            name="password"
             hint={initial.id ? t("users.fields.passwordResetHint") : t("account.passwordRules")}
             required={!initial.id}
           >
-            <Input id="password" name="password" type="password" maxLength={128} autoComplete="new-password" invalid={!!err.password} required={!initial.id} />
+            <Input id="password" name="password" type="password" maxLength={128} autoComplete="new-password" required={!initial.id} />
           </Field>
         )}
       </div>
 
-      <fieldset>
-        <FieldLabel as="legend">{t("users.fields.roles")}</FieldLabel>
+      <Field label={t("users.fields.roles")} group name="roleId">
         <ul className="mt-1 grid gap-2 sm:grid-cols-2">
           {roles.map((r) => {
             const locked = lockedRoleIds.includes(r.id);
@@ -92,7 +87,7 @@ export function UserForm({
             );
           })}
         </ul>
-      </fieldset>
+      </Field>
 
       <div className="flex flex-col gap-2">
         <Checkbox name="active" defaultChecked={initial.active} disabled={isSelf} label={t("users.fields.active")} />
@@ -102,13 +97,7 @@ export function UserForm({
         ) : null}
       </div>
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href="/admin/users">
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
+      <FormActions cancelHref="/admin/users" />
     </FormCard>
   );
 }

@@ -97,7 +97,7 @@ export function Plate({ children }: { children: ReactNode }) {
  * Hinweisfeld. `live={false}`: ohne eigene Live-Region-Rolle – nur wenn ein umgebender Container (immer im DOM, `aria-live`) die Ansage übernimmt, z. B. der Meldungsbereich
  * im Anwendungsrahmen (`FlashNotice`); eine erst beim Auftauchen eingefügte Rolle wird von Screenreadern oft nicht angesagt.
  */
-export function Alert({ tone = "info", live = true, children }: { tone?: "info" | "warning" | "danger" | "success"; live?: boolean; children: ReactNode }) {
+export function Alert({ tone = "info", live = true, className, children }: { tone?: "info" | "warning" | "danger" | "success"; live?: boolean; className?: string; children: ReactNode }) {
   const toneClass = {
     info: "bg-info-bg text-info-ink",
     warning: "bg-warning-bg text-warning-ink",
@@ -105,7 +105,7 @@ export function Alert({ tone = "info", live = true, children }: { tone?: "info" 
     success: "bg-success-bg text-success-ink",
   }[tone];
   return (
-    <div role={live ? (tone === "danger" ? "alert" : "status") : undefined} className={clsx("rounded-md px-3.5 py-2.5 text-sm", toneClass)}>
+    <div role={live ? (tone === "danger" ? "alert" : "status") : undefined} className={clsx("rounded-md px-3.5 py-2.5 text-sm", toneClass, className)}>
       {children}
     </div>
   );

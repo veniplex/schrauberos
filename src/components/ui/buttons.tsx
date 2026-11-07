@@ -4,7 +4,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
-import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ComponentProps } from "react";
 import { LinkPending } from "./link-pending";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -12,7 +12,7 @@ export type ButtonSize = "md" | "sm" | "icon" | "icon-sm";
 
 type ButtonLook = { variant?: ButtonVariant; size?: ButtonSize };
 
-function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSize = "md") {
+export function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSize = "md") {
   return clsx(
     "btn",
     variant === "primary" && "btn-primary",
@@ -72,37 +72,6 @@ export function SubmitButton({
       disabled={pending || props.disabled}
       aria-busy={pending || undefined}
       className={clsx(buttonClass(variant, size), className)}
-    >
-      {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-      {children}
-    </button>
-  );
-}
-
-/** Submit-Button mit Browser-Rückfrage (z. B. Löschen). */
-export function ConfirmSubmitButton({
-  message,
-  children,
-  variant = "danger",
-  size = "sm",
-  className,
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> &
-  ButtonLook & {
-    message: string;
-    children: ReactNode;
-  }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      {...props}
-      type="submit"
-      disabled={pending || props.disabled}
-      aria-busy={pending || undefined}
-      className={clsx(buttonClass(variant, size), className)}
-      onClick={(e) => {
-        if (!window.confirm(message)) e.preventDefault();
-      }}
     >
       {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
       {children}

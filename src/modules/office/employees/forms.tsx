@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState, useRef } from "react";
-import { type ActionState, Checkbox, Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
-import { LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Checkbox, Field, Form, FormActions, Input, Select, Textarea } from "@/components/ui/form";
+import { SubmitButton } from "@/components/ui/buttons";
 import { Card } from "@/components/ui/layout";
 import { ABSENCE_TYPES, DEPARTMENTS } from "@/modules/office/employees/domain";
 import { useI18n } from "@/i18n/client";
@@ -43,10 +42,8 @@ export function EmployeeForm({
   cancelHref: string;
 }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveEmployee, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <form action={action} className="flex max-w-4xl flex-col gap-5">
+    <Form action={saveEmployee} draftKey={`employee:${initial.id ?? "new"}`} className="flex max-w-4xl flex-col gap-5">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -56,14 +53,14 @@ export function EmployeeForm({
 
       <Card title={t("employees.sections.person")}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("employees.fields.firstName")} htmlFor="firstName" error={err.firstName} required>
-            <Input id="firstName" name="firstName" defaultValue={initial.firstName} invalid={!!err.firstName} maxLength={60} required autoComplete="off" />
+          <Field label={t("employees.fields.firstName")} htmlFor="firstName" name="firstName" required>
+            <Input id="firstName" name="firstName" defaultValue={initial.firstName} maxLength={60} required autoComplete="off" />
           </Field>
-          <Field label={t("employees.fields.lastName")} htmlFor="lastName" error={err.lastName} required>
-            <Input id="lastName" name="lastName" defaultValue={initial.lastName} invalid={!!err.lastName} maxLength={60} required autoComplete="off" />
+          <Field label={t("employees.fields.lastName")} htmlFor="lastName" name="lastName" required>
+            <Input id="lastName" name="lastName" defaultValue={initial.lastName} maxLength={60} required autoComplete="off" />
           </Field>
-          <Field label={t("employees.fields.personnelNumber")} htmlFor="personnelNumber" error={err.personnelNumber}>
-            <Input id="personnelNumber" name="personnelNumber" defaultValue={initial.personnelNumber} invalid={!!err.personnelNumber} maxLength={30} autoComplete="off" />
+          <Field label={t("employees.fields.personnelNumber")} htmlFor="personnelNumber" name="personnelNumber">
+            <Input id="personnelNumber" name="personnelNumber" defaultValue={initial.personnelNumber} maxLength={30} autoComplete="off" />
           </Field>
           <Field label={t("employees.fields.jobTitle")} htmlFor="jobTitle">
             <Input id="jobTitle" name="jobTitle" defaultValue={initial.jobTitle} maxLength={80} autoComplete="off" />
@@ -77,7 +74,7 @@ export function EmployeeForm({
               ))}
             </Select>
           </Field>
-          <Field label={t("employees.fields.vacationDays")} htmlFor="vacationDaysPerYear" error={err.vacationDaysPerYear} hint={t("employees.fields.vacationDaysHint")}>
+          <Field label={t("employees.fields.vacationDays")} htmlFor="vacationDaysPerYear" name="vacationDaysPerYear" hint={t("employees.fields.vacationDaysHint")}>
             <Input id="vacationDaysPerYear" name="vacationDaysPerYear" type="number" min={0} max={60} defaultValue={initial.vacationDaysPerYear} />
           </Field>
         </div>
@@ -85,8 +82,8 @@ export function EmployeeForm({
 
       <Card title={t("employees.sections.contact")}>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={t("customers.fields.email")} htmlFor="email" error={err.email}>
-            <Input id="email" name="email" type="email" defaultValue={initial.email} invalid={!!err.email} autoComplete="off" />
+          <Field label={t("customers.fields.email")} htmlFor="email" name="email">
+            <Input id="email" name="email" type="email" defaultValue={initial.email} autoComplete="off" />
           </Field>
           <Field label={t("customers.fields.phone")} htmlFor="phone">
             <Input id="phone" name="phone" type="tel" defaultValue={initial.phone} autoComplete="off" />
@@ -102,13 +99,13 @@ export function EmployeeForm({
           <Field label={t("employees.fields.hireDate")} htmlFor="hireDate">
             <Input id="hireDate" name="hireDate" type="date" defaultValue={initial.hireDate} />
           </Field>
-          <Field label={t("employees.fields.leaveDate")} htmlFor="leaveDate" error={err.leaveDate}>
-            <Input id="leaveDate" name="leaveDate" type="date" defaultValue={initial.leaveDate} invalid={!!err.leaveDate} />
+          <Field label={t("employees.fields.leaveDate")} htmlFor="leaveDate" name="leaveDate">
+            <Input id="leaveDate" name="leaveDate" type="date" defaultValue={initial.leaveDate} />
           </Field>
         </div>
         <Checkbox name="active" defaultChecked={initial.active} label={t("employees.fields.active")} className="mt-4" />
-        <Field label={t("employees.fields.userAccount")} htmlFor="userId" error={err.userId} hint={t("employees.fields.userAccountHint")} className="mt-4">
-          <Select id="userId" name="userId" defaultValue={initial.userId} invalid={!!err.userId}>
+        <Field label={t("employees.fields.userAccount")} htmlFor="userId" name="userId" hint={t("employees.fields.userAccountHint")} className="mt-4">
+          <Select id="userId" name="userId" defaultValue={initial.userId}>
             <option value="">{t("employees.fields.noUser")}</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
@@ -127,26 +124,20 @@ export function EmployeeForm({
           <p className="mb-3 text-sm text-ink-muted">{t("employees.sensitiveHint")}</p>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label={t("employees.fields.emergencyName")} htmlFor="emergencyName">
-              <Input id="emergencyName" name="emergencyName" defaultValue={initial.emergencyName} maxLength={80} autoComplete="off" />
+              <Input id="emergencyName" name="emergencyName" data-no-draft defaultValue={initial.emergencyName} maxLength={80} autoComplete="off" />
             </Field>
             <Field label={t("employees.fields.emergencyPhone")} htmlFor="emergencyPhone">
-              <Input id="emergencyPhone" name="emergencyPhone" type="tel" defaultValue={initial.emergencyPhone} autoComplete="off" />
+              <Input id="emergencyPhone" name="emergencyPhone" data-no-draft type="tel" defaultValue={initial.emergencyPhone} autoComplete="off" />
             </Field>
             <Field label={t("employees.fields.emergencyRelation")} htmlFor="emergencyRelation">
-              <Input id="emergencyRelation" name="emergencyRelation" defaultValue={initial.emergencyRelation} maxLength={40} autoComplete="off" />
+              <Input id="emergencyRelation" name="emergencyRelation" data-no-draft defaultValue={initial.emergencyRelation} maxLength={40} autoComplete="off" />
             </Field>
           </div>
         </Card>
       ) : null}
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={cancelHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={cancelHref} />
+    </Form>
   );
 }
 
@@ -168,14 +159,12 @@ export function AbsenceForm({
   closeHref: string;
 }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveAbsence, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <Form action={saveAbsence} className="flex flex-col gap-4">
       <input type="hidden" name="returnTo" value={returnTo} />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("employees.title")} htmlFor="employeeId" error={err.employeeId} required>
-          <Select id="employeeId" name="employeeId" defaultValue={initialEmployeeId} invalid={!!err.employeeId} required>
+        <Field label={t("employees.title")} htmlFor="employeeId" name="employeeId" required>
+          <Select id="employeeId" name="employeeId" defaultValue={initialEmployeeId} required>
             <option value="" disabled>
               {t("employees.fields.choose")}
             </option>
@@ -186,8 +175,8 @@ export function AbsenceForm({
             ))}
           </Select>
         </Field>
-        <Field label={t("employees.fields.absenceType")} htmlFor="type" error={err.type} required>
-          <Select id="type" name="type" defaultValue="vacation" invalid={!!err.type}>
+        <Field label={t("employees.fields.absenceType")} htmlFor="type" name="type" required>
+          <Select id="type" name="type" defaultValue="vacation">
             {ABSENCE_TYPES.filter((x) => x !== "sick" || canSensitive).map((x) => (
               <option key={x} value={x}>
                 {td(`employees.absenceTypes.${x}`, x)}
@@ -195,24 +184,18 @@ export function AbsenceForm({
             ))}
           </Select>
         </Field>
-        <Field label={t("employees.fields.from")} htmlFor="startDate" error={err.startDate} required>
-          <Input id="startDate" name="startDate" type="date" defaultValue={initialDate} invalid={!!err.startDate} required />
+        <Field label={t("employees.fields.from")} htmlFor="startDate" name="startDate" required>
+          <Input id="startDate" name="startDate" type="date" defaultValue={initialDate} required />
         </Field>
-        <Field label={t("employees.fields.to")} htmlFor="endDate" error={err.endDate} hint={t("employees.fields.toHint")} required>
-          <Input id="endDate" name="endDate" type="date" defaultValue={initialDate} invalid={!!err.endDate} required />
+        <Field label={t("employees.fields.to")} htmlFor="endDate" name="endDate" hint={t("employees.fields.toHint")} required>
+          <Input id="endDate" name="endDate" type="date" defaultValue={initialDate} required />
         </Field>
       </div>
       <Field label={t("common.notes")} htmlFor="note">
         <Input id="note" name="note" maxLength={200} />
       </Field>
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={closeHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={closeHref} />
+    </Form>
   );
 }
 
@@ -220,26 +203,19 @@ export function AbsenceForm({
 
 export function QualificationForm({ employeeId }: { employeeId: string }) {
   const { t } = useI18n();
-  const formRef = useRef<HTMLFormElement>(null);
-  const [state, action] = useActionState<ActionState, FormData>(async (prev, fd) => {
-    const result = await saveQualification(prev, fd);
-    if (result.ok) formRef.current?.reset();
-    return result;
-  }, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <form ref={formRef} action={action} className="flex flex-wrap items-start gap-3">
+    <Form action={saveQualification} className="flex flex-wrap items-start gap-3">
       <input type="hidden" name="employeeId" value={employeeId} />
-      <Input name="name" placeholder={t("employees.fields.qualification")} aria-label={t("employees.fields.qualification")} className="min-w-48 flex-[2]" maxLength={100} required invalid={!!err.name} />
+      <Input name="name" placeholder={t("employees.fields.qualification")} aria-label={t("employees.fields.qualification")} className="min-w-48 flex-[2]" maxLength={100} required />
       <Field label={t("employees.fields.issuedAt")} htmlFor="issuedAt" className="min-w-36 flex-1">
         <Input id="issuedAt" name="issuedAt" type="date" />
       </Field>
-      <Field label={t("employees.fields.expiresAt")} htmlFor="expiresAt" error={err.expiresAt} className="min-w-36 flex-1">
-        <Input id="expiresAt" name="expiresAt" type="date" invalid={!!err.expiresAt} />
+      <Field label={t("employees.fields.expiresAt")} htmlFor="expiresAt" name="expiresAt" className="min-w-36 flex-1">
+        <Input id="expiresAt" name="expiresAt" type="date" />
       </Field>
       <SubmitButton size="sm" className="mt-5">
         {t("common.add")}
       </SubmitButton>
-    </form>
+    </Form>
   );
 }

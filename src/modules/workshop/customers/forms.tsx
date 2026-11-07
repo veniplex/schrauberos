@@ -1,8 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
-import { type ActionState, Field, FormCard, FormMessage, Input, Textarea } from "@/components/ui/form";
-import { LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Field, FormActions, FormCard, Input, Textarea } from "@/components/ui/form";
 import { useI18n } from "@/i18n/client";
 import { saveCustomer } from "./actions";
 
@@ -24,10 +22,8 @@ export type CustomerFormValues = {
 
 export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormValues; cancelHref: string }) {
   const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveCustomer, {});
-  const err = state.fieldErrors ?? {};
   return (
-    <FormCard action={action}>
+    <FormCard action={saveCustomer} draftKey={`customer:${initial.id ?? "new"}`}>
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -35,23 +31,23 @@ export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormVal
         </>
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("customers.fields.firstName")} htmlFor="firstName" error={err.firstName}>
+        <Field label={t("customers.fields.firstName")} htmlFor="firstName" name="firstName">
           <Input id="firstName" name="firstName" defaultValue={initial.firstName} autoComplete="off" />
         </Field>
-        <Field label={t("customers.fields.lastName")} htmlFor="lastName" error={err.lastName}>
-          <Input id="lastName" name="lastName" defaultValue={initial.lastName} invalid={!!err.lastName} autoComplete="off" />
+        <Field label={t("customers.fields.lastName")} htmlFor="lastName" name="lastName">
+          <Input id="lastName" name="lastName" defaultValue={initial.lastName} autoComplete="off" />
         </Field>
-        <Field label={t("customers.fields.company")} htmlFor="company" error={err.company}>
+        <Field label={t("customers.fields.company")} htmlFor="company" name="company">
           <Input id="company" name="company" defaultValue={initial.company} autoComplete="off" />
         </Field>
-        <Field label={t("customers.fields.customerNumber")} htmlFor="customerNumber" error={err.customerNumber}>
+        <Field label={t("customers.fields.customerNumber")} htmlFor="customerNumber" name="customerNumber">
           <Input id="customerNumber" name="customerNumber" defaultValue={initial.customerNumber} autoComplete="off" />
         </Field>
-        <Field label={t("customers.fields.phone")} htmlFor="phone" error={err.phone}>
+        <Field label={t("customers.fields.phone")} htmlFor="phone" name="phone">
           <Input id="phone" name="phone" type="tel" defaultValue={initial.phone} autoComplete="off" />
         </Field>
-        <Field label={t("customers.fields.email")} htmlFor="email" error={err.email}>
-          <Input id="email" name="email" type="email" defaultValue={initial.email} invalid={!!err.email} autoComplete="off" />
+        <Field label={t("customers.fields.email")} htmlFor="email" name="email">
+          <Input id="email" name="email" type="email" defaultValue={initial.email} autoComplete="off" />
         </Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-[1fr_8rem_1fr]">
@@ -68,13 +64,7 @@ export function CustomerForm({ initial, cancelHref }: { initial: CustomerFormVal
       <Field label={t("common.notes")} htmlFor="notes">
         <Textarea id="notes" name="notes" defaultValue={initial.notes} maxLength={2000} />
       </Field>
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={cancelHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
+      <FormActions cancelHref={cancelHref} secondaryLabel={initial.id ? undefined : t("customers.saveAndAddVehicle")} />
     </FormCard>
   );
 }

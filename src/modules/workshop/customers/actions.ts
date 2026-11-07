@@ -8,6 +8,8 @@ export const saveCustomer = defineAction(saveCustomerOperation, {
   form: formObject,
   revalidate: ["/customers"],
   redirect: ({ id }) => `/customers/${id}`,
+  // „Speichern und Fahrzeug anlegen“: weiter zum Fahrzeugformular mit dem neuen Kunden als Halter
+  redirectNext: ({ id }) => `/vehicles/new?customer=${id}`,
 });
 
 export const deleteCustomer = defineAction(deleteCustomerOperation, {

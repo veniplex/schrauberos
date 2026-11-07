@@ -1,15 +1,15 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Bold, CheckSquare, Code, Heading2, ImagePlus, Italic, Link2, List, Table } from "lucide-react";
-import { type ActionState, Checkbox, Field, FieldError, FileInput, FormMessage, Input, Select } from "@/components/ui/form";
-import { Button, LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Checkbox, Field, FieldError, FileInput, Form, FormActions, Input, Select } from "@/components/ui/form";
+import { Button } from "@/components/ui/buttons";
 import { useI18n } from "@/i18n/client";
 import { saveDocPage } from "./actions";
 import { Markdown } from "@/components/ui/markdown";
 import { SegmentedControl } from "@/components/ui/segmented";
 import { Alert } from "@/components/ui/layout";
-import { DOC_AREAS_WITH_PASSWORD_HINT } from "./areas";
+import { DOC_AREAS_WITH_PASSWORD_HINT, DOC_IMAGE_MAX_BYTES } from "./areas";
 
 export type DocEditorInitial = {
   id?: string;
@@ -60,14 +60,12 @@ export function DocEditor({
   cancelHref: string;
 }) {
   const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveDocPage, {});
   const [content, setContent] = useState(initial.content);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const err = state.fieldErrors ?? {};
 
   function apply(fn: (value: string, s: number, e: number) => Edit) {
     const ta = ref.current;
@@ -106,7 +104,7 @@ export function DocEditor({
   }
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <Form action={saveDocPage} warnOnLeave className="flex flex-col gap-4">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -117,10 +115,10 @@ export function DocEditor({
       {(DOC_AREAS_WITH_PASSWORD_HINT as readonly string[]).includes(area) ? <Alert tone="warning">{t("docs.noPasswordsHint")}</Alert> : null}
 
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
-        <Field label={t("docs.fields.title")} htmlFor="title" error={err.title} required>
-          <Input id="title" name="title" defaultValue={initial.title} invalid={!!err.title} maxLength={120} required autoComplete="off" />
+        <Field label={t("docs.fields.title")} htmlFor="title" name="title" required>
+          <Input id="title" name="title" defaultValue={initial.title} maxLength={120} required autoComplete="off" />
         </Field>
-        <Field label={t("docs.fields.category")} htmlFor="categoryId" error={err.categoryId}>
+        <Field label={t("docs.fields.category")} htmlFor="categoryId" name="categoryId">
           <Select id="categoryId" name="categoryId" defaultValue={initial.categoryId}>
             <option value="">{t("docs.noCategory")}</option>
             {categories.map((c) => (
@@ -148,6 +146,8 @@ export function DocEditor({
             <FileInput
               ref={fileRef}
               accept="image/png,image/jpeg,image/webp,image/gif"
+              maxBytes={DOC_IMAGE_MAX_BYTES}
+              onReject={() => setUploadError(t("docs.errors.imageSize"))}
               className="hidden"
               aria-hidden
               tabIndex={-1}
@@ -196,13 +196,7 @@ export function DocEditor({
 
       <Checkbox name="pinned" defaultChecked={initial.pinned} label={t("docs.fields.pinned")} />
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={cancelHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={cancelHref} />
+    </Form>
   );
 }

@@ -44,7 +44,7 @@ describe("Fahrzeugsuche", () => {
     const { status, body } = await get(vehicles.GET, "BAB");
     assert.equal(status, 200);
     assert.equal(body.results.length, 1);
-    assert.deepEqual(Object.keys(body.results[0]).sort(), ["customer", "description", "id", "plate"]);
+    assert.deepEqual(Object.keys(body.results[0]).sort(), ["customer", "description", "id", "label", "plate", "sublabel"]);
     assert.equal(body.results[0].customer, "Erika Mustermann");
     assert.equal(JSON.stringify(body).includes("erika@example.org"), false);
     assert.equal(JSON.stringify(body).includes("Berlin"), false);

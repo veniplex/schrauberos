@@ -61,6 +61,7 @@ export const invoicesDe = {
     net: "Netto",
     vat: "MwSt.",
     gross: "Brutto",
+    grossSuggested: "Vorschlag aus Netto + MwSt. – du kannst ihn überschreiben.",
     amountHint: "Pflicht ist der Brutto-Betrag. Netto und MwSt. sind optional (z. B. 1.234,56).",
     paidAt: "Bezahlt am",
     paidAtHint: "Nur bei Status „Bezahlt“ – leer = Rechnungsdatum.",

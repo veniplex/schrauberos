@@ -1,4 +1,4 @@
-import type { ZodError } from "zod";
+import { fieldMessages, type FieldMessage } from "@/lib/field-errors";
 import type { MessageKey, Vars } from "@/i18n/translate";
 
 /**
@@ -24,7 +24,7 @@ export type ErrorCode =
   /** unerwarteter Fehler */
   | "failed";
 
-export type FieldMessage = { key: MessageKey; params?: Vars };
+export type { FieldMessage };
 
 export type OperationFailure = {
   code: ErrorCode;
@@ -76,26 +76,11 @@ export function failFields(fields: Record<string, FieldMessage>): never {
 }
 
 /**
- * Zod-Fehler → Feldname → Meldungsschlüssel (Code→Schlüssel-Abbildung; Texte und Darstellung liefert der Adapter bzw. später das Formular-Paket).
- * Leere Formularfelder fehlen vorab im Objekt → „fehlt“ = Pflichtfeld. Eigene Prüfungen (`custom`) tragen den Meldungsschlüssel
- * als `message` und Platzhalter in `params`: `ctx.addIssue({ code: "custom", message: "account.errors.passwordShort", params: { min: 8 } })`.
+ * Zod-Fehler → Feldname → Meldungsschlüssel (Code→Schlüssel-Abbildung, siehe `src/lib/field-errors.ts`: spezifische Texte für E-Mail, Zahlenbereiche, Länge, eigene
+ * Schlüssel wie `validation.vin`; Texte und Darstellung liefern der Adapter und `Field`/`FormErrorSummary`). Leere Formularfelder fehlen vorab im Objekt → „fehlt“ = Pflichtfeld.
+ * Eigene Prüfungen tragen den Meldungsschlüssel als `message` und Platzhalter in `params`: `ctx.addIssue({ code: "custom", message: "account.errors.passwordShort", params: { min: 8 } })`.
  */
-const KEY_SHAPE = /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/;
-
-export function fieldErrors(error: ZodError): Record<string, FieldMessage> {
-  const out: Record<string, FieldMessage> = {};
-  for (const issue of error.issues) {
-    const field = String(issue.path[0] ?? "_");
-    if (out[field]) continue;
-    if (issue.code === "custom") {
-      // Eigene Prüfungen tragen den Meldungsschlüssel in `message`; ein `refine` ohne eigenen Schlüssel (Zod-Standardtext) wird „ungültig“
-      out[field] = KEY_SHAPE.test(issue.message) ? { key: issue.message as MessageKey, params: (issue as { params?: Vars }).params } : { key: "validation.invalid" };
-      continue;
-    }
-    out[field] = { key: issue.code === "invalid_type" ? "validation.required" : issue.code === "too_big" ? "validation.tooLong" : "validation.invalid" };
-  }
-  return out;
-}
+export const fieldErrors = fieldMessages;
 
 /**
  * Fehler der Datenbank, die einen Zustand der Daten (nicht einen Programmfehler) melden: P2002 (doppelt), P2025 (fehlt), P2003 (Fremdschlüssel), P2028 (Transaktion

@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 import { NavProgress } from "@/components/ui/nav-progress";
+import { ToastProvider } from "@/components/ui/toast";
 import { I18nProvider } from "@/i18n/client";
 import { getLocale, getMessages, getTheme } from "@/i18n/server";
 import { contrastInk, isHexColor } from "@/lib/color";
@@ -45,7 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         <I18nProvider locale={locale} messages={messages}>
           <NavProgress />
-          {children}
+          <ToastProvider>{children}</ToastProvider>
         </I18nProvider>
       </body>
     </html>

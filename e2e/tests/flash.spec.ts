@@ -12,7 +12,7 @@ test("Löschen per Formular zeigt genau eine Meldung in einer Live-Region, das C
   // Kunde ohne Verknüpfungen anlegen (löschbar)
   await page.goto("/customers/new");
   await page.locator("#lastName").fill(lastName);
-  await page.getByRole("button", { name: "Speichern" }).click();
+  await page.getByRole("button", { name: "Speichern", exact: true }).click();
   await page.waitForURL((url) => /^\/customers\/(?!new$)[^/]+$/.test(url.pathname));
 
   // Die Live-Regionen sind schon da, bevor es eine Meldung gibt (leer)
@@ -22,9 +22,11 @@ test("Löschen per Formular zeigt genau eine Meldung in einer Live-Region, das C
   await expect(page.locator('[data-flash-region="assertive"]')).toHaveAttribute("aria-live", "assertive");
   await expect(page.locator('[data-flash-region="polite"]')).toBeEmpty();
 
-  // Löschen (Bestätigung des Browsers annehmen)
-  page.once("dialog", (dialog) => void dialog.accept());
+  // Löschen: Rückfrage im Dialog der Anwendung (kein Browser-Dialog) bestätigen
   await page.getByRole("button", { name: "Kunde löschen" }).click();
+  const confirm = page.getByRole("dialog");
+  await expect(confirm.getByRole("heading", { name: "Kunde löschen?" })).toBeVisible();
+  await confirm.getByRole("button", { name: "Kunde löschen" }).click();
   await page.waitForURL((url) => url.pathname === "/customers");
 
   // Genau eine Meldung, in der höflichen Region

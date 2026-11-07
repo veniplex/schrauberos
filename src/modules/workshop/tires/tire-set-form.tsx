@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { Copy } from "lucide-react";
-import { type ActionState, Checkbox, Field, FieldError, FieldLabel, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
-import { Button, LinkButton, SubmitButton } from "@/components/ui/buttons";
+import { Checkbox, Field, FieldLabel, Form, FormActions, FormFieldError, Input, Select, Textarea } from "@/components/ui/form";
+import { Button } from "@/components/ui/buttons";
 import { Card, Plate, Table } from "@/components/ui/layout";
-import { VehicleCombobox, type VehicleOption } from "@/modules/workshop/vehicles/public";
+import { VehiclePicker, type VehicleOption } from "@/modules/workshop/vehicles/public";
 import { RIM_TYPES, TIRE_CONDITIONS, TIRE_POSITIONS, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
 import { useI18n } from "@/i18n/client";
 import { createTireSet, updateTireSet } from "./actions";
@@ -38,17 +38,18 @@ export function TireSetForm({
   initial,
   locations,
   cancelHref,
+  canCreateVehicle = false,
 }: {
   initial: TireSetFormInitial;
   /** bereits genutzte Lagerorte als Vorschlagsliste */
   locations: string[];
   cancelHref: string;
+  /** Bei keinem Treffer in der Fahrzeugsuche „Fahrzeug neu anlegen“ anbieten */
+  canCreateVehicle?: boolean;
 }) {
   const { t, td } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(initial.id ? updateTireSet : createTireSet, {});
   const [spare, setSpare] = useState(initial.spare);
   const [rows, setRows] = useState(initial.tires);
-  const err = state.fieldErrors ?? {};
   const positions = TIRE_POSITIONS.filter((p) => spare || p !== "SPARE");
 
   const setRow = (pos: TirePosition, patch: Partial<TireRowInitial>) =>
@@ -64,7 +65,7 @@ export function TireSetForm({
   }
 
   return (
-    <form action={action} className="flex flex-col gap-5">
+    <Form action={initial.id ? updateTireSet : createTireSet} draftKey={`tireset:${initial.id ?? "new"}`} className="flex flex-col gap-5">
       {initial.id ? (
         <>
           <input type="hidden" name="id" value={initial.id} />
@@ -73,7 +74,7 @@ export function TireSetForm({
       ) : null}
 
       <Card title={t("tires.sections.vehicle")}>
-        <Field label={t("tires.fields.vehicle")} error={err.vehicleId} required>
+        <Field label={t("tires.fields.vehicle")} name="vehicleId" required>
           {initial.id && initial.vehicle ? (
             <>
               <input type="hidden" name="vehicleId" value={initial.vehicle.id} />
@@ -83,7 +84,7 @@ export function TireSetForm({
               </p>
             </>
           ) : (
-            <VehicleCombobox initial={initial.vehicle} invalid={!!err.vehicleId} required />
+            <VehiclePicker initial={initial.vehicle} canCreate={canCreateVehicle} required />
           )}
         </Field>
       </Card>
@@ -99,10 +100,10 @@ export function TireSetForm({
               ))}
             </Select>
           </Field>
-          <Field label={t("tires.fields.brand")} htmlFor="brand" error={err.brand}>
+          <Field label={t("tires.fields.brand")} htmlFor="brand" name="brand">
             <Input id="brand" name="brand" defaultValue={initial.brand} maxLength={60} placeholder="Continental" />
           </Field>
-          <Field label={t("tires.fields.model")} htmlFor="model" error={err.model} className="sm:col-span-2 lg:col-span-1">
+          <Field label={t("tires.fields.model")} htmlFor="model" name="model" className="sm:col-span-2 lg:col-span-1">
             <Input id="model" name="model" defaultValue={initial.model} maxLength={60} placeholder="WinterContact TS 870" />
           </Field>
           <Field label={t("tires.fields.rimType")} htmlFor="rimType">
@@ -119,14 +120,14 @@ export function TireSetForm({
         <fieldset className="mt-4">
           <FieldLabel as="legend">{t("tires.fields.size")}</FieldLabel>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <Field label={t("tires.fields.width")} htmlFor="width" error={err.width}>
-              <Input id="width" name="width" type="number" inputMode="numeric" defaultValue={initial.width} placeholder="205" invalid={!!err.width} />
+            <Field label={t("tires.fields.width")} htmlFor="width" name="width">
+              <Input id="width" name="width" type="number" inputMode="numeric" defaultValue={initial.width} placeholder="205" />
             </Field>
-            <Field label={t("tires.fields.aspect")} htmlFor="aspect" error={err.aspect}>
-              <Input id="aspect" name="aspect" type="number" inputMode="numeric" defaultValue={initial.aspect} placeholder="55" invalid={!!err.aspect} />
+            <Field label={t("tires.fields.aspect")} htmlFor="aspect" name="aspect">
+              <Input id="aspect" name="aspect" type="number" inputMode="numeric" defaultValue={initial.aspect} placeholder="55" />
             </Field>
-            <Field label={t("tires.fields.rim")} htmlFor="rim" error={err.rim}>
-              <Input id="rim" name="rim" type="number" inputMode="numeric" defaultValue={initial.rim} placeholder="16" invalid={!!err.rim} />
+            <Field label={t("tires.fields.rim")} htmlFor="rim" name="rim">
+              <Input id="rim" name="rim" type="number" inputMode="numeric" defaultValue={initial.rim} placeholder="16" />
             </Field>
             <Field label={t("tires.fields.loadIndex")} htmlFor="loadIndex">
               <Input id="loadIndex" name="loadIndex" defaultValue={initial.loadIndex} placeholder="91" maxLength={5} />
@@ -169,9 +170,8 @@ export function TireSetForm({
                       inputMode="numeric"
                       placeholder="2321"
                       maxLength={4}
-                      invalid={!!err[`tire.${pos}.dot`]}
                     />
-                    {err[`tire.${pos}.dot`] ? <FieldError>{err[`tire.${pos}.dot`]}</FieldError> : null}
+                    <FormFieldError name={`tire.${pos}.dot`} />
                   </td>
                   <td className="w-32">
                     <Input
@@ -185,9 +185,8 @@ export function TireSetForm({
                       value={rows[pos].tread}
                       onChange={(e) => setRow(pos, { tread: e.target.value })}
                       placeholder="6.5"
-                      invalid={!!err[`tire.${pos}.tread`]}
                     />
-                    {err[`tire.${pos}.tread`] ? <FieldError>{err[`tire.${pos}.tread`]}</FieldError> : null}
+                    <FormFieldError name={`tire.${pos}.tread`} />
                   </td>
                   <td>
                     <Select
@@ -238,13 +237,7 @@ export function TireSetForm({
         </Field>
       </Card>
 
-      <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
-        <LinkButton href={cancelHref}>
-          {t("common.cancel")}
-        </LinkButton>
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions cancelHref={cancelHref} />
+    </Form>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui/layout";
-import { ConfirmSubmitButton, SubmitButton } from "@/components/ui/buttons";
+import { SubmitButton } from "@/components/ui/buttons";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
 import { requirePermission } from "@/server/auth/session";
 import { FEATURES, MODULES, featureById, featuresOfModule } from "@/modules/catalog";

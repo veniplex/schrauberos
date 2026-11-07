@@ -1,14 +1,14 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { type ActionState, Checkbox, ColorPicker, Field, FieldError, FieldHint, FieldLabel, FileInput, FormMessage, Input, Select } from "@/components/ui/form";
-import { SubmitButton } from "@/components/ui/buttons";
+import { useState } from "react";
+import { Checkbox, ColorPicker, Field, FileInput, Form, FormActions, FormFieldError, Input, Select } from "@/components/ui/form";
 import { Card } from "@/components/ui/layout";
 import { ACCENT_PRESETS } from "@/lib/color";
 import { WEEKDAYS } from "@/lib/constants";
 import type { OpeningHours } from "@/lib/opening-hours";
 import { useI18n } from "@/i18n/client";
 import { saveWorkshop } from "./actions";
+import { MAX_LOGO_BYTES } from "./limits";
 
 export type WorkshopFormInitial = {
   name: string;
@@ -27,17 +27,15 @@ export type WorkshopFormInitial = {
 
 export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInitial; timezones: string[] }) {
   const { t } = useI18n();
-  const [state, action] = useActionState<ActionState, FormData>(saveWorkshop, {});
   const [accent, setAccent] = useState(initial.accentColor);
   const [closed, setClosed] = useState(() => Object.fromEntries(WEEKDAYS.map((d) => [d, initial.hours[d] === null])));
-  const err = state.fieldErrors ?? {};
 
   return (
-    <form action={action} encType="multipart/form-data" className="flex max-w-4xl flex-col gap-5">
+    <Form action={saveWorkshop} encType="multipart/form-data" className="flex max-w-4xl flex-col gap-5">
       <Card title={t("settings.workshop.identity")}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("settings.workshop.name")} htmlFor="name" error={err.name} required>
-            <Input id="name" name="name" defaultValue={initial.name} invalid={!!err.name} maxLength={80} required />
+          <Field label={t("settings.workshop.name")} htmlFor="name" name="name" required>
+            <Input id="name" name="name" defaultValue={initial.name} maxLength={80} required />
           </Field>
           <Field label={t("settings.workshop.tagline")} htmlFor="tagline">
             <Input id="tagline" name="tagline" defaultValue={initial.tagline} maxLength={120} />
@@ -56,8 +54,8 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
           <Field label={t("customers.fields.phone")} htmlFor="phone">
             <Input id="phone" name="phone" type="tel" defaultValue={initial.phone} />
           </Field>
-          <Field label={t("customers.fields.email")} htmlFor="email" error={err.email}>
-            <Input id="email" name="email" type="email" defaultValue={initial.email} invalid={!!err.email} />
+          <Field label={t("customers.fields.email")} htmlFor="email" name="email">
+            <Input id="email" name="email" type="email" defaultValue={initial.email} />
           </Field>
           <Field label={t("settings.workshop.website")} htmlFor="website" className="sm:col-span-2">
             <Input id="website" name="website" defaultValue={initial.website} placeholder="https://" />
@@ -67,8 +65,7 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
 
       <Card title={t("settings.workshop.branding")}>
         <div className="grid gap-6 sm:grid-cols-2">
-          <div>
-            <FieldLabel>{t("settings.workshop.logo")}</FieldLabel>
+          <Field label={t("settings.workshop.logo")} name="logo" hint={t("settings.workshop.logoHint")}>
             <div className="flex items-center gap-4">
               {initial.logoDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- Data-URL
@@ -77,24 +74,21 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
                 <span className="grid size-14 place-items-center rounded-md border border-dashed border-line-strong text-xs text-ink-muted">–</span>
               )}
               <div className="min-w-0 flex-1">
-                <FileInput name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" aria-label={t("settings.workshop.logo")} />
-                {err.logo ? <FieldError>{err.logo}</FieldError> : <FieldHint>{t("settings.workshop.logoHint")}</FieldHint>}
+                <FileInput name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" maxBytes={MAX_LOGO_BYTES} />
               </div>
             </div>
             {initial.logoDataUrl ? (
               <Checkbox name="removeLogo" label={t("settings.workshop.removeLogo")} className="mt-3" />
             ) : null}
-          </div>
-          <div>
-            <FieldLabel>{t("settings.workshop.accent")}</FieldLabel>
+          </Field>
+          <Field label={t("settings.workshop.accent")} name="accentColor" hint={t("settings.workshop.accentHint")} group>
             <ColorPicker name="accentColor" value={accent} presets={ACCENT_PRESETS} onChange={setAccent} customLabel={t("settings.workshop.accentCustom")} />
-            {err.accentColor ? <FieldError>{err.accentColor}</FieldError> : <FieldHint>{t("settings.workshop.accentHint")}</FieldHint>}
-          </div>
+          </Field>
         </div>
       </Card>
 
       <Card title={t("settings.workshop.timezoneTitle")}>
-        <Field label={t("settings.workshop.timezone")} htmlFor="timezone" error={err.timezone} hint={t("settings.workshop.timezoneHint")}>
+        <Field label={t("settings.workshop.timezone")} htmlFor="timezone" name="timezone" hint={t("settings.workshop.timezoneHint")}>
           <Select id="timezone" name="timezone" defaultValue={initial.timezone}>
             {timezones.map((z) => (
               <option key={z} value={z}>
@@ -122,16 +116,13 @@ export function WorkshopForm({ initial, timezones }: { initial: WorkshopFormInit
                 <span className="text-ink-muted sm:hidden">–</span>
                 <Input type="time" name={`hours.${day}.to`} defaultValue={initial.hours[day]?.[1] ?? "17:00"} disabled={closed[day]} aria-label={`${t(`enums.weekday.${day}`)} – ${t("settings.workshop.to")}`} className="w-28" />
               </div>
-              {err[`hours.${day}`] ? <FieldError className="col-span-full">{err[`hours.${day}`]}</FieldError> : null}
+              <FormFieldError name={`hours.${day}`} className="col-span-full" />
             </li>
           ))}
         </ul>
       </Card>
 
-      <FormMessage state={state} />
-      <div className="flex justify-end">
-        <SubmitButton>{t("common.save")}</SubmitButton>
-      </div>
-    </form>
+      <FormActions />
+    </Form>
   );
 }

@@ -57,7 +57,7 @@ test("Abmelden über HTTPS entfernt __Host-so_session wirklich", async ({ page, 
   await signIn(page);
   expect((await context.cookies()).map((c) => c.name)).toContain("__Host-so_session");
   await page.getByRole("button", { name: "E2E Administrator" }).click();
-  await page.getByRole("menuitem", { name: "Abmelden" }).click();
+  await page.getByRole("button", { name: "Abmelden" }).click();
   await page.waitForURL(/\/login/, { timeout: 30_000 });
   expect((await context.cookies()).map((c) => c.name)).not.toContain("__Host-so_session");
   // ohne Sitzung führt eine geschützte Seite zur Anmeldung

@@ -16,7 +16,7 @@ const vehicleInput = z.object({
   vin: z
     .string()
     .transform((v) => v.toUpperCase().replace(/\s/g, ""))
-    .pipe(z.string().regex(/^[A-HJ-NPR-Z0-9]{17}$/))
+    .pipe(z.string().regex(/^[A-HJ-NPR-Z0-9]{17}$/, { error: "validation.vin" }))
     .optional(),
   year: z.coerce.number().int().min(1950).max(2100).optional(),
   notes: z.string().max(2000).optional(),
