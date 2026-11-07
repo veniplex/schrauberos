@@ -1,6 +1,8 @@
 /**
  * Zustand des App-Starts (leichtgewichtig, ohne Datenbank-Imports, damit Layout und Health-Endpoint ihn lesen können).
- *  - `starting`: Migrationen laufen noch, `/api/health` antwortet 503,
+ *  - `starting`: Sicherung vor Migrationen und Migrationen laufen noch (`instrumentation.ts` startet sie im Hintergrund, `register()` wartet nicht darauf – Next
+ *    beantwortet vor dessen Ende gar keine Anfrage). `/api/health` antwortet 503 `{ status: "starting" }` (der Launcher verlängert dann seine Frist), und `proxy.ts` beantwortet
+ *    alles andere mit 503, damit keine Anfrage eine noch nicht migrierte Datenbank erreicht;
  *  - `ready`: alles bereit,
  *  - `failed`: Start gescheitert – der Prozess beendet sich (Launcher: Rückfall auf die Vorversion),
  *  - `reinstall`: fremde Migrationshistorie (Volume einer nicht verträglichen Version): die App bleibt bewusst am Leben, fasst die

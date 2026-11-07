@@ -249,6 +249,29 @@ describe("installierte Version (Update)", () => {
       }
     });
 
+    it("verlängert auch, wenn die Verbindung angenommen wird, aber nichts antwortet (Event-Loop blockiert: synchroner Migrationsschritt) – bis zur Obergrenze", async () => {
+      const silent = { status: 0, body: null, unresponsive: true };
+      install();
+      rig.healthReplies = [...Array.from({ length: 40 }, () => silent), ok];
+      rig.onSpawn = (proc) => void proc.exited;
+      const finished = launcherFor(volume("1.1.0"), { healthTimeoutMs: 10_000, healthMaxMs: 120_000 }).run();
+      for (let i = 0; i < 200 && readState(data).pending; i++) await new Promise((r) => setImmediate(r));
+      assert.equal(readState(data).pending, false, "Update bestätigt");
+      assert.ok(rig.clock.ms - started() >= 40_000, "länger als die Grundfrist gewartet");
+      rig.spawned[0].exit(0);
+      assert.equal(await finished, 0);
+
+      // …aber nicht ewig
+      install();
+      rig.spawned.length = 0;
+      rig.healthReplies = Array.from({ length: 1000 }, () => silent);
+      rig.onSpawn = () => undefined;
+      const before = rig.clock.ms;
+      assert.equal(await launcherFor(volume("1.1.0"), { healthTimeoutMs: 10_000, healthMaxMs: 60_000 }).run(), RESTART_EXIT_CODE);
+      const waited = rig.clock.ms - before;
+      assert.ok(waited >= 60_000 && waited <= 62_000, `bis zur Obergrenze: ${waited} ms`);
+    });
+
     it("ohne healthMaxMs gilt ein Standard von 15 Minuten; die Grundfrist wird nie unterschritten", async () => {
       assert.equal(DEFAULT_HEALTH_MAX_MS, 15 * 60_000);
       install();

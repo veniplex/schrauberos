@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { reinstallHtml } from "@/lib/reinstall-text";
+import { startingHtml, STARTING_RETRY_SECONDS } from "@/lib/starting-text";
 import { isSecureRequest, sessionCookieName } from "@/lib/session-cookie";
 import { startupState } from "@/server/startup-state";
 
@@ -23,8 +24,22 @@ function reinstallResponse(request: NextRequest): NextResponse {
   return NextResponse.json({ status: "reinstall" }, { status: 503, headers });
 }
 
+/**
+ * Der Start läuft noch (Sicherung vor Migrationen, Migrationen – `instrumentation.ts` startet ihn im Hintergrund): **Keine** Anfrage darf eine noch nicht migrierte
+ * Datenbank erreichen. Der Proxy beantwortet deshalb jeden Pfad außer `/api/health` (nicht im Matcher; meldet 503 `starting`) mit 503. Statik (`_next/static`, Icons …)
+ * und der Upload von Sicherungen liegen außerhalb des Proxys: Statik fasst die Datenbank nicht an, die Upload-Route prüft den Zustand selbst.
+ */
+function startingResponse(request: NextRequest): NextResponse {
+  const wantsHtml = request.method === "GET" && (request.headers.get("accept") ?? "").includes("text/html");
+  const headers = { "cache-control": "no-store", "retry-after": String(STARTING_RETRY_SECONDS) };
+  if (wantsHtml) return new NextResponse(startingHtml(), { status: 503, headers: { ...headers, "content-type": "text/html; charset=utf-8" } });
+  return NextResponse.json({ status: "starting" }, { status: 503, headers });
+}
+
 export function proxy(request: NextRequest) {
-  if (startupState().status === "reinstall") return reinstallResponse(request);
+  const status = startupState().status;
+  if (status === "reinstall") return reinstallResponse(request);
+  if (status !== "ready") return startingResponse(request);
   const { pathname, search } = request.nextUrl;
   if (isSelfAuthenticated(pathname)) return NextResponse.next();
   // Nur der Cookie-Name, der zum Übertragungsweg passt (unter HTTPS ausschließlich __Host-…), siehe lib/session-cookie.ts

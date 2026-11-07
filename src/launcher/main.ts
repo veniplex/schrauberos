@@ -6,7 +6,8 @@
  */
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { createLauncher, type AppProcess, type LauncherDeps } from "./launcher";
+import { positiveMs, probeHealth } from "../lib/updates/health";
+import { createLauncher, DEFAULT_HEALTH_MAX_MS, type AppProcess, type LauncherDeps } from "./launcher";
 
 const PORT = process.env.PORT ?? "3000";
 
@@ -26,14 +27,7 @@ const deps: LauncherDeps = {
     });
     return { exited, hasExited: () => done, kill: (signal) => void proc.kill(signal) };
   },
-  health: async () => {
-    try {
-      const res = await fetch(`http://127.0.0.1:${PORT}/api/health`, { signal: AbortSignal.timeout(2000) });
-      return { status: res.status, body: await res.json().catch(() => null) };
-    } catch {
-      return null; // noch nicht bereit
-    }
-  },
+  health: () => probeHealth(PORT),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now: () => Date.now(),
   log: (message) => console.log(`[launcher] ${message}`),
@@ -44,8 +38,8 @@ const launcher = createLauncher(
     own: path.resolve(process.cwd()),
     builtin: path.resolve(process.env.BUILTIN_DIR ?? "/app"),
     port: PORT,
-    healthTimeoutMs: Number(process.env.LAUNCHER_HEALTH_TIMEOUT_MS ?? 90_000),
-    healthMaxMs: Number(process.env.LAUNCHER_HEALTH_MAX_MS ?? 15 * 60_000),
+    healthTimeoutMs: positiveMs(process.env.LAUNCHER_HEALTH_TIMEOUT_MS, 90_000),
+    healthMaxMs: positiveMs(process.env.LAUNCHER_HEALTH_MAX_MS, DEFAULT_HEALTH_MAX_MS),
     env: process.env,
     execPath: process.execPath,
   },

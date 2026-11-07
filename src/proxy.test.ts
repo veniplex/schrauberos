@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { before, describe, it } from "node:test";
 import { NextRequest } from "next/server";
 import { config, proxy } from "./proxy";
 import { startupState } from "./server/startup-state";
+
+// Frisch gestartet ist der Zustand „starting“ (der Proxy sperrt dann alles) – die Tests unten prüfen den Normalbetrieb, die Sperre hat einen eigenen Abschnitt
+before(() => {
+  startupState().status = "ready";
+});
 
 /** Der Proxy ist nur die schnelle Vorprüfung (Cookie vorhanden?) – die echte Prüfung macht jede Seite selbst. */
 const request = (path: string, cookie?: string, headers: Record<string, string> = {}) =>
@@ -130,5 +135,51 @@ describe("Proxy: Neuinstallation nötig (fremde Datenbank)", () => {
     await withState("ready", () => {
       assert.ok(passes(proxy(request("/appointments", "so_session=abc"))));
     });
+  });
+});
+
+describe("Proxy: Start läuft noch (Migrationen)", () => {
+  const withStarting = async (fn: () => void | Promise<void>) => {
+    const state = startupState();
+    const before = state.status;
+    state.status = "starting";
+    try {
+      await fn();
+    } finally {
+      state.status = before;
+    }
+  };
+
+  it("beantwortet jeden Pfad mit 503 – keine Anfrage erreicht die noch nicht migrierte Datenbank", async () => {
+    await withStarting(async () => {
+      for (const path of ["/", "/login", "/setup", "/customers/abc", "/api/customers/search", "/api/v1/customers", "/api/ical/x.ics", "/api/backups/download"]) {
+        for (const cookie of [undefined, "so_session=abc"]) {
+          const res = proxy(request(path, cookie));
+          assert.equal(res.status, 503, `${path}: ${res.status}`);
+          assert.equal(res.headers.get("x-middleware-next"), null);
+          assert.equal(res.headers.get("cache-control"), "no-store");
+        }
+      }
+      const action = proxy(new NextRequest("http://localhost:3000/customers", { method: "POST", headers: { "next-action": "abc", cookie: "so_session=abc" } }));
+      assert.equal(action.status, 503);
+      assert.deepEqual(await action.json(), { status: "starting" });
+    });
+  });
+
+  it("Browser bekommen eine kurze Seite, die sich selbst neu lädt; der Health-Check liegt außerhalb des Proxys", async () => {
+    await withStarting(async () => {
+      const page = proxy(request("/", undefined, { accept: "text/html" }));
+      assert.equal(page.status, 503);
+      assert.match(page.headers.get("content-type") ?? "", /text\/html/);
+      assert.ok(page.headers.get("retry-after"));
+      const html = await page.text();
+      assert.match(html, /http-equiv="refresh"/);
+      assert.match(html, /startet/);
+      assert.equal(matched("/api/health"), false);
+    });
+  });
+
+  it("die Gesamtprüfung: nach dem Start (ready) läuft wieder alles durch", async () => {
+    assert.ok(passes(proxy(request("/appointments", "so_session=abc"))));
   });
 });

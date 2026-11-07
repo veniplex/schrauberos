@@ -32,9 +32,12 @@ const STATUS: Record<string, number> = { tooLarge: 413, diskFull: 507 };
  * Deshalb beantwortet sie den Zustand „Neuinstallation nötig“ (fremde Datenbank, die App fasst sie nicht an) selbst mit 503 – vor allem anderen.
  */
 export async function POST(request: NextRequest) {
-  if (startupState().status === "reinstall") {
+  const startup = startupState().status;
+  if (startup === "reinstall") {
     return NextResponse.json({ status: "reinstall" }, { status: 503, headers: { "cache-control": "no-store", "retry-after": "3600" } });
   }
+  // Der Start (Migrationen) läuft noch: keine Anfrage an eine noch nicht migrierte Datenbank (wie der Proxy, an dem diese Route vorbeiläuft)
+  if (startup !== "ready") return NextResponse.json({ status: "starting" }, { status: 503, headers: { "cache-control": "no-store", "retry-after": "5" } });
   const session = await getSession();
   if (!session || session.user.mustChangePassword) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!session.can("backup.manage")) return NextResponse.json({ error: "forbidden" }, { status: 403 });

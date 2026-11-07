@@ -34,8 +34,11 @@ export type SpawnSpec = { command: string; args: string[]; cwd: string; env: Nod
 
 export type LauncherDeps = {
   spawn(spec: SpawnSpec): AppProcess;
-  /** Antwort von `/api/health`; null, wenn (noch) nicht erreichbar */
-  health(): Promise<{ status: number; body: unknown } | null>;
+  /**
+   * Antwort von `/api/health`; null, wenn (noch) nicht erreichbar. `unresponsive`: Die Verbindung wurde angenommen, aber es kam keine HTTP-Antwort
+   * (Event-Loop blockiert, etwa in einem synchronen Migrationsschritt) – gilt wie „starting“ als Lebenszeichen.
+   */
+  health(): Promise<{ status: number; body: unknown; unresponsive?: boolean } | null>;
   sleep(ms: number): Promise<void>;
   now(): number;
   log(message: string): void;
@@ -90,7 +93,8 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
 
   /**
    * Wartet, bis die App gesund antwortet; false bei Zeitüberschreitung, vorzeitigem Ende oder „Neuinstallation nötig“. Die Frist (`healthTimeoutMs`) verlängert sich
-   * jedes Mal um ihre volle Länge, wenn die App mit „starting“ antwortet (sie lebt und migriert noch) – höchstens bis zur harten Obergrenze `healthMaxMs` ab Start.
+   * jedes Mal um ihre volle Länge, wenn die App mit „starting“ antwortet (sie lebt und migriert noch) oder die Verbindung annimmt, aber nicht antwortet (Event-Loop in
+   * einem synchronen Migrationsschritt blockiert) – höchstens bis zur harten Obergrenze `healthMaxMs` ab Start. Eine Verbindung, die verweigert wird, verlängert nie.
    */
   async function waitHealthy(proc: AppProcess): Promise<boolean> {
     const started = deps.now();
@@ -99,7 +103,7 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
     while (!proc.hasExited() && !stopping && deps.now() < deadline) {
       const res = await deps.health().catch(() => null);
       if (res) {
-        if (isStarting(res.status, res.body)) deadline = Math.min(hardLimit, Math.max(deadline, deps.now() + config.healthTimeoutMs));
+        if (res.unresponsive || isStarting(res.status, res.body)) deadline = Math.min(hardLimit, Math.max(deadline, deps.now() + config.healthTimeoutMs));
         const verdict = healthVerdict(res.status, res.body);
         if (verdict === "ok") return true;
         if (verdict === "fatal") {

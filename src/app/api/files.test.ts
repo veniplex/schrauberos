@@ -24,6 +24,7 @@ let core: typeof import("@/server/backup/core");
 
 before(async () => {
   env = await createTestEnv();
+  startupState().status = "ready"; // frisch gestartet ist der Zustand „starting“ (die Upload-Route sperrt dann)
   invoiceRoute = await import("./invoices/[id]/file/route");
   uploadRoute = await import("./backups/upload/route");
   downloadRoute = await import("./backups/[name]/route");
@@ -291,22 +292,22 @@ describe("Sicherung hochladen", () => {
   const uploads = () => readdirSync(core.backupsDir()).filter((f) => f.startsWith(".upload-"));
 
   it("ohne Anmeldung 401, mit Passwortwechsel 401, ohne backup.manage 403 – es wird nichts angelegt", async () => {
-    const before = core.listBackups().length;
+    const before = (await core.listBackups()).length;
     assert.equal((await post(archive)).status, 401);
     await signInWith(["backup.manage"], { mustChangePassword: true });
     assert.equal((await post(archive)).status, 401);
     await signInWith(["settings.manage"]);
     assert.equal((await post(archive)).status, 403);
-    assert.equal(core.listBackups().length, before);
+    assert.equal((await core.listBackups()).length, before);
   });
 
   it("Fremdaufrufe werden abgewiesen: ohne eigenen Header oder mit fremder Herkunft", async () => {
     await signInWith(["backup.manage"]);
-    const before = core.listBackups().length;
+    const before = (await core.listBackups()).length;
     assert.equal((await post(archive, { host: "localhost" })).status, 403, "ohne X-Requested-With");
     assert.equal((await post(archive, { "x-requested-with": "irgendwas", host: "localhost" })).status, 403);
     assert.equal((await post(archive, { "x-requested-with": "schrauberos", host: "localhost", origin: "https://evil.example" })).status, 403, "fremde Herkunft");
-    assert.equal(core.listBackups().length, before);
+    assert.equal((await core.listBackups()).length, before);
     assert.equal((await post(archive, { "x-requested-with": "schrauberos", host: "localhost", origin: "http://localhost" })).status, 200, "gleiche Herkunft ist in Ordnung");
   });
 
@@ -316,17 +317,34 @@ describe("Sicherung hochladen", () => {
     assert.equal(res.status, 200);
     const { name } = (await res.json()) as { name: string };
     assert.match(name, /-upload$/);
-    assert.ok(core.listBackups().some((b) => b.name === name));
+    assert.ok((await core.listBackups()).some((b) => b.name === name));
     assert.deepEqual(uploads(), []);
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "backup.upload" } });
     assert.equal(entry.target, name);
+  });
+
+  it("Start läuft noch (Migrationen): 503 „starting“, auch mit Sitzung – es wird nichts angelegt", async () => {
+    await signInWith(["backup.manage"]);
+    const state = startupState();
+    const before = state.status;
+    const count = (await core.listBackups()).length;
+    state.status = "starting";
+    try {
+      const res = await post(archive);
+      assert.equal(res.status, 503);
+      assert.deepEqual(await res.json(), { status: "starting" });
+    } finally {
+      state.status = before;
+    }
+    assert.equal((await core.listBackups()).length, count);
+    assert.deepEqual(uploads(), []);
   });
 
   it("Zustand „Neuinstallation nötig“: 503, auch mit Sitzung – die Route läuft nicht durch den Proxy und beantwortet das selbst, es wird nichts angelegt", async () => {
     await signInWith(["backup.manage"]);
     const state = startupState();
     const before = state.status;
-    const count = core.listBackups().length;
+    const count = (await core.listBackups()).length;
     state.status = "reinstall";
     try {
       const res = await post(archive);
@@ -335,7 +353,7 @@ describe("Sicherung hochladen", () => {
     } finally {
       state.status = before;
     }
-    assert.equal(core.listBackups().length, count);
+    assert.equal((await core.listBackups()).length, count);
     assert.deepEqual(uploads(), []);
   });
 
@@ -363,7 +381,7 @@ describe("Sicherung hochladen", () => {
 
   it("Archive mit Symlink, Hardlink, „..“-Pfad oder absolutem Pfad werden abgelehnt (422), nichts wird angelegt oder außerhalb geschrieben (SEC-14)", async () => {
     await signInWith(["backup.manage"]);
-    const before = core.listBackups().length;
+    const before = (await core.listBackups()).length;
     const outside = path.join(env.dir, "draussen.txt");
     const evil: Array<[string, RawEntry[]]> = [
       ["Symlink", [{ name: "files/link", type: "2", linkname: "../../secret.key" }]],
@@ -378,14 +396,14 @@ describe("Sicherung hochladen", () => {
       assert.equal(((await res.json()) as { error: string }).error, "notBackup", name);
     }
     assert.equal(existsSync(outside), false);
-    assert.equal(core.listBackups().length, before);
+    assert.equal((await core.listBackups()).length, before);
     assert.deepEqual(uploads(), []);
     assert.deepEqual(readdirSync(core.backupsDir()).filter((f) => f.startsWith(".import-")), [], "keine halben Entpackordner");
   });
 
   it("Schutz der Platte: angekündigte Größe über der Obergrenze 413, passt sie nicht in den freien Platz 507, während des Empfangs wird der freie Platz laufend geprüft", async () => {
     await signInWith(["backup.manage"]);
-    const before = core.listBackups().length;
+    const before = (await core.listBackups()).length;
     const GiB = 1024 ** 3;
     assert.equal((await post(archive, { "x-requested-with": "schrauberos", host: "localhost", "content-length": String(101 * GiB) })).status, 413);
 
@@ -405,7 +423,7 @@ describe("Sicherung hochladen", () => {
     } finally {
       setFreeBytesForTest(null);
     }
-    assert.equal(core.listBackups().length, before);
+    assert.equal((await core.listBackups()).length, before);
     assert.deepEqual(uploads(), [], "die halbe Datei ist gelöscht");
     const failures = await env.db.auditLog.findMany({ where: { action: "backup.uploadFailed" } });
     assert.ok(failures.some((f) => f.target === "diskFull"));
@@ -413,13 +431,13 @@ describe("Sicherung hochladen", () => {
 
   it("Müll, leerer Body und fremde Datenbanken: abgelehnt (422/400), Zwischendatei weg, Fehlschlag im Audit – nur mit Fehlercode", async () => {
     await signInWith(["backup.manage"]);
-    const before = core.listBackups().length;
+    const before = (await core.listBackups()).length;
     const junk = await post(Buffer.from("das ist kein Backup, nur Müll mit Geheimnis hunter2"));
     assert.equal(junk.status, 422);
     const body = (await junk.json()) as { error: string };
     assert.ok(["notBackup", "corrupt"].includes(body.error));
     assert.equal((await post(null)).status, 400);
-    assert.equal(core.listBackups().length, before);
+    assert.equal((await core.listBackups()).length, before);
     assert.deepEqual(uploads(), []);
     const failures = await env.db.auditLog.findMany({ where: { action: "backup.uploadFailed" } });
     assert.ok(failures.length >= 1);
