@@ -72,14 +72,18 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
     operation: Operation<unknown, unknown>;
     toInput?: (id: string) => unknown;
   };
-  /** Weitere Aktionen am Element: POST `<path>/{id}/<name>` */
+  /**
+   * Weitere Aktionen am Element: POST `<path>/{id}/<name>`. `ifMatch`: Die Aktion ändert die Zeile wie ein PATCH und verlangt deshalb den ETag im Header `If-Match`
+   * (428 ohne, 412 bei veralteter Version); die Version steht dann in `ctx.version`.
+   */
   actions?: Array<{
     name: string;
     summary: string;
     permission: Permission;
     operation: Operation<unknown, unknown>;
     body?: z.ZodObject;
-    toInput: (id: string, body: Record<string, unknown>, ctx: Ctx<Row>) => unknown;
+    ifMatch?: boolean;
+    toInput: (id: string, body: Record<string, unknown>, ctx: Ctx<Row> & { version?: string }) => unknown;
     rename?: Rename;
   }>;
 };
@@ -261,11 +265,19 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       operations: [action.operation.name],
       body: action.body,
       response: cfg.item,
+      ifMatch: !!(action.ifMatch && cfg.version),
       etag: !!cfg.version,
       handler: async (call) => {
+        let version: string | undefined;
+        if (action.ifMatch && cfg.version) {
+          const match = parseIfMatch(call.ifMatch);
+          if (match.kind === "none") throw apiProblem("precondition_required");
+          if (match.kind === "invalid") throw apiProblem("bad_request", { fields: { "If-Match": { code: "validation.invalid" } } });
+          version = match.version;
+        }
         const row = await find(call.params.id);
         if (!row) throw notFound();
-        const raw = action.toInput(call.params.id, compact((call.body ?? {}) as Record<string, unknown>), { params: call.params, call, row });
+        const raw = action.toInput(call.params.id, compact((call.body ?? {}) as Record<string, unknown>), { params: call.params, call, row, version });
         await runApiOperation(action.operation, call.principal, raw, action.rename);
         call.committed({ status: 200, body: { data: { id: call.params.id } } });
         const fresh = await find(call.params.id);
