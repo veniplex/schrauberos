@@ -137,6 +137,7 @@ export const auditEn: typeof auditDe = {
       privacyConfirm: "Retention periods confirmed or confirmation withdrawn",
       security: "Security settings changed",
       csp: "Content security policy (CSP) mode changed",
+      publicUrl: "Application address changed",
       holidays: "Holidays changed",
       backupPlan: "Backup plan changed",
       updateToken: "Update token changed",

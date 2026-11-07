@@ -61,6 +61,8 @@ export type PdfOptions = {
   language?: string;
   /** Erstellzeit (Standard: jetzt) – feste Zeit macht die Ausgabe wiederholbar */
   creationDate?: Date;
+  /** Seitengröße in Punkt (Standard A4 hochkant); Etiketten und A5/A6-Zettel setzen sie. Zulässig: 30 bis 1200 Punkt je Seite. */
+  pageSize?: { width: number; height: number };
   /** Seitenränder in Punkt; unten bleibt Platz für die Fußzeile */
   margins?: Partial<Record<"top" | "right" | "bottom" | "left", number>>;
   /** Fußzeile mit Seitenzahl; `false` schaltet sie ab */
@@ -71,6 +73,10 @@ export type PdfOptions = {
   maxPages?: number;
   maxBytes?: number;
 };
+
+/** Zulässige Seitenkante in Punkt (etwa 10 mm bis 423 mm). */
+export const MIN_PAGE_POINTS = 30;
+export const MAX_PAGE_POINTS = 1200;
 
 export const DEFAULT_MAX_PAGES = 200;
 export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
@@ -125,12 +131,18 @@ export class PdfBuilder {
   private readonly done: Promise<void>;
   private readonly margins: { top: number; right: number; bottom: number; left: number };
   private readonly options: PdfOptions;
+  private readonly pageWidth: number;
+  private readonly pageHeight: number;
   private finished = false;
   /** bisher gesetzte Zeichen (Summe aller Texte und Zellen) – Obergrenze `MAX_DOCUMENT_CHARS` */
   private chars = 0;
 
   constructor(options: PdfOptions) {
     this.options = options;
+    const size = options.pageSize;
+    if (size && !(size.width >= MIN_PAGE_POINTS && size.width <= MAX_PAGE_POINTS && size.height >= MIN_PAGE_POINTS && size.height <= MAX_PAGE_POINTS)) throw new PdfError("invalid", "pageSize");
+    this.pageWidth = size?.width ?? A4_WIDTH;
+    this.pageHeight = size?.height ?? A4_HEIGHT;
     this.margins = { top: mm(20), right: mm(20), bottom: mm(22), left: mm(20), ...options.margins };
     const fonts = loadFonts();
     const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
@@ -144,7 +156,7 @@ export class PdfBuilder {
     if (options.subject) info.Subject = cleanPdfText(options.subject).slice(0, 200);
     if (options.keywords) info.Keywords = cleanPdfText(options.keywords).slice(0, 400);
     // `font` als Puffer: pdfkit lädt dann nicht die eingebaute Helvetica (Dateien neben der Bibliothek) – das Paket braucht nur die eigene Schrift
-    this.doc = new PDFDocument({ size: [A4_WIDTH, A4_HEIGHT], margins: this.margins, bufferPages: true, font: fonts.regular as unknown as string, info, lang: options.language ?? "de-DE", displayTitle: true });
+    this.doc = new PDFDocument({ size: [this.pageWidth, this.pageHeight], margins: this.margins, bufferPages: true, font: fonts.regular as unknown as string, info, lang: options.language ?? "de-DE", displayTitle: true });
     this.doc.registerFont("regular", fonts.regular as unknown as string);
     this.doc.registerFont("bold", fonts.bold as unknown as string);
     this.doc.on("data", (chunk: Buffer) => this.chunks.push(chunk));
@@ -176,10 +188,10 @@ export class PdfBuilder {
     return this.margins.left;
   }
   get right(): number {
-    return A4_WIDTH - this.margins.right;
+    return this.pageWidth - this.margins.right;
   }
   get contentWidth(): number {
-    return A4_WIDTH - this.margins.left - this.margins.right;
+    return this.pageWidth - this.margins.left - this.margins.right;
   }
   /** aktuelle Schreibposition von oben (Punkt) */
   get y(): number {
@@ -190,7 +202,7 @@ export class PdfBuilder {
   }
   /** unterste Zeile, die noch auf die Seite passt */
   get limit(): number {
-    return A4_HEIGHT - this.margins.bottom;
+    return this.pageHeight - this.margins.bottom;
   }
   get pageCount(): number {
     return this.doc.bufferedPageRange().count;
@@ -254,20 +266,21 @@ export class PdfBuilder {
   }
 
   /** Beschriftung links, Wert rechts daneben (Anschrift, Kopfdaten, Rechnungsdaten). */
-  keyValues(rows: ReadonlyArray<readonly [string, string]>, options: { labelWidth?: number; size?: number } = {}): this {
+  keyValues(rows: ReadonlyArray<readonly [string, string]>, options: { labelWidth?: number; size?: number; /** Breite des ganzen Blocks (Standard: Inhaltsbreite) – z. B. neben einem QR-Code */ width?: number } = {}): this {
     const size = options.size ?? 9.5;
     const labelWidth = options.labelWidth ?? mm(40);
+    const total = options.width ?? this.contentWidth;
     const gap = 8;
     for (const [label, value] of rows) {
       this.font(false, size);
       const labelText = this.prep(label);
       const valueText = this.prep(value);
-      const height = Math.max(this.doc.heightOfString(labelText, { width: labelWidth }), this.doc.heightOfString(valueText, { width: this.contentWidth - labelWidth - gap }));
+      const height = Math.max(this.doc.heightOfString(labelText, { width: labelWidth }), this.doc.heightOfString(valueText, { width: total - labelWidth - gap }));
       this.ensure(height + 2);
       const top = this.doc.y;
       this.doc.fillColor(MUTED).text(labelText, this.left, top, { width: labelWidth });
       this.font(false, size);
-      this.doc.fillColor(INK).text(valueText, this.left + labelWidth + gap, top, { width: this.contentWidth - labelWidth - gap });
+      this.doc.fillColor(INK).text(valueText, this.left + labelWidth + gap, top, { width: total - labelWidth - gap });
       this.doc.y = top + height + 2;
     }
     return this;
@@ -394,6 +407,55 @@ export class PdfBuilder {
     return this;
   }
 
+  /* ------------------------------------------------------------ Feste Stellen (Etiketten, Karten) */
+
+  /**
+   * Größte Schriftgröße (in Halbpunkt-Schritten von `max` bis `min`), mit der `value` in einen Kasten aus `width` × `height` Punkt passt – für Etiketten, deren Text unterschiedlich lang ist (Kennzeichen,
+   * Lagerort). Passt es auch mit `min` nicht, ist es `min` (der Text wird dann in `textAt` am Kastenrand abgeschnitten, nie über ihn hinaus gesetzt).
+   */
+  fitSize(value: string, box: { width: number; height: number }, options: { max: number; min?: number; bold?: boolean; lineGap?: number }): number {
+    const text = this.prep(value);
+    const min = options.min ?? 5;
+    const lineGap = options.lineGap ?? 1;
+    for (let size = options.max; size > min; size -= 0.5) {
+      this.font(options.bold ?? false, size);
+      if (this.doc.heightOfString(text, { width: box.width, lineGap }) <= box.height + 0.01) return size;
+    }
+    return min;
+  }
+
+  /**
+   * Text in einen Kasten an fester Stelle (Punkt von links oben der Seite). Nichts läuft über den Kasten hinaus: Was nicht mehr passt, wird mit „…“ abgeschnitten. Setzt die Schreibposition
+   * (`y`) nicht fort und bricht nie auf eine neue Seite um. Liefert die belegte Höhe.
+   */
+  textAt(value: string, box: { x: number; y: number; width: number; height: number }, style: Omit<TextStyle, "x" | "width" | "after"> & { valign?: "top" | "middle" } = {}): number {
+    const { size = 10, bold = false, muted = false, color, align = "left", lineGap = 1, valign = "top" } = style;
+    const text = this.prep(value);
+    this.font(bold, size);
+    const used = Math.min(box.height, this.doc.heightOfString(text, { width: box.width, align, lineGap }));
+    const top = valign === "middle" ? box.y + (box.height - used) / 2 : box.y;
+    this.doc.fillColor(color ?? (muted ? MUTED : INK)).text(text, box.x, top, { width: box.width, height: valign === "middle" ? used + 0.5 : box.height, align, lineGap, ellipsis: true });
+    return used;
+  }
+
+  /** Rahmen und/oder Fläche an fester Stelle (Etikettenrand, Kästchen zum Abhaken, Schreibfläche für Notizen). */
+  rectAt(box: { x: number; y: number; width: number; height: number }, options: { stroke?: boolean; fill?: string; lineWidth?: number; dash?: number } = {}): this {
+    if (options.fill) this.doc.rect(box.x, box.y, box.width, box.height).fill(options.fill);
+    if (options.stroke) {
+      this.doc.save();
+      if (options.dash) this.doc.dash(options.dash, { space: options.dash });
+      this.doc.rect(box.x, box.y, box.width, box.height).lineWidth(options.lineWidth ?? 0.6).strokeColor(LINE).stroke();
+      this.doc.restore();
+    }
+    return this;
+  }
+
+  /** Linie an fester Stelle (Schreiblinien, Trennlinie). */
+  lineAt(x1: number, y1: number, x2: number, y2: number, options: { lineWidth?: number; dark?: boolean } = {}): this {
+    this.doc.moveTo(x1, y1).lineTo(x2, y2).lineWidth(options.lineWidth ?? 0.5).strokeColor(options.dark ? INK : LINE).stroke();
+    return this;
+  }
+
   /* ------------------------------------------------------------ Ende */
 
   private decoratePages(): void {
@@ -409,7 +471,7 @@ export class PdfBuilder {
       }
       if (footer !== false) {
         const label = (footer?.pageLabel ?? ((page: number, count: number) => `Seite ${page} von ${count}`))(index + 1, total);
-        const y = A4_HEIGHT - mm(12);
+        const y = this.pageHeight - mm(12);
         this.font(false, 8);
         this.doc.fillColor(MUTED);
         if (footer?.text) this.doc.text(oneLine(footer.text, 160), this.left, y, { width: this.contentWidth * 0.7, lineBreak: false });

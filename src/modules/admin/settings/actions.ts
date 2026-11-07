@@ -9,6 +9,7 @@ import { formObject } from "@/lib/forms";
 import { isValidTime } from "@/lib/opening-hours";
 import { DEFAULT_INVOICE_NUMBER_FORMAT, parseInvoiceNumberFormat } from "@/lib/invoice-number-format";
 import { LOGO_TYPES } from "@/lib/logo";
+import { parsePublicUrl, PUBLIC_URL_MAX_LENGTH } from "@/lib/public-url";
 import { checkUpload } from "@/lib/upload-sniff";
 import { moneyCents } from "@/lib/zod-fields";
 import { AUDIT_RETENTION_KEY, AUDIT_RETENTION_MAX_DAYS, AUDIT_RETENTION_MIN_DAYS, parseRetentionDays } from "@/server/audit-retention";
@@ -16,6 +17,7 @@ import { CSP_MODE_KEY, parseCspMode, setCspModeInProcess } from "@/lib/csp-mode"
 import { BEHIND_PROXY_KEY } from "@/server/auth/network";
 import { IDLE_TIMEOUT_KEY, IDLE_TIMEOUT_MAX_HOURS, parseIdleHours, REQUIRE_2FA_ADMINS_KEY } from "@/server/auth/policy";
 import { jobRunner } from "@/server/jobs";
+import { PUBLIC_URL_KEY } from "@/server/public-url";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
@@ -203,6 +205,32 @@ export const saveSecurity = defineAction(saveSecurityOperation, {
   revalidate: ["/settings"],
   message: "common.saved",
 });
+
+/**
+ * Adresse der Anwendung (QR-Codes auf Etiketten, Adresse des Kalender-Abos): leer = nicht gesetzt. Nur eine Herkunft (`lib/public-url.ts`); sie kommt nie aus dem Header einer Anfrage.
+ * Alter und neuer Wert stehen im Audit-Log (ein Etikett mit falscher Adresse führt Leute auf eine fremde Seite – das muss man nachvollziehen können).
+ */
+const savePublicUrlOperation = defineOperation({
+  name: "admin.settings.savePublicUrl",
+  permission: "settings.manage",
+  input: z.object({ publicUrl: z.string().max(PUBLIC_URL_MAX_LENGTH + 20).default("") }),
+  audit: "settings.publicUrl",
+  run: async ({ input, tx, audit }) => {
+    const text = input.publicUrl.trim();
+    let value: string | null = null;
+    if (text !== "") {
+      const parsed = parsePublicUrl(text);
+      if (!parsed.ok) failField("publicUrl", `settings.errors.publicUrl.${parsed.error}`);
+      value = parsed.value;
+    }
+    const before = (await tx.appSetting.findUnique({ where: { key: PUBLIC_URL_KEY } }))?.value ?? null;
+    await setSetting(PUBLIC_URL_KEY, value, tx);
+    audit({ target: `${before ?? "–"} → ${value ?? "–"}` });
+    return { saved: true };
+  },
+});
+
+export const savePublicUrl = defineAction(savePublicUrlOperation, { form: formObject, revalidate: ["/settings"], message: "common.saved" });
 
 /**
  * Notschalter der Content-Security-Policy: „nur melden“ statt erzwingen. Der Proxy liest den Zustand aus dem Prozess (`lib/csp-mode.ts`), nicht aus der Datenbank –

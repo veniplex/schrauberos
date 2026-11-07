@@ -507,6 +507,7 @@ export const en: Messages = {
       hours: { label: "Set the opening hours", hint: "The opening hours are part of the profile and the basis for the calendar and hints." },
       holidays: { label: "Choose the holiday region", hint: "State or canton determines the statutory holidays; they feed into the working days of absences and the notes in the appointment form." },
       https: { label: "Set up an encrypted connection (HTTPS)", hint: "Without HTTPS passwords travel the network unencrypted – acceptable on a local network, not for access from outside." },
+      publicUrl: { label: "Enter the application address", hint: "Labels with a QR code and the calendar subscription need the address at which the application can be reached." },
       twoFactor: { label: "Set up two-factor sign-in for your own account", hint: "A second factor (authenticator app) protects administrators if the password becomes known." },
     },
     security: {
@@ -520,6 +521,13 @@ export const en: Messages = {
       auditRetention: "Keep audit log (days)",
       auditRetentionHint: "Older audit log entries are deleted daily (data minimisation). Default: 730 days (2 years); at least 30 days; 0 = keep forever.",
       behindProxyHint: "Turn this on only if a reverse proxy really sits in front that appends the client address as the last X-Forwarded-For entry (nginx: proxy_add_x_forwarded_for). Sign-in then additionally limits failed attempts per address. Without a real proxy anyone can forge the address in the header and get other people's addresses blocked. Even with a proxy: if many devices share one address (office network behind NAT), the limit hits all of them together – administrators included, except on devices they chose to remember when signing in. When in doubt, leave it off.",
+      publicUrl: {
+        title: "Application address",
+        label: "Address (origin)",
+        hint: "The address people use to open the application in a browser, for example https://workshop.example or http://192.168.1.10:3000 – without a path. It is used in the QR codes of tyre storage labels (the system camera opens the tyre set page with it) and in the address of the calendar subscription. It is never derived from the request, only set here. Leave it empty = not set: labels are then printed without a QR code.",
+        httpNote: "The address starts with http:// – fine inside the workshop network; labels and calendar subscriptions used from outside need HTTPS.",
+        unset: "No address has been entered yet.",
+      },
       csp: {
         title: "Content security policy (CSP)",
         reportOnly: "Emergency mode: only report the policy, do not enforce it",
@@ -554,6 +562,13 @@ export const en: Messages = {
         brace: "Curly braces must come in pairs.",
       },
       auditRetentionMin: "At least {min} days (or 0 for unlimited).",
+      publicUrl: {
+        empty: "Please enter an address.",
+        invalid: "This is not a valid address. Example: https://workshop.example",
+        scheme: "The address must start with https:// or http://.",
+        credentials: "The address must not contain a user name or password.",
+        extra: "Please enter only the application address without a path, parameters or anchor (https://workshop.example).",
+      },
       requireTwoFactorOwn: "You can only make this mandatory after you have set up two-factor sign-in yourself (My account → Security). Otherwise you would lock yourself out.",
     },
     workshop: {

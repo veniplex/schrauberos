@@ -507,6 +507,7 @@ export const de = {
       hours: { label: "Öffnungszeiten festlegen", hint: "Die Öffnungszeiten stehen im Profil und sind Grundlage für Kalender und Hinweise." },
       holidays: { label: "Region der Feiertage wählen", hint: "Bundesland oder Kanton bestimmt die gesetzlichen Feiertage; sie fließen in die Arbeitstage der Abwesenheiten und in die Hinweise im Terminformular ein." },
       https: { label: "Verschlüsselte Verbindung (HTTPS) einrichten", hint: "Ohne HTTPS laufen Passwörter unverschlüsselt durchs Netz – im lokalen Netz geht das, für den Zugriff von außen nicht." },
+      publicUrl: { label: "Adresse der Anwendung eintragen", hint: "Etiketten mit QR-Code und das Kalender-Abo brauchen die Adresse, unter der die Anwendung erreichbar ist." },
       twoFactor: { label: "Zwei-Faktor-Anmeldung für das eigene Konto einrichten", hint: "Ein zweiter Faktor (Authenticator-App) schützt Administratoren, falls das Passwort bekannt wird." },
     },
     security: {
@@ -520,6 +521,13 @@ export const de = {
       auditRetention: "Audit-Log aufbewahren (Tage)",
       auditRetentionHint: "Ältere Einträge des Audit-Logs werden täglich gelöscht (Datensparsamkeit). Standard: 730 Tage (2 Jahre); mindestens 30 Tage; 0 = unbegrenzt aufbewahren.",
       behindProxyHint: "Nur einschalten, wenn wirklich ein Reverse-Proxy davorsteht, der die Adresse des Clients als letzten Eintrag von X-Forwarded-For anhängt (nginx: proxy_add_x_forwarded_for). Dann begrenzt die Anmeldung Fehlversuche zusätzlich je Adresse. Ohne echten Proxy kann jeder die Adresse im Header vortäuschen und damit fremde Adressen sperren lassen. Auch mit Proxy gilt: Teilen sich viele Geräte eine Adresse (Büro-Netz hinter NAT), trifft die Begrenzung alle gemeinsam – auch Administratoren, außer auf Geräten, die sie bei der Anmeldung gemerkt haben. Im Zweifel ausgeschaltet lassen.",
+      publicUrl: {
+        title: "Adresse der Anwendung",
+        label: "Adresse (Herkunft)",
+        hint: "Die Adresse, unter der die Leute die Anwendung im Browser öffnen, zum Beispiel https://werkstatt.example oder http://192.168.1.10:3000 – ohne Pfad. Sie steht in den QR-Codes der Reifenlager-Etiketten (die Systemkamera öffnet damit die Seite des Reifensatzes) und in der Adresse des Kalender-Abos. Sie wird nie aus der Anfrage abgeleitet, sondern nur hier festgelegt. Leer lassen = nicht gesetzt: Etiketten werden dann ohne QR-Code gedruckt.",
+        httpNote: "Die Adresse beginnt mit http:// – im Werkstattnetz geht das; Etiketten und Kalender-Abos von außerhalb brauchen HTTPS.",
+        unset: "Es ist noch keine Adresse eingetragen.",
+      },
       csp: {
         title: "Inhaltssicherheitsrichtlinie (CSP)",
         reportOnly: "Notbetrieb: Richtlinie nur melden, nicht erzwingen",
@@ -554,6 +562,13 @@ export const de = {
         brace: "Geschweifte Klammern müssen paarweise stehen.",
       },
       auditRetentionMin: "Mindestens {min} Tage (oder 0 für unbegrenzt).",
+      publicUrl: {
+        empty: "Bitte eine Adresse eintragen.",
+        invalid: "Das ist keine gültige Adresse. Beispiel: https://werkstatt.example",
+        scheme: "Die Adresse muss mit https:// oder http:// beginnen.",
+        credentials: "Die Adresse darf keinen Benutzernamen und kein Passwort enthalten.",
+        extra: "Bitte nur die Adresse der Anwendung ohne Pfad, Parameter oder Anker angeben (https://werkstatt.example).",
+      },
       requireTwoFactorOwn: "Die Pflicht lässt sich erst einschalten, wenn die eigene Zwei-Faktor-Anmeldung eingerichtet ist (Mein Konto → Sicherheit). Sonst sperrt sie das eigene Konto aus.",
     },
     workshop: {

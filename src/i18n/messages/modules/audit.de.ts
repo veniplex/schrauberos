@@ -135,6 +135,7 @@ export const auditDe = {
       privacyConfirm: "Aufbewahrungsfristen bestätigt oder Bestätigung zurückgenommen",
       security: "Sicherheits-Einstellungen geändert",
       csp: "Inhaltssicherheitsrichtlinie (CSP) umgestellt",
+      publicUrl: "Adresse der Anwendung geändert",
       holidays: "Feiertage geändert",
       backupPlan: "Backup-Plan geändert",
       updateToken: "Update-Token geändert",

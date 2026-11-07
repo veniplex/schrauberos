@@ -12,5 +12,5 @@ export const settingsFeature = defineFeature({
     { id: "settings", href: "/settings", labelKey: "nav.settings", icon: "settings", permission: "settings.manage", order: 120 },
   ],
   routes: ["settings"],
-  auditActions: ["settings.workshop", "settings.security", "settings.csp", "settings.holidays"],
+  auditActions: ["settings.workshop", "settings.security", "settings.csp", "settings.holidays", "settings.publicUrl"],
 });

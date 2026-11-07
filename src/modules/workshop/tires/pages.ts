@@ -7,5 +7,6 @@ export const pages = definePages("workshop.tires", [
   { path: "/tires/import", kind: "other", permission: "tires.import" },
   { path: "/tires/new", kind: "new", permission: "tires.create" },
   { path: "/tires/[id]", kind: "detail", permission: "tires.view", params: { id: { table: "TireSet" } }, key: true },
+  { path: "/tires/[id]/label", kind: "print", permission: "tires.view", params: { id: { table: "TireSet" } } },
   { path: "/tires/[id]/edit", kind: "edit", permission: "tires.edit", params: { id: { table: "TireSet" } } },
 ]);

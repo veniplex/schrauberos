@@ -9,7 +9,8 @@ import { centsToInput } from "@/lib/money";
 import { getFullYear, getMonth } from "@/lib/zone";
 import { connectionIsSecure } from "@/server/auth/connection";
 import { authPolicy } from "@/server/auth/policy";
-import { CspModeForm, HttpsNotice, SecurityForm } from "./security-form";
+import { getPublicUrl } from "@/server/public-url";
+import { CspModeForm, HttpsNotice, PublicUrlForm, SecurityForm } from "./security-form";
 import { HolidaysSettingsTab } from "./holiday-tab";
 import { WorkshopForm } from "./workshop-form";
 
@@ -54,11 +55,12 @@ async function WorkshopSettingsTab() {
 }
 
 async function SecuritySettingsTab() {
-  const [behindProxy, secure, auditRetentionDays, policy] = await Promise.all([isBehindProxy(), connectionIsSecure(), getAuditRetentionDays(), authPolicy()]);
+  const [behindProxy, secure, auditRetentionDays, policy, publicUrl] = await Promise.all([isBehindProxy(), connectionIsSecure(), getAuditRetentionDays(), authPolicy(), getPublicUrl()]);
   return (
     <div className="flex flex-col gap-5">
       <HttpsNotice secure={secure} behindProxy={behindProxy} />
       <SecurityForm behindProxy={behindProxy} auditRetentionDays={auditRetentionDays} idleTimeoutHours={policy.idleTimeoutHours} requireTwoFactorAdmins={policy.requireTwoFactorForAdmins} />
+      <PublicUrlForm value={publicUrl ?? ""} />
       <CspModeForm reportOnly={cspMode() === "report-only"} />
     </div>
   );

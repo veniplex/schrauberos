@@ -73,7 +73,16 @@ export const uiDe = {
     days_other: "{count} Tage",
     preset: { today: "Heute", yesterday: "Gestern", last7: "Letzte 7 Tage", last30: "Letzte 30 Tage", thisMonth: "Dieser Monat", lastMonth: "Letzter Monat", thisYear: "Dieses Jahr" },
   },
-  print: { print: "Drucken" },
+  print: {
+    print: "Drucken",
+    labelQr: "QR-Code: öffnet die Seite in der Anwendung",
+    format: "Etikettenformat",
+    copies: "Anzahl",
+    skip: "Felder überspringen",
+    skipHint: "Nur beim A4-Bogen: So viele Felder eines angefangenen Bogens sind schon benutzt.",
+    apply: "Vorschau aktualisieren",
+    formats: { "62x29": "62 × 29 mm (Etikettenrolle)", "100x50": "100 × 50 mm (Etikettenrolle)", "sheet-3x8": "A4-Bogen, 3 × 8 Etiketten (70 × 37 mm)" },
+  },
   signature: {
     group: "Unterschrift",
     mode: "Art der Unterschrift",
@@ -128,5 +137,8 @@ export const uiDe = {
     download: "Herunterladen",
     shareFailed: "Teilen ist nicht möglich. Bitte herunterladen.",
     actions: "PDF-Datei",
+    showPreview: "Vorschau anzeigen",
+    hidePreview: "Vorschau ausblenden",
+    previewDesktopOnly: "Die Vorschau gibt es am Rechner – hier öffnen, teilen oder herunterladen.",
   },
 };

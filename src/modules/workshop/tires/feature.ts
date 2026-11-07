@@ -15,6 +15,6 @@ export const tiresFeature = defineFeature({
   quickActions: [{ id: "tires.new", labelKey: "tires.quick.new", href: "/tires/new", icon: "tires", permission: "tires.create", order: 20 },
     { id: "tires.stock", kind: "open", labelKey: "tires.quick.stock", href: "/tires", icon: "tires", permission: "tires.stock", order: 201 },
   ],
-  routes: ["tires"],
+  routes: ["tires", "api/tires"],
   auditActions: ["tires.create", "tires.update", "tires.stock", "tires.dispose", "tires.delete", "tires.export", "tires.import", "settings.tires"],
 });

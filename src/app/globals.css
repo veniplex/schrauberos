@@ -377,6 +377,20 @@ html[data-form-actions] {
 .print-a4 {
   page: a4;
 }
+@page a5 {
+  size: A5 portrait;
+  margin: 10mm;
+}
+.print-a5 {
+  page: a5;
+}
+@page a6 {
+  size: A6 portrait;
+  margin: 8mm;
+}
+.print-a6 {
+  page: a6;
+}
 .print-break {
   break-before: page;
 }
@@ -390,6 +404,99 @@ html[data-form-actions] {
   body {
     background: var(--paper);
     color: var(--paper-ink);
+  }
+}
+
+/* ───────── Etiketten (PrintLabels, components/ui/print-label.tsx) ─────────
+   Jedes Etikettenformat hat eine benannte Seite in genau seinem Maß (ohne Rand): ein Etikett = eine Seite; der A4-Bogen ist ein Raster. Am Bildschirm eine Vorschau in Originalgröße (Millimeter),
+   im Ausdruck ohne Rahmen. Im Ausdruck verschwinden Seitenrand und Innenabstand der App (`:has`), sonst säße das Etikett verschoben auf der Seite. */
+@page label-62x29 {
+  size: 62mm 29mm;
+  margin: 0;
+}
+@page label-100x50 {
+  size: 100mm 50mm;
+  margin: 0;
+}
+@page label-sheet {
+  size: A4 portrait;
+  margin: 0;
+}
+.print-label-page-62x29 .print-label-page { page: label-62x29; }
+.print-label-page-100x50 .print-label-page { page: label-100x50; }
+.print-label-page-sheet .print-label-page { page: label-sheet; }
+.print-labels {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.print-label-page {
+  break-inside: avoid;
+}
+.print-label-sheet {
+  display: grid;
+}
+.print-label {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 2mm;
+  background: var(--paper);
+  color: var(--paper-ink);
+  outline: 1px dashed var(--line-strong);
+  outline-offset: -1px;
+}
+.print-label-empty {
+  outline-style: dotted;
+  opacity: 0.45;
+}
+.print-label-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  overflow: hidden;
+}
+.print-label-title {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.print-label-body {
+  margin: 0.5mm 0 0;
+  line-height: 1.25;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.print-label-qr {
+  flex: 0 0 auto;
+  height: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
+}
+@media print {
+  body:has(.print-labels) main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .print-labels {
+    display: block;
+    gap: 0;
+  }
+  .print-label-page {
+    break-after: page;
+  }
+  .print-label-page:last-child {
+    break-after: auto;
+  }
+  .print-label {
+    outline: none;
+  }
+  .print-label-empty {
+    visibility: hidden;
   }
 }
 

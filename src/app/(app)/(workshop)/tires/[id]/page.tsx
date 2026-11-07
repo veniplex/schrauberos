@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarPlus, Pencil } from "lucide-react";
+import { CalendarPlus, Pencil, Tag } from "lucide-react";
 import { Alert, Card, DefinitionList, EmptyState, Plate, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
@@ -119,6 +119,9 @@ export default async function TireSetPage({ params }: { params: Promise<{ id: st
                 <CalendarPlus className="size-4" aria-hidden /> {t("tires.planChange")}
               </LinkButton>
             ) : null}
+            <LinkButton href={`/tires/${set.id}/label`} variant="secondary">
+              <Tag className="size-4" aria-hidden /> {t("tires.label.button")}
+            </LinkButton>
             {canEdit ? (
               <LinkButton href={`/tires/${set.id}/edit`} variant="secondary">
                 <Pencil className="size-4" aria-hidden /> {t("common.edit")}

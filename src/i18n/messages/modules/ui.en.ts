@@ -74,7 +74,16 @@ export const uiEn: typeof uiDe = {
     days_other: "{count} days",
     preset: { today: "Today", yesterday: "Yesterday", last7: "Last 7 days", last30: "Last 30 days", thisMonth: "This month", lastMonth: "Last month", thisYear: "This year" },
   },
-  print: { print: "Print" },
+  print: {
+    print: "Print",
+    labelQr: "QR code: opens the page in the application",
+    format: "Label format",
+    copies: "Quantity",
+    skip: "Skip fields",
+    skipHint: "A4 sheet only: this many fields of a partly used sheet are already taken.",
+    apply: "Update preview",
+    formats: { "62x29": "62 × 29 mm (label roll)", "100x50": "100 × 50 mm (label roll)", "sheet-3x8": "A4 sheet, 3 × 8 labels (70 × 37 mm)" },
+  },
   signature: {
     group: "Signature",
     mode: "Kind of signature",
@@ -129,5 +138,8 @@ export const uiEn: typeof uiDe = {
     download: "Download",
     shareFailed: "Sharing is not possible. Please download instead.",
     actions: "PDF file",
+    showPreview: "Show preview",
+    hidePreview: "Hide preview",
+    previewDesktopOnly: "The preview is available on a computer – open, share or download here.",
   },
 };

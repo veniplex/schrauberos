@@ -226,3 +226,34 @@ describe("saveCspMode (Notschalter der Content-Security-Policy)", () => {
     assert.equal(await env.db.appSetting.count({ where: { key: mode.CSP_MODE_KEY } }), 0);
   });
 });
+
+describe("savePublicUrl: Adresse der Anwendung (F8)", () => {
+  const stored = async () => (await env.db.appSetting.findUnique({ where: { key: "app.publicUrl" } }))?.value ?? null;
+
+  it("speichert die Herkunft normalisiert und schreibt alten und neuen Wert ins Audit-Log", async () => {
+    const state = await actions.savePublicUrl({}, form({ publicUrl: "https://Werkstatt.example/" }));
+    assert.equal(state.ok, true);
+    assert.equal(await stored(), "https://werkstatt.example");
+    await actions.savePublicUrl({}, form({ publicUrl: "http://192.168.1.10:3000" }));
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "settings.publicUrl" }, orderBy: { createdAt: "desc" } });
+    assert.match(entry.target ?? "", /https:\/\/werkstatt\.example → http:\/\/192\.168\.1\.10:3000/);
+  });
+
+  it("leer löscht die Einstellung; Pfad, Anmeldedaten und fremde Schemata werden mit Feldfehler abgelehnt", async () => {
+    await actions.savePublicUrl({}, form({ publicUrl: "https://werkstatt.example" }));
+    assert.equal((await actions.savePublicUrl({}, form({ publicUrl: "" }))).ok, true);
+    assert.equal(await stored(), null);
+    for (const bad of ["https://werkstatt.example/app", "https://u:p@werkstatt.example", "javascript:alert(1)", "werkstatt"]) {
+      const state = await actions.savePublicUrl({}, form({ publicUrl: bad }));
+      assert.ok(state.fieldErrors?.publicUrl, bad);
+    }
+    assert.equal(await stored(), null, "nichts wurde gespeichert");
+  });
+
+  it("verlangt `settings.manage`", async () => {
+    browser.reset();
+    await env.signIn(await env.user({ username: "azubi", roles: [await env.role({ key: `r-${Math.random()}`, permissions: ["tires.view"] })] }));
+    assert.equal(await redirectOf(() => actions.savePublicUrl({}, form({ publicUrl: "https://werkstatt.example" }))), "/forbidden");
+    assert.equal(await stored(), null);
+  });
+});
