@@ -36,3 +36,9 @@ export function centsToInput(cents: number | null | undefined): string {
   if (cents == null) return "";
   return (cents / 100).toFixed(2).replace(".", ",");
 }
+
+/** Cent → Text für ein Eingabefeld in der Schreibweise der Oberfläche („1234,56“ in Deutsch, „1234.56“ in Englisch). */
+export function centsToInputFor(cents: number | null | undefined, locale: "de" | "en" = "de"): string {
+  const text = centsToInput(cents);
+  return locale === "en" ? text.replace(",", ".") : text;
+}
