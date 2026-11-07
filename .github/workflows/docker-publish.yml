@@ -301,6 +301,10 @@ jobs:
     needs: [check, guard, e2e, publish]
     runs-on: ubuntu-latest
     environment: release
+    # Nie zwei Releases gleichzeitig (zwei Tags kurz nacheinander dürfen "latest" nicht in beliebiger Reihenfolge setzen); ein laufendes wird nicht abgebrochen, das nächste wartet
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: write
       packages: write
@@ -309,6 +313,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
+      # Reihenfolge der Tags: "latest" und "X.Y" setzt nur der höchste Versions-Tag. Der Job "guard" prüft nur, dass der Commit auf main liegt; ein Tag auf einem alten main-Commit mit
+      # passender package.json-Version würde "latest" sonst zurückdrehen. Vor allem anderen (Signatur, Veröffentlichung, Retag) – es gibt bewusst keinen Pfad für Rückportierungen.
+      - name: Der Tag ist der höchste Versions-Tag
+        run: |
+          git fetch --tags --force --quiet
+          node --no-warnings scripts/check-release-order.mjs --tag "$GITHUB_REF_NAME"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
@@ -385,7 +395,9 @@ jobs:
   # Läuft in der Umgebung "release", also nur mit Freigabe des Pflicht-Reviewers.
   key-check:
     name: Signaturschlüssel prüfen (ohne Veröffentlichung)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.check_signing_key }}
+    # Nur auf main: Auf einem anderen Zweig könnte jemand mit Schreibrecht scripts/check-signing-key.mjs ändern und den Schlüssel ausgeben lassen (die Umgebung "release" gibt das Secret frei).
+    # Zusätzlich muss die Umgebung "release" Deployment branches auf main und v* beschränken (README, Checkliste).
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.check_signing_key && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: release
     steps:

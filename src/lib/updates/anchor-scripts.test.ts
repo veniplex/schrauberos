@@ -223,3 +223,34 @@ describe("Generalprobe und Baumprüfung", () => {
     assert.match(extra.stdout, /"reason":"extra"/);
   });
 });
+
+describe("Reihenfolge der Versions-Tags (scripts/check-release-order.mjs, Gate des Jobs release)", () => {
+  const order = (tag: string, tags: string) => run("check-release-order.mjs", ["--tag", tag, "--tags", tags]);
+
+  it("der höchste Versions-Tag passiert; Zahlen werden als Zahlen verglichen (v1.10.0 > v1.9.0)", () => {
+    assert.equal(order("v1.9.0", "v1.0.0 v1.8.0 v1.9.0").ok, true);
+    assert.equal(order("v1.10.0", "v1.9.0 v1.10.0").ok, true);
+    assert.equal(order("v0.2.0", "v0.2.0").ok, true, "der erste Tag");
+  });
+
+  it("ein Tag unterhalb eines vorhandenen höheren Tags bricht ab (kein Zurückdrehen von latest durch einen Tag auf einem alten main-Commit)", () => {
+    for (const [tag, tags] of [
+      ["v1.9.0", "v1.9.0 v1.10.0"],
+      ["v0.2.0", "v0.2.0 v0.2.1"],
+      ["v1.0.0", "v1.0.0 v2.0.0 v1.5.0"],
+    ] as const) {
+      const result = order(tag, tags);
+      assert.equal(result.ok, false, `${tag} gegen ${tags}`);
+      assert.match(result.output, /höheren Versions-Tag/);
+    }
+  });
+
+  it("Vorabversionen berühren latest nie: sie passieren; sie sind auch kein Gegenstück für stabile Tags", () => {
+    assert.equal(order("v1.2.0-rc1", "v1.2.0-rc1 v2.0.0").ok, true);
+    assert.equal(order("v1.2.0", "v1.2.0 v1.3.0-rc1 v2.0.0-beta").ok, true);
+  });
+
+  it("ohne --tag: Aufruffehler", () => {
+    assert.equal(run("check-release-order.mjs", []).ok, false);
+  });
+});
