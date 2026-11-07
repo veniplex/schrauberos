@@ -151,11 +151,15 @@ export function encryptSecret(plain: string): string {
  * nicht lesbar, wirft die Funktion `SecretKeyUnavailableError` (nie `null`): „ich kann nicht lesen“ ist etwas anderes als „das ist nicht von mir“.
  */
 export function decryptSecret(blob: string): string | null {
-  const k = key();
+  return decryptSecretWith(blob, key());
+}
+
+/** Wie `decryptSecret`, aber mit einem gegebenen Schlüssel (Hex) statt der Datei – z. B. um zu prüfen, ob ein aufgehobener Schlüssel zu einer Datenbank passt. `null`: passt nicht oder beschädigt. */
+export function decryptSecretWith(blob: string, key: Buffer | string): string | null {
   try {
     const [version, iv, tag, data] = blob.split(":");
     if (version !== "v1") return null;
-    const decipher = createDecipheriv("aes-256-gcm", k, Buffer.from(iv, "base64"));
+    const decipher = createDecipheriv("aes-256-gcm", typeof key === "string" ? Buffer.from(key, "hex") : key, Buffer.from(iv, "base64"));
     decipher.setAuthTag(Buffer.from(tag, "base64"));
     return Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]).toString("utf8");
   } catch {

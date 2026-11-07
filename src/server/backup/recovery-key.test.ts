@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 import * as tar from "tar";
 import { NextRequest } from "next/server";
 import { formatRecoveryKey } from "@/lib/recovery-key";
@@ -86,6 +86,7 @@ async function resetState() {
   for (const backup of await core.listBackups()) await core.deleteBackup(backup.name);
   const { cancelPending } = await import("@/lib/updates/restore");
   cancelPending(dataDirectory());
+  rmSync(path.join(restoreDir(), "applied.json"), { force: true }); // Journal einer früheren Wiederherstellung (die Tests bestätigen sie nie)
   newSecretKey();
   sleeps = [];
   logged.length = 0;
@@ -241,6 +242,8 @@ describe("Restore mit und ohne Schlüssel", () => {
   it("der Hinweis ist nur für Administratoren sichtbar und lässt sich nur von ihnen bestätigen", async () => {
     await backupWithKey();
     newSecretKey();
+    mkdirSync(restoreDir(), { recursive: true }); // eine Wiederherstellung ohne Schlüssel wurde eingesetzt (Journal)
+    writeFileSync(path.join(restoreDir(), "applied.json"), JSON.stringify({ from: "backup", at: new Date().toISOString(), files: false }));
     await secretReset.resetUnreadableSecrets();
     const { acknowledgeSecretsReset } = await import("@/platform/account/secrets-actions");
     const role = await env.role({ key: "kein-admin-ack", permissions: [] });
@@ -321,6 +324,46 @@ async function archiveOf(name: string): Promise<Buffer> {
   });
   return Buffer.concat(chunks);
 }
+
+describe("Stand „Vor Wiederherstellung“ bleibt lesbar (ZP5-8)", () => {
+  const previousKeyFile = () => path.join(restoreDir(), "previous-secret-20260102T110000Z.key");
+  const keepKey = (hex: string) => {
+    mkdirSync(restoreDir(), { recursive: true });
+    writeFileSync(previousKeyFile(), hex, { mode: 0o600 });
+  };
+  afterEach(() => rmSync(previousKeyFile(), { force: true }));
+
+  it("ein Backup, das zu einem aufgehobenen früheren Schlüssel gehört, bringt diesen Schlüssel mit zurück – ohne dass jemand einen Schlüssel eingibt", async () => {
+    const old = secrets.secretKeyHex();
+    await settings.setSecret("update.token", "ghp_alt");
+    const backup = (await core.createBackup("manual")).name; // Geheimnis unter dem alten Schlüssel, keine Hülle
+    newSecretKey(); // inzwischen läuft der Server mit einem anderen Schlüssel (nach einer Wiederherstellung mit Wiederherstellungsschlüssel)
+    keepKey(old);
+
+    const staged = await restore.stageRestore(backup);
+    assert.equal(staged.secretKeyRestored, true);
+    assert.equal(readFileSync(path.join(restoreDir(), "pending-secret.key"), "utf8"), old);
+    assert.equal(readPending()?.secretKey, true);
+    writeFileSync(path.join(dataDirectory(), "dummy.db"), "x");
+    applyPendingRestore(path.join(dataDirectory(), "dummy.db"));
+    assert.equal(secrets.secretKeyHex(), old);
+    assert.equal(await settings.getSecret("update.token"), "ghp_alt", "der Stand ist mit allen Geheimnissen lesbar");
+  });
+
+  it("ein Backup, das schon zum laufenden Schlüssel passt, oder eines ohne passenden aufgehobenen Schlüssel ändert am Schlüssel nichts", async () => {
+    await settings.setSecret("update.token", "ghp_jetzt");
+    const backup = (await core.createBackup("manual")).name;
+    keepKey("e".repeat(64)); // passt zu nichts
+    assert.equal((await restore.stageRestore(backup)).secretKeyRestored, false, "der laufende Schlüssel passt");
+    assert.equal(existsSyncSafe(path.join(restoreDir(), "pending-secret.key")), false);
+    const { cancelPending } = await import("@/lib/updates/restore");
+    cancelPending();
+
+    newSecretKey(); // jetzt passt der laufende nicht mehr, der aufgehobene aber auch nicht
+    assert.equal((await restore.stageRestore(backup)).secretKeyRestored, false);
+    assert.equal(existsSyncSafe(path.join(restoreDir(), "pending-secret.key")), false);
+  });
+});
 
 describe("Wiederherstellung in der Einrichtung (frisches Volume)", () => {
   const post = (body: Buffer, headers: Record<string, string> = {}) =>

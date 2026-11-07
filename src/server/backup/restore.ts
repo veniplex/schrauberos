@@ -9,10 +9,10 @@ import { ArchiveError, extractArchive, type ArchiveLimits } from "@/lib/archive"
 import { DISK_RESERVE_BYTES, freeBytes } from "@/lib/disk";
 import { limitStream, StreamLimitError } from "@/lib/limit-stream";
 import { OffsiteCryptoError, createDecryptStream, isOffsiteHeader } from "@/lib/offsite/crypto";
-import { deriveOffsiteMasterKey, WRAPPED_SETTING_KEY } from "@/lib/secret-wrap";
-import { cancelPending, pendingDbFile, pendingFilesDir, restoreDir, writePending, writePendingSecretKey } from "@/lib/updates/restore";
+import { deriveOffsiteMasterKey, secretKeyCheck, WRAPPED_SETTING_KEY } from "@/lib/secret-wrap";
+import { cancelPending, listPreviousSecretKeys, pendingDbFile, pendingFilesDir, restoreDir, writePending, writePendingSecretKey } from "@/lib/updates/restore";
 import { listMigrations } from "@/server/migrate";
-import { readSecretKey } from "@/server/secrets";
+import { decryptSecretWith, isSecretBlob, readSecretKey } from "@/server/secrets";
 import { assertPlainTree, backupPath, backupsDir, checkDatabaseFile, countTree, createBackup, DB_ARCHIVE, gzipFile, linkTree, markTempActive, removeTree, uniqueBackupName, writeInfo } from "./core";
 
 export type RestoreErrorCode =
@@ -131,6 +131,15 @@ export async function stageRestore(name: string, options: { recoveryKey?: string
         secretKeyRestored = true;
       }
     }
+    // Ohne eingegebenen Schlüssel: Gehört das Backup zu einem früheren Schlüssel dieses Servers (etwa der Stand „Vor Wiederherstellung“ nach einer Wiederherstellung mit
+    // Wiederherstellungsschlüssel), wird dieser aufgehobene Schlüssel wieder eingesetzt – so bleibt auch dieser Stand mit allen Geheimnissen lesbar (ZP5-8).
+    if (!entered) {
+      const previous = findPreviousKeyFor(pendingDbFile());
+      if (previous) {
+        writePendingSecretKey(previous);
+        secretKeyRestored = true;
+      }
+    }
     if (hasFiles) await linkTree(path.join(dir, "files"), pendingFilesDir());
     await createBackup("pre-restore");
   } catch (error) {
@@ -139,6 +148,41 @@ export async function stageRestore(name: string, options: { recoveryKey?: string
   }
   writePending({ from: name, at: new Date().toISOString(), files: hasFiles, ...(secretKeyRestored ? { secretKey: true } : {}) });
   return { secretKeyRestored };
+}
+
+/** Woran sich erkennen lässt, zu welchem Schlüssel eine Datenbank gehört: der Kennwert der Hülle und einige verschlüsselte Werte. */
+function keyEvidence(file: string): { check: string | null; blobs: string[] } {
+  const database = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    const check = (database.prepare(`SELECT value FROM AppSetting WHERE key = ?`).get("secrets.keyCheck") as { value: string } | undefined)?.value ?? null;
+    const blobs = [
+      ...(database.prepare(`SELECT secret AS value FROM TwoFactor WHERE secret IS NOT NULL LIMIT 3`).all() as Array<{ value: string }>),
+      ...(database.prepare(`SELECT value FROM AppSetting WHERE value LIKE 'v1:%' LIMIT 20`).all() as Array<{ value: string }>),
+    ]
+      .map((row) => row.value)
+      .filter(isSecretBlob)
+      .slice(0, 5);
+    return { check, blobs };
+  } catch {
+    return { check: null, blobs: [] };
+  } finally {
+    database.close();
+  }
+}
+
+/**
+ * Ein aufgehobener früherer Geheimnisschlüssel (`restore/previous-secret-*.key`), der zu dieser Datenbank gehört – und zwar nur, wenn der laufende Schlüssel nicht schon passt.
+ * Erkennung über den Kennwert der Hülle, ohne Hülle über die Entschlüsselung eines Geheimnisses. `null`: nichts zu tun oder nichts Passendes.
+ */
+function findPreviousKeyFor(file: string): string | null {
+  const candidates = listPreviousSecretKeys();
+  if (candidates.length === 0) return null;
+  const evidence = keyEvidence(file);
+  if (!evidence.check && evidence.blobs.length === 0) return null;
+  const fits = (hex: string) => (evidence.check ? secretKeyCheck(hex) === evidence.check : evidence.blobs.some((blob) => decryptSecretWith(blob, hex) !== null));
+  const current = readSecretKey();
+  if (current.state === "readable" && fits(current.hex)) return null;
+  return candidates.find(fits) ?? null;
 }
 
 /** Die umhüllte Kopie von secret.key aus einer Datenbankdatei (Backup); null, wenn es sie nicht gibt. */
