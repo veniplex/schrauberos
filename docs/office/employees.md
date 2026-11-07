@@ -5,7 +5,7 @@ Stammdaten der Mitarbeiter: Name, Personalnummer, Funktion, Abteilung, Kontakt, 
 * **Benutzerkonto verknüpfen:** Ein Mitarbeiter kann mit einem Benutzerkonto verbunden werden (jedes Konto nur einmal).
 * **Qualifikationen:** Mit Ablaufdatum; bald ablaufende Qualifikationen werden hervorgehoben.
 * **Urlaub und Abwesenheiten:** Monatskalender mit Urlaub, Krankheit, Fortbildung u. a. Die Urlaubstage zählen Montag bis Freitag;
-  Feiertage werden nicht abgezogen. Jede Zelle trägt ein **Kürzel** (U Urlaub, K Krank, S Schulung, X Sonstiges, A abwesend – die Legende nennt sie), die Art steht also
+  **Feiertage zählen nicht mit**, sobald unter Verwaltung → Einstellungen → Feiertage eine Region gewählt ist (ein halber Feiertag zählt als halber Tag, daher können Zahlen wie 4,5 erscheinen). Ohne Region zählen alle Wochentage. Jede Zelle trägt ein **Kürzel** (U Urlaub, K Krank, S Schulung, X Sonstiges, A abwesend – die Legende nennt sie), die Art steht also
   nicht nur in der Farbe. Ein Klick auf eine **freie Zelle** öffnet das Formular „Abwesenheit eintragen“ schon mit Mitarbeiter und Tag; ändern Sie im Formular das
   Datum „Von“, zieht „Bis“ mit, solange Sie es nicht bewusst später setzen.
   **Überschneidungen:** Ist für die Person im gewählten Zeitraum schon etwas eingetragen, zeigt das Formular eine ruhige Liste („In diesem Zeitraum ist schon etwas eingetragen“) – das ist nur

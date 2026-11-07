@@ -16,6 +16,7 @@ import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { setSetting } from "@/server/settings";
 import { applyTimezone, isValidTimezone } from "@/server/startup";
+import { deleteHolidayCustomOperation, saveHolidayCustomOperation, saveHolidayRegionOperation, saveHolidayRulesOperation } from "./holiday-operations";
 
 const dayHours = z.object({ closed: z.boolean(), from: z.string(), to: z.string() });
 
@@ -186,3 +187,22 @@ export const saveCspMode = defineAction(saveCspModeOperation, {
   revalidate: ["/settings"],
   message: "common.saved",
 });
+
+/* ───────────── Feiertage (P4b-0) ───────────── */
+
+export const saveHolidayRegion = defineAction(saveHolidayRegionOperation, { form: (fd) => ({ region: String(fd.get("region") ?? "") }), revalidate: [["/", "layout"]], message: "common.saved" });
+
+/** Die Auswahlfelder `rule.<Kennung>` der Pflegeliste → `{ <Kennung>: Modus }`. */
+export const saveHolidayRules = defineAction(saveHolidayRulesOperation, {
+  form: (fd) => ({ rules: Object.fromEntries([...fd.entries()].filter(([k]) => k.startsWith("rule.")).map(([k, v]) => [k.slice(5), String(v)])) }),
+  revalidate: [["/", "layout"]],
+  message: "common.saved",
+});
+
+export const saveHolidayCustom = defineAction(saveHolidayCustomOperation, {
+  form: (fd) => ({ ...formObject(fd), yearly: fd.get("yearly") === "on", half: fd.get("half") === "on" }),
+  revalidate: [["/", "layout"]],
+  message: "common.saved",
+});
+
+export const deleteHolidayCustom = defineAction(deleteHolidayCustomOperation, { form: formObject, revalidate: [["/", "layout"]], message: "common.deleted" });

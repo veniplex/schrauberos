@@ -118,6 +118,7 @@ export const auditEn: typeof auditDe = {
       tires: "Tyre settings changed",
       security: "Security settings changed",
       csp: "Content security policy (CSP) mode changed",
+      holidays: "Holidays changed",
       backupPlan: "Backup plan changed",
       updateToken: "Update token changed",
     },

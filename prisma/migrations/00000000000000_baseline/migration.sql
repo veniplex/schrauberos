@@ -146,6 +146,41 @@ CREATE TABLE "Workshop" (
     "accentColor" TEXT NOT NULL DEFAULT '#2459c9',
     "openingHours" TEXT NOT NULL DEFAULT '{}',
     "timezone" TEXT NOT NULL DEFAULT 'Europe/Berlin',
+    "taxNumber" TEXT,
+    "vatId" TEXT,
+    "smallBusiness" BOOLEAN NOT NULL DEFAULT false,
+    "bankName" TEXT,
+    "iban" TEXT,
+    "bic" TEXT,
+    "paymentTermDays" INTEGER NOT NULL DEFAULT 14,
+    "managingDirector" TEXT,
+    "registerCourt" TEXT,
+    "registerNumber" TEXT,
+    "hourlyRateCents" INTEGER,
+    "workUnitMinutes" INTEGER NOT NULL DEFAULT 5,
+    "invoiceNumberFormat" TEXT NOT NULL DEFAULT '{YYYY}-{NNNN}',
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "HolidaySettings" (
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "region" TEXT NOT NULL DEFAULT '',
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "HolidayDay" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "kind" TEXT NOT NULL,
+    "ruleKey" TEXT,
+    "mode" TEXT,
+    "name" TEXT,
+    "month" INTEGER,
+    "day" INTEGER,
+    "year" INTEGER,
+    "half" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
 
@@ -186,6 +221,7 @@ CREATE TABLE "Customer" (
     "nameKey" TEXT NOT NULL DEFAULT '',
     "cityKey" TEXT NOT NULL DEFAULT '',
     "phoneKey" TEXT NOT NULL DEFAULT '',
+    "archivedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -210,6 +246,7 @@ CREATE TABLE "Vehicle" (
     "extraInspectionDue" DATETIME,
     "notes" TEXT,
     "searchKey" TEXT NOT NULL DEFAULT '',
+    "archivedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Vehicle_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -223,7 +260,7 @@ CREATE TABLE "VehicleOwnership" (
     "fromDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "toDate" DATETIME,
     "note" TEXT,
-    CONSTRAINT "VehicleOwnership_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "VehicleOwnership_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "VehicleOwnership_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -744,7 +781,13 @@ CREATE UNIQUE INDEX "TwoFactorBackupCode_codeHash_key" ON "TwoFactorBackupCode"(
 CREATE INDEX "TwoFactorBackupCode_userId_idx" ON "TwoFactorBackupCode"("userId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "HolidayDay_ruleKey_key" ON "HolidayDay"("ruleKey");
+
+-- CreateIndex
 CREATE INDEX "Customer_lastName_idx" ON "Customer"("lastName");
+
+-- CreateIndex
+CREATE INDEX "Customer_archivedAt_idx" ON "Customer"("archivedAt");
 
 -- CreateIndex
 CREATE INDEX "Vehicle_plateNorm_idx" ON "Vehicle"("plateNorm");
@@ -754,6 +797,9 @@ CREATE INDEX "Vehicle_customerId_idx" ON "Vehicle"("customerId");
 
 -- CreateIndex
 CREATE INDEX "Vehicle_inspectionDue_idx" ON "Vehicle"("inspectionDue");
+
+-- CreateIndex
+CREATE INDEX "Vehicle_archivedAt_idx" ON "Vehicle"("archivedAt");
 
 -- CreateIndex
 CREATE INDEX "VehicleOwnership_vehicleId_idx" ON "VehicleOwnership"("vehicleId");

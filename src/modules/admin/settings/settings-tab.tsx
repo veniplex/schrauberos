@@ -7,6 +7,7 @@ import { logoSrc } from "@/lib/logo";
 import { connectionIsSecure } from "@/server/auth/connection";
 import { authPolicy } from "@/server/auth/policy";
 import { CspModeForm, HttpsNotice, SecurityForm } from "./security-form";
+import { HolidaysSettingsTab } from "./holiday-tab";
 import { WorkshopForm } from "./workshop-form";
 
 async function WorkshopSettingsTab() {
@@ -47,5 +48,6 @@ async function SecuritySettingsTab() {
 
 export const settingsTabs: SettingsTabDef[] = [
   { id: "workshop", feature: "admin.settings", labelKey: "settings.tabs.workshop", permission: "settings.manage", order: 10, Component: WorkshopSettingsTab },
+  { id: "holidays", feature: "admin.settings", labelKey: "settings.tabs.holidays", permission: "settings.manage", order: 12, Component: HolidaysSettingsTab },
   { id: "security", feature: "admin.settings", labelKey: "settings.tabs.security", permission: "settings.manage", order: 15, Component: SecuritySettingsTab },
 ];

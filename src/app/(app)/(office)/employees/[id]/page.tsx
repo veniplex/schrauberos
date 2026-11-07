@@ -9,6 +9,7 @@ import { getI18n } from "@/i18n/server";
 import { currentYear } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
+import { getHolidays } from "@/server/holidays";
 import { employeeName, workdaysBetween, workdaysWithinKeys } from "@/modules/office/employees/domain";
 import { employeeTitle, getEmployeeDetail } from "@/modules/office/employees/queries";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
@@ -26,7 +27,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission("employees.view");
   const [{ id }, i18n] = await Promise.all([params, getI18n()]);
-  const { t, tp, td, date } = i18n;
+  const { t, tp, td, date, number } = i18n;
+  const holidays = await getHolidays();
   const canEdit = session.can("employees.edit");
   const year = currentYear();
 
@@ -34,7 +36,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   const e = await getEmployeeDetail(session, id);
   if (!e) notFound();
 
-  const vacationUsed = e.absences.filter((a) => a.type === "vacation").reduce((n, a) => n + workdaysWithinKeys(a, `${year}-01-01`, `${year}-12-31`), 0);
+  const vacationUsed = e.absences.filter((a) => a.type === "vacation").reduce((n, a) => n + workdaysWithinKeys(a, `${year}-01-01`, `${year}-12-31`, holidays), 0);
   const returnTo = `/employees/${e.id}`;
 
   return (
@@ -73,7 +75,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           >
             {e.vacationDaysPerYear != null ? (
               <p className="border-b border-line px-5 py-3 text-sm">
-                {t("employees.vacationSummary", { year, used: vacationUsed, total: e.vacationDaysPerYear, left: e.vacationDaysPerYear - vacationUsed })}
+                {t("employees.vacationSummary", { year, used: number(vacationUsed), total: e.vacationDaysPerYear, left: number(e.vacationDaysPerYear - vacationUsed) })}
                 <span className="block text-xs text-ink-muted">{t("employees.vacationNote")}</span>
               </p>
             ) : null}
@@ -83,7 +85,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
               <ul className="divide-y divide-line">
                 {e.absences.map((a) => {
                   const type = a.type;
-                  const days = workdaysBetween(a.startDate, a.endDate);
+                  const days = workdaysBetween(a.startDate, a.endDate, holidays);
                   return (
                     <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                       <span className="flex flex-wrap items-center gap-2">
@@ -92,7 +94,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                           {date(a.startDate)}
                           {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""}
                         </span>
-                        <span className="text-ink-muted">({tp("employees.workdays", days)})</span>
+                        <span className="text-ink-muted">({tp("employees.workdays", days, { count: number(days) })})</span>
                         {a.note && type !== "masked" && type !== "sick" ? <span className="text-ink-muted">{a.note}</span> : null}
                       </span>
                       {canEdit && a.type !== "masked" ? (

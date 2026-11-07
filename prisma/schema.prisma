@@ -212,7 +212,58 @@ model Workshop {
   openingHours        String   @default("{}")
   // IANA-Zeitzone der Werkstatt (Termine werden darin ein- und ausgegeben); wird beim App-Start auf den Prozess angewendet
   timezone            String   @default("Europe/Berlin")
+  // Werkstattprofil für Rechnungen (P4b-7): alles optional, erscheint später auf Belegen
+  // Steuernummer (nur Ziffern/Trenner geprüft) und Umsatzsteuer-Identifikationsnummer (Länderpräfix + Muster geprüft)
+  taxNumber           String?
+  vatId               String?
+  // Kleinunternehmer nach § 19 UStG: keine Umsatzsteuer, Pflichthinweis auf Belegen
+  smallBusiness       Boolean  @default(false)
+  bankName            String?
+  // IBAN ohne Leerzeichen, Großbuchstaben (Prüfsumme mod 97 geprüft); BIC optional
+  iban                String?
+  bic                 String?
+  // Standard-Zahlungsziel in Tagen
+  paymentTermDays     Int      @default(14)
+  managingDirector    String?
+  registerCourt       String?
+  registerNumber      String?
+  // Stundenverrechnungssatz in ganzen Cent (netto bzw. bei Kleinunternehmern ohne Steuer); null = nicht festgelegt
+  hourlyRateCents     Int?
+  // Dauer eines Arbeitswerts (AW) in Minuten (Standard 1 AW = 5 Minuten)
+  workUnitMinutes     Int      @default(5)
+  // Muster der Rechnungsnummer mit Platzhaltern ({YYYY}, {YY}, {MM}, {NNNN} …), siehe src/lib/invoice-number-format.ts
+  invoiceNumberFormat String   @default("{YYYY}-{NNNN}")
   updatedAt           DateTime @updatedAt
+}
+
+// ───────────── Feiertage (Plattform, P4b-0) ─────────────
+
+// Region der Feiertage (Singleton): "" = keine Feiertage berücksichtigen; sonst "DE-NW", "AT-9", "CH-ZH" … (src/lib/holidays.ts)
+model HolidaySettings {
+  id        String   @id @default("default")
+  region    String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+// Pflege der Feiertage: Änderungen an den gesetzlichen Tagen der Region (kind "rule": gestrichen/halber Tag/eingeschaltet)
+// und eigene Tage (kind "custom": Betriebsferien, Brückentage, Rosenmontag …; einmalig mit year oder jährlich ohne year)
+model HolidayDay {
+  id        String   @id @default(cuid())
+  // rule | custom
+  kind      String
+  // nur kind "rule": Kennung der Regel in src/lib/holidays.ts (z. B. "corpusChristi")
+  ruleKey   String?  @unique
+  // nur kind "rule": off | half | on
+  mode      String?
+  // nur kind "custom"
+  name      String?
+  month     Int?
+  day       Int?
+  // null = jedes Jahr
+  year      Int?
+  half      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Einstellungen gehören der jeweiligen Funktion (Singleton-Zeilen, bei Bedarf mit Standardwerten angelegt)
@@ -256,6 +307,8 @@ model Customer {
   nameKey        String    @default("")
   cityKey        String    @default("")
   phoneKey       String    @default("")
+  // Archiviert (P4b-2): aus Auswahlfeldern, Suche und Neu-Formularen ausgeblendet, per Filter auffindbar, wieder aktivierbar; Verknüpfungen bleiben
+  archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -265,6 +318,7 @@ model Customer {
   invoices     Invoice[]
 
   @@index([lastName])
+  @@index([archivedAt])
 }
 
 model Vehicle {
@@ -295,6 +349,8 @@ model Vehicle {
   notes          String?
   // Normalisierte Suchspalte (src/lib/search-key.ts, von den Operationen gepflegt): Marke, Modell, FIN
   searchKey      String    @default("")
+  // Archiviert (P4b-2): wie beim Kunden; ein archiviertes Fahrzeug zählt nicht für die Kennzeichen-Dublettenwarnung
+  archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -307,6 +363,7 @@ model Vehicle {
   @@index([plateNorm])
   @@index([customerId])
   @@index([inspectionDue])
+  @@index([archivedAt])
 }
 
 // Halter-Historie eines Fahrzeugs (Halterwechsel). Der aktuelle Halter steht zusätzlich in Vehicle.customerId.
@@ -319,7 +376,8 @@ model VehicleOwnership {
   toDate     DateTime?
   note       String?
 
-  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  // Restrict statt Cascade (P4b-2): die Halter-Historie verschwindet nie stillschweigend mit dem Fahrzeug; ein Fahrzeug mit Historie wird archiviert
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   @@index([vehicleId])

@@ -4,4 +4,5 @@ import { definePages } from "@/modules/types";
 export const pages = definePages("admin.settings", [
   { path: "/settings", kind: "other", permission: "settings.manage" },
   { path: "/settings", kind: "other", permission: "settings.manage", query: "?tab=security" },
+  { path: "/settings", kind: "other", permission: "settings.manage", query: "?tab=holidays" },
 ]);

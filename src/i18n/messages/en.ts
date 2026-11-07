@@ -20,8 +20,10 @@ import { apiEn } from "./modules/api.en";
 import { updatesEn } from "./modules/updates.en";
 import { backupEn } from "./modules/backup.en";
 import { systemEn } from "./modules/system.en";
+import { holidaysEn } from "./modules/holidays.en";
 
 export const en: Messages = {
+  holidays: holidaysEn,
   docs: docsEn,
   invoices: invoicesEn,
   fleet: fleetEn,
@@ -418,10 +420,11 @@ export const en: Messages = {
     },
     title: "Settings",
     description: "Adapt the application to your own workshop.",
-    tabs: { workshop: "Workshop", security: "Security" },
+    tabs: { workshop: "Workshop", holidays: "Holidays", security: "Security" },
     checklist: {
       profile: { label: "Fill in the workshop profile", hint: "Enter the workshop's address and contact details (the name is already set)." },
       hours: { label: "Set the opening hours", hint: "The opening hours are part of the profile and the basis for the calendar and hints." },
+      holidays: { label: "Choose the holiday region", hint: "State or canton determines the statutory holidays; they feed into the working days of absences and the notes in the appointment form." },
       https: { label: "Set up an encrypted connection (HTTPS)", hint: "Without HTTPS passwords travel the network unencrypted – acceptable on a local network, not for access from outside." },
       twoFactor: { label: "Set up two-factor sign-in for your own account", hint: "A second factor (authenticator app) protects administrators if the password becomes known." },
     },

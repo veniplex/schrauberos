@@ -19,10 +19,12 @@ import { apiDe } from "./modules/api.de";
 import { updatesDe } from "./modules/updates.de";
 import { backupDe } from "./modules/backup.de";
 import { systemDe } from "./modules/system.de";
+import { holidaysDe } from "./modules/holidays.de";
 // Deutsch ist die Standardsprache und definiert die Struktur aller Übersetzungen (en.ts muss dieselbe haben).
 // Plural: `<key>_one` / `<key>_other` (siehe tp()). Platzhalter: {name}.
 export const de = {
   security: securityDe,
+  holidays: holidaysDe,
   docs: docsDe,
   invoices: invoicesDe,
   fleet: fleetDe,
@@ -418,10 +420,11 @@ export const de = {
     },
     title: "Einstellungen",
     description: "Die Anwendung auf die eigene Werkstatt anpassen.",
-    tabs: { workshop: "Werkstatt", security: "Sicherheit" },
+    tabs: { workshop: "Werkstatt", holidays: "Feiertage", security: "Sicherheit" },
     checklist: {
       profile: { label: "Werkstattprofil ausfüllen", hint: "Anschrift und Kontakt der Werkstatt hinterlegen (Name steht bereits)." },
       hours: { label: "Öffnungszeiten festlegen", hint: "Die Öffnungszeiten stehen im Profil und sind Grundlage für Kalender und Hinweise." },
+      holidays: { label: "Region der Feiertage wählen", hint: "Bundesland oder Kanton bestimmt die gesetzlichen Feiertage; sie fließen in die Arbeitstage der Abwesenheiten und in die Hinweise im Terminformular ein." },
       https: { label: "Verschlüsselte Verbindung (HTTPS) einrichten", hint: "Ohne HTTPS laufen Passwörter unverschlüsselt durchs Netz – im lokalen Netz geht das, für den Zugriff von außen nicht." },
       twoFactor: { label: "Zwei-Faktor-Anmeldung für das eigene Konto einrichten", hint: "Ein zweiter Faktor (Authenticator-App) schützt Administratoren, falls das Passwort bekannt wird." },
     },

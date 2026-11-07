@@ -10,6 +10,7 @@ import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { isCalendarDay, nowDate, parseMonthParam, toDateInput, todayInput } from "@/lib/dates";
 import { addMonths, eachDayOfInterval, endOfMonth, getDate, getDay, isSameDay, monthKeyOf, startOfDay } from "@/lib/zone";
+import { getHolidays } from "@/server/holidays";
 import { employeeName, workdaysBetween } from "@/modules/office/employees/domain";
 import { absencesOverlapping, activeEmployees } from "@/modules/office/employees/queries";
 import { requirePermission } from "@/server/auth/session";
@@ -38,7 +39,8 @@ export default async function AbsencesPage({
 }) {
   const session = await requirePermission("employees.view");
   const [sp, i18n] = await Promise.all([searchParams, getI18n()]);
-  const { t, tp, td, date } = i18n;
+  const { t, tp, td, date, number } = i18n;
+  const holidays = await getHolidays();
   const canEdit = session.can("employees.edit");
   const sensitive = session.can("employees.sensitive");
 
@@ -199,7 +201,7 @@ export default async function AbsencesPage({
                       <StatusBadge tone={ABSENCE_TONE[type]}>{type === "masked" ? t("employees.absent") : td(`employees.absenceTypes.${type}`, type)}</StatusBadge>
                       <span className="tabular text-ink-muted">
                         {date(a.startDate)}
-                        {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""} · {tp("employees.workdays", workdaysBetween(a.startDate, a.endDate))}
+                        {a.endDate.getTime() !== a.startDate.getTime() ? ` – ${date(a.endDate)}` : ""} · {tp("employees.workdays", workdaysBetween(a.startDate, a.endDate, holidays), { count: number(workdaysBetween(a.startDate, a.endDate, holidays)) })}
                       </span>
                     </span>
                     {canEdit && a.type !== "masked" ? (
