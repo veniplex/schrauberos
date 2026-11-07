@@ -110,6 +110,11 @@ export default async function OpenItemsReportPage({ searchParams }: { searchPara
           ) : null}
         </>
       )}
+      {report.credits.count > 0 ? (
+        <Alert tone="info" className="mb-5">
+          {tp("reports.openItems.credits", report.credits.count, { amount: eur(report.credits.cents) })}
+        </Alert>
+      ) : null}
 
       <div className="mb-5">
         <Disclosure title={t("reports.common.rulesTitle")} variant="card">

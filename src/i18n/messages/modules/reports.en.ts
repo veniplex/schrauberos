@@ -83,9 +83,12 @@ export const reportsEn: typeof reportsDe = {
     empty: "There are no open items.",
     hidden_one: "{count} open item of customers with restricted processing (Art. 18 GDPR) is in the totals but not in the list.",
     hidden_other: "{count} open items of customers with restricted processing (Art. 18 GDPR) are in the totals but not in the list.",
+    credits_one: "{count} open document with a negative amount (hand-entered credit, {amount}) is in neither the totals nor the list – it is not netted.",
+    credits_other: "{count} open documents with a negative amount (hand-entered credits, {amount} in total) are in neither the totals nor the list – they are not netted.",
+    creditsRow: "Credits not netted",
     rules: {
       scope: "Open are invoices, partial and final invoices with the status \"open\" (finalized or entered by hand); cancelled, paid ones, quotes and drafts are not.",
-      amount: "The open amount is gross less deducted partial invoices and payments so far.",
+      amount: "The open amount is gross less deducted partial invoices and payments so far. Open documents with a negative amount (hand-entered credits) are not netted but reported separately – the totals are always the sum of the items.",
       age: "The age counts in calendar days past the due date on the reference date; items without a due date count as not due.",
     },
   },

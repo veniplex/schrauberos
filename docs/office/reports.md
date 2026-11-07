@@ -19,6 +19,7 @@ Ausgangsrechnungen nach **Rechnungsdatum**, je Monat der Werkstatt-Zeitzone: **N
 Was noch **zu zahlen** ist, nach dem **Alter der Fälligkeit** am heutigen Tag: **nicht fällig**, **1–30**, **31–60**, **61–90** und **über 90 Tage überfällig**. Oben wählen Sie **Forderungen** (Ausgangsrechnungen, voreingestellt) oder **Verbindlichkeiten** (Eingangsrechnungen). Darunter die **ältesten offenen Posten** (die 50 ältesten; die Summen zählen alle).
 
 * Offen sind Rechnungen, Abschläge und Schlussrechnungen mit dem Status „offen“; stornierte, bezahlte, Angebote und Entwürfe nicht. Der offene Betrag ist Brutto abzüglich angerechneter Abschläge und Teilzahlungen.
+* **Gutschriften:** Ein offener, von Hand erfasster Beleg mit **negativem Betrag** (etwa die Gutschrift eines Lieferanten) wird **nicht verrechnet**: Er steht weder in den Summen noch in der Liste, ein Hinweis nennt Anzahl und Summe. So ist die Summe immer die Summe der aufgeführten Posten.
 * Posten ohne Fälligkeit gelten als nicht fällig.
 * **Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO)** stehen nie in der Liste; ihre Beträge sind in den Summen enthalten – ein Hinweis nennt, wie viele Posten nicht aufgeführt sind.
 

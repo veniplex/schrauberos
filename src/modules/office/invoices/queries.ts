@@ -136,8 +136,14 @@ export async function revenueByMonth(viewer: Viewer, months: readonly string[]):
   return rows;
 }
 
-/** Offene Posten: Ausgangs- oder Eingangsrechnungen mit Status „offen“ (Rechnung, Abschlag, Schlussrechnung – kein Gegenbeleg), nur Ausgangsliste. */
-const openWhere = (direction: "outgoing" | "incoming"): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, { direction, status: "open", docType: { in: ["invoice", "partial", "final"] } }] });
+/**
+ * Offene Posten: Ausgangs- oder Eingangsrechnungen mit Status „offen“ (Rechnung, Abschlag, Schlussrechnung – kein Gegenbeleg), nur Ausgangsliste, **mit positivem Betrag**. Ein von Hand erfasster Beleg mit
+ * **negativem** Brutto (z. B. eine Lieferanten-Gutschrift als Eingangsrechnung) ist kein Posten, der zu zahlen ist: Er steht weder in den Summen noch in der Liste, sondern wird getrennt genannt (`creditsWhere`,
+ * `OpenItemsData.credits`) – so ist die Summe immer die Summe der Liste und nichts wird still verrechnet. (Ein bezahlter Betrag über dem Brutto ist bei offenen Belegen nicht möglich: `billing.addPayment`
+ * lehnt mehr als den Rest ab, der Rest macht den Beleg „bezahlt“; Test in `reports.test.ts`.)
+ */
+const openWhere = (direction: "outgoing" | "incoming"): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, { direction, status: "open", docType: { in: ["invoice", "partial", "final"] }, grossCents: { gt: 0 } }] });
+const creditsWhere = (direction: "outgoing" | "incoming"): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, { direction, status: "open", docType: { in: ["invoice", "partial", "final"] }, grossCents: { lt: 0 } }] });
 const UNRESTRICTED_PARTY: Prisma.InvoiceWhereInput = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
 const RESTRICTED_PARTY: Prisma.InvoiceWhereInput = { customerId: { not: null }, customer: { is: { processingRestrictedAt: { not: null } } } };
 
@@ -154,6 +160,8 @@ export type OpenItemsData = {
   items: OpenItem[];
   /** offene Posten, die nicht aufgeführt sind, weil der Kunde eingeschränkt verarbeitet wird (Art. 18 DSGVO) – sie zählen in den Summen */
   hiddenCount: number;
+  /** offene Belege mit **negativem** Betrag (von Hand erfasste Gutschriften): nicht in den Summen und nicht in der Liste, hier getrennt (Summe negativ) */
+  credits: { count: number; cents: number };
 };
 
 /**
@@ -169,7 +177,7 @@ export async function openItems(viewer: Viewer, options: { direction: "outgoing"
     const due: Prisma.DateTimeNullableFilter = { ...(range.gte ? { gte: startOfDay(range.gte) } : {}), ...(range.lt ? { lt: startOfDay(range.lt) } : {}) };
     return bucket === "notDue" ? { OR: [{ dueDate: null }, { dueDate: due }] } : { dueDate: due };
   };
-  const [buckets, rows, hiddenCount] = await Promise.all([
+  const [buckets, rows, hiddenCount, credits] = await Promise.all([
     Promise.all(AGE_BUCKETS.map(async (bucket) => {
       const sum = await db.invoice.aggregate({ where: { AND: [open, dueWhere(bucket)] }, _sum: OPEN_SUMS, _count: { _all: true } });
       return { bucket, count: sum._count._all, cents: toOutstanding(sum._sum) };
@@ -182,12 +190,13 @@ export async function openItems(viewer: Viewer, options: { direction: "outgoing"
       select: { id: true, number: true, partyName: true, dueDate: true, grossCents: true, deductedCents: true, paidCents: true },
     }),
     db.invoice.count({ where: { AND: [open, RESTRICTED_PARTY] } }),
+    db.invoice.aggregate({ where: creditsWhere(direction), _sum: OPEN_SUMS, _count: { _all: true } }),
   ]);
   const items = rows.map((r): OpenItem => {
     const dueDay = r.dueDate ? dayKey(r.dueDate) : null;
     return { id: r.id, number: r.number, partyName: r.partyName, dueDay, outstandingCents: outstandingCents(r), daysOverdue: dueDay ? Math.max(0, daysBetweenKeys(dueDay, today)) : 0, bucket: ageBucketOf(dueDay, today) };
   });
-  return { direction, buckets, total: { count: buckets.reduce((n, b) => n + b.count, 0), cents: buckets.reduce((n, b) => n + b.cents, 0) }, items, hiddenCount };
+  return { direction, buckets, total: { count: buckets.reduce((n, b) => n + b.count, 0), cents: buckets.reduce((n, b) => n + b.cents, 0) }, items, hiddenCount, credits: { count: credits._count._all, cents: (credits._sum.grossCents ?? 0) - (credits._sum.deductedCents ?? 0) - (credits._sum.paidCents ?? 0) } };
 }
 
 export type PaymentsDue = { direction: "outgoing" | "incoming"; count: number; cents: number; items: Array<{ id: string; number: string; partyName: string; dueDay: string; outstandingCents: number }>; hiddenCount: number };

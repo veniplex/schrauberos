@@ -82,9 +82,12 @@ export const reportsDe = {
     empty: "Es gibt keine offenen Posten.",
     hidden_one: "{count} offener Posten von Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) steht in den Summen, aber nicht in der Liste.",
     hidden_other: "{count} offene Posten von Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO) stehen in den Summen, aber nicht in der Liste.",
+    credits_one: "{count} offener Beleg mit negativem Betrag (von Hand erfasste Gutschrift, {amount}) ist nicht in den Summen und nicht in der Liste enthalten – er wird nicht verrechnet.",
+    credits_other: "{count} offene Belege mit negativem Betrag (von Hand erfasste Gutschriften, zusammen {amount}) sind nicht in den Summen und nicht in der Liste enthalten – sie werden nicht verrechnet.",
+    creditsRow: "Nicht verrechnete Gutschriften",
     rules: {
       scope: "Offen sind Rechnungen, Abschläge und Schlussrechnungen mit dem Status „offen“ (festgeschrieben oder von Hand erfasst); Stornierte, bezahlte, Angebote und Entwürfe nicht.",
-      amount: "Der offene Betrag ist Brutto abzüglich angerechneter Abschläge und bisheriger Zahlungen.",
+      amount: "Der offene Betrag ist Brutto abzüglich angerechneter Abschläge und bisheriger Zahlungen. Offene Belege mit negativem Betrag (von Hand erfasste Gutschriften) werden nicht verrechnet, sondern getrennt genannt – die Summen sind immer die Summe der Posten.",
       age: "Das Alter zählt in Kalendertagen über der Fälligkeit am Stichtag; Posten ohne Fälligkeit gelten als nicht fällig.",
     },
   },

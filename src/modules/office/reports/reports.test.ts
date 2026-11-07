@@ -304,6 +304,27 @@ describe("Offene Posten", () => {
     assert.equal(incoming!.buckets.find((b) => b.bucket === "d1_30")!.count, 1, "10.10. ist 28 Tage überfällig");
     assert.equal(await queries.openItemsReport(await session(["reports.view"]), { direction: "outgoing", today }), null);
   });
+
+  it("von Hand erfasste Gutschrift (negatives Brutto, offen) wird nicht verrechnet: nicht in den Summen, nicht in der Liste, getrennt genannt – die Summe ist immer die Summe der Liste", async () => {
+    const e1 = await invoice({ number: "N-1", direction: "incoming", grossCents: 10_000, status: "open", dueDate: await noon("2026-06-01") });
+    const e2 = await invoice({ number: "N-2", direction: "incoming", grossCents: -4_000, status: "open", dueDate: await noon("2026-06-01") });
+    const report = await queries.openItemsReport(await session(["invoices.view"]), { direction: "incoming", today });
+    assert.ok(report);
+    // I-1 (3.000, 28 Tage überfällig) + N-1 (10.000, über 90 Tage); N-2 (−4.000) ist eine Gutschrift
+    assert.deepEqual(report.total, { count: 2, cents: 13_000 });
+    assert.deepEqual(report.buckets.find((b) => b.bucket === "d91plus"), { bucket: "d91plus", count: 1, cents: 10_000 });
+    assert.deepEqual(report.credits, { count: 1, cents: -4_000 });
+    assert.equal(report.items.reduce((sum, i) => sum + i.outstandingCents, 0), report.total.cents, "Summe = Summe der Liste");
+    assert.ok(!report.items.some((i) => i.number === "N-2"));
+    // Zahlungsziele rechnen ebenso (nur positive Posten)
+    const due = await queries.dueReport(await session(["invoices.view"]), { today: "2026-05-30", months: 3 });
+    const incoming = due!.payments!.incoming;
+    assert.equal(incoming.items.reduce((sum, i) => sum + i.outstandingCents, 0), incoming.cents);
+    assert.ok(!incoming.items.some((i) => i.number === "N-2"));
+    // die Ausgangsseite hat keine Gutschriften
+    assert.deepEqual((await queries.openItemsReport(await session(["invoices.view"]), { direction: "outgoing", today }))!.credits, { count: 0, cents: 0 });
+    await env.db.invoice.deleteMany({ where: { id: { in: [e1.id, e2.id] } } });
+  });
 });
 
 describe("Auslastung", () => {

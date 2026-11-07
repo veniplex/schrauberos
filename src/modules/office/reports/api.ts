@@ -55,7 +55,7 @@ export const endpoints: ApiEndpoint[] = [
     method: "GET",
     path: "/reports/open-items",
     operationId: "reports.open-items",
-    summary: "Open items by age of the due date (receivables or payables). Needs invoices.view as well; customers with restricted processing are only in the totals",
+    summary: "Open items by age of the due date (receivables or payables). Needs invoices.view as well; customers with restricted processing are only in the totals; open documents with a negative amount (hand-entered credits) are not netted but reported separately as credits",
     query: z.strictObject({ direction: z.enum(["outgoing", "incoming"]).optional() }),
     response: z.object({
       direction: z.enum(["outgoing", "incoming"]),
@@ -64,6 +64,7 @@ export const endpoints: ApiEndpoint[] = [
       total: z.object({ count: z.number().int(), cents }),
       items: z.array(z.object({ id: z.string(), number: z.string(), partyName: z.string(), dueDay: day.nullable(), outstandingCents: cents, daysOverdue: z.number().int(), bucket: z.enum(["notDue", "d1_30", "d31_60", "d61_90", "d91plus"]) })),
       hiddenCount: z.number().int(),
+      credits: z.object({ count: z.number().int(), cents }),
     }),
     handler: async (call) => {
       requireReport(call, "openItems");

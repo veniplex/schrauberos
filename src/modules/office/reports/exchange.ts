@@ -58,6 +58,7 @@ export const openItemsExport: ExportDef = {
       return [t(`reports.openItems.buckets.${bucket}`), intCell(row.count), moneyCell(row.cents, format)];
     });
     rows.push([t("reports.common.total"), intCell(report.total.count), moneyCell(report.total.cents, format)]);
+    if (report.credits.count > 0) rows.push([t("reports.openItems.creditsRow"), intCell(report.credits.count), moneyCell(report.credits.cents, format)]);
     return { columns: [{ labelKey: "reports.exporting.cols.stage" }, { labelKey: "reports.common.count" }, { labelKey: "reports.exporting.cols.outstanding" }], count: rows.length, target: `Offene Posten ${direction} ${report.today}`, rows: rowsOf(rows) };
   },
 };
