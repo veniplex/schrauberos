@@ -47,7 +47,7 @@ RUN npx prisma generate \
 RUN set -eux; \
     mkdir -p /runtime/lib; \
     cp /usr/local/bin/node /runtime/node; \
-    native="$(find node_modules -name '*.node' -o -name 'libvips*.so*' | tr '\n' ' ')"; \
+    native="$(find node_modules \( -path 'node_modules/sharp' -o -path 'node_modules/@img' \) -prune -o -name '*.node' -print | tr '\n' ' ')"; \
     for f in $(ldd /usr/local/bin/node $native 2>/dev/null | awk '/=>/ {print $3} /ld-linux/ {print $1}' | sort -u); do cp -L "$f" /runtime/lib/; done; \
     triplet="$(gcc -dumpmachine)"; \
     for n in libnss_files.so.2 libnss_dns.so.2 libresolv.so.2; do cp -L "/lib/$triplet/$n" /runtime/lib/; done; \
@@ -59,11 +59,13 @@ RUN set -eux; \
 # `next build` (output: standalone) kopiert je nach Ablaufverfolgung auch Quelldateien (`src/`: Seiten, Routen, Tests), `.env`, `assets/` und `prisma/migrations` mit: Quelltext und Umgebungsdateien
 # kommen nicht ins Paket (rm), Schrift, Migrationen und Hilfe werden aus dem Quellbaum **in** die Zielordner kopiert (`dir/.`: ein `cp -a dir ziel` legte sie bei vorhandenem Ziel in `ziel/dir` ab), und
 # Next schreibt `.next/server` und Teile von `.next/static` mit Modus 664: `chmod -R go-w` (der Starter prüft nur das Ausführbit, der Smoke-Test verlangt kein g+w/o+w unter /app).
+# `sharp` und `@img/*` (libvips, LGPL-3.0) sind optionale Abhängigkeiten von `next` für die Bildoptimierung, die hier aus ist (`images.unoptimized`, Pflicht): weder sie noch ihre Bibliotheken
+# kommen ins Paket bzw. in die Laufzeit (`check-bundle` verbietet sie). `scripts/gen-notices.mjs` legt `THIRD-PARTY-NOTICES.md` (Pakete, Lizenzen, Hinweise zu glibc/libstdc++) ins Paket.
 # `scripts/check-bundle.mjs` bricht ab, wenn etwas Unzulässiges im Paket liegt oder etwas fehlt, das die App zur Laufzeit liest (Hilfe-Markdown, Schrift, Migrationen, Laufzeit, Launcher).
 RUN set -eux; \
     mkdir -p /bundle/.next /bundle/prisma/migrations /bundle/assets /bundle/docs /bundle/public; \
     cp -a .next/standalone/. /bundle/; \
-    rm -rf /bundle/src /bundle/.env /bundle/.env.*; \
+    rm -rf /bundle/src /bundle/.env /bundle/.env.* /bundle/node_modules/sharp /bundle/node_modules/@img; \
     cp -a .next/static /bundle/.next/static; \
     cp -a public/. /bundle/public/; \
     cp -a docs/. /bundle/docs/; \
@@ -71,6 +73,7 @@ RUN set -eux; \
     cp -a prisma/migrations/. /bundle/prisma/migrations/; \
     cp -a version.json launcher.mjs /bundle/; \
     cp -a /runtime /bundle/runtime; \
+    node scripts/gen-notices.mjs /bundle; \
     chmod -R go-w /bundle; \
     node scripts/check-bundle.mjs /bundle; \
     node scripts/gen-tree.mjs /bundle

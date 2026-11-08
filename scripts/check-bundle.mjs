@@ -8,7 +8,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Pfade (relativ zur Wurzel), die im Paket nicht vorkommen dürfen. */
-export const FORBIDDEN_PATHS = ["src", "e2e", "scripts", "docker", ".data", ".git", ".github", ".claude", ".hallmark", "test-results", "playwright-report", "playwright.config.ts", "README.md", "CLAUDE.md", "AGENTS.md", "Dockerfile", "tsconfig.json", "prisma/schema.prisma", "prisma.config.ts", "next.config.ts", "package-lock.json"];
+export const FORBIDDEN_PATHS = ["src", "e2e", "scripts", "docker", ".data", ".git", ".github", ".claude", ".hallmark", "test-results", "playwright-report", "playwright.config.ts", "README.md", "CLAUDE.md", "AGENTS.md", "Dockerfile", "tsconfig.json", "prisma/schema.prisma", "prisma.config.ts", "next.config.ts", "package-lock.json", "node_modules/sharp", "node_modules/@img"];
 /** Pfade, die zur Laufzeit gelesen werden (Datei oder Ordner). */
 export const REQUIRED_PATHS = [
   "server.js",
@@ -22,6 +22,7 @@ export const REQUIRED_PATHS = [
   "assets/fonts/NotoSans-Bold.ttf",
   "prisma/migrations/00000000000000_baseline/migration.sql",
   "version.json",
+  "THIRD-PARTY-NOTICES.md",
   "launcher.mjs",
   "runtime/node",
   "runtime/loader",

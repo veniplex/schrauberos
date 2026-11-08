@@ -34,6 +34,7 @@ function goodBundle(name: string) {
     "assets/fonts/NotoSans-Bold.ttf",
     "prisma/migrations/00000000000000_baseline/migration.sql",
     "version.json",
+    "THIRD-PARTY-NOTICES.md",
     "launcher.mjs",
     "runtime/node",
     "runtime/loader",
@@ -65,6 +66,8 @@ describe("check-bundle", () => {
       ["test", "lib/x.test.ts"],
       ["e2e", "e2e/tests/a.spec.ts"],
       ["data", ".data/secret.key"],
+      ["sharp", "node_modules/sharp/package.json"], // libvips (LGPL-3.0) kommt nie ins Paket (Z6-3 M-9)
+      ["img", "node_modules/@img/sharp-linux-x64/lib/x.node"],
       ["pem", "release-signing-key.pem"],
       ["pem2", "certs/ca.PEM"],
       ["keyfile", "keys/server.key"],
@@ -78,7 +81,7 @@ describe("check-bundle", () => {
   });
 
   it("verlangt, was die App zur Laufzeit liest (Hilfe, Schrift, Migrationen)", () => {
-    for (const rel of ["docs/platform/01-a.md", "assets/fonts/NotoSans-Regular.ttf", "prisma/migrations/00000000000000_baseline/migration.sql", "runtime/node"]) {
+    for (const rel of ["THIRD-PARTY-NOTICES.md", "docs/platform/01-a.md", "assets/fonts/NotoSans-Regular.ttf", "prisma/migrations/00000000000000_baseline/migration.sql", "runtime/node"]) {
       const dir = goodBundle(`missing-${path.basename(rel)}`);
       rmSync(path.join(dir, ...rel.split("/")), { recursive: true, force: true });
       if (rel.startsWith("docs/")) rmSync(path.join(dir, "docs"), { recursive: true, force: true });
