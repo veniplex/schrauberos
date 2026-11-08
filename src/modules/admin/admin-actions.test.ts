@@ -8,6 +8,7 @@ import { createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
 let env: TestEnv;
 let modules: typeof import("./modules/actions");
 let backup: typeof import("./backup/actions");
+let offsite: typeof import("./backup/offsite-actions");
 let updates: typeof import("./updates/actions");
 let settings: typeof import("./settings/actions");
 let retention: typeof import("@/server/audit-retention");
@@ -18,6 +19,7 @@ before(async () => {
   process.env.UPDATE_API_URL = "http://127.0.0.1:9"; // nichts erreichbar: die Update-Prüfung scheitert sofort
   modules = await import("./modules/actions");
   backup = await import("./backup/actions");
+  offsite = await import("./backup/offsite-actions");
   updates = await import("./updates/actions");
   settings = await import("./settings/actions");
   retention = await import("@/server/audit-retention");
@@ -127,6 +129,29 @@ describe("Backup-Plan und Backups", () => {
     assert.equal(await redirectOf(() => backup.runAutoBackupNow({}, form({}))), "/forbidden");
   });
 
+  it("„Jetzt hochladen“ (runOffsiteNow): ohne eingerichtetes Ziel läuft nichts schief, das Audit nennt den Job; ohne backup.manage verboten", async () => {
+    const state = await offsite.runOffsiteNow({}, form({}));
+    assert.equal(state.ok, true);
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "backup.runNow", target: "backup.offsite" } });
+    assert.equal(entry.actorName, "chef");
+    assert.ok(env.browser.revalidated.includes("/admin/backup/offsite"));
+    await signInWith("settings.manage");
+    assert.equal(await redirectOf(() => offsite.runOffsiteNow({}, form({}))), "/forbidden");
+    assert.equal(await env.db.auditLog.count({ where: { action: "backup.runNow", target: "backup.offsite" } }), 1, "der verbotene Aufruf schreibt nichts");
+  });
+
+  it("„Jetzt hochladen“ (runOffsiteNow): scheitert der Lauf (eingeschaltet, aber ohne Zugangsdaten), kommt die Fehlermeldung statt Erfolg und es gibt kein Audit „backup.runNow“", async () => {
+    await env.db.appSetting.createMany({ data: [{ key: "offsite.enabled", value: "true" }, { key: "offsite.protocol", value: "webdav" }, { key: "offsite.url", value: "https://example.invalid/dav" }, { key: "offsite.username", value: "x" }] });
+    try {
+      const state = await offsite.runOffsiteNow({}, form({}));
+      assert.ok(state.error, "Fehler wird gemeldet");
+      assert.ok(!state.ok);
+      assert.equal(await env.db.auditLog.count({ where: { action: "backup.runNow", target: "backup.offsite" } }), 0);
+    } finally {
+      await env.db.appSetting.deleteMany({ where: { key: { startsWith: "offsite." } } });
+    }
+  });
+
   it("eine fehlgeschlagene Wiederherstellung wird gemeldet und im Audit festgehalten", async () => {
     const state = await backup.restoreBackup({}, form({ name: "schrauberos-20200101T000000Z-manual" }));
     assert.ok(state.error);
@@ -156,6 +181,32 @@ describe("Update-Token", () => {
     await updates.saveUpdateToken({}, form({ remove: true }));
     assert.equal(await getSecret("update.token"), null);
     assert.equal(await env.db.auditLog.count({ where: { action: "settings.updateToken" } }), 2);
+  });
+
+  it("checkForUpdates fragt GitHub frisch an (ohne Zwischenspeicher), ändert keine Daten und schreibt kein Audit; verlangt updates.manage", async () => {
+    const releases = await import("./updates/releases");
+    const realFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return new Response("nein", { status: 500 });
+    }) as typeof fetch;
+    try {
+      await updates.checkForUpdates(form({}));
+      const first = calls;
+      assert.ok(first >= 1, "die Anfrage geht hinaus");
+      await updates.checkForUpdates(form({}));
+      assert.ok(calls > first, "auch ein frisches Ergebnis im Zwischenspeicher hindert die erneute Anfrage nicht (force)");
+      assert.ok("error" in (await releases.checkLatestRelease()), "das Ergebnis steht im Zwischenspeicher");
+      assert.equal(await env.db.auditLog.count(), 0, "reine Abfrage: kein Audit");
+      assert.ok(env.browser.revalidated.includes("/admin/updates"));
+      await signInWith("settings.manage");
+      const before = calls;
+      assert.equal(await redirectOf(() => updates.checkForUpdates(form({}))), "/forbidden");
+      assert.equal(calls, before, "ohne Recht geht keine Anfrage hinaus");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 
   it("eine fehlgeschlagene Installation wird gemeldet und protokolliert", async () => {
