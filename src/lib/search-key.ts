@@ -58,3 +58,9 @@ export function phoneTerm(term: string): string | null {
   const key = phoneKey(term);
   return key.length >= PHONE_MIN_DIGITS ? key : null;
 }
+
+/**
+ * Version des Algorithmus der normalisierten Suchspalten (`searchKey`, `phoneKey` hier und `normalizePlate` in `lib/plate.ts`). **Bei jeder Änderung, die für denselben Eingabetext ein anderes Ergebnis liefert,
+ * um eins erhöhen**: Dann rechnen die Jobs der Funktionen (`server/search-key-rebuild.ts`) die Spalten Kunden, Fahrzeuge, Rechnungen und Artikel blockweise neu (Version 1 = Stand von 0.2.0).
+ */
+export const SEARCH_KEY_VERSION = 1;

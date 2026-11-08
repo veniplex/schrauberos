@@ -7,6 +7,10 @@ import { jobs as apiAdmin, outboxHandlers as apiHandlers } from "./admin/api/job
 import { jobs as billing } from "./office/billing/jobs";
 import { jobs as files } from "./workshop/files/jobs";
 import { jobs as network } from "./it/network/jobs";
+import { jobs as invoices } from "./office/invoices/jobs";
+import { jobs as customers } from "./workshop/customers/jobs";
+import { jobs as parts } from "./workshop/parts/jobs";
+import { jobs as vehicles } from "./workshop/vehicles/jobs";
 
 /**
  * Composition Root des Job-Runners (wird nur von `src/server/jobs/registry.ts` importiert – nicht über `registry.ts`, das jede Seite lädt): Jede Funktion
@@ -14,6 +18,6 @@ import { jobs as network } from "./it/network/jobs";
  * solange die Funktion aktiv ist (`feature`). Jobs der Plattform selbst stehen in `src/server/jobs/platform.ts`.
  * Neue Funktion mit Job: `jobs.ts` anlegen, Zeile ergänzen – `src/server/jobs/jobs.test.ts` prüft IDs, Zeitpläne und die Zuordnung zur Funktion.
  */
-export const featureJobs: readonly JobDef[] = [...audit, ...backup, ...mail, ...apiAdmin, ...files, ...billing, ...network];
+export const featureJobs: readonly JobDef[] = [...audit, ...backup, ...mail, ...apiAdmin, ...files, ...billing, ...network, ...customers, ...vehicles, ...invoices, ...parts];
 
 export const featureOutboxHandlers: readonly OutboxHandlerDef[] = [...mailHandlers, ...apiHandlers];

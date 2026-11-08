@@ -80,6 +80,10 @@ export const systemEn: typeof systemDe = {
     mail: { prune: "Clean up send log (retention)" },
     files: { purge: "Permanently delete removed files" },
     billing: { "sent-files": "Clean up sent document copies" },
+    customers: { "search-keys": "Update search columns of customers" },
+    vehicles: { "search-keys": "Update search columns of vehicles" },
+    invoices: { "search-keys": "Update search column of invoices" },
+    parts: { "search-keys": "Update search column of articles" },
     platform: {
       outbox: "Deliver events (outbox)",
       "outbox-prune": "Clean up delivered events",
