@@ -3,7 +3,8 @@ import { SMALL_BUSINESS_NOTE } from "@/lib/einvoice/ubl";
 import { formatIban } from "@/lib/bank-tax";
 import { epcPayload } from "@/lib/girocode";
 import { QUANTITY_DECIMALS, lineResult, scaledToInput } from "@/lib/line-items";
-import { parseLogoDataUrl } from "@/lib/logo";
+import { sanitizeImage } from "@/lib/image-sanitize";
+import { LOGO_LIMITS, parseLogoDataUrl } from "@/lib/logo";
 import { formatCents } from "@/lib/money";
 import { createPdf, mm } from "@/server/pdf";
 import { dateDe, docTitle, paymentReference } from "./domain";
@@ -29,7 +30,10 @@ const cityLine = (zip: string | null, city: string | null): string => joinParts(
 /** Logo als Raster (PNG/JPEG) für das PDF; `null`, wenn es keins (oder ein nicht darstellbares) gibt. */
 export function logoForPdf(dataUrl: string | null | undefined): Buffer | null {
   const logo = parseLogoDataUrl(dataUrl);
-  return logo && (logo.mime === "image/png" || logo.mime === "image/jpeg") ? logo.data : null;
+  if (!logo || (logo.mime !== "image/png" && logo.mime !== "image/jpeg")) return null;
+  // Bildgröße erneut prüfen (auch ein früher gespeichertes Logo): zu viele Bildpunkte = kein Logo im PDF statt eines Speicherfressers (Z6-2 N1)
+  const clean = sanitizeImage(logo.data, LOGO_LIMITS);
+  return clean.ok ? clean.bytes : null;
 }
 
 /** Der Hinweis zur Steuer unter den Summen: Kleinunternehmer (§ 19 UStG) oder der Grund der Steuerbefreiung bei 0 %. */

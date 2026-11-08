@@ -1,5 +1,7 @@
 import PDFDocument from "pdfkit";
 import { qrMatrix, QrTooLongError } from "@/lib/qr";
+import { sanitizeImage } from "@/lib/image-sanitize";
+import { LOGO_LIMITS } from "@/lib/logo";
 import { PdfError } from "./errors";
 import { loadFonts } from "./fonts";
 
@@ -398,6 +400,9 @@ export class PdfBuilder {
   /** Bild (PNG/JPEG, z. B. das Firmenlogo) in den Textfluss oder an eine feste Stelle. */
   image(data: Buffer | Uint8Array, options: { width?: number; height?: number; x?: number; y?: number } = {}): this {
     if (data.byteLength > MAX_IMAGE_BYTES) throw new PdfError("tooLarge", "image");
+    // pdfkit dekodiert Bilder ohne Obergrenze: Bildpunkte vorab aus dem Dateikopf prüfen (kleine Dateien können riesige Bilder sein)
+    const checked = sanitizeImage(data, LOGO_LIMITS);
+    if (!checked.ok) throw new PdfError("tooLarge", "image");
     const placed = options.y !== undefined;
     const fit: [number, number] = [options.width ?? mm(40), options.height ?? mm(20)];
     if (!placed) this.ensure(fit[1]);

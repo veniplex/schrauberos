@@ -11,6 +11,13 @@ export type LogoType = (typeof LOGO_TYPES)[number];
 
 export const LOGO_PATH = "/api/logo";
 
+/**
+ * Grenzen für Logo und Bilder im PDF (Z6-2 N1): Ein 190-KB-PNG kann 14000 × 3500 Bildpunkte haben, und pdfkit dekodiert es ohne Obergrenze (belegt: 869 MB Arbeitsspeicher je PDF). Ein Logo für 50 mm Breite
+ * braucht nicht mehr als 4 Megapixel und 4000 Bildpunkte je Kante. Beim Hochladen (PNG/JPEG über `sanitizeImage`, das zugleich Metadaten entfernt) und **erneut beim Erzeugen jedes PDFs** geprüft
+ * (auch für früher gespeicherte Logos); ein Logo darüber erscheint im PDF nicht (Standardmarke).
+ */
+export const LOGO_LIMITS = { maxPixels: 4_000_000, maxSide: 4000 } as const;
+
 /** Zerlegt die gespeicherte Daten-URL; `null` bei allem, was kein erlaubtes Rasterbild ist (SVG, Unsinn, leer). */
 export function parseLogoDataUrl(dataUrl: string | null | undefined): { mime: LogoType; data: Buffer } | null {
   if (!dataUrl) return null;

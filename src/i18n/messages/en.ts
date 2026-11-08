@@ -568,6 +568,7 @@ export const en: Messages = {
       hoursInvalid: "Please enter valid times (end after start).",
       logoType: "Allowed: PNG, JPEG or WebP.",
       logoSize: "The logo may be at most 200 KB.",
+      logoPixels: "The logo has too many pixels (at most 4 megapixels, 4000 pixels per side).",
       taxNumber: "Please enter a tax number with at least 6 digits (digits, spaces, / and - are allowed).",
       vatId: "This is not a valid VAT ID (Germany: DE and 9 digits, Austria: ATU and 8 digits, Switzerland: CHE-123.456.789 MWST).",
       iban: "This is not a valid IBAN (length or checksum is wrong).",

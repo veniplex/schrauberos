@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
+import { makePng } from "@/test/png";
 import { browser, createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
 
 /** Werkstatt-Einstellungen: Die Zeitzone des Prozesses ändert sich nur, wenn tatsächlich gespeichert wurde. */
@@ -114,7 +115,7 @@ describe("saveWorkshop: Rechnungsangaben (P4b-7)", () => {
 });
 
 describe("saveWorkshop: Logo (SEC-12: der Inhalt entscheidet)", () => {
-  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+  const PNG = new Uint8Array(makePng(16, 8));
   const logoOf = async () => (await env.db.workshop.findUnique({ where: { id: "default" } }))?.logoDataUrl ?? null;
   const withLogo = (file: File) => form({ name: "Werkstatt", accentColor: "#2459c9", timezone: "Europe/Berlin", ...Object.fromEntries(["mon", "tue", "wed", "thu", "fri", "sat", "sun"].map((d) => [`hours.${d}.closed`, true])), logo: file });
 
@@ -128,6 +129,28 @@ describe("saveWorkshop: Logo (SEC-12: der Inhalt entscheidet)", () => {
     }
     assert.ok((await actions.saveWorkshop({}, withLogo(new File([PNG], "logo.png", { type: "image/jpeg" })))).fieldErrors?.logo, "echtes PNG unter falschem Typ");
     assert.equal(await logoOf(), before);
+  });
+
+  it("Logo mit zu vielen Bildpunkten (Dekompressionsbombe, Z6-2 N1) wird abgelehnt, ein kleines Logo gespeichert und bereinigt; ein früher gespeichertes Riesenlogo erscheint nicht im PDF", async () => {
+    await actions.saveWorkshop({}, withLogo(new File([PNG], "logo.png", { type: "image/png" })));
+    const stored = await logoOf();
+    // 14000 × 3500 Bildpunkte (49 Megapixel) in wenigen hundert Bytes: der Kopf nennt die Größe, die Bilddaten sind winzig
+    const bomb = makePng(1, 1, { ihdr: { width: 14000, height: 3500 } });
+    assert.ok(bomb.length < 1000);
+    const state = await actions.saveWorkshop({}, withLogo(new File([new Uint8Array(bomb)], "logo.png", { type: "image/png" })));
+    assert.ok(state.fieldErrors?.logo, "abgelehnt");
+    assert.equal(await logoOf(), stored, "das bisherige Logo bleibt");
+    // genau an der Grenze: 2000 × 2000 = 4 Megapixel gehen noch, 2001 × 2000 nicht
+    const { LOGO_LIMITS } = await import("@/lib/logo");
+    assert.equal(LOGO_LIMITS.maxPixels, 4_000_000);
+    assert.ok((await actions.saveWorkshop({}, withLogo(new File([new Uint8Array(makePng(2000, 2000))], "logo.png", { type: "image/png" })))).ok);
+    assert.ok((await actions.saveWorkshop({}, withLogo(new File([new Uint8Array(makePng(2001, 2000))], "logo.png", { type: "image/png" })))).fieldErrors?.logo);
+
+    // beim Erzeugen jedes PDFs wird erneut geprüft (auch ein früher gespeichertes Logo): kein Logo statt 870 MB Arbeitsspeicher
+    const { logoForPdf } = await import("@/modules/office/billing/documents");
+    assert.equal(logoForPdf(`data:image/png;base64,${bomb.toString("base64")}`), null);
+    assert.ok(logoForPdf(`data:image/png;base64,${Buffer.from(PNG).toString("base64")}`));
+    assert.equal(logoForPdf("data:image/webp;base64,AAAA"), null, "WebP kommt nie ins PDF");
   });
 
   it("speichert ein echtes PNG mit dem erkannten Typ in der Daten-URL; ein echtes SVG wird abgelehnt (P3-5: kein Dokument mit Skriptmöglichkeit unter der Herkunft der App)", async () => {

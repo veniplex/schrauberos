@@ -8,7 +8,8 @@ import { WEEKDAYS } from "@/lib/constants";
 import { formObject } from "@/lib/forms";
 import { isValidTime } from "@/lib/opening-hours";
 import { DEFAULT_INVOICE_NUMBER_FORMAT, parseInvoiceNumberFormat } from "@/lib/invoice-number-format";
-import { LOGO_TYPES } from "@/lib/logo";
+import { sanitizeImage } from "@/lib/image-sanitize";
+import { LOGO_LIMITS, LOGO_TYPES } from "@/lib/logo";
 import { parsePublicUrl, PUBLIC_URL_MAX_LENGTH } from "@/lib/public-url";
 import { checkUpload } from "@/lib/upload-sniff";
 import { moneyCents } from "@/lib/zod-fields";
@@ -87,7 +88,14 @@ const saveWorkshopOperation = defineOperation({
       const data = new Uint8Array(await file.arrayBuffer());
       const checked = checkUpload(data, file.type, LOGO_TYPES);
       if (!checked.ok) failField("logo", "settings.errors.logoType");
-      logoDataUrl = `data:${checked.mime};base64,${Buffer.from(data).toString("base64")}`;
+      let content: Uint8Array = data;
+      if (checked.mime === "image/png" || checked.mime === "image/jpeg") {
+        // Bildpunkte und Aufbau prüfen und Metadaten entfernen (kleine Dateien können riesige Bilder sein, Z6-2 N1); WebP wird nur angezeigt, nie ins PDF gesetzt
+        const clean = sanitizeImage(data, LOGO_LIMITS);
+        if (!clean.ok) failField("logo", clean.reason === "size" ? "settings.errors.logoPixels" : "settings.errors.logoType");
+        content = clean.bytes;
+      }
+      logoDataUrl = `data:${checked.mime};base64,${Buffer.from(content).toString("base64")}`;
     }
     return { logoDataUrl };
   },

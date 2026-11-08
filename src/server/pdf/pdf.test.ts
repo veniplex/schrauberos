@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { makePng } from "@/test/png";
 import { inspectPdf } from "@/test/pdf-text";
 import { breakLongWords } from "./builder";
 import { cleanPdfText, createPdf, mm, pdfResponse, PdfError } from ".";
@@ -224,6 +225,14 @@ describe("PDF-Erzeugung", () => {
     it("zu langer QR-Inhalt ist ein PdfError, ein zu großes Bild ebenfalls", () => {
       assert.throws(() => createPdf(opts).qr("a".repeat(3000)), tooLarge);
       assert.throws(() => createPdf(opts).image(Buffer.alloc(3 * 1024 * 1024)), tooLarge);
+    });
+
+    it("ein kleines Bild mit riesigen Maßen (Dekompressionsbombe, Z6-2 N1) ist ein PdfError, bevor pdfkit es dekodiert; ein normales Bild geht", () => {
+      const bomb = makePng(1, 1, { ihdr: { width: 14000, height: 3500 } });
+      assert.ok(bomb.length < 1000);
+      assert.throws(() => createPdf(opts).image(bomb), tooLarge);
+      assert.throws(() => createPdf(opts).image(Buffer.from("kein Bild")), tooLarge);
+      assert.doesNotThrow(() => createPdf(opts).image(makePng(200, 100)));
     });
 
     it("Kopf- und Fußzeile mit sehr langem Text laufen nicht über den Rand (gekürzt)", async () => {

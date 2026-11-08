@@ -568,6 +568,7 @@ export const de = {
       hoursInvalid: "Bitte gültige Zeiten angeben (Ende nach Beginn).",
       logoType: "Erlaubt sind PNG, JPEG oder WebP.",
       logoSize: "Das Logo darf höchstens 200 KB groß sein.",
+      logoPixels: "Das Logo hat zu viele Bildpunkte (höchstens 4 Megapixel, 4000 Punkte je Seite).",
       taxNumber: "Bitte eine Steuernummer mit mindestens 6 Ziffern angeben (Ziffern, Leerzeichen, / und - sind erlaubt).",
       vatId: "Das ist keine gültige USt-IdNr. (Deutschland: DE und 9 Ziffern, Österreich: ATU und 8 Ziffern, Schweiz: CHE-123.456.789 MWST).",
       iban: "Das ist keine gültige IBAN (Länge oder Prüfsumme stimmen nicht).",
