@@ -13,7 +13,8 @@ import { applyPendingRestore, readPending } from "@/lib/updates/restore";
 import { runMigrations } from "@/server/migrate";
 import { filesDir, resolveRel, storeFile } from "@/server/files";
 import { BACKUP_KINDS, backupPath, backupsDir, cleanupBackupTemp, createBackup, deleteBackup, isBackupName, linkTree, listBackups, markTempActive, PruneError, pruneBackups, removeTree, TEMP_MIN_AGE_MS } from "./core";
-import { gunzipDatabase, importBackupFile, readDatabaseArchive, RestoreError, stageRestore, validateDatabase } from "./restore";
+import { readDatabaseArchive } from "@/test/backup-archive";
+import { gunzipDatabase, importBackupFile, RestoreError, stageRestore, validateDatabase } from "./restore";
 
 const data = mkdtempSync(path.join(tmpdir(), "so-backup-"));
 process.env.DATA_DIR = data;

@@ -66,6 +66,7 @@ jobs:
   check:
     name: Typecheck, Lint, Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -136,6 +137,13 @@ jobs:
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
             || { echo "::error::Der Commit von $GITHUB_REF_NAME liegt nicht auf main – es wird nichts veröffentlicht."; exit 1; }
+      # Wurzelschlüssel-Gate früh (Z6-2 N5): Dasselbe Skript, das später die `trust`-Stufe des Image-Baus ausführt, bricht hier nach Sekunden ab – nicht erst nach den ~75 Minuten von e2e und native –,
+      # wenn ROOT_PUBLIC_KEY fehlt, gleich dem Release-Schlüssel ist oder ein Testschlüssel im Image landen würde. Schreibt nichts (Ausgabe nur ins Runner-Temp-Verzeichnis).
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Wurzelschlüssel ist ein eigener Schlüssel (Tag-Build-Gate)
+        run: SOS_TAG_BUILD=1 node scripts/gen-trust-header.mjs --out "$RUNNER_TEMP/trust-keys.h"
 
   e2e:
     name: Browser-Tests (Playwright)
@@ -376,6 +384,7 @@ jobs:
     if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.check.result == 'success' && needs.guard.result == 'success' && needs.e2e.result == 'success' && needs.xrechnung.result == 'success' && needs.publish.result == 'success' }}
     needs: [check, guard, e2e, xrechnung, publish]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     environment: release
     # Nie zwei Releases gleichzeitig (zwei Tags kurz nacheinander dürfen "latest" nicht in beliebiger Reihenfolge setzen); ein laufendes wird nicht abgebrochen, das nächste wartet
     concurrency:

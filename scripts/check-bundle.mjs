@@ -30,6 +30,8 @@ export const REQUIRED_PATHS = [
   "node_modules/better-sqlite3/package.json",
 ];
 
+/** Schlüssel- und Zertifikatsdateien außerhalb von node_modules: ein Paket enthält keine (der Release-Schlüssel steckt kompiliert im Starter, nie als Datei). */
+const keyFile = (name) => /\.(pem|key|p12|pfx)$/i.test(name);
 const forbiddenName = (name) => /^\.env(\..*)?$/.test(name) || /\.(db|db-wal|db-shm|db-journal|sqlite)$/.test(name) || name === "secret.key" || name === "setup-token";
 const testFile = (name) => /\.(test|spec)\.(ts|tsx|js|mjs|cjs)$/.test(name);
 
@@ -44,6 +46,7 @@ export function checkBundle(root) {
       // Pakete in node_modules bringen ihre eigenen Testdateien mit; dort gilt nur die Namensregel für Umgebungs-/Datenbankdateien
       const inModules = r.startsWith("node_modules/") || r.includes("/node_modules/");
       if (forbiddenName(entry.name) && !(inModules && entry.name.startsWith(".env"))) problems.push(`nicht erlaubt: ${r}`);
+      else if (!inModules && keyFile(entry.name)) problems.push(`Schlüsseldatei: ${r}`);
       else if (!inModules && testFile(entry.name)) problems.push(`Testdatei: ${r}`);
       // Modi gibt es nur unter Linux (Image-Bau); unter Windows meldet lstat für alles 666
       if (process.platform !== "win32" && !entry.isSymbolicLink()) {

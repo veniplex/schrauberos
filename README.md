@@ -69,6 +69,10 @@ echo <TOKEN> | docker login ghcr.io -u <github-benutzer> --password-stdin
 docker compose up -d
 ```
 
+**Empfohlen: gehärtet starten** (Wurzeldateisystem schreibgeschützt, keine Linux-Capabilities, keine Rechteerhöhung – kostet nichts, die Pipeline prüft jedes Image genau so):
+`docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d` (Datei im Repository; Näheres unter [Betrieb](#betrieb)). Das ist der Weg, den die Pipeline vor jeder Veröffentlichung
+geht; die schlichte Variante oben funktioniert genauso, ihr fehlt nur die zusätzliche Absicherung des Containers.
+
 Das **Einrichtungs-Token** steht im Container-Log: `docker compose logs app` (Zeile `[setup] Einrichtungs-Token: …`; die Datei
 `setup-token` im Volume enthält denselben Wert). Dann `http://<server>:3000` öffnen: Die **Ersteinrichtung** verlangt dieses Token
 und legt Werkstattname, Zeitzone und den ersten Administrator an (optional mit Beispieldaten) und zeigt zum Schluss dessen
@@ -1841,7 +1845,7 @@ gültige Manifeste signieren, eine Beglaubigung für einen neuen Schlüssel entz
   einen eigenen Wurzelschlüssel erzeugt (Befehle oben, andere Dateinamen), den öffentlichen Teil als `ROOT_PUBLIC_KEY` einträgt (vor der
   Veröffentlichung, die Wurzel steht im Image) und den privaten Teil offline verwahrt.
 * **Release-Schlüssel tauschen:** neues Paar erzeugen, Secret `RELEASE_SIGNING_KEY` ersetzen, offline beglaubigen:
-  `ROOT_SIGNING_KEY_FILE=wurzel-privat.pem node scripts/endorse-release-key.mjs --public release-public-key.pem --valid-until 2031-12-31`,
+  `ROOT_SIGNING_KEY_FILE="$KEYDIR/wurzel-privat.pem" node scripts/endorse-release-key.mjs --public "$KEYDIR/release-public-key.pem" --valid-until 2031-12-31`,
   `release-keys.json` committen, Release veröffentlichen – Installationen nehmen den neuen Schlüssel über die Beglaubigung an.
   `scripts/make-release.mjs` prüft die Signatur gegen die Kette und legt `release-keys.json` bei.
 * **Wurzelschlüssel tauschen** (Verlust/Kompromittierung) und **Widerruf eines gestohlenen Release-Schlüssels** gehen nur über ein neues Image.
@@ -1849,17 +1853,23 @@ gültige Manifeste signieren, eine Beglaubigung für einen neuen Schlüssel entz
 
 ### Schlüsselpaar erzeugen
 
+**Den privaten Schlüssel nie im Repository-Ordner anlegen** (auch nicht kurz): `.gitignore` und `.dockerignore` schließen `*.pem`/`*.key` zwar aus, aber ein Ordner außerhalb des Arbeitsbaums schließt den Fehler aus, ihn aus Versehen zu committen, in einen Docker-Build-Kontext oder ein Backup des Projektordners zu geben. Ein eigener Ordner im Heimatverzeichnis, nur für den Besitzer lesbar:
+
+```bash
+KEYDIR="$HOME/schrauberos-keys"; mkdir -p "$KEYDIR" && chmod 700 "$KEYDIR"     # außerhalb des Repository-Ordners; weiter unten steht $KEYDIR für diesen Pfad
+```
+
 Mit OpenSSL (3.x):
 
 ```bash
-openssl genpkey -algorithm ed25519 -out release-signing-key.pem     # privat – geheim halten
-openssl pkey -in release-signing-key.pem -pubout -out release-public-key.pem   # öffentlich
+openssl genpkey -algorithm ed25519 -out "$KEYDIR/release-signing-key.pem"     # privat – geheim halten
+openssl pkey -in "$KEYDIR/release-signing-key.pem" -pubout -out "$KEYDIR/release-public-key.pem"   # öffentlich
 ```
 
 oder nur mit Node:
 
 ```bash
-node -e "const c=require('crypto'),f=require('fs');const k=c.generateKeyPairSync('ed25519');f.writeFileSync('release-signing-key.pem',k.privateKey.export({type:'pkcs8',format:'pem'}));f.writeFileSync('release-public-key.pem',k.publicKey.export({type:'spki',format:'pem'}))"
+node -e "const c=require('crypto'),f=require('fs');const k=c.generateKeyPairSync('ed25519');const d=process.env.KEYDIR;f.writeFileSync(d+'/release-signing-key.pem',k.privateKey.export({type:'pkcs8',format:'pem'}),{mode:0o600});f.writeFileSync(d+'/release-public-key.pem',k.publicKey.export({type:'spki',format:'pem'}))"
 ```
 
 Die private Datei beginnt mit `-----BEGIN PRIVATE KEY-----`, die öffentliche mit `-----BEGIN PUBLIC KEY-----`.
@@ -1869,7 +1879,7 @@ Die private Datei beginnt mit `-----BEGIN PRIVATE KEY-----`, die öffentliche mi
 1. **Privaten Schlüssel als Secret hinterlegen** (der komplette PEM-Text samt `BEGIN`/`END`-Zeilen):
 
    ```bash
-   gh secret set RELEASE_SIGNING_KEY --repo veniplex/schrauberos < release-signing-key.pem
+   gh secret set RELEASE_SIGNING_KEY --repo veniplex/schrauberos < "$KEYDIR/release-signing-key.pem"
    gh secret list --repo veniplex/schrauberos        # prüfen: RELEASE_SIGNING_KEY ist aufgeführt
    ```
 
@@ -1917,7 +1927,7 @@ Alles, was nur der Besitzer tun kann (Schlüssel, GitHub-Einstellungen, Geräte,
 
 **B. Schlüssel-Zeremonie** (auf einem Rechner ohne Netz, wenn möglich; Befehle: „Schlüsselpaar erzeugen“)
 3. **Wurzelschlüssel** erzeugen: das **private** Paar nur offline verwahren (zwei Kopien, Passwortmanager/Datenträger; verloren = nur neues Image hilft), das öffentliche als `ROOT_PUBLIC_KEY` in `src/modules/admin/updates/release-key.ts` eintragen.
-4. **Release-Schlüssel** erzeugen (ein **anderes** Paar): privat als **Environment secret** `RELEASE_SIGNING_KEY` der Umgebung `release` (`gh secret set RELEASE_SIGNING_KEY --env release --repo veniplex/schrauberos < release-signing-key.pem`), öffentlich als `RELEASE_PUBLIC_KEY` eintragen. Der eingebaute Release-Schlüssel braucht keine Beglaubigung. Danach private Dateien vom Rechner löschen.
+4. **Release-Schlüssel** erzeugen (ein **anderes** Paar): privat als **Environment secret** `RELEASE_SIGNING_KEY` der Umgebung `release` (`gh secret set RELEASE_SIGNING_KEY --env release --repo veniplex/schrauberos < "$KEYDIR/release-signing-key.pem"`), öffentlich als `RELEASE_PUBLIC_KEY` eintragen. Der eingebaute Release-Schlüssel braucht keine Beglaubigung. Danach private Dateien vom Rechner löschen.
 5. Eintragungen committen und auf `main` pushen. **Probe:** Workflow „Build & publish“ von Hand mit `check_signing_key` starten (nur auf `main`): bestätigt, dass Secret und eingebauter Schlüssel zusammengehören und die Wurzel ≠ Release-Schlüssel ist.
 
 **C. Vor dem Tag** (der Reihe nach, Commits auf `main`)
@@ -1965,8 +1975,8 @@ Lokal ein Paket bauen und signieren (zum Testen):
 ```bash
 docker build --target bundle --build-arg APP_VERSION=0.2.0 --output type=local,dest=pkg .     # enthält SOS-TREE
 tar --sort=name --owner=0 --group=0 --numeric-owner -czf schrauberos-0.2.0.tar.gz -C pkg .
-RELEASE_SIGNING_KEY="$(cat release-signing-key.pem)" node scripts/make-seal.mjs --bundle pkg --out .
-RELEASE_SIGNING_KEY="$(cat release-signing-key.pem)" node scripts/make-release.mjs \
+RELEASE_SIGNING_KEY="$(cat "$KEYDIR/release-signing-key.pem")" node scripts/make-seal.mjs --bundle pkg --out .
+RELEASE_SIGNING_KEY="$(cat "$KEYDIR/release-signing-key.pem")" node scripts/make-release.mjs \
   --archive schrauberos-0.2.0.tar.gz --bundle pkg --out .
 ```
 
@@ -1994,7 +2004,7 @@ Backups, Updates, Einstellungen). Das Volume `app-data` muss auf einer **lokalen
 Optional, nur beim Neu-Erstellen des Containers: `.env` neben der `docker-compose.yml` (Vorlage `docker.env.example`) mit `APP_PORT`
 und `SCHRAUBEROS_VERSION` (Image-Version, Standard `latest`; `edge` = neuester Stand von `main`, nur zum Ausprobieren).
 
-**Gehärtete Variante (optional):** `docker-compose.hardened.yml` über die Standard-Datei legen –
+**Gehärtete Variante (empfohlen):** `docker-compose.hardened.yml` über die Standard-Datei legen –
 `docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d`. Sie setzt `read_only: true` (Wurzeldateisystem schreibgeschützt, beschrieben werden nur das Volume
 und `tmpfs /tmp`), `cap_drop: [ALL]` und `security_opt: [no-new-privileges:true]`. Die Pipeline startet das Image vor jeder Veröffentlichung genau so; Web-Updates, Backups und
 Wiederherstellung schreiben nur nach `/data` und funktionieren unverändert. In Portainer die drei Schlüssel in den Stack übernehmen.
@@ -2011,6 +2021,10 @@ Wiederherstellung schreiben nur nach `/data` und funktionieren unverändert. In 
 /data/secret-reset/                   Sicherung der verschlüsselten Zeilen vor jedem Zurücksetzen nicht lesbarer Geheimnisse (0600, nicht in Backups)
 /data/setup-token                     Einrichtungs-Token (nur bis zur Ersteinrichtung, Modus 0600, nicht in Backups)
 ```
+
+**Dateimodi im Volume:** Datenbank, Dateien (`/data/files`), Backups und Zustandsdateien entstehen mit den gewöhnlichen Modi (0644/0755, Besitzer uid 1000); nur `secret.key`, das Einrichtungs-Token
+und `secret-reset/` sind 0600/0700. In einem **benannten Docker-Volume** (Standard) erreicht sie auf dem Host nur root. Bei einem **Bind-Mount** lesen andere Benutzer des Hosts Datenbank und Belege mit:
+den Ordner auf dem Host dann auf `0700` setzen (Besitzer uid 1000) – die Anwendung ändert die Modi nicht (Hardlink-Backups und Wiederherstellung setzen auf stabile Dateien).
 
 ### Notfall ohne Weboberfläche
 

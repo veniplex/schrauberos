@@ -128,3 +128,26 @@ describe("Namen mit Punkten und Sonderfällen (Z6-2 M3)", () => {
     assert.ok(await storeFile(location.dir, location.name, bytes("beleg")));
   });
 });
+
+describe("Verwaiste Zwischendateien (Z6-2 N10)", () => {
+  it("cleanStaleTemp löscht nur .part-Dateien im Zwischenordner, die älter als ein Tag sind", async () => {
+    const { cleanStaleTemp } = await import("./files");
+    const { mkdirSync, utimesSync, writeFileSync } = await import("node:fs");
+    const tmp = path.join(filesDir(), ".tmp");
+    mkdirSync(tmp, { recursive: true });
+    const old = path.join(tmp, "alt.part");
+    const fresh = path.join(tmp, "frisch.part");
+    const other = path.join(tmp, "anderes.txt");
+    for (const f of [old, fresh, other]) writeFileSync(f, "x");
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000);
+    utimesSync(old, twoDaysAgo, twoDaysAgo);
+    utimesSync(other, twoDaysAgo, twoDaysAgo);
+    assert.equal(await cleanStaleTemp(), 1);
+    assert.equal(existsSync(old), false);
+    assert.equal(existsSync(fresh), true, "ein laufender Upload ist nie so alt");
+    assert.equal(existsSync(other), true, "nur .part-Dateien");
+    assert.equal(await cleanStaleTemp(), 0, "wiederholbar");
+    rmSync(tmp, { recursive: true, force: true });
+    assert.equal(await cleanStaleTemp(), 0, "ohne Zwischenordner: nichts zu tun, kein Fehler");
+  });
+});

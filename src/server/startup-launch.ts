@@ -1,3 +1,5 @@
+import { describeError } from "@/lib/log-safe";
+
 /**
  * Startet den App-Start (`startApp`) **im Hintergrund** – leichtgewichtig, ohne Datenbank-Imports (testbar).
  *
@@ -31,6 +33,6 @@ export function launchStartup(): void {
   void startInBackground({
     run: async () => (await import("@/server/startup")).startApp(),
     exit: (code) => process.exit(code),
-    log: (message, error) => console.error(message, error),
+    log: (message, error) => console.error(`${message} ${describeError(error)}`), // nur Art und Code, nie Meldung oder Stack
   });
 }

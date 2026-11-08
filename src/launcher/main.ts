@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { readAppliedMigrations, type MigrationDb } from "../lib/updates/compat";
+import { describeError } from "../lib/log-safe";
 import { positiveMs, probeHealth } from "../lib/updates/health";
 import { databaseFile } from "../server/db-client-path";
 import { createLauncher, DEFAULT_HEALTH_MAX_MS, type AppProcess, type LauncherDeps } from "./launcher";
@@ -67,7 +68,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
 launcher.run().then(
   (code) => process.exit(code),
   (error) => {
-    console.error("[launcher] Unerwarteter Fehler", error);
+    console.error(`[launcher] Unerwarteter Fehler: ${describeError(error)}`); // nur Art und Code, nie Meldung oder Stack
     process.exit(1);
   },
 );

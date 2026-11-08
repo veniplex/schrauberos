@@ -26,6 +26,7 @@ export const systemDe = {
     diskLow: "Der Speicherplatz wird knapp: {free} von {total} frei ({percent}). Alte Backups löschen oder den Datenträger vergrößern, bevor er voll läuft.",
     diskCritical: "Der Speicherplatz ist fast voll: nur noch {free} von {total} frei ({percent}). Backups, Uploads und Updates werden abgewiesen, sobald der Mindestplatz unterschritten ist.",
     backupOld: "Das neueste Backup ist {days} Tage alt. Bitte unter Backups prüfen, ob das automatische Backup läuft.",
+    testMode: "Im Betrieb sind Umgebungsvariablen gesetzt, die nur Tests setzen: {names}. Bitte aus der Compose-Datei bzw. Umgebung des Containers entfernen (sie schalten Testseiten frei bzw. lockern die Zielsperre) und den Container neu starten.",
     backupNone: "Es gibt noch kein Backup. Bitte unter Backups eines anlegen oder das automatische Backup einschalten.",
   },
   notice: {

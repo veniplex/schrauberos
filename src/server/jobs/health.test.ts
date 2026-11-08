@@ -95,3 +95,21 @@ describe("Webhooks im Systemstatus", () => {
     assert.equal(problemTone(withWebhooks(0, 2)), "warning");
   });
 });
+
+describe("Systemstatus: Test-Variablen im Betrieb (Z6-2 N8)", () => {
+  it("gesetzte Test-Variablen sind ein Fehler im Systemstatus; ohne sie wird nichts gemeldet", async () => {
+    const problems = evaluateSystem({ now, jobs: [], outboxFailed: 0, runner: runner(), testVariables: ["SCHRAUBEROS_E2E"] });
+    assert.deepEqual(problems, [{ code: "testMode", names: ["SCHRAUBEROS_E2E"] }]);
+    assert.equal(problemTone(problems), "danger");
+    assert.deepEqual(evaluateSystem({ now, jobs: [], outboxFailed: 0, runner: runner(), testVariables: [] }), []);
+  });
+
+  it("testVariablesInProduction meldet nur im echten Betrieb (APP_UPDATER=1) und nur gesetzte, nicht leere Variablen", async () => {
+    const { testVariablesInProduction } = await import("@/server/e2e-mode");
+    assert.deepEqual(testVariablesInProduction({ SCHRAUBEROS_E2E: "1", NODE_TEST_CONTEXT: "child" }), [], "Entwicklung und Browser-CI (ohne Starter) sind nicht betroffen");
+    assert.deepEqual(testVariablesInProduction({ APP_UPDATER: "1" }), []);
+    assert.deepEqual(testVariablesInProduction({ APP_UPDATER: "1", SCHRAUBEROS_E2E: "1" }), ["SCHRAUBEROS_E2E"]);
+    assert.deepEqual(testVariablesInProduction({ APP_UPDATER: "1", SCHRAUBEROS_E2E: "1", NODE_TEST_CONTEXT: "child-v8" }), ["SCHRAUBEROS_E2E", "NODE_TEST_CONTEXT"]);
+    assert.deepEqual(testVariablesInProduction({ APP_UPDATER: "1", SCHRAUBEROS_E2E: "" }), []);
+  });
+});

@@ -22,13 +22,16 @@ export function setTrustAnchorsForTest(anchors: { builtInKey: string; rootKey: s
 
 const updateApiUrl = () => (process.env.UPDATE_API_URL ?? "https://api.github.com").replace(/\/$/, "");
 
-/** Token aus den Einstellungen (verschlüsselt in der Datenbank); UPDATE_GITHUB_TOKEN bleibt als Rückfall nutzbar. */
+/**
+ * Token aus den Einstellungen (verschlüsselt in der Datenbank). Es gibt bewusst **keine** Umgebungsvariable dafür (früher `UPDATE_GITHUB_TOKEN`, Z6-2 N9): Betriebsaufgaben laufen über die Weboberfläche
+ * (Betriebskonzept), und ein Token in der Umgebung läge im Klartext in `docker inspect` und in Compose-Dateien.
+ */
 export async function updateConfig() {
   const repo = process.env.UPDATE_REPO ?? "veniplex/schrauberos";
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error("UPDATE_REPO muss die Form <besitzer>/<repo> haben.");
   return {
     repo,
-    token: (await getSecret(UPDATE_TOKEN_KEY)) || process.env.UPDATE_GITHUB_TOKEN || null,
+    token: (await getSecret(UPDATE_TOKEN_KEY)) || null,
     // Nur für Tests/Spiegel: Basis-URL der GitHub-API
     apiUrl: updateApiUrl(),
     /** Eingebauter Release-Schlüssel und Wurzelschlüssel der Schlüsselkette (nur aus dem Build, siehe release-key.ts) */

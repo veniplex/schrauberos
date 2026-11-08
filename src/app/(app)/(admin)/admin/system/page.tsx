@@ -9,6 +9,7 @@ import { recentLogs } from "@/lib/log-buffer";
 import { requirePermission } from "@/server/auth/session";
 import { isBehindProxy } from "@/server/auth/network";
 import { connectionIsSecure } from "@/server/auth/connection";
+import { testVariablesInProduction } from "@/server/e2e-mode";
 import { systemInfo } from "@/server/system-info";
 import { webhookHealth } from "@/server/webhooks/health";
 import { monitorHealth } from "@/server/monitor/run";
@@ -57,6 +58,7 @@ export default async function SystemPage() {
     runner,
     disk: info.disk,
     newestBackupAt: info.newestBackup?.createdAt ?? null,
+    testVariables: testVariablesInProduction(),
   });
   const notices = connectionNotices({ secure, behindProxy });
   const size = (bytes: number) => {
@@ -93,6 +95,8 @@ export default async function SystemPage() {
         return t("system.problem.diskLow", { free: size(p.freeBytes), total: size(p.totalBytes), percent: percent(p.freeBytes, p.totalBytes) });
       case "diskCritical":
         return t("system.problem.diskCritical", { free: size(p.freeBytes), total: size(p.totalBytes), percent: percent(p.freeBytes, p.totalBytes) });
+      case "testMode":
+        return t("system.problem.testMode", { names: p.names.join(", ") });
       case "backupOld":
         return p.ageDays === null ? t("system.problem.backupNone") : t("system.problem.backupOld", { days: p.ageDays });
     }

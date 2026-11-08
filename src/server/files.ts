@@ -1,5 +1,5 @@
 import { createReadStream, existsSync, rmdirSync, readdirSync, statSync, type ReadStream } from "node:fs";
-import { link, mkdir, rm, unlink, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { safeName } from "@/lib/filename";
@@ -85,6 +85,35 @@ export async function storeFile(dir: string, fileName: string, data: Uint8Array)
   } finally {
     await rm(tmp, { force: true });
   }
+}
+
+/**
+ * Räumt verwaiste Zwischendateien auf (Z6-2 N10): Bricht der Prozess zwischen dem Schreiben und dem Einhängen ab (Absturz, Neustart, Strom), bleibt `.tmp/<zufall>.part` liegen und belegt Platz (Backups
+ * verlinken sie mit). Gelöscht werden nur Dateien dieses Ordners, die älter als `maxAgeMs` sind (Standard ein Tag – ein laufender Upload ist nie so alt), asynchron; Fehler einzelner Dateien halten nichts auf.
+ * Läuft beim Start der Anwendung. Liefert die Zahl der gelöschten Dateien.
+ */
+export async function cleanStaleTemp(maxAgeMs = 24 * 3_600_000, now = Date.now()): Promise<number> {
+  let removed = 0;
+  let names: string[];
+  try {
+    names = await readdir(tmpDir());
+  } catch {
+    return 0; // noch kein Dateiverzeichnis: nichts zu tun
+  }
+  for (const name of names) {
+    if (!name.endsWith(".part")) continue;
+    try {
+      const full = path.join(tmpDir(), name);
+      const info = await stat(full);
+      if (info.isFile() && now - info.mtimeMs > maxAgeMs) {
+        await unlink(full);
+        removed++;
+      }
+    } catch {
+      /* verschwunden oder nicht löschbar: weiter */
+    }
+  }
+  return removed;
 }
 
 export const openFile = (rel: string): ReadStream => createReadStream(resolveRel(rel));

@@ -56,6 +56,9 @@ export async function fetchSftpHostKey(host: string, port: number, timeoutMs = 1
   const { Client } = await loadSsh2();
   return new Promise<string>((resolve, reject) => {
     const client = new Client();
+    // Dauerhafter Zuhörer von Anfang an (Z6-2 N2): ssh2 meldet Protokoll- und Socketfehler an mehreren Stellen, auch mehrfach; nach dem ersten `once` gäbe es sonst keinen Zuhörer, und ein `error` ohne
+    // Zuhörer beendet den Prozess (uncaughtException). Die Fehler erreichen die Aufrufer ohnehin über die Datenströme und Rückrufe der SFTP-Aufrufe.
+    client.on("error", () => undefined);
     let seen = "";
     let settled = false;
     const settle = (fn: () => void) => {
@@ -93,6 +96,9 @@ export class SftpTransport implements OffsiteTransport {
     const pin = await resolvePinned(config.host); // aufgelöst und geprüft; verbunden wird nur mit dieser Adresse (ZP5-6)
     const { Client } = await loadSsh2();
     const client = new Client();
+    // Dauerhafter Zuhörer von Anfang an (Z6-2 N2): ssh2 meldet Protokoll- und Socketfehler an mehreren Stellen, auch mehrfach; nach dem ersten `once` gäbe es sonst keinen Zuhörer, und ein `error` ohne
+    // Zuhörer beendet den Prozess (uncaughtException). Die Fehler erreichen die Aufrufer ohnehin über die Datenströme und Rückrufe der SFTP-Aufrufe.
+    client.on("error", () => undefined);
     let seen = "";
     let mismatch = false;
     const sftp = await new Promise<SFTPWrapper>((resolve, reject) => {

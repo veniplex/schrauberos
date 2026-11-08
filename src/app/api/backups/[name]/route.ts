@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import * as tar from "tar";
 import { NextResponse } from "next/server";
 import { getSession } from "@/server/auth/session";
+import { logError } from "@/lib/log-safe";
 import { audit } from "@/server/audit";
 import { backupPath } from "@/server/backup/core";
 import { secretHoldings, withHoldings } from "@/server/secret-holdings";
@@ -26,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
   await audit("backup.download", { target: withHoldings(name, await secretHoldings()) });
   // Datenbank (bereits gzip) und Belege sind kaum weiter komprimierbar: ein einfaches tar genügt
   const pack = tar.c({ cwd: dir, portable: true }, ["."]);
-  pack.on("error", (error) => console.error("[backup] Archiv konnte nicht erstellt werden:", error));
+  pack.on("error", (error) => logError("backup:archive", error));
   return new Response(Readable.toWeb(Readable.from(pack)) as ReadableStream, {
     headers: { "content-type": "application/x-tar", "content-disposition": `attachment; filename="${name}.tar"`, "cache-control": "no-store" },
   });

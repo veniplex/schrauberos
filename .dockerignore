@@ -28,3 +28,9 @@ playwright-report
 
 # Testbauten des Starters (docker/test/run.mjs)
 docker/test/build
+
+# private Schlüssel und Zertifikate gehören nie in den Build-Kontext (auch kein Zwischenschicht-Cache)
+*.pem
+*.key
+*.p12
+*.pfx

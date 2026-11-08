@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
-import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -349,6 +349,3 @@ export async function decryptToFile(input: Readable, dest: string, masterKey: Bu
     throw error;
   }
 }
-
-/** Inhalt der Datei `database.db.gz` einer Sicherung als Roh-Datenbank (für Tests und Prüfungen). */
-export const readDatabaseArchive = (name: string): Buffer => gunzipSync(readFileSync(path.join(backupPath(name)!, DB_ARCHIVE)));

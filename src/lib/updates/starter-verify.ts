@@ -7,7 +7,7 @@ import type { VerifyFailure, VerifySuccess } from "./seal";
  */
 export type StarterRun = (binary: string, args: string[], env: NodeJS.ProcessEnv) => Promise<{ code: number | null; stdout: string }>;
 
-/** Höchstdauer einer Prüfung (der Starter selbst begrenzt sich beim Start auf 300 s; hier das Vielfache für langsame Platten). */
+/** Höchstdauer einer Prüfung (der Starter selbst begrenzt sich beim Start auf 900 s (`SOS_VERIFY_TIMEOUT_SECONDS` in docker/bootstrap.c); hier dieselbe Größenordnung als äußere Grenze für langsame Platten). */
 const STARTER_TIMEOUT_MS = 15 * 60_000;
 
 export const runStarter: StarterRun = (binary, args, env) =>

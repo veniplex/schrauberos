@@ -27,6 +27,7 @@ export const systemEn: typeof systemDe = {
     diskLow: "Disk space is getting low: {free} of {total} free ({percent}). Delete old backups or enlarge the disk before it fills up.",
     diskCritical: "Disk space is almost full: only {free} of {total} free ({percent}). Backups, uploads and updates are refused once the minimum free space is undercut.",
     backupOld: "The newest backup is {days} days old. Please check under Backups whether the automatic backup is running.",
+    testMode: "Environment variables that only tests set are present in production: {names}. Please remove them from the compose file or the container environment (they enable test pages and loosen the target blocklist) and restart the container.",
     backupNone: "There is no backup yet. Please create one under Backups or switch on the automatic backup.",
     runnerError: "The scheduler reports an error (for example database unreachable) and retries on every tick.",
   },

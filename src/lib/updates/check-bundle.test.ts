@@ -65,6 +65,10 @@ describe("check-bundle", () => {
       ["test", "lib/x.test.ts"],
       ["e2e", "e2e/tests/a.spec.ts"],
       ["data", ".data/secret.key"],
+      ["pem", "release-signing-key.pem"],
+      ["pem2", "certs/ca.PEM"],
+      ["keyfile", "keys/server.key"],
+      ["p12", "keys/cert.p12"],
     ] as const) {
       const dir = goodBundle(`bad-${name}`);
       write(dir, rel);
@@ -86,6 +90,7 @@ describe("check-bundle", () => {
   it("lässt Testdateien und .env-Dateien in Paketen von node_modules zu, nicht aber Schreibrechte für Gruppe/Andere", { skip: process.platform === "win32" }, () => {
     const dir = goodBundle("modules");
     write(dir, "node_modules/next/dist/x.test.js");
+    write(dir, "node_modules/some-pkg/test/cert.pem"); // Pakete bringen eigene Testzertifikate mit; die Namensregel für Schlüsseldateien gilt nur außerhalb von node_modules
     assert.equal(check(dir).ok, true);
     chmodSync(path.join(dir, "server.js"), 0o664);
     const r = check(dir);

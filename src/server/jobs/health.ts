@@ -50,7 +50,9 @@ export type SystemProblem =
   /** Weniger als 5 % oder weniger als der Mindestplatz frei: Sicherungen, Uploads und Updates werden abgewiesen */
   | { code: "diskCritical"; freeBytes: number; totalBytes: number }
   /** Das neueste Backup ist älter als `BACKUP_MAX_AGE_DAYS` Tage (`ageDays`) oder es gibt keines (`null`) */
-  | { code: "backupOld"; ageDays: number | null };
+  | { code: "backupOld"; ageDays: number | null }
+  /** Im Betrieb sind Umgebungsvariablen gesetzt, die nur Tests setzen (`SCHRAUBEROS_E2E`, `NODE_TEST_CONTEXT`): Testseiten bzw. gelockerte Zielsperre */
+  | { code: "testMode"; names: string[] };
 
 /** So lange darf ein fälliger Job auf seinen Lauf warten, bevor er als überfällig gilt (der Zeitgeber tickt alle 15 s). */
 export const OVERDUE_MS = 5 * 60_000;
@@ -78,6 +80,8 @@ export function evaluateSystem(input: {
   disk?: DiskHealthInput | null;
   /** Zeitpunkt des neuesten Backups (`null` = es gibt keines); weglassen = nicht bewerten */
   newestBackupAt?: Date | null;
+  /** Im Betrieb gesetzte Test-Variablen (`testVariablesInProduction`); weglassen/leer = nichts zu melden */
+  testVariables?: readonly string[];
 }): SystemProblem[] {
   const now = input.now.getTime();
   const problems: SystemProblem[] = [];
@@ -105,6 +109,7 @@ export function evaluateSystem(input: {
     if (fraction < DISK_CRITICAL_FRACTION || disk.freeBytes < DISK_MIN_FREE_BYTES) problems.push({ code: "diskCritical", freeBytes: disk.freeBytes, totalBytes: disk.totalBytes });
     else if (fraction < DISK_WARN_FRACTION) problems.push({ code: "diskLow", freeBytes: disk.freeBytes, totalBytes: disk.totalBytes });
   }
+  if ((input.testVariables ?? []).length > 0) problems.push({ code: "testMode", names: [...input.testVariables!] });
   if (input.newestBackupAt !== undefined) {
     if (input.newestBackupAt === null) problems.push({ code: "backupOld", ageDays: null });
     else {

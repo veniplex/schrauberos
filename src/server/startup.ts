@@ -1,12 +1,14 @@
 import "server-only";
 import { readApplied } from "@/lib/updates/restore";
 import { createBackup } from "@/server/backup/core";
-import { logError } from "@/lib/log-safe";
+import { logError, stripControl } from "@/lib/log-safe";
 import { isValidTimeZone, setWorkshopZone } from "@/lib/zone";
 import { writeAudit } from "@/server/audit";
 import { loadCspMode } from "@/server/csp-setting";
 import { db } from "@/server/db";
 import { databaseFile } from "@/server/db-client";
+import { testVariablesInProduction } from "@/server/e2e-mode";
+import { cleanStaleTemp } from "@/server/files";
 import { startJobRunner } from "@/server/jobs";
 import { appliedMigrations, MigrationError, runMigrations } from "@/server/migrate";
 import { reportIntegrityOnce } from "@/server/integrity-report";
@@ -80,7 +82,7 @@ export async function startApp(): Promise<void> {
     // Nur eine bestehende Datenbank wird vor Migrationen gesichert (eine frische hat nichts zu verlieren)
     const hadData = appliedMigrations(file).length > 0;
     const applied = await runMigrations(file, undefined, async () => {
-      if (hadData) await createBackup("pre-migration", file).catch((error) => console.error("[start] Sicherung vor Migration fehlgeschlagen:", error));
+      if (hadData) await createBackup("pre-migration", file).catch((error) => logError("start:pre-migration-backup", error));
     });
     if (applied.length) console.log(`[start] Migrationen angewendet: ${applied.join(", ")}`);
 
@@ -108,6 +110,13 @@ export async function startApp(): Promise<void> {
     // Frische Installation: Einrichtungs-Token erzeugen und ins Container-Log schreiben (nach der Einrichtung entfernt)
     ensureSetupToken((await db.user.count()) === 0, { logExisting: true });
 
+    // Test-Variablen im echten Betrieb (versehentlich in der Compose-Datei): im Log melden, der Systemstatus zeigt sie als Fehler (Z6-2 N8)
+    const testVars = testVariablesInProduction();
+    if (testVars.length > 0) console.error(`[start] WARNUNG: Im Betrieb sind Test-Umgebungsvariablen gesetzt (${testVars.join(", ")}). Bitte entfernen – sie schalten Testseiten frei bzw. lockern die Zielsperre.`);
+
+    // verwaiste Zwischendateien eines abgebrochenen Uploads (älter als ein Tag) wegräumen; nie Bedingung für den Start
+    void cleanStaleTemp().then((n) => (n > 0 ? console.log(`[start] ${n} verwaiste Zwischendatei(en) aus abgebrochenen Uploads gelöscht.`) : undefined), (error) => logError("start:tmp", error));
+
     startJobRunner();
     state.status = "ready";
   } catch (error) {
@@ -115,12 +124,14 @@ export async function startApp(): Promise<void> {
       // Kein Absturz (Neustart-Schleife), kein Eingriff in die fremde Datenbank: klar melden und stehen bleiben
       state.status = "reinstall";
       state.error = error.message;
-      console.error(`[start] ${error.message}`);
+      console.error(`[start] ${stripControl(error.message, 400)}`); // feste Meldung ohne Nutzdaten
       return;
     }
     state.status = "failed";
     state.error = error instanceof Error ? error.message : String(error);
-    console.error("[start] Start fehlgeschlagen:", error);
+    // Migrationsfehler tragen nur Namen der eigenen Migration und der SQLite-Meldung (Tabellen/Spalten, keine Werte); alles andere nur Art und Code (Log-Hygiene, Z6-2 N3)
+    if (error instanceof MigrationError) console.error(`[start] Start fehlgeschlagen: ${stripControl(error.message, 400)}`);
+    else logError("start", error);
     process.exit(1);
   }
 }

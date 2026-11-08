@@ -13,6 +13,7 @@ import { parseRecoveryKey } from "@/lib/recovery-key";
 import { startFakeSftp, type FakeSftp } from "@/test/fake-sftp";
 import { startFakeWebdav, type FakeWebdav } from "@/test/fake-webdav";
 import { startupState } from "@/server/startup-state";
+import { readDatabaseArchive } from "@/test/backup-archive";
 import { createTestEnv, form, type TestEnv } from "@/test/harness";
 
 /**
@@ -276,7 +277,7 @@ describe("Off-Site: Übertragen (WebDAV)", () => {
     assert.equal((await core.listBackups()).length, before + 1);
     // derselbe Datenbankstand wie das Original
     const sha = (buffer: Buffer) => createHash("sha256").update(buffer).digest("hex");
-    assert.equal(sha(restore.readDatabaseArchive(imported)), sha(restore.readDatabaseArchive(name)));
+    assert.equal(sha(readDatabaseArchive(imported)), sha(readDatabaseArchive(name)));
     // über die Aktion (mit Audit); fremde oder ungültige Namen werden abgewiesen
     const state = (await actions.fetchOffsiteBackupAction({}, form({ file: `${name}.sobk` }))) as { ok?: boolean };
     assert.ok(state.ok);
