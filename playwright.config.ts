@@ -9,6 +9,7 @@ import { BASE_URL, authFile } from "./e2e/support/env";
  */
 const iphone = devices["iPhone 13"];
 const chromium = devices["Desktop Chrome"];
+const TEXT_ARGS = ["--font-render-hinting=none", "--disable-lcd-text", "--disable-font-subpixel-positioning"];
 
 export default defineConfig({
   testDir: "./e2e/tests",
@@ -49,8 +50,8 @@ export default defineConfig({
   },
   projects: [
     { name: "iphone", use: { ...iphone, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true } },
-    { name: "tablet-hoch", use: { ...chromium, viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true } },
-    { name: "tablet-quer", use: { ...chromium, viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true } },
+    { name: "tablet-hoch", use: { ...chromium, viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, launchOptions: { args: TEXT_ARGS } } },
+    { name: "tablet-quer", use: { ...chromium, viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true, launchOptions: { args: TEXT_ARGS } } },
     { name: "desktop", use: { ...chromium, viewport: { width: 1440, height: 900 } } },
   ],
 });

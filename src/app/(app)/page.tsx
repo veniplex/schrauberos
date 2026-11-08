@@ -54,11 +54,18 @@ export default async function DashboardPage() {
   const checklistHidden = session.user.isAdmin ? (await getSetting(SETUP_CHECKLIST_HIDDEN)) === "true" : true;
   const checks = session.user.isAdmin && !checklistHidden ? await setupChecksFor(session, await connectionIsSecure()) : [];
 
+  const now = new Date();
+
   return (
     <>
       <PageHeader
         title={t("dashboard.welcome", { name: session.user.name.split(" ")[0] })}
-        description={`${date(new Date(), { dateStyle: "full" })} · ${workshop.name}`}
+        description={
+          <>
+            {/* `<time>`: das Tagesdatum ändert sich täglich – die Baseline-Screenshots der Browser-CI maskieren `time` */}
+            <time dateTime={now.toISOString()}>{date(now, { dateStyle: "full" })}</time> · {workshop.name}
+          </>
+        }
       />
       <SetupChecklist items={checks} />
       {shortcuts.length > 0 ? (

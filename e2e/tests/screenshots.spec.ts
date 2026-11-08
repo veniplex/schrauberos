@@ -22,9 +22,11 @@ for (const entry of loadInventory().filter((e) => e.screenshot)) {
       test.skip(!UPDATE_SNAPSHOTS && (process.platform !== "linux" || !hasBaselines), "Baseline-Screenshots gelten nur auf Linux und sobald sie eingecheckt sind");
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
       await page.goto(entry.url, { waitUntil: "load" });
+      // Abwarten, bis die Seite fertig ist: Weiterleitungen (`/login` mit Anmeldung → Übersicht) und Daten, die nachgeladen werden, verändern sonst das Bild oder zerstören den Ausführungskontext
+      await page.waitForLoadState("networkidle");
       await page.evaluate(() => document.fonts.ready);
       // Veränderliches (Datum, Uhrzeit, Zähler) wird abgedeckt
-      await expect(page).toHaveScreenshot(`${slug(entry.key)}-${theme}.png`, { mask: [page.locator("time, header p, [data-e2e-mask]")], animations: "disabled" });
+      await expect(page).toHaveScreenshot(`${slug(entry.key)}-${theme}.png`, { mask: [page.locator("time, header p, [data-e2e-mask]")], animations: "disabled", caret: "hide", scale: "css" });
     });
   }
 }
