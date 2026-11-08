@@ -84,7 +84,7 @@ const close = async (id: string, who: AppSession = advisor) => ops.closeOrderOpe
 
 describe("Auftragsnummer (Zähler)", () => {
   it("zählt fortlaufend im Muster A-JJJJ-NNNN und protokolliert", async () => {
-    const year = new Date().getFullYear();
+    const year = (await import("@/lib/zone")).dayKey(new Date()).slice(0, 4);
     const a = await created();
     const b = await created();
     assert.equal(a.number, `A-${year}-0001`);

@@ -32,11 +32,8 @@ before(async () => {
   dom = installDom();
   env = await createTestEnv();
   await env.db.featureSetting.create({ data: { key: "office.reports", enabled: true, updatedByName: "test" } });
-  const { noon } = await import("@/lib/zone");
-  const now = new Date();
-  const thisMonth = new Date(now.getTime());
-  void thisMonth;
-  await env.db.invoice.create({ data: { direction: "outgoing", number: "RE-1", partyName: "Muster GmbH", issueDate: noon(new Date().toISOString().slice(0, 10)), netCents: 10_000, vatCents: 1_900, grossCents: 11_900, status: "open", dueDate: noon("2020-01-01") } });
+  const { noon, dayKey } = await import("@/lib/zone");
+  await env.db.invoice.create({ data: { direction: "outgoing", number: "RE-1", partyName: "Muster GmbH", issueDate: noon(dayKey(new Date())), netCents: 10_000, vatCents: 1_900, grossCents: 11_900, status: "open", dueDate: noon("2020-01-01") } });
   await env.db.bay.create({ data: { name: "Hebebühne 1" } });
   const car = await env.db.vehicle.create({ data: { plate: "B-AB 1", plateNorm: "BAB1", inspectionDue: "2020-01" } });
   await env.db.tireSet.create({ data: { vehicleId: car.id, season: "winter", storageLocation: "Halle A" } });

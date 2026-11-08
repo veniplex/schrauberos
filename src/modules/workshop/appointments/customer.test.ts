@@ -119,7 +119,8 @@ describe("Halterwechsel zieht offene Termine nach", () => {
     const v = await env.db.vehicle.create({ data: { plate: "B-AB 11", plateNorm: "BAB11", customerId: a.id, ownerships: { create: [{ customerId: a.id }] } } });
     const soon = await appt(v.id, a.id, "scheduled", new Date(Date.now() + 2 * 86_400_000).toISOString());
     const later = await appt(v.id, a.id, "scheduled", new Date(Date.now() + 20 * 86_400_000).toISOString());
-    const changeDay = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+    const { addDaysToKey, dayKey } = await import("@/lib/zone");
+    const changeDay = addDaysToKey(dayKey(new Date()), 10);
     assert.ok(await redirectOf(() => vehicleActions.transferVehicle({}, form({ vehicleId: v.id, newCustomerId: b.id, date: changeDay }))));
     assert.equal((await env.db.appointment.findUniqueOrThrow({ where: { id: soon.id } })).customerId, a.id);
     assert.equal((await env.db.appointment.findUniqueOrThrow({ where: { id: later.id } })).customerId, b.id);

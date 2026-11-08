@@ -11,7 +11,6 @@ import { SERVICE_SOURCE } from "@/server/auth/providers";
 import { db } from "@/server/db";
 import { defineOperation, fail, failField } from "@/server/operations";
 import { loadActor, toRights } from "@/server/rbac/hierarchy";
-import { apiGrantablePermissions } from "./doc";
 import { apiRuntime } from "./state";
 
 /**
@@ -83,6 +82,8 @@ export const createApiTokenOperation = defineOperation({
     const denial = checkTokenScope(actor, scope);
     if (denial) failField("scope", denial === "notSubset" ? "api.errors.scopeNotSubset" : denial === "forbidden" ? "api.errors.scopeForbidden" : "validation.invalid");
     // nur Rechte, zu denen die Schnittstelle Endpunkte hat (auch ausgeschalteter Funktionen: sie lassen sich später einschalten)
+    // (die Beschreibung der Schnittstelle zieht alle `api.ts` mit: erst hier laden, nicht beim Einbinden – das Aufräumen der Tokens und der Start brauchen sie nicht)
+    const { apiGrantablePermissions } = await import("./doc");
     const grantable = new Set(apiGrantablePermissions(new Set(FEATURES.map((f) => fullFeatureId(f) as string))));
     if (scope.some((p) => !grantable.has(p))) failField("scope", "api.errors.scopeNoEndpoint");
 

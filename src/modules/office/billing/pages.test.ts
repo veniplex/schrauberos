@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, afterEach, before, describe, it } from "node:test";
 import { createElement, type ReactNode } from "react";
+import { dayKey } from "@/lib/zone";
 import { installDom, mount, type MountedView, type TestDom } from "@/test/dom";
 import { createTestEnv, isNotFound, redirectOf, type TestEnv } from "@/test/harness";
 import { resolveServerTree } from "@/test/server-tree";
@@ -44,7 +45,7 @@ before(async () => {
   ids.draftInvoice = await pick({ docType: "invoice", finalizedAt: null });
   ids.draftFinal = await pick({ docType: "final", finalizedAt: null });
   ids.draftConfirmation = await pick({ docType: "confirmation" });
-  ids.offerOpen = await pick({ docType: "offer", offerStatus: "open", number: "AN-" + new Date().getFullYear() + "-0001" });
+  ids.offerOpen = await pick({ docType: "offer", offerStatus: "open", number: "AN-" + dayKey(new Date()).slice(0, 4) + "-0001" });
   ids.offerAccepted = await pick({ docType: "offer", offerStatus: "accepted" });
   ids.invoiceOpen = await pick({ docType: "invoice", paidCents: 0, status: "open", finalizedAt: { not: null } });
   ids.invoicePartial = await pick({ docType: "invoice", paidCents: { gt: 0 }, status: "open" });

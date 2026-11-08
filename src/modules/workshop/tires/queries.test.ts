@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
+import { dayKey } from "@/lib/zone";
 import { createTestEnv, type TestEnv } from "@/test/harness";
 
 /**
@@ -21,7 +22,8 @@ beforeEach(async () => {
   await env.db.tireSet.deleteMany();
 });
 
-const thisMonth = new Date().getMonth() + 1;
+// Monat in der Werkstatt-Zone (nicht der Prozess-Zone: am Monatsende abends ein anderer Monat)
+const thisMonth = Number(dayKey(new Date()).slice(5, 7));
 const nextMonth = (thisMonth % 12) + 1;
 const setWindow = (winterStartMonth: number, winterEndMonth: number) =>
   env.db.tireSettings.upsert({ where: { id: "default" }, update: { winterStartMonth, winterEndMonth }, create: { id: "default", winterStartMonth, winterEndMonth } });

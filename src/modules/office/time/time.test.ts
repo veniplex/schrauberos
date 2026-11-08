@@ -314,9 +314,10 @@ describe("Sichtbarkeit", () => {
 
 describe("Woche: Ist, Soll, Saldo", () => {
   it("Abwesenheit und Feiertag senken das Soll; die Zeiterfassung erfährt keinen Grund", async () => {
-    const monday = addDaysToKey(today(), -((new Date(`${today()}T12:00:00Z`).getUTCDay() + 6) % 7));
+    // feste Woche (Montag 2. bis Freitag 6. März 2026, ohne Feiertag): das Ergebnis hängt nicht vom Tag des Testlaufs ab (Feiertage, Wochenbeginn)
+    const monday = "2026-03-02";
     await env.db.absence.create({ data: { employeeId: staffEmployee, type: "sick", startDate: parseZoned(monday, "12:00")!, endDate: parseZoned(monday, "12:00")!, note: "geheim" } });
-    out(await ops.addManualTimeOperation.execute(staff, times(addDaysToKey(monday, 1) <= today() ? addDaysToKey(monday, 1) : monday, "08:00", "12:00")));
+    out(await ops.addManualTimeOperation.execute(staff, times(addDaysToKey(monday, 1), "08:00", "12:00")));
     const view = await queries.weekFor({ id: staffEmployee, workWeekdays: "1,2,3,4,5" }, monday);
     assert.equal(view.week.days[0].absent, true);
     assert.equal(view.week.days[0].target, 0);
