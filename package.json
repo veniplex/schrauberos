@@ -57,7 +57,7 @@
     "@tailwindcss/turbopack": "^4",
     "@types/better-sqlite3": "^9.6.0",
     "@types/fontkit": "2.0.9",
-    "@types/node": "^20",
+    "@types/node": "^26",
     "@types/nodemailer": "8.0.2",
     "@types/pdfkit": "0.17.7",
     "@types/react": "^19",
