@@ -14,7 +14,7 @@ import { defineAction, defineOperation, fail } from "@/server/operations";
  * (bereits abgelegte Off-Site-Dateien bleiben mit dem alten Schlüssel verschlüsselt).
  *
  * **Auffälliges Audit bei vorhandenen Tresor-Einträgen:** Wer den Wiederherstellungsschlüssel kennt (er wird hier einmal angezeigt) und eine Sicherung hat, kann `secret.key` und damit den Tresor außerhalb der
- * Anwendung lesen, ohne das Tresor-Recht und ohne `vault.reveal`. Gibt es Tresor-Einträge, vermerkt der Eintrag `secrets.keyCreated` das (`Tresor betroffen (n Einträge)`, nie Inhalt) – siehe `secret-holdings.ts`.
+ * Anwendung lesen, ohne das Tresor-Recht und ohne die Passwortabfrage der Tresor-Anzeige. Gibt es Tresor-Einträge, vermerkt der Eintrag `secrets.keyCreated` das (`Tresor betroffen (n Einträge)`, nie Inhalt) – siehe `secret-holdings.ts`.
  */
 const createRecoveryKeyOperation = defineOperation({
   name: "admin.backup.createRecoveryKey",
