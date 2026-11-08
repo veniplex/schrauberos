@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
+import { GCM_TAG_BYTES, gcmParts, strictBase64 } from "./gcm";
 
 /**
  * Umhüllung des Geheimnisschlüssels (`secret.key`) mit dem Wiederherstellungsschlüssel (256 Bit, siehe `recovery-key.ts`). Reine Funktionen ohne Datei- und Datenbankzugriff.
@@ -26,7 +27,7 @@ export function wrapSecretKey(secretKeyHex: string, recoveryKey: Buffer): string
   if (!isSecretKeyHex(secretKeyHex)) throw new Error("Ungültiger Geheimnisschlüssel.");
   const salt = randomBytes(16);
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", derive(recoveryKey, salt, WRAP_INFO), iv);
+  const cipher = createCipheriv("aes-256-gcm", derive(recoveryKey, salt, WRAP_INFO), iv, { authTagLength: GCM_TAG_BYTES });
   cipher.setAAD(AAD);
   const data = Buffer.concat([cipher.update(secretKeyHex, "utf8"), cipher.final()]);
   return ["w1", salt.toString("base64"), iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
@@ -35,12 +36,16 @@ export function wrapSecretKey(secretKeyHex: string, recoveryKey: Buffer): string
 /** Öffnet die Hülle; null bei falschem Schlüssel oder beschädigten Daten (nicht unterscheidbar). */
 export function unwrapSecretKey(blob: string, recoveryKey: Buffer): string | null {
   try {
-    const [version, salt, iv, tag, data] = blob.split(":");
-    if (version !== "w1") return null;
-    const decipher = createDecipheriv("aes-256-gcm", derive(recoveryKey, Buffer.from(salt, "base64"), WRAP_INFO), Buffer.from(iv, "base64"));
+    const parts = blob.split(":");
+    if (parts.length !== 5 || parts[0] !== "w1") return null;
+    const saltBytes = strictBase64(parts[1], 16);
+    const gcm = gcmParts(parts[2], parts[3]);
+    const data = strictBase64(parts[4]);
+    if (!saltBytes || !gcm || !data) return null;
+    const decipher = createDecipheriv("aes-256-gcm", derive(recoveryKey, saltBytes, WRAP_INFO), gcm.iv, { authTagLength: GCM_TAG_BYTES });
     decipher.setAAD(AAD);
-    decipher.setAuthTag(Buffer.from(tag, "base64"));
-    const plain = Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]).toString("utf8");
+    decipher.setAuthTag(gcm.tag);
+    const plain = Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
     return isSecretKeyHex(plain) ? plain : null;
   } catch {
     return null;

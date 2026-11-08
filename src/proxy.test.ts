@@ -31,6 +31,16 @@ describe("Proxy: IT-Tresor wird nie zwischengespeichert", () => {
     assert.equal(proxy(request("/docs/it", session)).headers.get("cache-control"), null);
     assert.equal(proxy(request("/network", session)).headers.get("cache-control"), null);
   });
+
+  it("auch Schreibvarianten desselben Pfads: Prozentkodierung (auch doppelt), doppelte Schrägstriche, Punkt-Segmente, Rückwärtsschrägstrich, Groß-/Kleinschreibung – und Unverwandtes bleibt frei", () => {
+    const session = "so_session=gueltig";
+    for (const path of ["/docs//vault/abc", "//docs/vault", "/docs/%76ault/abc", "/docs/%56AULT", "/docs/%2576ault", "/%64ocs/vault/x", "/docs/./vault", "/docs/x/../vault/abc", "/docs\\vault\\abc", "/DOCS/Vault/abc", "/docs/vault/", "/docs/%76ault%2Fabc"]) {
+      assert.equal(proxy(request(path, session)).headers.get("cache-control"), "no-store", path);
+    }
+    for (const path of ["/docs/vaultx", "/docs/it/vault", "/vault", "/docs", "/docs/it/vault/x"]) {
+      assert.equal(proxy(request(path, session)).headers.get("cache-control"), null, path);
+    }
+  });
 });
 
 describe("Proxy: Anmeldeseite und Weiterleitungen", () => {

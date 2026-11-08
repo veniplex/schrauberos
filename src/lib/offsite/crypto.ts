@@ -72,7 +72,7 @@ export function createEncryptStream(masterKey: Buffer, options: { chunkSize?: nu
   let started = false;
 
   const seal = (plain: Buffer, final: boolean): Buffer => {
-    const cipher = createCipheriv("aes-256-gcm", key, nonce(counter++));
+    const cipher = createCipheriv("aes-256-gcm", key, nonce(counter++), { authTagLength: TAG_LENGTH });
     cipher.setAAD(aad(header, final));
     const body = Buffer.concat([cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
     const length = Buffer.alloc(4);
@@ -121,7 +121,7 @@ export function createDecryptStream(masterKey: Buffer, options: { /** erwarteter
 
   const open = (record: Buffer, final: boolean): Buffer => {
     try {
-      const decipher = createDecipheriv("aes-256-gcm", key!, nonce(counter++));
+      const decipher = createDecipheriv("aes-256-gcm", key!, nonce(counter++), { authTagLength: TAG_LENGTH });
       decipher.setAAD(aad(header!, final));
       decipher.setAuthTag(record.subarray(record.length - TAG_LENGTH));
       return Buffer.concat([decipher.update(record.subarray(0, record.length - TAG_LENGTH)), decipher.final()]);

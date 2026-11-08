@@ -44,28 +44,36 @@ type Rows = { settings: Array<{ key: string; value: string }>; twoFactor: Array<
  * Welche Zeilen würde ein Zurücksetzen anfassen? Nicht lesbare Geheimnisse in den Einstellungen und zweite Faktoren, deren Geheimnis bei lesbarem Schlüssel nicht
  * entschlüsselt werden kann (samt Sicherungscode-Hashes dieser Konten); bei `withWrap` auch die Hülle des Wiederherstellungsschlüssels (sie wird entfernt). `null`: nichts zu tun.
  * Nur Blobs, die ohnehin verschlüsselt in der Datenbank liegen – kein Klartext.
+ * `failed`: Verbraucher, deren Zeilen sich **nicht sichern** ließen (Fehler in `affectedRows`): sie werden **nicht** zurückgesetzt (erst Sicherung, dann Zurücksetzen – ohne Sicherung kein Zurücksetzen), die
+ * übrigen schon; der Fehler wird gemeldet (nur der Code), nie verschluckt, als wäre alles gut gegangen.
  */
-async function collectAffected(withWrap: boolean, consumers: readonly SecretConsumerDef[]): Promise<Rows | null> {
+async function collectAffected(withWrap: boolean, consumers: readonly SecretConsumerDef[]): Promise<{ rows: Rows | null; failed: ReadonlySet<string> }> {
   const settings = (await db.appSetting.findMany()).filter((row) => (isSecretBlob(row.value) && decryptSecret(row.value) === null) || (withWrap && WRAP_KEYS.includes(row.key)));
   const twoFactor = (await db.twoFactor.findMany()).filter((row) => (row.enabledAt || row.secret) && (!row.secret || decryptSecret(row.secret) === null));
   // Zeilen von Verbrauchern mit eigenen Tabellen (IT-Tresor): ihre verschlüsselten Blöcke gehören in dieselbe Sicherung
   const own: Record<string, Array<Record<string, unknown>>> = {};
+  const failed = new Set<string>();
   for (const consumer of consumers) {
     if (!consumer.affectedRows) continue;
     try {
       const rows = await consumer.affectedRows();
       if (rows.length > 0) own[consumer.id] = rows;
     } catch (error) {
+      failed.add(consumer.id);
       logError(`secrets:affected:${consumer.id}`, error);
+      console.error(`[secrets] ${consumer.id}: die betroffenen Zeilen ließen sich nicht sichern – dieser Verbraucher wird nicht zurückgesetzt.`);
     }
   }
-  if (settings.length === 0 && twoFactor.length === 0 && Object.keys(own).length === 0) return null;
+  if (settings.length === 0 && twoFactor.length === 0 && Object.keys(own).length === 0) return { rows: null, failed };
   const backupCodes = twoFactor.length ? await db.twoFactorBackupCode.findMany({ where: { userId: { in: twoFactor.map((row) => row.userId) } } }) : [];
   return {
-    settings: settings.map(({ key, value }) => ({ key, value })),
-    twoFactor: twoFactor.map((row) => ({ ...row })),
-    backupCodes: backupCodes.map((row) => ({ ...row })),
-    ...(Object.keys(own).length > 0 ? { consumers: own } : {}),
+    rows: {
+      settings: settings.map(({ key, value }) => ({ key, value })),
+      twoFactor: twoFactor.map((row) => ({ ...row })),
+      backupCodes: backupCodes.map((row) => ({ ...row })),
+      ...(Object.keys(own).length > 0 ? { consumers: own } : {}),
+    },
+    failed,
   };
 }
 
@@ -114,12 +122,14 @@ export async function resetUnreadableSecrets(consumers: readonly SecretConsumerD
     console.error("[secrets] secret.key passt nicht zur Datenbank, eine Wiederherstellung mit dem Wiederherstellungsschlüssel ist möglich: es wird nichts zurückgesetzt (Seite „Schlüssel wiederherstellen“ bzw. Verwaltung → Backups → Schlüssel).");
     return [];
   }
-  const affected = await collectAffected(stale, consumers);
+  const { rows: affected, failed } = await collectAffected(stale, consumers);
   if (!affected) return [];
   const backup = writeResetBackup(affected, options.force ? "forced" : stale ? "restore" : "unreadable", options.dataRoot);
 
   const items: SecretResetItem[] = [];
   for (const consumer of consumers) {
+    // Ohne Sicherung der Zeilen setzt ein Verbraucher nichts zurück (die Sicherung ging dem Zurücksetzen voraus)
+    if (failed.has(consumer.id)) continue;
     try {
       const count = await consumer.resetUnreadable();
       if (count > 0) items.push({ id: consumer.id, count });

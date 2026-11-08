@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { LinkButton } from "@/components/ui/buttons";
+import { Field, Input } from "@/components/ui/form";
 import { Alert, Badge, Card, DangerZone, DefinitionList, StatusBadge } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
@@ -67,8 +68,11 @@ export default async function VaultEntryPage({ params }: { params: Promise<{ id:
 
         {canManage ? (
           <DangerZone title={t("common.dangerZone")}>
-            <form action={deleteVaultEntry}>
+            <form action={deleteVaultEntry} className="flex max-w-sm flex-col gap-3">
               <input type="hidden" name="id" value={entry.id} />
+              <Field label={t("vault.fields.password")} htmlFor="vault-delete-password" required hint={t("vault.fields.deleteHint")}>
+                <Input id="vault-delete-password" name="password" type="password" required autoComplete="current-password" data-no-draft />
+              </Field>
               <ConfirmSubmitButton message={t("vault.deleteConfirm", { title: entry.title })}>{t("vault.delete")}</ConfirmSubmitButton>
             </form>
           </DangerZone>

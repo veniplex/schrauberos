@@ -201,11 +201,19 @@ export function numberInputMode(step: string | number | undefined): "decimal" | 
  * Nachkommastellen), und `autoFocus` wirkt nur am Desktop und nur einmal – auf Touch-Geräten springt sonst die Tastatur auf und verdeckt das Formular.
  * Id, `aria-describedby`, `aria-invalid` und `aria-required` kommen vom umgebenden `Field`.
  */
-export function Input({ invalid, className, autoFocus, inputMode, ref, ...props }: InputHTMLAttributes<HTMLInputElement> & WithInvalid & { ref?: Ref<HTMLInputElement> }) {
+export function Input({
+  invalid,
+  masked,
+  className,
+  autoFocus,
+  inputMode,
+  ref,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & WithInvalid & { ref?: Ref<HTMLInputElement>; /** Inhalt wie ein Passwort verdeckt, aber ohne `type="password"` (Geheimnisse, die ein Passwortmanager nicht als Anmeldedaten anbieten soll, z. B. der Tresor); nur mit `type="text"` */ masked?: boolean }) {
   const mode = inputMode ?? (props.type === "number" ? numberInputMode(props.step) : undefined);
   const setRef = useDesktopAutoFocus(autoFocus, ref);
   const attributes = useFieldAttributes({ id: props.id, name: props.name, invalid, "aria-describedby": props["aria-describedby"], "aria-required": props["aria-required"] });
-  return <input {...props} {...attributes} inputMode={mode} ref={setRef} className={clsx("input", className)} />;
+  return <input {...props} {...attributes} inputMode={mode} ref={setRef} className={clsx("input", masked && "input-masked", className)} />;
 }
 
 /** Suchfeld mit Lupe (für Listen und Filter). */

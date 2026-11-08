@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { chmodSync, linkSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { GCM_TAG_BYTES, gcmParts, strictBase64 } from "@/lib/gcm";
 import { isSecretKeyHex, WRAPPED_SETTING_KEY } from "@/lib/secret-wrap";
 import { dataDir } from "@/lib/updates/store";
 import { databaseFile } from "@/server/db-client-path";
@@ -147,7 +148,7 @@ const key = (): Buffer => Buffer.from(secretKeyHex(), "hex");
 
 export function encryptSecret(plain: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  const cipher = createCipheriv("aes-256-gcm", key(), iv, { authTagLength: GCM_TAG_BYTES });
   const data = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
   return ["v1", iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
 }
@@ -168,7 +169,7 @@ export function decryptSecret(blob: string): string | null {
  */
 export function encryptSecretBound(plain: Buffer, aad: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  const cipher = createCipheriv("aes-256-gcm", key(), iv, { authTagLength: GCM_TAG_BYTES });
   cipher.setAAD(Buffer.from(aad, "utf8"));
   const data = Buffer.concat([cipher.update(plain), cipher.final()]);
   return ["b1", iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
@@ -182,26 +183,46 @@ export function decryptSecretBound(blob: string, aad: string): Buffer | null {
 /** Wie `decryptSecretBound` mit einem gegebenen Schlüssel (Hex oder Bytes). */
 export function decryptSecretBoundWith(blob: string, aad: string, secretKey: Buffer | string): Buffer | null {
   try {
-    const parts = blob.split(":");
-    if (parts.length !== 4 || parts[0] !== "b1") return null;
-    const [, iv, tag, data] = parts;
-    const decipher = createDecipheriv("aes-256-gcm", typeof secretKey === "string" ? Buffer.from(secretKey, "hex") : secretKey, Buffer.from(iv, "base64"));
+    const shape = parseBound(blob);
+    if (!shape) return null;
+    const decipher = createDecipheriv("aes-256-gcm", typeof secretKey === "string" ? Buffer.from(secretKey, "hex") : secretKey, shape.iv, { authTagLength: GCM_TAG_BYTES });
     decipher.setAAD(Buffer.from(aad, "utf8"));
-    decipher.setAuthTag(Buffer.from(tag, "base64"));
-    return Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]);
+    decipher.setAuthTag(shape.tag);
+    return Buffer.concat([decipher.update(shape.data), decipher.final()]);
   } catch {
     return null;
   }
 }
 
+/** Form eines gebundenen Blocks: Version `b1`, vier Teile, IV 12 und Tag 16 Byte, kanonisches Base64. */
+function parseBound(blob: string): { iv: Buffer; tag: Buffer; data: Buffer } | null {
+  const parts = blob.split(":");
+  if (parts.length !== 4 || parts[0] !== "b1") return null;
+  const gcm = gcmParts(parts[1], parts[2]);
+  const data = strictBase64(parts[3]);
+  return gcm && data ? { ...gcm, data } : null;
+}
+
+/**
+ * Was ist das für ein gebundener Block, ohne ihn zu öffnen? `ok`: Form von `b1`; `unsupported`: trägt eine andere, höhere Version (`b2:…` – von einem neueren Programm geschrieben, nicht beschädigt);
+ * `damaged`: sonst nicht lesbar geformt (Teile, Länge, Kodierung). Für den Tresor: nur ein Block, der *gut geformt* ist und mit dem Schlüssel nicht aufgeht, ist „fremder Schlüssel“.
+ */
+export function boundBlobShape(blob: string): "ok" | "unsupported" | "damaged" {
+  if (parseBound(blob)) return "ok";
+  return /^b(?!1:)[1-9]\d*:/.test(blob) ? "unsupported" : "damaged";
+}
+
 /** Wie `decryptSecret`, aber mit einem gegebenen Schlüssel (Hex) statt der Datei – z. B. um zu prüfen, ob ein aufgehobener Schlüssel zu einer Datenbank passt. `null`: passt nicht oder beschädigt. */
 export function decryptSecretWith(blob: string, key: Buffer | string): string | null {
   try {
-    const [version, iv, tag, data] = blob.split(":");
-    if (version !== "v1") return null;
-    const decipher = createDecipheriv("aes-256-gcm", typeof key === "string" ? Buffer.from(key, "hex") : key, Buffer.from(iv, "base64"));
-    decipher.setAuthTag(Buffer.from(tag, "base64"));
-    return Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]).toString("utf8");
+    const parts = blob.split(":");
+    if (parts.length !== 4 || parts[0] !== "v1") return null;
+    const gcm = gcmParts(parts[1], parts[2]);
+    const data = strictBase64(parts[3]);
+    if (!gcm || !data) return null;
+    const decipher = createDecipheriv("aes-256-gcm", typeof key === "string" ? Buffer.from(key, "hex") : key, gcm.iv, { authTagLength: GCM_TAG_BYTES });
+    decipher.setAuthTag(gcm.tag);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
   } catch {
     return null;
   }

@@ -22,6 +22,7 @@ export type SecretConsumerDef = {
   /**
    * Die Zeilen, die `resetUnreadable` anfassen würde (nur bereits verschlüsselte Werte, nie Klartext): Sie werden **vor** dem Zurücksetzen als Teil der Sicherung `secret-reset/<Zeit>.json` abgelegt.
    * Verbraucher, deren Geheimnisse nicht in `AppSetting`/`TwoFactor` liegen (z. B. der IT-Tresor), liefern sie hier – ohne diese Angabe gäbe es für ihre Zeilen keine Sicherung.
+   * **Scheitert diese Abfrage, setzt `secret-reset.ts` für diesen Verbraucher nichts zurück** (erst sichern, dann zurücksetzen) und meldet es; die übrigen Verbraucher laufen weiter. Nur Zeilen, die der Verbraucher hier meldet, darf sein `resetUnreadable` anfassen.
    */
   affectedRows?: () => Promise<Array<Record<string, unknown>>>;
 };

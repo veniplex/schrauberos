@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createCipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
@@ -87,11 +87,12 @@ const BOTH = ["docsIt.vault", "docsIt.vaultManage"];
 /** Eintrag direkt anlegen (wie die Operation: Zeile, dann verschlüsseln) */
 async function makeEntry(title = "Firewall", secret: Partial<ReturnType<typeof markSecret>> = markSecret()) {
   const row = await env.db.vaultEntry.create({ data: { title, kind: "network", system: "fw-01" } });
-  const sealed = crypto.sealVaultEntry(row.id, 1, { ...crypto.EMPTY_SECRET, ...secret });
+  const sealed = crypto.sealVaultEntry(row.id, 1, { title, kind: "network", system: "fw-01" }, { ...crypto.EMPTY_SECRET, ...secret });
   return env.db.vaultEntry.update({ where: { id: row.id }, data: sealed });
 }
 const markSecret = () => ({ ...MARK });
-const save = (fields: Record<string, string | number | boolean | undefined> = {}) => actions.saveVaultEntry({}, form({ title: "Firewall", kind: "network", system: "fw-01", ...MARK, ...fields }));
+/** Speichern; das Passwort der handelnden Person steht dabei (nötig, wenn die hinterlegten Zugangsdaten eines Eintrags geändert werden) – `password: undefined` lässt es weg */
+const save = (fields: Record<string, string | number | boolean | undefined> = {}) => actions.saveVaultEntry({}, form({ title: "Firewall", kind: "network", system: "fw-01", ...MARK, password: PASSWORD, ...fields }));
 const reveal = (id: string, password = PASSWORD) => actions.revealVaultEntry({}, form({ id, password }));
 const audits = async () => (await env.db.auditLog.findMany({ orderBy: { createdAt: "asc" } })).map((e) => `${e.action} ${e.target}`);
 
@@ -111,10 +112,19 @@ const assertNoPlaintext = (text: string, where: string) => {
 };
 
 describe("Kryptographie", () => {
-  const entry = (id: string, sealed: ReturnType<typeof crypto.sealVaultEntry>) => ({ id, ...sealed });
+  const LABEL: { title: string; kind: string; system: string | null } = { title: "Firewall", kind: "network", system: "fw-01" };
+  const entry = (id: string, sealed: ReturnType<typeof crypto.sealVaultEntry>, label = LABEL) => ({ id, ...label, ...sealed });
+  /** Teil `index` (1 = IV, 2 = Tag, 3 = Daten) eines Blocks verändern: ein Bit kippen */
+  const flip = (blob: string, index: number) => {
+    const parts = blob.split(":");
+    const bytes = Buffer.from(parts[index], "base64");
+    bytes[0] ^= 1;
+    parts[index] = bytes.toString("base64");
+    return parts.join(":");
+  };
 
   it("Hin und zurück; der verschlüsselte Block und der umhüllte Schlüssel enthalten nichts im Klartext", () => {
-    const sealed = crypto.sealVaultEntry("e1", 1, markSecret());
+    const sealed = crypto.sealVaultEntry("e1", 1, LABEL, markSecret());
     assert.equal(sealed.format, 1);
     assertNoPlaintext(`${sealed.payload}\n${sealed.wrappedKey}`, "Block");
     for (const marker of markers) assert.ok(!Buffer.from(sealed.payload.split(":")[3], "base64").toString("latin1").includes(marker.slice(0, 8)), "auch im entschlüsselten Rohblock des Chiffrats ist nichts lesbar");
@@ -125,41 +135,50 @@ describe("Kryptographie", () => {
   });
 
   it("Eintrags-ID als AAD: Block oder Schlüssel in einen anderen Eintrag verschoben lässt sich nicht öffnen", () => {
-    const a = crypto.sealVaultEntry("a", 1, markSecret());
-    const b = crypto.sealVaultEntry("b", 1, { ...markSecret(), secret: "anderes-Geheimnis" });
-    assert.equal(crypto.openVaultEntry({ id: "a", ...a }).ok, true);
+    const a = crypto.sealVaultEntry("a", 1, LABEL, markSecret());
+    const b = crypto.sealVaultEntry("b", 1, LABEL, { ...markSecret(), secret: "anderes-Geheimnis" });
+    assert.equal(crypto.openVaultEntry(entry("a", a)).ok, true);
     // Block von b unter a: der Schlüssel von a öffnet ihn nicht
-    assert.deepEqual(crypto.openVaultEntry({ id: "a", format: 1, revision: 1, wrappedKey: a.wrappedKey, payload: b.payload }), { ok: false, reason: "damaged" });
+    assert.deepEqual(crypto.openVaultEntry(entry("a", { ...a, payload: b.payload })), { ok: false, reason: "damaged" });
     // Schlüssel von b unter a: nicht für diese Zeile umhüllt
-    assert.deepEqual(crypto.openVaultEntry({ id: "a", format: 1, revision: 1, wrappedKey: b.wrappedKey, payload: a.payload }), { ok: false, reason: "unreadable" });
+    assert.deepEqual(crypto.openVaultEntry(entry("a", { ...a, wrappedKey: b.wrappedKey })), { ok: false, reason: "unreadable" });
     // beides vertauscht: unter der ID b geöffnet, ist der Schlüssel von a nicht für b umhüllt
-    assert.deepEqual(crypto.openVaultEntry({ id: "b", ...a }), { ok: false, reason: "unreadable" });
+    assert.deepEqual(crypto.openVaultEntry(entry("b", a)), { ok: false, reason: "unreadable" });
   });
 
-  it("Format und Revision stecken in der AAD: eine andere Revision oder ein unbekanntes Format öffnet nie", () => {
-    const sealed = crypto.sealVaultEntry("e", 3, markSecret());
-    assert.equal(crypto.openVaultEntry({ id: "e", ...sealed }).ok, true);
-    assert.deepEqual(crypto.openVaultEntry({ id: "e", ...sealed, revision: 2 }), { ok: false, reason: "damaged" });
-    assert.deepEqual(crypto.openVaultEntry({ id: "e", ...sealed, revision: 4 }), { ok: false, reason: "damaged" });
-    assert.deepEqual(crypto.openVaultEntry({ id: "e", ...sealed, format: 2 }), { ok: false, reason: "damaged" });
+  it("Format und Revision stecken in der AAD: eine andere Revision öffnet nie, ein unbekanntes Format ist „nicht unterstützt“ (nie beschädigt)", () => {
+    const sealed = crypto.sealVaultEntry("e", 3, LABEL, markSecret());
+    assert.equal(crypto.openVaultEntry(entry("e", sealed)).ok, true);
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, revision: 2 })), { ok: false, reason: "damaged" });
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, revision: 4 })), { ok: false, reason: "damaged" });
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, format: 2 })), { ok: false, reason: "unsupported" });
+  });
+
+  it("Titel, Art und System stecken in der AAD: vertauschte Beschriftungen öffnen nie (statt falscher Zugangsdaten unter einem vertrauten Titel)", () => {
+    const sealed = crypto.sealVaultEntry("e", 1, LABEL, markSecret());
+    assert.equal(crypto.openVaultEntry(entry("e", sealed)).ok, true);
+    for (const other of [{ ...LABEL, title: "Router" }, { ...LABEL, kind: "server" }, { ...LABEL, system: "fw-02" }, { ...LABEL, system: null }]) {
+      assert.deepEqual(crypto.openVaultEntry(entry("e", sealed, other)), { ok: false, reason: "damaged" }, JSON.stringify(other));
+    }
+    // kein System und leeres System sind dasselbe
+    const none = crypto.sealVaultEntry("e", 1, { ...LABEL, system: null }, markSecret());
+    assert.equal(crypto.openVaultEntry(entry("e", none, { ...LABEL, system: null })).ok, true);
   });
 
   it("Manipulation: ein veränderter Block (Chiffrat, Tag, IV), ein veränderter Schlüssel oder Unsinn öffnet nie – nie ein Klartext, nie eine Ausnahme", () => {
-    const sealed = crypto.sealVaultEntry("e", 1, markSecret());
-    const flip = (blob: string, index: number) => {
-      const parts = blob.split(":");
-      const bytes = Buffer.from(parts[index], "base64");
-      bytes[0] ^= 1;
-      parts[index] = bytes.toString("base64");
-      return parts.join(":");
-    };
-    for (const index of [1, 2, 3]) assert.deepEqual(crypto.openVaultEntry({ id: "e", ...sealed, payload: flip(sealed.payload, index) }), { ok: false, reason: "damaged" }, `Teil ${index}`);
-    for (const index of [1, 2, 3]) assert.deepEqual(crypto.openVaultEntry({ id: "e", ...sealed, wrappedKey: flip(sealed.wrappedKey, index) }), { ok: false, reason: "unreadable" }, `Schlüsselteil ${index}`);
-    for (const payload of ["", "p1", "p1:::", "p2:a:b:c", "Unsinn", `${sealed.payload}:extra`.replace(/:[^:]*$/, ":%%%")]) {
-      assert.equal(crypto.openVaultEntry({ id: "e", ...sealed, payload }).ok, false, payload);
+    const sealed = crypto.sealVaultEntry("e", 1, LABEL, markSecret());
+    for (const index of [1, 2, 3]) assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload: flip(sealed.payload, index) })), { ok: false, reason: "damaged" }, `Teil ${index}`);
+    for (const index of [1, 2, 3]) assert.equal(crypto.openVaultEntry(entry("e", { ...sealed, wrappedKey: flip(sealed.wrappedKey, index) })).ok, false, `Schlüsselteil ${index}`);
+    // ein gut geformter, aber veränderter umhüllter Schlüssel ist „fremder Schlüssel“ (nicht zu unterscheiden)
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, wrappedKey: flip(sealed.wrappedKey, 3) })), { ok: false, reason: "unreadable" });
+    for (const payload of ["p1", "p1:::", "Unsinn", `${sealed.payload}:extra`, `${sealed.payload}`.replace(/:[^:]*$/, ":%%%")]) {
+      assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload })), { ok: false, reason: "damaged" }, payload);
     }
-    assert.deepEqual(crypto.openVaultEntry({ id: "e", ...sealed, wrappedKey: null }), { ok: false, reason: "empty" });
-    assert.deepEqual(crypto.openVaultEntry({ id: "e", ...sealed, payload: null }), { ok: false, reason: "empty" });
+    // eine höhere Version ist nicht beschädigt, sondern unbekannt
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload: "p2:a:b:c" })), { ok: false, reason: "unsupported" });
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, wrappedKey: sealed.wrappedKey.replace(/^b1:/, "b2:") })), { ok: false, reason: "unsupported" });
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, wrappedKey: null as never })), { ok: false, reason: "empty" });
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload: null as never })), { ok: false, reason: "empty" });
   });
 
   it("IV und Eintragsschlüssel sind je Verschlüsselung neu: 500 Mal dieselben Daten ergeben 500 verschiedene IVs, Schlüssel und Blöcke", () => {
@@ -167,7 +186,7 @@ describe("Kryptographie", () => {
     const wraps = new Set<string>();
     const blocks = new Set<string>();
     for (let i = 0; i < 500; i++) {
-      const sealed = crypto.sealVaultEntry("same", 1, markSecret());
+      const sealed = crypto.sealVaultEntry("same", 1, LABEL, markSecret());
       ivs.add(sealed.payload.split(":")[1]);
       wraps.add(sealed.wrappedKey);
       blocks.add(sealed.payload);
@@ -175,16 +194,55 @@ describe("Kryptographie", () => {
     assert.deepEqual([ivs.size, wraps.size, blocks.size], [500, 500, 500]);
   });
 
-  it("zu lange Felder und beschädigter JSON-Inhalt gelten als beschädigt, nicht als lesbar", () => {
-    // ein selbst gebauter, gültig verschlüsselter Block mit falschem Inhalt
-    const dek = randomBytes(32);
-    const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", dek, iv);
-    cipher.setAAD(Buffer.from("schrauberos:vault:payload:v1:z:1"));
-    const data = Buffer.concat([cipher.update(JSON.stringify({ url: 1, username: "x" })), cipher.final()]);
-    const payload = ["p1", iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
-    const wrappedKey = secrets.encryptSecretBound(dek, "schrauberos:vault:dek:v1:z");
-    assert.deepEqual(crypto.openVaultEntry({ id: "z", format: 1, revision: 1, wrappedKey, payload }), { ok: false, reason: "damaged" });
+  it("ein echter (GCM-geprüfter) Block mit unerwarteter Form oder zu langen Feldern ist „nicht unterstützt“, nicht beschädigt und nicht lesbar", () => {
+    // ein selbst gebauter, gültig verschlüsselter Block mit falschem Inhalt (wie ihn eine andere Programmversion schriebe)
+    const build = (content: unknown) => {
+      const dek = randomBytes(32);
+      const iv = randomBytes(12);
+      const cipher = createCipheriv("aes-256-gcm", dek, iv);
+      const digest = createHash("sha256").update(JSON.stringify([LABEL.title, LABEL.kind, LABEL.system])).digest("hex").slice(0, 32);
+      cipher.setAAD(Buffer.from(`schrauberos:vault:payload:v1:z:1:${digest}`));
+      const data = Buffer.concat([cipher.update(JSON.stringify(content)), cipher.final()]);
+      const payload = ["p1", iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
+      return { id: "z", ...LABEL, format: 1, revision: 1, wrappedKey: secrets.encryptSecretBound(dek, "schrauberos:vault:dek:v1:z"), payload };
+    };
+    assert.deepEqual(crypto.openVaultEntry(build({ url: 1, username: "x" })), { ok: false, reason: "unsupported" });
+    assert.deepEqual(crypto.openVaultEntry(build({ url: "u", username: "n", secret: "s".repeat(2001), note: "" })), { ok: false, reason: "unsupported" });
+    assert.deepEqual(crypto.openVaultEntry(build(null)), { ok: false, reason: "unsupported" });
+    assert.equal(crypto.openVaultEntry(build({ url: "u", username: "n", secret: "s", note: "" })).ok, true, "die Bauart stimmt");
+  });
+
+  it("GCM-Tag und IV sind festgenagelt: ein auf 4 Byte gekürzter (sonst korrekter) Tag, eine zu kurze IV und unkanonisches Base64 öffnen nie – weder Block noch umhüllter Schlüssel", () => {
+    const sealed = crypto.sealVaultEntry("e", 1, LABEL, markSecret());
+    const withPart = (blob: string, index: number, mutate: (part: string) => string) => {
+      const parts = blob.split(":");
+      parts[index] = mutate(parts[index]);
+      return parts.join(":");
+    };
+    const truncate = (part: string) => Buffer.from(part, "base64").subarray(0, 4).toString("base64");
+    // Block: gekürzter Tag, gekürzte IV
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload: withPart(sealed.payload, 2, truncate) })), { ok: false, reason: "damaged" });
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload: withPart(sealed.payload, 1, (p) => Buffer.from(p, "base64").subarray(0, 8).toString("base64")) })), { ok: false, reason: "damaged" });
+    // Block: Leerraum, URL-sicheres Alphabet, fehlende Auffüllung, Fremdzeichen
+    const data = sealed.payload.split(":")[3];
+    for (const mutate of [
+      (p: string) => `${p.slice(0, 4)} \n${p.slice(4)}`,
+      (p: string) => p.replace(/\+/g, "-").replace(/\//g, "_") + "-",
+      (p: string) => p.replace(/=+$/, "") + (p.endsWith("=") ? "" : "A"),
+      (p: string) => `${p.slice(0, 4)}!!${p.slice(4)}`,
+    ]) {
+      assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload: withPart(sealed.payload, 3, mutate) })), { ok: false, reason: "damaged" }, mutate(data).slice(0, 12));
+    }
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, payload: withPart(sealed.payload, 2, (p) => p.replace(/=+$/, "")) })), { ok: false, reason: "damaged" }, "ohne Auffüllung");
+    // umhüllter Schlüssel (b1): gekürzter Tag und Fremdzeichen sind keine Form von b1
+    assert.equal(secrets.decryptSecretBound(withPart(sealed.wrappedKey, 2, truncate), "schrauberos:vault:dek:v1:e"), null);
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, wrappedKey: withPart(sealed.wrappedKey, 2, truncate) })), { ok: false, reason: "damaged" });
+    assert.deepEqual(crypto.openVaultEntry(entry("e", { ...sealed, wrappedKey: withPart(sealed.wrappedKey, 3, (p) => `${p} `) })), { ok: false, reason: "damaged" });
+    // v1-Geheimnisse der Einstellungen und die Hülle des Wiederherstellungsschlüssels: dieselbe Regel
+    const v1 = secrets.encryptSecret("geheim");
+    assert.equal(secrets.decryptSecret(v1), "geheim");
+    assert.equal(secrets.decryptSecret(withPart(v1, 2, truncate)), null, "v1: Tag 4 Byte");
+    assert.equal(secrets.decryptSecret(`${v1}:extra`), null, "v1: fünf Teile");
   });
 });
 
@@ -217,8 +275,8 @@ describe("Rechte: auch Administratoren nur ausdrücklich", () => {
     const state = await save({ title: "Blind" });
     assert.ok(state.error, "wer nur verwalten darf, ändert nichts blind");
     assert.equal(await env.db.vaultEntry.count(), 1);
-    assert.ok((await actions.deleteVaultEntry(form({ id: entry.id }))) === undefined || (await env.db.vaultEntry.count()) === 1);
-    assert.equal(await env.db.vaultEntry.count(), 1);
+    await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id, password: PASSWORD })));
+    assert.equal(await env.db.vaultEntry.count(), 1, "wer nur verwalten darf, löscht nichts blind");
     env.signOut();
     await login(["docsIt.vault", "docsIt.edit", "docsIt.view"]);
     assert.equal(await redirectOf(() => save({ title: "Zu wenig" })), "/forbidden");
@@ -277,10 +335,23 @@ describe("Anlegen, Ändern, Löschen", () => {
     await login(BOTH);
     await redirectOf(() => save());
     const before = await env.db.vaultEntry.findFirstOrThrow();
-    assert.ok(await redirectOf(() => save({ id: before.id, version: versionOf(before), title: "Firewall neu", system: "fw-02", url: undefined, username: undefined, secret: undefined, note: undefined })));
+    // gleiche Beschriftung, keine neuen Zugangsdaten: der Block bleibt, wie er ist
+    assert.ok(await redirectOf(() => save({ id: before.id, version: versionOf(before), url: undefined, username: undefined, secret: undefined, note: undefined, password: undefined })));
     const after = await env.db.vaultEntry.findUniqueOrThrow({ where: { id: before.id } });
-    assert.deepEqual([after.title, after.system, after.revision, after.wrappedKey, after.payload], ["Firewall neu", "fw-02", 1, before.wrappedKey, before.payload]);
+    assert.deepEqual([after.title, after.system, after.revision, after.wrappedKey, after.payload], ["Firewall", "fw-01", 1, before.wrappedKey, before.payload]);
+    assert.deepEqual(await audits(), ["vault.create Firewall · Zugangsdaten", "vault.update Firewall"]);
+  });
+
+  it("Umbenennen verschlüsselt neu (Titel, Art und System sind mit dem Block verbunden): Revision + 1, neuer Block, derselbe Inhalt – ohne Passwortabfrage", async () => {
+    await login(BOTH);
+    await redirectOf(() => save());
+    const before = await env.db.vaultEntry.findFirstOrThrow();
+    assert.ok(await redirectOf(() => save({ id: before.id, version: versionOf(before), title: "Firewall neu", system: "fw-02", kind: "server", url: undefined, username: undefined, secret: undefined, note: undefined, password: undefined })));
+    const after = await env.db.vaultEntry.findUniqueOrThrow({ where: { id: before.id } });
+    assert.deepEqual([after.title, after.system, after.kind, after.revision], ["Firewall neu", "fw-02", "server", 2]);
+    assert.notEqual(after.payload, before.payload);
     assert.deepEqual(await audits(), ["vault.create Firewall · Zugangsdaten", "vault.update Firewall neu"]);
+    assert.deepEqual(((await reveal(before.id)) as { vault?: Record<string, string> }).vault, { title: "Firewall neu", ...MARK });
   });
 
   it("Ändern mit neuen Zugangsdaten: neue IV und neuer Schlüssel, Revision + 1; leere Felder behalten ihren Wert, „Entfernen“ leert ihn", async () => {
@@ -323,10 +394,123 @@ describe("Anlegen, Ändern, Löschen", () => {
   it("Löschen ist endgültig und steht im Audit-Log (Titel, nie Inhalt)", async () => {
     await login(BOTH);
     const entry = await makeEntry("Router Büro");
-    assert.equal(await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id }))), "/docs/vault");
+    assert.equal(await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id, password: PASSWORD }))), "/docs/vault");
     assert.equal(await env.db.vaultEntry.count(), 0);
     assert.deepEqual(await audits(), ["vault.delete Router Büro"]);
-    assert.ok((await actions.deleteVaultEntry(form({ id: entry.id }))) !== null);
+    // ein zweites Mal: es gibt nichts mehr – zurück zur Seite des Eintrags mit Meldung, kein Fehler
+    assert.ok(await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id, password: PASSWORD }))));
+  });
+
+  it("Löschen und Ändern der hinterlegten Zugangsdaten verlangen das eigene Passwort (gleiches Limit wie das Anzeigen): ohne und mit falschem Passwort bleibt alles, wie es war", async () => {
+    await login(BOTH);
+    const entry = await makeEntry("Router");
+    const row = () => env.db.vaultEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    // Löschen
+    await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id })));
+    await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id, password: "falsch" })));
+    assert.equal(await env.db.vaultEntry.count(), 1, "nicht gelöscht");
+    // Ersetzen, Ergänzen, Leeren der Zugangsdaten
+    for (const fields of [{ secret: "Koeder-Pw-1" }, { username: "koeder" }, { clearSecret: true }, { clearNote: true }]) {
+      const current = await row();
+      const base = { id: entry.id, version: versionOf(current), title: "Router", url: undefined, username: undefined, note: undefined, secret: undefined, ...fields };
+      const without = await save({ ...base, password: undefined });
+      assert.ok(without.fieldErrors?.password, `ohne Passwort: ${JSON.stringify(fields)}`);
+      const wrong = await save({ ...base, password: "falsch" });
+      assert.ok(wrong.fieldErrors?.password, `falsches Passwort: ${JSON.stringify(fields)}`);
+    }
+    const unchanged = await row();
+    assert.deepEqual([unchanged.payload, unchanged.wrappedKey, unchanged.revision], [entry.payload, entry.wrappedKey, entry.revision], "Block unverändert");
+    // dieselben Fehlversuche zählen im Limit des Anzeigens: nach fünf ist auch das richtige Passwort eine Weile zu
+    const blocked = (await reveal(entry.id)) as { error?: string; fieldErrors?: unknown };
+    assert.ok(blocked.error ?? blocked.fieldErrors, "gemeinsames Limit");
+    assert.equal((blocked as { vault?: unknown }).vault, undefined);
+    // nach Ablauf der Wartezeit geht Löschen mit dem richtigen Passwort
+    throttle.resetLoginThrottle();
+    assert.equal(await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id, password: PASSWORD }))), "/docs/vault");
+    assert.equal(await env.db.vaultEntry.count(), 0);
+  });
+
+  it("erstmaliges Eintragen von Zugangsdaten in einen Eintrag ohne Zugangsdaten braucht kein Passwort (es ersetzt nichts)", async () => {
+    await login(BOTH);
+    await redirectOf(() => save({ url: undefined, username: undefined, secret: undefined, note: undefined }));
+    const row = await env.db.vaultEntry.findFirstOrThrow();
+    assert.ok(await redirectOf(() => save({ id: row.id, version: versionOf(row), password: undefined })));
+    assert.equal((await queries.getVaultEntry(row.id))?.state, "sealed");
+  });
+});
+
+describe("Ändern überschreibt nie einen rettbaren oder unbekannten Block", () => {
+  const row = (id: string) => env.db.vaultEntry.findUniqueOrThrow({ where: { id } });
+  const edit = async (id: string, fields: Record<string, string | number | boolean | undefined> = {}) =>
+    save({ id, version: versionOf(await row(id)), title: "Firewall", url: undefined, username: undefined, secret: undefined, note: undefined, ...fields });
+
+  it("Probe P2: fremder, noch nicht zurückgesetzter Schlüssel – eine Teiländerung überschreibt den alten Block nicht (er bleibt mit dem richtigen Schlüssel lesbar)", async () => {
+    await login(BOTH);
+    const original = readFileSync(keyPath(), "utf8");
+    const entry = await makeEntry();
+    writeKey(); // fremder Schlüssel (anderes Volume), keine Hülle: kein Schlüsselproblem, aber der Block gehört nicht dazu
+    assert.deepEqual(crypto.openVaultEntry(await row(entry.id)), { ok: false, reason: "unreadable" });
+    const partial = await edit(entry.id, { username: "nur-ein-neuer-user" });
+    assert.ok(partial.error, "Teiländerung abgelehnt");
+    const rename = await edit(entry.id, { title: "Umbenannt", password: PASSWORD });
+    assert.ok(rename.error, "auch Umbenennen schreibt den Block neu und wird abgelehnt");
+    const unchanged = await row(entry.id);
+    assert.deepEqual([unchanged.payload, unchanged.wrappedKey, unchanged.revision, unchanged.title], [entry.payload, entry.wrappedKey, entry.revision, "Firewall"]);
+    writeKey(original);
+    assert.deepEqual(crypto.openVaultEntry(await row(entry.id)), { ok: true, secret: markSecret() }, "mit dem richtigen Schlüssel noch lesbar");
+  });
+
+  it("nicht lesbarer Block ohne Schlüsselstörung: nur eine vollständige Neueingabe aller vier Felder (mit Passwort) ersetzt ihn", async () => {
+    await login(BOTH);
+    const entry = await makeEntry();
+    writeKey();
+    assert.ok((await edit(entry.id, { url: "https://neu.example", username: "u", secret: "s" })).error, "drei von vier Feldern genügen nicht");
+    assert.deepEqual([(await row(entry.id)).payload], [entry.payload]);
+    await redirectOf(() => edit(entry.id, { url: "https://neu.example", username: "u", secret: "neues-Pw-9", clearNote: true }));
+    const after = await row(entry.id);
+    assert.deepEqual(crypto.openVaultEntry(after), { ok: true, secret: { url: "https://neu.example", username: "u", secret: "neues-Pw-9", note: "" } });
+    assert.equal(after.revision, 2);
+  });
+
+  it("Schlüsselstörung „passt nicht zur Datenbank“ (mismatch): Zugangsdaten anlegen und ändern sind gesperrt, bis der richtige Schlüssel zurück ist; Eintrag ohne Zugangsdaten anlegen geht", async () => {
+    await login(BOTH);
+    const original = readFileSync(keyPath(), "utf8");
+    await recoveryKey.issueRecoveryKey(env.db); // Hülle: der Wiederherstellungsschlüssel könnte alles retten
+    const entry = await makeEntry();
+    writeKey();
+    assert.equal((await issueMod.secretKeyIssue())?.kind, "mismatch");
+    // ändern (mit und ohne vollständige Neueingabe), umbenennen
+    assert.ok((await edit(entry.id, { username: "neu" })).error);
+    assert.ok((await edit(entry.id, { url: "u", username: "n", secret: "s", note: "x" })).error);
+    assert.ok((await edit(entry.id, { title: "Umbenannt", password: PASSWORD })).error);
+    // neu anlegen: mit Zugangsdaten gesperrt (sie wären nach der Wiederherstellung des richtigen Schlüssels unlesbar), ohne erlaubt
+    assert.ok((await save({ title: "Neu mit Zugangsdaten" })).error);
+    assert.equal(await env.db.vaultEntry.count({ where: { title: "Neu mit Zugangsdaten" } }), 0, "nichts angelegt");
+    assert.ok(await redirectOf(() => save({ title: "Neu leer", url: undefined, username: undefined, secret: undefined, note: undefined })));
+    // der alte Block ist unverändert und mit dem richtigen Schlüssel wieder lesbar
+    assert.deepEqual([(await row(entry.id)).payload, (await row(entry.id)).wrappedKey], [entry.payload, entry.wrappedKey]);
+    writeKey(original);
+    assert.deepEqual(crypto.openVaultEntry(await row(entry.id)), { ok: true, secret: markSecret() });
+  });
+
+  it("unbekanntes Format (neuere Programmversion): nie überschrieben, auch nicht durch vollständige Neueingabe; beschädigter Block: nur vollständige Neueingabe", async () => {
+    await login(BOTH);
+    const entry = await makeEntry();
+    await env.db.vaultEntry.update({ where: { id: entry.id }, data: { format: 2 } });
+    for (const fields of [{ username: "x" }, { url: "u", username: "n", secret: "s", note: "x" }, { title: "Umbenannt" }]) {
+      assert.ok((await edit(entry.id, fields)).error, JSON.stringify(fields));
+    }
+    assert.deepEqual([(await row(entry.id)).payload, (await row(entry.id)).format], [entry.payload, 2]);
+    // beschädigt: ein Bit im Chiffrat
+    const parts = entry.payload!.split(":");
+    const bytes = Buffer.from(parts[3], "base64");
+    bytes[0] ^= 1;
+    parts[3] = bytes.toString("base64");
+    await env.db.vaultEntry.update({ where: { id: entry.id }, data: { format: 1, payload: parts.join(":") } });
+    assert.deepEqual(crypto.openVaultEntry(await row(entry.id)), { ok: false, reason: "damaged" });
+    assert.ok((await edit(entry.id, { username: "teil" })).error, "Teiländerung abgelehnt");
+    await redirectOf(() => edit(entry.id, { url: "u", username: "n", secret: "heil", note: "x" }));
+    assert.equal(crypto.openVaultEntry(await row(entry.id)).ok, true);
   });
 });
 
@@ -462,16 +646,18 @@ describe("Zustände von secret.key", () => {
     assert.equal(existsSync(keyPath()), false, "nie still ein neuer Schlüssel");
     assert.deepEqual(await issueMod.secretKeyIssue(), { kind: "missing", recoverable: false });
     assert.throws(() => crypto.openVaultEntry(entry), secrets.SecretKeyUnavailableError);
-    assert.throws(() => crypto.sealVaultEntry("x", 1, markSecret()), secrets.SecretKeyUnavailableError);
+    assert.throws(() => crypto.sealVaultEntry("x", 1, { title: "x", kind: "other", system: null }, markSecret()), secrets.SecretKeyUnavailableError);
     assert.ok(((await reveal(entry.id)) as { error?: string }).error, "Anzeigen gesperrt");
     assert.ok((await save({ title: "Neu" })).error, "Anlegen gesperrt");
     assert.ok((await save({ id: entry.id, version: versionOf(entry), secret: "neu-1" })).error, "Ändern der Zugangsdaten gesperrt");
+    // auch das Umbenennen verschlüsselt neu (Beschriftung und Block sind verbunden) und braucht den Schlüssel
+    assert.ok((await save({ id: entry.id, version: versionOf(entry), title: "Nur umbenannt", url: undefined, username: undefined, secret: undefined, note: undefined, password: undefined })).error, "Umbenennen gesperrt");
     assert.deepEqual(await secretReset.resetUnreadableSecrets(), [], "ohne Schlüssel wird nichts zurückgesetzt");
     const row = await env.db.vaultEntry.findUniqueOrThrow({ where: { id: entry.id } });
     assert.deepEqual([row.wrappedKey, row.payload, row.unreadableAt === null], [entry.wrappedKey, entry.payload, true], "unverändert");
     assert.equal(await env.db.vaultEntry.count(), 1);
-    // nur die Beschriftung zu ändern geht ohne Schlüssel (der Block bleibt unberührt)
-    assert.ok(await redirectOf(() => save({ id: entry.id, version: versionOf(row), title: "Nur umbenannt", url: undefined, username: undefined, secret: undefined, note: undefined })));
+    // ohne Änderung an der Beschriftung (nur „gespeichert“) geht es auch ohne Schlüssel: der Block bleibt unberührt
+    assert.ok(await redirectOf(() => save({ id: entry.id, version: versionOf(row), url: undefined, username: undefined, secret: undefined, note: undefined, password: undefined })));
   });
 
   it("Datei nicht lesbar (Verzeichnis statt Datei): gesperrt, nie überschrieben, nie zurückgesetzt", async () => {
@@ -543,10 +729,78 @@ describe("Zustände von secret.key", () => {
 
     // „Neu eingeben nötig“: Titel bleiben, die Zugangsdaten werden neu eingegeben
     const row = rows.find((r) => r.title === "Eins")!;
-    assert.ok(await redirectOf(() => save({ id: row.id, version: versionOf(row), title: "Eins", url: undefined, username: "neu-user", secret: "neues-Passwort-2", note: undefined })));
+    assert.ok(await redirectOf(() => save({ id: row.id, version: versionOf(row), title: "Eins", url: undefined, username: "neu-user", secret: "neues-Passwort-2", note: undefined, password: undefined })));
     assert.deepEqual(((await reveal(row.id)) as { vault?: Record<string, string> }).vault, { title: "Eins", url: "", username: "neu-user", secret: "neues-Passwort-2", note: "" });
     assert.equal((await queries.getVaultEntry(row.id))?.state, "sealed");
     void two;
+  });
+
+  it("Probe P4: nur „fremder Schlüssel“ wird beim Start zurückgesetzt – ein unbekanntes Format (neuere Version, abgesenkte Grenzen) und ein beschädigter Block werden gemeldet, nie zurückgesetzt", async () => {
+    const original = readFileSync(keyPath(), "utf8");
+    await makeEntry("Lesbar", markSecret());
+    const newer = await makeEntry("Neuere Version", markSecret());
+    const broken = await makeEntry("Beschädigt", markSecret());
+    const lowered = await makeEntry("Abgesenkt", markSecret());
+    // neuere Version: Format 2
+    await env.db.vaultEntry.update({ where: { id: newer.id }, data: { format: 2 } });
+    // beschädigt: ein Bit im Chiffrat
+    const parts = broken.payload!.split(":");
+    const bytes = Buffer.from(parts[3], "base64");
+    bytes[0] ^= 1;
+    parts[3] = bytes.toString("base64");
+    await env.db.vaultEntry.update({ where: { id: broken.id }, data: { payload: parts.join(":") } });
+    // abgesenkte Feldgrenze: der Block ist echt, aber das Geheimnis länger als die Grenze dieses Programms (so schriebe ihn ein Release mit höherer Grenze)
+    const huge = crypto.sealVaultEntry(lowered.id, 1, { title: "Abgesenkt", kind: "network", system: "fw-01" }, { ...crypto.EMPTY_SECRET, secret: "y".repeat(2001) });
+    await env.db.vaultEntry.update({ where: { id: lowered.id }, data: huge });
+    // fremder Schlüssel: der Eintragsschlüssel ist mit einem anderen secret.key umhüllt
+    const alien = await env.db.vaultEntry.create({ data: { title: "Fremder Schlüssel", kind: "other" } });
+    writeKey();
+    const alienSealed = crypto.sealVaultEntry(alien.id, 1, { title: "Fremder Schlüssel", kind: "other", system: null }, markSecret());
+    writeKey(original);
+    await env.db.vaultEntry.update({ where: { id: alien.id }, data: alienSealed });
+
+    const read = async (id: string) => crypto.openVaultEntry(await env.db.vaultEntry.findUniqueOrThrow({ where: { id } }));
+    assert.deepEqual(await read(alien.id), { ok: false, reason: "unreadable" });
+    assert.deepEqual(await read(newer.id), { ok: false, reason: "unsupported" });
+    assert.deepEqual(await read(broken.id), { ok: false, reason: "damaged" });
+    assert.deepEqual(await read(lowered.id), { ok: false, reason: "unsupported" });
+
+    const items = await secretReset.resetUnreadableSecrets();
+    assert.deepEqual(items, [{ id: "it.vault", count: 1 }], "nur der Eintrag mit fremdem Schlüssel");
+    const after = await env.db.vaultEntry.findMany();
+    const state = (title: string) => after.find((r) => r.title === title)!;
+    assert.equal(state("Fremder Schlüssel").wrappedKey, null);
+    assert.notEqual(state("Fremder Schlüssel").unreadableAt, null);
+    for (const title of ["Neuere Version", "Beschädigt", "Abgesenkt"]) {
+      assert.ok(state(title).wrappedKey && state(title).payload, `${title}: Block bleibt`);
+      assert.equal(state(title).unreadableAt, null, `${title}: nicht als „Neu eingeben nötig“ markiert`);
+    }
+    assert.equal(state("Neuere Version").format, 2, "Format unangetastet");
+    assert.equal(crypto.openVaultEntry(state("Lesbar")).ok, true, "lesbarer Eintrag unberührt");
+    // gemeldet (nur Anzahlen, nie Inhalt oder Titel), und die Sicherung enthält nur den zurückgesetzten Eintrag
+    assert.ok(logged.some((line) => /it\.vault: 1 beschädigte und 2 nicht unterstützte/.test(line)), logged.join("\n"));
+    const files = readdirSync(path.join(env.dir, "secret-reset"));
+    const saved = JSON.parse(readFileSync(path.join(env.dir, "secret-reset", files[0]), "utf8")) as { consumers?: Record<string, Array<Record<string, unknown>>> };
+    assert.deepEqual(saved.consumers?.["it.vault"]?.map((r) => r.title), ["Fremder Schlüssel"]);
+    assertNoPlaintext(logged.join("\n"), "Protokoll");
+  });
+
+  it("scheitert die Sicherung der Zeilen eines Verbrauchers, setzt er nichts zurück (erst sichern, dann zurücksetzen); die übrigen Verbraucher laufen, der Fehler wird gemeldet", async () => {
+    const calls: string[] = [];
+    const broken = { id: "test.kaputt", resetUnreadable: async () => (calls.push("kaputt"), 3), affectedRows: async (): Promise<Array<Record<string, unknown>>> => Promise.reject(new Error("Datenbank kurz weg")) };
+    const fine = { id: "test.heil", resetUnreadable: async () => (calls.push("heil"), 1), affectedRows: async () => [{ id: "x", value: "verschlüsselt" }] };
+    const items = await secretReset.resetUnreadableSecrets([broken, fine]);
+    assert.deepEqual(calls, ["heil"], "der Verbraucher ohne Sicherung wird übersprungen");
+    assert.deepEqual(items, [{ id: "test.heil", count: 1 }]);
+    assert.ok(logged.some((line) => /test\.kaputt: die betroffenen Zeilen ließen sich nicht sichern/.test(line)));
+    const files = readdirSync(path.join(env.dir, "secret-reset"));
+    const saved = JSON.parse(readFileSync(path.join(env.dir, "secret-reset", files[0]), "utf8")) as { consumers?: Record<string, unknown> };
+    assert.deepEqual(Object.keys(saved.consumers ?? {}), ["test.heil"]);
+    // gibt es sonst nichts zu sichern, bleibt alles (auch für den kaputten Verbraucher) beim Alten
+    calls.length = 0;
+    rmSync(path.join(env.dir, "secret-reset"), { recursive: true, force: true });
+    assert.deepEqual(await secretReset.resetUnreadableSecrets([broken]), []);
+    assert.deepEqual(calls, []);
   });
 
   it("fremder Schlüssel mit vorhandener Hülle (Wiederherstellung wäre möglich): ohne ausdrückliche Wiederherstellung wird nichts zurückgesetzt", async () => {

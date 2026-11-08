@@ -566,10 +566,25 @@ describe("Datenzugriff", () => {
       "server/secret-key-issue.ts": "zählt Einträge mit umhülltem Schlüssel, um zu erkennen, dass ein fehlender secret.key nie still ersetzt werden darf (liest keinen Inhalt)",
       "modules/it/docs/seed.ts": "Demo-Seed: ein Beispiel-Eintrag ohne Zugangsdaten",
     };
+    /** Roh-SQL auf die Tabelle (`$queryRaw`, `better-sqlite3`): der Tabellenname steht in einem Text – `code()` ersetzt Texte, hier zählen sie. Nur Kommentarzeilen bleiben außen vor. */
+    const RAW_EXCEPTIONS: Record<string, string> = {
+      "server/secrets.ts": "databaseHoldsSecrets (`SELECT 1 FROM VaultEntry WHERE wrappedKey IS NOT NULL LIMIT 1`): läuft synchron und vor Prisma (beim Start, bevor ein neuer secret.key entstehen darf) und liest nur, ob es einen Eintrag mit umhülltem Schlüssel gibt – nie eine Spalte mit Inhalt",
+      "modules/it/docs/pages.ts": "Routen-Inventur (Browser-CI): nennt die Tabelle als Namen für die ID der Seite, liest nichts",
+    };
+    const comments = (text: string) =>
+      text
+        .split("\n")
+        .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+        .join("\n");
     const offenders = sources
-      .filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && !(file in EXCEPTIONS) && /\bvaultEntry\b/.test(code(text)))
+      .filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && !(file in EXCEPTIONS) && /\bvaultEntry\b/i.test(code(text)))
       .map(({ file }) => file);
     assert.deepEqual(offenders, [], "Zugriff auf VaultEntry außerhalb von it/docs/vault*.ts");
+    const rawOffenders = sources
+      .filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && !(file in RAW_EXCEPTIONS) && !(file in EXCEPTIONS) && /\bVaultEntry\b/.test(comments(text)))
+      .map(({ file }) => file);
+    assert.deepEqual(rawOffenders, [], "Roh-SQL auf VaultEntry außerhalb von it/docs/vault*.ts");
+    for (const file of Object.keys(RAW_EXCEPTIONS)) assert.ok(sources.some((s) => s.file === file && /\bVaultEntry\b/.test(comments(s.text))), `${file}: Ausnahme nicht mehr nötig – bitte streichen`);
     for (const file of Object.keys(EXCEPTIONS)) assert.ok(sources.some((s) => s.file === file && /\bvaultEntry\b/.test(code(s.text))), `${file}: Ausnahme nicht mehr nötig – bitte streichen`);
     // Wer entschlüsseln kann (vault-crypto), sind nur die Operationen und das Zurücksetzen – nie eine Seite, ein Baustein, die Suche oder eine andere Funktion
     const crypto = sources.filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && /vault-crypto/.test(text)).map(({ file }) => file);
