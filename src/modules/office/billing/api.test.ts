@@ -144,7 +144,7 @@ describe("Belege über die API", () => {
     assert.equal((await call(full, "POST", `/billing-documents/${created.id}/confirmation`)).status, 409);
   });
 
-  it("Versand: nur mit billing.send ausdrücklich im Token (und mail.send beim Besitzer); ohne eingerichteten Versand 4xx", async () => {
+  it("Versand per Token ist nicht möglich (Z6-1 L3): mail.send ist ein Plattformrecht und nie in einem Token – genau 403, auch mit billing.send im Scope und mail.send beim Besitzer; es wird nichts gesendet", async () => {
     const created = await draft();
     const done = await call(full, "POST", `/billing-documents/${created.id}/finalize`, undefined, ifMatch(created));
     const noSendInScope = (await makeToken(env, { ownerPermissions: [...EDIT, "billing.send", "mail.send"], scope: EDIT, rateLimitPerMinute: 6000 })).token;
@@ -153,7 +153,7 @@ describe("Belege über die API", () => {
     assert.equal(resNoScope.status, 403);
     const withSend = (await makeToken(env, { ownerPermissions: [...EDIT, "billing.send", "mail.send"], scope: [...EDIT, "billing.send"], rateLimitPerMinute: 6000 })).token;
     const res = await call(withSend, "POST", `/billing-documents/${done.json.data.id}/send`, {});
-    assert.ok([403, 422, 409, 400].includes(res.status), `Versand ohne E-Mail-Einrichtung wird abgelehnt: ${res.status}`);
+    assert.equal(res.status, 403, res.text);
     assert.equal(await env.db.mailMessage.count(), 0);
   });
 

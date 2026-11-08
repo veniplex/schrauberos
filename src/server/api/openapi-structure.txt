@@ -67,8 +67,8 @@ DELETE /employees/{id} employees.delete employees.delete
 GET /files files.list files.view query=ownerType,ownerId,category,q sort=createdAt
 POST /files files.upload files.upload body=ownerType,ownerId,category,caption,file
 GET /files/{id} files.get files.view
-PATCH /files/{id} files.update files.view body=category,caption
-DELETE /files/{id} files.delete files.view
+PATCH /files/{id} files.update files.view+files.upload body=category,caption
+DELETE /files/{id} files.delete files.view+files.upload
 GET /files/{id}/content files.content files.view
 GET /fleet-costs fleet-costs.list fleet.view query=fleetVehicleId,category sort=date,amountCents
 POST /fleet-costs fleet-costs.create fleet.edit body=fleetVehicleId,date,category,amountCents,km,note
@@ -135,7 +135,7 @@ GET /network-vlans/{id} network-vlans.get network.view
 PATCH /network-vlans/{id} network-vlans.update network.edit body=number,name,description
 DELETE /network-vlans/{id} network-vlans.delete network.delete
 GET /order-approvals order-approvals.list orders.prices query=orderId sort=createdAt
-POST /order-approvals order-approvals.create orders.prices body=orderId,amountCents,reason,method,approverName
+POST /order-approvals order-approvals.create orders.edit+orders.prices body=orderId,amountCents,reason,method,approverName
 GET /order-approvals/{id} order-approvals.get orders.prices
 GET /order-items order-items.list orders.prices query=orderId sort=position
 GET /order-items/{id} order-items.get orders.prices
@@ -145,7 +145,7 @@ GET /orders/{id} orders.get orders.view
 PATCH /orders/{id} orders.update orders.edit body=request,mileageKm
 POST /orders/{id}/close orders.close orders.close
 POST /orders/{id}/findings orders.findings orders.edit body=text
-POST /orders/{id}/items orders.items orders.prices body=items
+POST /orders/{id}/items orders.items orders.edit+orders.prices body=items
 POST /orders/{id}/status orders.status orders.edit body=status
 GET /reports/due reports.due reports.view query=months
 GET /reports/open-items reports.open-items reports.view query=direction

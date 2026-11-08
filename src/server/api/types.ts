@@ -46,6 +46,11 @@ export type ApiEndpoint = {
   path: string;
   /** Erforderliches Recht (Scope und Besitzer müssen es haben) */
   permission: Permission;
+  /**
+   * Weitere Rechte, die die Operation zusätzlich verlangt (z. B. Positionen ersetzen: `orders.edit` und für die Preise `orders.prices`). Das Token braucht **alle**; die Beschreibung nennt sie (`x-also-requires`)
+   * und die Rechteauswahl für Tokens bietet sie an. Ohne diese Angabe scheiterte ein Token mit nur dem Hauptrecht erst in der Operation mit 403.
+   */
+  alsoRequires?: readonly Permission[];
   /** Eindeutiger Name, z. B. "customers.list" */
   operationId: string;
   /** Kurzbeschreibung (englisch, erscheint in OpenAPI) */

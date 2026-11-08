@@ -230,6 +230,38 @@ describe("Drosselung", () => {
     assert.equal((await attempt("admin", "admin-passwort-1")).ok, true);
   });
 
+  /**
+   * Z6-1 L1 – dokumentierte Grenze (Produktentscheid): Die Wartezeit eines Kontos gilt für alle Quellen gemeinsam. Fragt jemand das Konto im Takt ab, öffnet sich das Fenster nach Ablauf der Wartezeit genau
+   * für seinen nächsten Versuch (er läuft zur Passwortprüfung und setzt die Wartezeit neu); die Besitzerin kommt nur durch, wenn ihre Anfrage in derselben Millisekunde davor liegt. „Keine harte Sperre“ heißt
+   * hier also nicht „immer erreichbar“: Gegenmittel sind das gemerkte Gerät (nächster Test) und der Notzugang. Wird die Drosselung je so geändert, dass die Besitzerin durchkommt, diesen Test anpassen.
+   */
+  it("Dauerbeschuss im Takt: ohne gemerktes Gerät kommt die Besitzerin nicht durch (dokumentierte Grenze), mit gemerktem Gerät schon", async () => {
+    await makeUser("admin", "admin-passwort-1");
+    const deviceToken = browser.cookies.get("so_device");
+    assert.equal(deviceToken, undefined);
+    // Gerät merken (Anmeldung mit Häkchen), danach ausloggen und das Cookie aufheben
+    assert.equal((await attemptRemember("admin", "admin-passwort-1")).ok, true);
+    const device = browser.cookies.get("so_device");
+    assert.ok(device, "bekanntes Gerät entstanden");
+    browser.cookies.delete("so_device");
+    throttleMod.resetLoginThrottle();
+
+    const start = clock;
+    let plainOk = 0;
+    let deviceOk = 0;
+    for (let t = 0; t < 600_000; t += 250) {
+      clock = start + t;
+      await attempt("admin", "geraten-123456"); // der Angreifer: fremdes Gerät, jede Viertelsekunde
+      if (t >= 300_000 && t % 1000 === 0) {
+        clock = start + t + 249; // knapp vor dem nächsten Versuch des Angreifers
+        if ((await attempt("admin", "admin-passwort-1")).ok) plainOk++;
+        else if (deviceOk === 0 && (await session.login("admin", "admin-passwort-1", { ip: null, deviceToken: device })).ok) deviceOk++;
+      }
+    }
+    assert.equal(plainOk, 0, "ohne Gerät: die Besitzerin kommt im Takt-Beschuss nicht durch (Grenze, siehe Kommentar)");
+    assert.equal(deviceOk, 1, "mit gemerktem Gerät befreit das Cookie von der Konto-Wartezeit – das Passwort bleibt Pflicht");
+  });
+
   it("die dauerhaften Zähler überstehen einen Neustart (Speicher leer, Datenbank gedrosselt) – ohne Hash", async () => {
     await makeUser();
     for (let i = 0; i < 3; i++) await attempt("anna");

@@ -136,6 +136,7 @@ function operationOf(endpoint: ApiEndpoint): Json {
     summary: endpoint.summary,
     tags: [endpoint.tag],
     "x-required-permission": endpoint.permission,
+    ...(endpoint.alsoRequires?.length ? { "x-also-requires": [...endpoint.alsoRequires] } : {}),
     parameters,
     responses,
   };

@@ -129,7 +129,7 @@ export function docModel(doc: Json, base: string): DocGroup[] {
         method: method.toUpperCase(),
         path,
         summary: String(operation.summary ?? ""),
-        permission: String(operation["x-required-permission"] ?? ""),
+        permission: [String(operation["x-required-permission"] ?? ""), ...((operation["x-also-requires"] as string[] | undefined) ?? [])].join(" + "),
         params: params.map((p) => ({ name: String(p.name), where: String(p.in), required: p.required === true, type: typeOf(obj(p.schema)), ...(typeof p.description === "string" ? { description: p.description } : {}) })),
         body: bodySchema ? fieldsOf(bodySchema) : null,
         bodyKind,

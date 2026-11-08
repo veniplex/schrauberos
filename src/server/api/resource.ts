@@ -63,6 +63,8 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
   };
   create?: {
     permission: Permission;
+    /** Weitere Rechte der Operation (siehe `ApiEndpoint.alsoRequires`) */
+    alsoRequires?: readonly Permission[];
     operation: Operation<unknown, { id: string }>;
     body: B;
     /** API-Körper → rohe Eingabe der Operation */
@@ -97,6 +99,8 @@ export type ResourceConfig<Row, Q extends z.ZodObject, B extends z.ZodObject> = 
     name: string;
     summary: string;
     permission: Permission;
+    /** Weitere Rechte der Operation (siehe `ApiEndpoint.alsoRequires`) */
+    alsoRequires?: readonly Permission[];
     operation: Operation<unknown, unknown>;
     body?: z.ZodObject;
     ifMatch?: boolean;
@@ -200,6 +204,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       method: "POST",
       path: cfg.path,
       permission: create.permission,
+      ...(create.alsoRequires ? { alsoRequires: create.alsoRequires } : {}),
       operationId: `${cfg.name}.create`,
       summary: `Create a ${cfg.singular}`,
       operations: [create.operation.name],
@@ -285,6 +290,7 @@ export function defineResource<Row, Q extends z.ZodObject, B extends z.ZodObject
       method: "POST",
       path: `${itemPath}/${action.name}`,
       permission: action.permission,
+      ...(action.alsoRequires ? { alsoRequires: action.alsoRequires } : {}),
       operationId: `${cfg.name}.${action.name}`,
       summary: action.summary,
       operations: [action.operation.name],

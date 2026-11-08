@@ -225,6 +225,9 @@ export async function handleApiRequest(request: Request, endpoints: readonly Api
   }
 }
 
+/** Trägt das Token alle Rechte des Endpunkts (Hauptrecht und `alsoRequires`)? */
+const mayCall = (principal: Principal, endpoint: ApiEndpoint): boolean => principal.can(endpoint.permission) && (endpoint.alsoRequires ?? []).every((p) => principal.can(p));
+
 async function dispatch(request: Request, principal: Principal, tokenId: string, endpoints: readonly ApiEndpoint[]): Promise<Response> {
   const url = new URL(request.url);
   const segments = segmentsOf(url.pathname);
@@ -235,7 +238,7 @@ async function dispatch(request: Request, principal: Principal, tokenId: string,
   if (pathname === OPEN_API_PATH) {
     if (method !== "GET") throw apiProblem("method_not_allowed", undefined, { allow: "GET" });
     // Ein Token sieht nur die Endpunkte, deren Recht es trägt (Scope ∩ Rechte des Besitzers) – nicht die ganze Struktur der Schnittstelle
-    return toResponse(render({ status: 200, body: buildOpenApi(endpoints.filter((endpoint) => principal.can(endpoint.permission)), principal.features) }));
+    return toResponse(render({ status: 200, body: buildOpenApi(endpoints.filter((endpoint) => mayCall(principal, endpoint)), principal.features) }));
   }
 
   const matches = compile(endpoints)
@@ -248,7 +251,7 @@ async function dispatch(request: Request, principal: Principal, tokenId: string,
   if (!match) throw apiProblem("method_not_allowed", undefined, { allow: [...new Set(matches.map((m) => m.compiled.endpoint.method))].join(", ") });
 
   const endpoint = match.compiled.endpoint;
-  if (!principal.can(endpoint.permission)) throw apiProblem("forbidden");
+  if (!mayCall(principal, endpoint)) throw apiProblem("forbidden");
 
   const { query, body, text, file } = await parseInput(endpoint, request, url.searchParams);
   const call: ApiCall = {

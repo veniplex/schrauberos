@@ -99,6 +99,14 @@ describe("Aufträge über die API", () => {
     assert.equal((await call(noPrices, "GET", "/order-items")).status, 403);
     assert.equal((await call(noPrices, "POST", `/orders/${order.id}/items`, { items }, ifMatch(await fresh(noPrices, order.id)))).status, 403);
     assert.equal((await call(noPrices, "GET", `/orders/${order.id}`)).status, 200);
+    // Z6-1 L7: Der Endpunkt verlangt orders.edit **und** orders.prices (OpenAPI: x-required-permission + x-also-requires) – ein Token mit nur einem der beiden sieht ihn weder in der Beschreibung noch kommt es durch
+    const onlyPrices = (await makeToken(env, { ownerPermissions: FULL_SCOPE, scope: ["orders.view", "orders.prices"], rateLimitPerMinute: 6000 })).token;
+    assert.equal((await call(onlyPrices, "POST", `/orders/${order.id}/items`, { items }, ifMatch(await fresh(onlyPrices, order.id)))).status, 403);
+    const docOf = async (token: string) => (await call(token, "GET", "/openapi.json")).json.paths as Json;
+    assert.ok(!(await docOf(noPrices))["/orders/{id}/items"], "ohne orders.prices fehlt der Endpunkt in der Beschreibung");
+    assert.ok(!(await docOf(onlyPrices))["/orders/{id}/items"], "ohne orders.edit auch");
+    const documented = (await docOf(full))["/orders/{id}/items"].post;
+    assert.deepEqual([documented["x-required-permission"], documented["x-also-requires"]], ["orders.edit", ["orders.prices"]]);
     // Besitzer ohne orders.prices, Scope mit: wirksam ist die Schnittmenge
     const ownerLost = (await makeToken(env, { ownerPermissions: ["orders.view", "orders.edit"], scope: FULL_SCOPE, rateLimitPerMinute: 6000 })).token;
     assert.equal((await call(ownerLost, "GET", "/order-items")).status, 403);

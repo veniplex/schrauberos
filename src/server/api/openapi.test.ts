@@ -90,7 +90,7 @@ describe("OpenAPI-Erzeugung", () => {
         const query = (op.parameters as Json[]).filter((p) => p.in === "query" && !["page", "limit", "sort"].includes(p.name)).map((p) => p.name);
         const sort = ((op.parameters as Json[]).find((p) => p.name === "sort")?.description as string | undefined)?.replace(/^.*Allowed: /, "").replace(/\.$/, "");
         const body = op.requestBody ? Object.keys((Object.values(op.requestBody.content)[0] as Json).schema.properties ?? {}).join(",") : "";
-        lines.push(`${method.toUpperCase()} ${route} ${op.operationId} ${op["x-required-permission"]}${query.length ? ` query=${query.join(",")}` : ""}${sort ? ` sort=${sort.replace(/, /g, ",")}` : ""}${body ? ` body=${body}` : ""}`);
+        lines.push(`${method.toUpperCase()} ${route} ${op.operationId} ${op["x-required-permission"]}${(op["x-also-requires"] as string[] | undefined)?.length ? `+${(op["x-also-requires"] as string[]).join("+")}` : ""}${query.length ? ` query=${query.join(",")}` : ""}${sort ? ` sort=${sort.replace(/, /g, ",")}` : ""}${body ? ` body=${body}` : ""}`);
       }
     }
     const actual = `${lines.join("\n")}\n`;

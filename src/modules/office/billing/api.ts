@@ -330,7 +330,7 @@ const documentEndpoints = defineResource({
     },
     {
       name: "send",
-      summary: "Send the document by e-mail to the customer's address (PDF, optionally the XRechnung XML). Needs billing.send (never in a default role) and an e-mail setup; sending again needs resend=true",
+      summary: "Send the document by e-mail to the customer's address (PDF, optionally the XRechnung XML). Sending needs mail.send in addition to billing.send; mail.send is a platform permission that no token can carry, so this endpoint always answers 403 for tokens – send from the web interface",
       permission: "billing.send",
       operation: sendDocumentOperation,
       body: z.strictObject({ includeXml: z.boolean().optional(), resend: z.boolean().optional() }),

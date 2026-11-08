@@ -11,7 +11,7 @@ export const apiDocument = (activeFeatures: ReadonlySet<string>) => buildOpenApi
 
 /** Rechte, die ein Endpunkt aktiver Funktionen verlangt und die ein Token tragen darf – die Auswahl bei der Token-Erzeugung (nur, was die Schnittstelle auch nutzt). */
 export function apiGrantablePermissions(activeFeatures: ReadonlySet<string>): string[] {
-  return [...new Set(apiEndpoints.filter((e) => activeFeatures.has(e.feature)).map((e) => e.permission as string))].filter((p) => !isApiForbidden(p));
+  return [...new Set(apiEndpoints.filter((e) => activeFeatures.has(e.feature)).flatMap((e) => [e.permission as string, ...((e.alsoRequires ?? []) as readonly string[])]))].filter((p) => !isApiForbidden(p));
 }
 
 /** Pfade der Ressourcen (erstes Segment, z. B. `orders`) – für Prüfungen, dass Webhook-Ereignisse auf eine echte Ressource zeigen. */

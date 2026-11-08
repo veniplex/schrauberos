@@ -64,12 +64,13 @@ before(async () => {
     const mod = (await import(specOf(file))) as Record<string, unknown>;
     for (const value of Object.values(mod)) if (typeof value === "function" && "operation" in value) actions.push(value as Action);
   }
-  const routeFiles = walk(path.join(SRC, "app", "api"), (n) => n === "route.ts");
+  // alle Route Handler unter src/app, auch außerhalb von app/api (OpenAPI-Dokument der Verwaltung, Offline-Seite); Routengruppen wie „(app)“ gehören nicht zur Adresse
+  const routeFiles = walk(path.join(SRC, "app"), (n) => n === "route.ts");
   routes = [];
   for (const file of routeFiles) {
     const mod = (await import(specOf(file))) as Record<string, unknown>;
     const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"].filter((m) => typeof mod[m] === "function").map((m) => [m, mod[m]] as never);
-    const url = `/${path.relative(SRC, path.dirname(file)).split(path.sep).join("/").replace(/\[\w+\]/g, "x")}`;
+    const url = `/${path.relative(SRC, path.dirname(file)).split(path.sep).join("/").replace(/\[(?:\.\.\.)?\w+\]/g, "x").replace(/\(\w+\)\//g, "")}`;
     routes.push({ file: path.relative(SRC, file).split(path.sep).join("/"), url, methods });
   }
 });
@@ -213,12 +214,13 @@ describe("Berechtigungs-Matrix: Server Actions", () => {
 describe("Berechtigungs-Matrix: Route Handler", () => {
   // Ohne Anmeldung erreichbar (Liveness für Docker/Launcher; das Logo für die Anmeldeseite); alles andere verlangt Sitzung und Recht
   // Wiederherstellung in der Einrichtung: eigene Prüfung (Einrichtungs-Token, nur ohne Benutzer) – siehe der Test darunter und `src/app/api/setup/restore/route.test.ts`
-  const PUBLIC = new Set(["app/api/health/route.ts", "app/api/setup/restore/route.ts", "app/api/logo/route.ts"]);
+  const PUBLIC = new Set(["app/api/health/route.ts", "app/api/setup/restore/route.ts", "app/api/logo/route.ts", "app/offline/route.ts"]);
   // Programmierschnittstelle: authentifiziert nur über Bearer-Token und ignoriert das Sitzungs-Cookie vollständig (eigene Matrix: server/api/matrix.test.ts)
   // Kalender-Abo: nur das Token in der Adresse zählt, kein Cookie (Lebenszyklus, 401-Gleichheit, Rechte: appointments/feed.test.ts)
   const TOKEN_ONLY = new Set(["app/api/v1/[...path]/route.ts", "app/api/ical/[file]/route.ts"]);
   const call = (route: (typeof routes)[number], method: string, handler: (typeof routes)[number]["methods"][number][1]) =>
-    handler(new NextRequest(`http://localhost${route.url}`, { method }), { params: Promise.resolve({ id: "x", name: "x", file: "x" }) });
+    // Header der Upload-Routen gegen Fremdaufrufe (`isSameOriginUpload`): gesetzt, damit die Probe das **Recht** prüft und nicht an der Herkunftsprüfung scheitert
+    handler(new NextRequest(`http://localhost${route.url}`, { method, headers: { "x-requested-with": "schrauberos" } }), { params: Promise.resolve({ id: "x", name: "x", file: "x" }) });
 
   it("findet die Route Handler (kein leerer Lauf)", () => {
     assert.ok(routes.length >= 8, `nur ${routes.length} Routen gefunden`);
@@ -261,5 +263,105 @@ describe("Berechtigungs-Matrix: Route Handler", () => {
         assert.ok(status >= 400 && status < 500 && status !== 401, `${method} ${route.url}: erwartet 4xx (Recht fehlt), war ${status}`);
       }
     }
+  });
+
+  /**
+   * Das Recht je Route (Z6-1 L4): `all` = jedes dieser Rechte ist nötig, `any` = eines genügt. Die Tabelle ist die **unabhängige** Gegenprobe zum Quelltext der Route: Wer das falsche Recht prüft (etwa
+   * `customers.view` statt `billing.view`), fällt hier auf, weil die Probe alle Rechte *außer* dem erforderlichen vergibt und genau 403 verlangt. Eine neue Route muss hier (oder in `SPECIAL`) eingetragen werden.
+   */
+  const NEEDS: Record<string, { all?: string[]; any?: string[]; /** Funktion, deren Abschalten die Route sperrt (Standard: die des ersten Rechts) */ feature?: string }> = {
+    "app/(app)/(admin)/admin/api/openapi.json/route.ts": { all: ["api.manage"] },
+    "app/api/appointments/[id]/slip/route.ts": { all: ["appointments.view"] },
+    "app/api/appointments/hints/route.ts": { any: ["appointments.create", "appointments.edit"] },
+    "app/api/backups/[name]/route.ts": { all: ["backup.manage"] },
+    "app/api/backups/status/route.ts": { all: ["backup.manage"] },
+    "app/api/billing/[id]/pdf/route.ts": { all: ["billing.view"] },
+    "app/api/billing/[id]/xml/route.ts": { all: ["billing.view"] },
+    "app/api/billing/deductions/route.ts": { all: ["billing.edit"] },
+    "app/api/checklists/[id]/signature/route.ts": { all: ["checklists.view"] },
+    "app/api/customers/[id]/disclosure/route.ts": { all: ["customers.disclose", "customers.view"] },
+    "app/api/customers/search/route.ts": { any: ["customers.view", "customers.edit", "invoices.edit", "billing.edit"], feature: "workshop.customers" },
+    "app/api/employees/absence-hints/route.ts": { all: ["employees.edit"] },
+    "app/api/files/[id]/route.ts": { all: ["files.view"] },
+    "app/api/files/route.ts": { all: ["files.upload"] },
+    "app/api/backups/upload/route.ts": { all: ["backup.manage"] },
+    "app/api/docs/images/route.ts": { any: ["handbook.edit", "docsIt.edit"], feature: "" }, // zwei Funktionen: das Abschalten nur einer sperrt die Route nicht
+    "app/api/invoices/[id]/file/route.ts": { all: ["invoices.view"] },
+    "app/api/invoices/e-invoice/route.ts": { all: ["invoices.edit"] },
+    "app/api/orders/[id]/card/route.ts": { all: ["orders.view"] },
+    "app/api/orders/approvals/[id]/signature/route.ts": { all: ["orders.view", "orders.prices"] },
+    "app/api/parts/search/route.ts": { all: ["parts.view"] },
+    "app/api/tires/[id]/label/route.ts": { all: ["tires.view"] },
+    "app/api/updates/status/route.ts": { all: ["updates.manage"] },
+    "app/api/vehicles/search/route.ts": { any: ["appointments.create", "appointments.edit", "tires.create", "tires.edit", "vehicles.view", "billing.edit"], feature: "workshop.vehicles" },
+
+  };
+  /** Routen, deren Recht von Daten abhängt (Bereich des Bildes, Datenart, Suchanbieter): eigene Tests, hier nur die gemeinsamen Proben. */
+  const SPECIAL = new Set([
+    "app/api/docs/images/[id]/route.ts", // Bereich des Bildes (handbook/it) bestimmt das Leserecht
+    "app/api/exchange/[kind]/route.ts", // Recht je Datenart (`<funktion>.export`)
+    "app/api/exchange/[kind]/import/route.ts", // Recht je Datenart (`<funktion>.import`)
+    "app/api/search/route.ts", // Rechte der Suchanbieter
+  ]);
+
+  it("jede Route ist eingeordnet: öffentlich, nur Token, mit festem Recht oder besonders (neue Routen müssen eingetragen werden)", () => {
+    const unclassified = routes.filter((r) => !PUBLIC.has(r.file) && !TOKEN_ONLY.has(r.file) && !(r.file in NEEDS) && !SPECIAL.has(r.file)).map((r) => r.file);
+    assert.deepEqual(unclassified, []);
+    const stale = [...Object.keys(NEEDS), ...SPECIAL].filter((file) => !routes.some((r) => r.file === file));
+    assert.deepEqual(stale, [], "Einträge ohne Route");
+  });
+
+  it("mit allen Rechten außer dem erforderlichen: genau 403 (nicht 404, nicht 2xx) – und mit dem Recht nicht 401/403", async () => {
+    for (const route of routes) {
+      const needs = NEEDS[route.file];
+      if (!needs) continue;
+      const required = needs.all ?? needs.any ?? [];
+      // „all“: jedes Recht einzeln weglassen; „any“: alle weglassen
+      const withheld = needs.all ? needs.all.map((p) => [p]) : [required];
+      for (const missing of withheld) {
+        await signInAs({ permissions: ALL_PERMISSIONS.filter((p) => !missing.includes(p)) });
+        for (const [method, handler] of route.methods) assert.equal((await call(route, method, handler)).status, 403, `${method} ${route.url} ohne ${missing.join("+")}`);
+      }
+      // Gegenprobe: mit genau dem Recht wird nicht an der Berechtigung abgewiesen (404/400 für die erfundene Kennung sind in Ordnung)
+      await signInAs({ permissions: needs.all ?? [required[0]!] });
+      for (const [method, handler] of route.methods) {
+        const status = (await call(route, method, handler)).status;
+        assert.ok(status !== 401 && status !== 403, `${method} ${route.url}: mit dem erforderlichen Recht fälschlich abgewiesen (${status})`);
+      }
+    }
+  });
+
+  it("Pflicht-2FA ohne eingerichteten zweiten Faktor (auch als Administrator): 401 auf jeder geschützten Route", async () => {
+    await env.db.appSetting.upsert({ where: { key: "auth.require2faAdmins" }, update: { value: "true" }, create: { key: "auth.require2faAdmins", value: "true" } });
+    try {
+      await signInAs({ admin: true });
+      for (const route of routes) {
+        if (PUBLIC.has(route.file) || TOKEN_ONLY.has(route.file)) continue;
+        for (const [method, handler] of route.methods) assert.equal((await call(route, method, handler)).status, 401, `${method} ${route.url}`);
+      }
+    } finally {
+      await env.db.appSetting.deleteMany({ where: { key: "auth.require2faAdmins" } });
+    }
+  });
+
+  it("ausgeschaltete Funktion: die Route antwortet auch mit dem Recht (Administrator) mit 403 oder 404", async () => {
+    let tested = 0;
+    for (const route of routes) {
+      const needs = NEEDS[route.file];
+      if (!needs || needs.feature === "") continue;
+      const featureId = needs.feature ?? featureOfPermission((needs.all ?? needs.any)![0]!);
+      const feature = FEATURES.find((f) => `${f.module}.${f.id}` === featureId);
+      if (!feature || ("required" in feature && feature.required)) continue; // Verwaltung ist Plattform und nie abschaltbar
+      await env.db.featureSetting.upsert({ where: { key: featureId! }, update: { enabled: false }, create: { key: featureId!, enabled: false } });
+      await signInAs({ admin: true });
+      for (const [method, handler] of route.methods) {
+        const status = (await call(route, method, handler)).status;
+        assert.ok(status === 403 || status === 404, `${method} ${route.url} (${featureId} aus): erwartet 403/404, war ${status}`);
+      }
+      await env.db.featureSetting.deleteMany();
+      await enableDefaultOff();
+      tested++;
+    }
+    assert.ok(tested > 10, `nur ${tested} Routen geprüft`);
   });
 });

@@ -139,6 +139,26 @@ describe("API: Registrierung und Ausnahmeliste", () => {
     assert.deepEqual(problems, []);
   });
 
+  /**
+   * Endpunktrecht = Operationsrecht (Z6-1 L7): Die OpenAPI-Beschreibung und die Rechteauswahl für Tokens nennen das Recht des Endpunkts; verlangte die Operation ein anderes, sähe ein Token einen Endpunkt als
+   * erlaubt, der erst in der Operation mit 403 scheitert. Abweichungen nur hier, mit Begründung: Der Endpunkt darf **mehr** verlangen als die Operation, wenn deren Innenprüfung datenabhängig ist.
+   */
+  const ENDPOINT_RIGHT_EXCEPTIONS: Record<string, string> = {};
+
+  it("das Recht eines Endpunkts ist das Recht seiner Operation (Ausnahmen mit Begründung)", () => {
+    const differing: string[] = [];
+    for (const e of endpoints) {
+      for (const name of e.operations) {
+        const op = operations.get(name);
+        if (!op || op.permission === "authenticated" || op.permission === e.permission) continue;
+        if (ENDPOINT_RIGHT_EXCEPTIONS[e.operationId]) continue;
+        differing.push(`${e.operationId}: Endpunkt ${e.permission}, Operation ${name} ${op.permission}`);
+      }
+    }
+    assert.deepEqual(differing, []);
+    for (const [id, reason] of Object.entries(ENDPOINT_RIGHT_EXCEPTIONS)) assert.ok(endpoints.some((e) => e.operationId === id) && reason.length >= 30, `${id}: Eintrag veraltet oder ohne Begründung`);
+  });
+
   it("jeder Endpunkt, der Operationen nennt, nennt nur bekannte", () => {
     for (const e of endpoints) for (const name of e.operations) assert.ok(operations.has(name), `${e.operationId}: Operation ${name} unbekannt`);
   });

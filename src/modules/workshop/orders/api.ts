@@ -164,8 +164,9 @@ export const orderEndpoints = defineResource({
     },
     {
       name: "items",
-      summary: "Replace all positions of an open order (needs orders.prices; send the current ETag in If-Match)",
-      permission: "orders.prices",
+      summary: "Replace all positions of an open order (needs orders.edit and orders.prices; send the current ETag in If-Match)",
+      permission: "orders.edit",
+      alsoRequires: ["orders.prices"],
       operation: saveItemsOperation,
       body: z.strictObject({ items: z.array(lineBody).max(200) }),
       ifMatch: true,
@@ -269,7 +270,8 @@ export const approvalEndpoints = defineResource({
     defaultSort: [{ key: "createdAt", dir: "asc" }],
   },
   create: {
-    permission: "orders.prices",
+    permission: "orders.edit",
+    alsoRequires: ["orders.prices"],
     operation: approveOperation,
     body: z.strictObject({
       orderId: requiredRef,
