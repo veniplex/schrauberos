@@ -6,7 +6,7 @@ import { noon, todayInput } from "@/lib/dates";
 import { logError } from "@/lib/log-safe";
 import { searchKey } from "@/lib/search-key";
 import { dateText, moneyCents } from "@/lib/zod-fields";
-import { lineItemsInput } from "@/lib/line-items";
+import { lineItemsInput } from "@/lib/line-items-schema";
 import { appendOrderItems, createOrderInTx, orderForBilling } from "@/modules/workshop/orders/public";
 import { NumberExhaustedError, allocateDocumentNumber } from "@/server/invoice-numbering";
 import { mailConfigured, queueMail } from "@/server/mail";

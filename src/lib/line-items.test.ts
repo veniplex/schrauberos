@@ -9,7 +9,6 @@ import {
   evaluateRow,
   evaluateRows,
   lineExceedsLimit,
-  lineItemsInput,
   lineResult,
   mulDiv,
   parseDraft,
@@ -22,6 +21,7 @@ import {
   serializeSubmit,
   type ParsedLine,
 } from "./line-items";
+import { lineItemsInput } from "./line-items-schema";
 
 const line = (quantityMilli: number, unitCents: number, taxBp = 1900, discountBp = 0): ParsedLine => ({ quantityMilli, unitCents, taxBp, discountBp });
 

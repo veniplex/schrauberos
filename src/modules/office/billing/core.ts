@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { Workshop } from "@/generated/prisma/client";
-import { computeTotals, type lineItemsSchema, type Totals } from "@/lib/line-items";
+import { computeTotals, type Totals } from "@/lib/line-items";
+import type { lineItemsSchema } from "@/lib/line-items-schema";
 import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { fail, failField, type Tx } from "@/server/operations";
 import { ALLOWED_TAX_BP, ITEM_KINDS } from "./constants";
