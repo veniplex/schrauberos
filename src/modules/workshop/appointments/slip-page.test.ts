@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createElement, type ReactNode } from "react";
+import { resetWorkshopZone, setWorkshopZone } from "@/lib/zone";
 import { installDom, mount, type MountedView, type TestDom } from "@/test/dom";
 import { createTestEnv, isNotFound, type TestEnv } from "@/test/harness";
 import { resolveServerTree } from "@/test/server-tree";
@@ -26,6 +27,8 @@ async function render(node: ReactNode) {
 }
 
 before(async () => {
+  // Die Erwartungen (09:00 Uhr für 08:00 UTC) gelten in der Zone der Werkstatt Europe/Berlin – nicht in der des Prozesses (CI und Container laufen in UTC)
+  setWorkshopZone("Europe/Berlin");
   dom = installDom();
   env = await createTestEnv();
   const owner = await env.db.customer.create({ data: { firstName: "Erika", lastName: "Muster", phone: "0151 123456", nameKey: "erika muster" } });
@@ -38,6 +41,7 @@ before(async () => {
   };
 });
 after(async () => {
+  resetWorkshopZone();
   await view?.unmount();
   await dom.close();
   await env.cleanup();

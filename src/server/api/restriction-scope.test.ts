@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { resetWorkshopZone, setWorkshopZone } from "@/lib/zone";
 import { ALL_PERMISSIONS } from "@/modules/catalog";
 import { apiRequest, makeToken } from "@/test/api-helpers";
 import { createTestEnv, type TestEnv } from "@/test/harness";
@@ -22,6 +23,8 @@ const call = async (method: string, path: string) => {
 const listIds = async (path: string): Promise<string[]> => ((await call("GET", path)).json.data as Array<{ id: string }>).map((row) => row.id);
 
 before(async () => {
+  // Termine werden um 09:15 „Ortszeit der Werkstatt“ gebucht (Doppelbelegung gegen 08:00 UTC): Zone ausdrücklich Europe/Berlin, nicht die des Prozesses (CI läuft in UTC)
+  setWorkshopZone("Europe/Berlin");
   env = await createTestEnv();
   const { FEATURES } = await import("@/modules/catalog");
   for (const f of FEATURES) await env.db.featureSetting.upsert({ where: { key: `${f.module}.${f.id}` }, update: { enabled: true }, create: { key: `${f.module}.${f.id}`, enabled: true, updatedByName: "Test" } });
@@ -71,7 +74,10 @@ before(async () => {
   await move("MA", ids.OA, "geheime Notiz zum Auftrag");
   await move("MK", ids.OK, "Kontrolle");
 });
-after(() => env.cleanup());
+after(async () => {
+  resetWorkshopZone();
+  await env.cleanup();
+});
 
 describe("Aufträge: Kunde und Fahrzeughalter zählen", () => {
   it("Aufträge am Fahrzeug von C (ohne Kunden oder mit unbeschränktem Kunden) und Aufträge von C: nicht in der Liste, einzeln 404; die Kontrolle bleibt", async () => {
