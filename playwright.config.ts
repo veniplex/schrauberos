@@ -18,7 +18,9 @@ export default defineConfig({
   fullyParallel: true,
   // 1 500 Tests in vier Größen: lokal sechs Worker (rund 10 Minuten), in der Pipeline drei (GitHub-Runner haben vier Kerne)
   workers: 3,
+  // Ein Wiederholungsversuch fängt in der Pipeline einen Ausreißer ab, aber ein Test, der erst beim zweiten Mal besteht, ist „flaky“ – das färbt den Lauf rot (Z6-4 M-5) und wird nicht stillschweigend grün.
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   globalSetup: "./e2e/global-setup.ts",

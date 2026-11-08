@@ -151,7 +151,8 @@ test("IT-Tresor: Eintrag anlegen, Zugangsdaten nie in Liste und Seite, Anzeige n
   await expect(page.locator("a:visible", { hasText: title }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText(secretText);
 
-  // Anzeige mit dem richtigen Passwort zeigt die Werte
+  // Anzeige mit dem richtigen Passwort zeigt die Werte. Die Uhr des Browsers läuft ab hier unter Kontrolle (Z6-4 L-4): „nach 30 Sekunden wieder verborgen“ wird vorgespult statt abgewartet
+  await page.clock.install();
   await page.goto(detailUrl);
   await page.getByRole("textbox", { name: "Passwort" }).first().fill(TEST_PASSWORD);
   await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
@@ -163,7 +164,7 @@ test("IT-Tresor: Eintrag anlegen, Zugangsdaten nie in Liste und Seite, Anzeige n
   await expect(masked).toHaveValue(secretText);
 
   // nach 30 Sekunden sind die Werte wieder verborgen (Uhr des Browsers vorspulen statt zu warten)
-  await page.waitForTimeout(31_000);
+  await page.clock.fastForward(31_000);
   await expect(page.getByText("admin-e2e")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(secretText);
   await expect(page.getByText("Die Zugangsdaten sind wieder verborgen.")).toBeVisible();
