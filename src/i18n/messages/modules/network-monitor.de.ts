@@ -27,6 +27,7 @@ export const networkMonitorDe = {
   switchOn: "Eingeschaltet – die Ziele werden regelmäßig geprüft.",
   switchOff: "Ausgeschaltet – es wird nichts geprüft; alle Status bleiben „unbekannt“.",
   turnOff: "Ausschalten",
+  turnOffConfirm: "Es wird danach nichts mehr geprüft, und alle Status der Geräte und Ziele werden „unbekannt“. Der Verlauf bleibt erhalten.",
   notConfigured: "Überwachung nicht eingerichtet",
   noTargets: "Noch keine Überwachungsziele.",
   noTargetsHint: "Ein Ziel prüft, ob ein Gerät oder Dienst auf einer Adresse und einem Port antwortet.",

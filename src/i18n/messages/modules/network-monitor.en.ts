@@ -28,6 +28,7 @@ export const networkMonitorEn: typeof networkMonitorDe = {
   switchOn: "Switched on – the targets are checked regularly.",
   switchOff: "Switched off – nothing is checked; every status stays “unknown”.",
   turnOff: "Switch off",
+  turnOffConfirm: "Afterwards nothing is checked any more, and the status of all devices and targets becomes “unknown”. The history is kept.",
   notConfigured: "Monitoring not set up",
   noTargets: "No monitoring targets yet.",
   noTargetsHint: "A target checks whether a device or service answers on an address and port.",

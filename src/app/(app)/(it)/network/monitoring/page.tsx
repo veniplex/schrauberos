@@ -58,7 +58,7 @@ export default async function MonitoringPage() {
                 <SubmitSwitch
                   checked={enabled}
                   label={t("network.monitor.switchTitle")}
-                  confirm={{ title: `${t("network.monitor.turnOff")}?`, message: t("network.monitor.switchOff"), confirmLabel: t("network.monitor.turnOff") }}
+                  confirm={{ title: `${t("network.monitor.turnOff")}?`, message: t("network.monitor.turnOffConfirm"), confirmLabel: t("network.monitor.turnOff") }}
                 />
               </form>
             ) : null}

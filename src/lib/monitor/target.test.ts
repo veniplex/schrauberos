@@ -57,6 +57,11 @@ describe("Zielsperre (Eingabe)", () => {
     }
   });
 
+  it("die Namen des Docker-Hosts sind wie localhost gesperrt (die Adresse dahinter sperrt das Host-Gateway beim Speichern und Verbinden)", () => {
+    for (const host of ["host.docker.internal", "HOST.DOCKER.INTERNAL", "host.docker.internal.", "gateway.docker.internal", "host.containers.internal", "host.lima.internal"]) assert.equal(check({ host }), "host:forbiddenHost", host);
+    assert.equal(check({ host: "docker.internal.example" }), "ok", "ein ähnlicher, anderer Name bleibt erlaubt");
+  });
+
   it("das interne Netz ist erlaubt: RFC 1918, Carrier-NAT, ULA, öffentliche Adressen und Namen", () => {
     for (const host of ["10.0.0.5", "172.16.0.1", "172.31.255.254", "192.168.10.1", "100.64.0.1", "fd12:3456::1", "[fc00::1]", "8.8.8.8", "2001:4860:4860::8888", "nas.firma.example", "NAS.Firma.Example.", "sw-core-01"]) {
       assert.equal(check({ host }), "ok", host);
