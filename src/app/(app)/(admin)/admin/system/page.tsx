@@ -49,7 +49,7 @@ export default async function SystemPage() {
   const runner = jobRunner().status();
   const problems = evaluateSystem({
     now: new Date(),
-    jobs: jobs.map((j) => ({ id: j.id, active: !j.feature || active.has(j.feature), failures: j.failures, lastStatus: j.lastStatus, nextRunAt: j.nextRunAt, lockedUntil: j.lockedUntil })),
+    jobs: jobs.map((j) => ({ id: j.id, active: !j.feature || active.has(j.feature), failures: j.failures, lastStatus: j.lastStatus, nextRunAt: j.nextRunAt, lockedUntil: j.lockedUntil, idle: j.idle })),
     outboxFailed: failed,
     webhookDeadLetters: webhooks.deadLetters,
     webhooksDisabled: webhooks.disabledByApp,
@@ -214,7 +214,7 @@ export default async function SystemPage() {
                 header: t("system.jobs.cols.next"),
                 cell: (j) => {
                   const inactive = !!j.feature && !active.has(j.feature);
-                  return <span className="tabular text-ink-muted">{inactive ? t("system.jobs.inactive") : j.nextRunAt ? when(j.nextRunAt) : "–"}</span>;
+                  return <span className="tabular text-ink-muted">{inactive ? t("system.jobs.inactive") : j.idle ? t("system.jobs.idle") : j.nextRunAt ? when(j.nextRunAt) : "–"}</span>;
                 },
               },
               { id: "failures", header: t("system.jobs.cols.failures"), align: "end", cell: (j) => (j.failures > 0 ? <StatusBadge tone="danger">{j.failures}</StatusBadge> : "0") },

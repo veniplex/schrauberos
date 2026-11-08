@@ -64,6 +64,7 @@ export const systemEn: typeof systemDe = {
     never: "never",
     running: "running now",
     inactive: "paused (feature switched off)",
+    idle: "waiting for work (nothing to do)",
     empty: "No jobs registered.",
   },
   schedule: {

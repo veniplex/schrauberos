@@ -630,6 +630,18 @@ describe("Aufräumen der Ergebnisse", () => {
     await env.db.jobRun.create({ data: { jobId: "backup.auto", status: "ok", message: "m" } });
     assert.equal((await status.recentJobRuns(5))[0].jobId, "backup.auto");
   });
+
+  it("ein fälliger Job, dessen Vorabprüfung „nichts zu tun“ sagt, ist ruhend (idle) und kein Rückstand – mit Arbeit nicht", async () => {
+    const past = new Date(Date.now() - 20 * 60_000);
+    await env.db.jobState.upsert({ where: { id: "platform.outbox" }, create: { id: "platform.outbox", nextRunAt: past }, update: { nextRunAt: past, lockedUntil: null } });
+    await env.db.outboxEvent.deleteMany({});
+    const idle = (await status.jobStatusRows()).find((r) => r.id === "platform.outbox");
+    assert.equal(idle?.idle, true, "nichts zuzustellen: wartet auf Arbeit");
+    await env.db.outboxEvent.create({ data: { type: "t.pending", entityId: "e1", payload: "{}", availableAt: new Date("2000-01-01T00:00:00Z") } });
+    const busy = (await status.jobStatusRows()).find((r) => r.id === "platform.outbox");
+    assert.equal(busy?.idle, false, "es gibt etwas zuzustellen: ein echter Rückstand bleibt sichtbar");
+    await env.db.outboxEvent.deleteMany({});
+  });
 });
 
 describe("Nur Auffälliges wird festgehalten, Vorabprüfung, Sperre bei Fehlern", () => {

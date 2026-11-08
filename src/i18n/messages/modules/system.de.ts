@@ -62,6 +62,7 @@ export const systemDe = {
     never: "noch nie",
     running: "läuft gerade",
     inactive: "ruht (Funktion ausgeschaltet)",
+    idle: "wartet auf Arbeit (nichts zu tun)",
     empty: "Keine Aufgaben angemeldet.",
   },
   schedule: {

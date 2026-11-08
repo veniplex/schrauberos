@@ -20,6 +20,7 @@ describe("Bewertung des Systemstatus", () => {
     assert.deepEqual(evaluate([], { outboxFailed: 2 }), [{ code: "outboxFailed", count: 2 }]);
     assert.deepEqual(evaluate([job({ nextRunAt: ago(OVERDUE_MS + 1) })]), [{ code: "overdue", jobId: "test.job" }]);
     assert.deepEqual(evaluate([job({ nextRunAt: ago(OVERDUE_MS - 1000) })]), [], "knapp noch im Rahmen");
+    assert.deepEqual(evaluate([job({ nextRunAt: ago(OVERDUE_MS + 1), idle: true })]), [], "fällig, aber die Vorabprüfung meldet nichts zu tun: wartet auf Arbeit, kein Rückstand");
     assert.deepEqual(evaluate([job({ nextRunAt: ago(OVERDUE_MS + 1), lockedUntil: new Date(now.getTime() + 60_000) })]), [], "läuft gerade: nicht überfällig");
     assert.deepEqual(evaluate([job({ nextRunAt: ago(OVERDUE_MS + 1), lockedUntil: ago(1000) })]), [{ code: "stuck", jobId: "test.job" }], "Sperre abgelaufen, Lauf nie beendet");
     assert.deepEqual(evaluate([job({ lastStatus: "interrupted" })]), [{ code: "interrupted", jobId: "test.job" }]);

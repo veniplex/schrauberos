@@ -14,6 +14,8 @@ export type JobHealthInput = {
   lastStatus: string | null;
   nextRunAt: Date | null;
   lockedUntil: Date | null;
+  /** Fällig, aber die Vorabprüfung des Jobs sagt „nichts zu tun“ (`JobStatusRow.idle`): kein Rückstand. */
+  idle?: boolean;
 };
 
 /** Platz auf dem Datenträger des Datenverzeichnisses (`null`: das Dateisystem meldet ihn nicht – dann gibt es nichts zu bewerten). */
@@ -86,7 +88,7 @@ export function evaluateSystem(input: {
     if (job.failures > 0) problems.push({ code: "failing", jobId: job.id, failures: job.failures });
     const lockExpired = job.lockedUntil !== null && job.lockedUntil.getTime() < now;
     if (lockExpired) problems.push({ code: "stuck", jobId: job.id });
-    else if (ticking && job.lockedUntil === null && job.nextRunAt && now - job.nextRunAt.getTime() > OVERDUE_MS) problems.push({ code: "overdue", jobId: job.id });
+    else if (ticking && !job.idle && job.lockedUntil === null && job.nextRunAt && now - job.nextRunAt.getTime() > OVERDUE_MS) problems.push({ code: "overdue", jobId: job.id });
     if (job.lastStatus === "interrupted" && job.failures === 0 && !lockExpired) problems.push({ code: "interrupted", jobId: job.id });
   }
   if (input.outboxFailed > 0) problems.push({ code: "outboxFailed", count: input.outboxFailed });
