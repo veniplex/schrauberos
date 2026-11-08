@@ -93,7 +93,25 @@ describe("Migrations-Läufer", () => {
     for (const m of listMigrations()) assert.equal(rows.find((r) => r.name === m.name)?.checksum, m.checksum);
 
     // Die Prisma-CLI selbst akzeptiert den Stand (Exit-Code 0 = keine offenen und keine abweichenden Migrationen) …
-    const status = (url: string) => execFileSync(process.execPath, [path.resolve("node_modules/prisma/build/index.js"), "migrate", "status"], { env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
+    // Die CLI läuft im Projektordner (Schema, Konfiguration) ohne Telemetrie-/Update-Abfrage. **Ein** Wiederholungsversuch, und zwar nur bei der einen bekannten, unter Last auftretenden Fehlermeldung der
+    // Schema-Engine („input contains invalid characters“, im Gesamtlauf unter Last in 1 von 3 Läufen (Block 13c, Linux-Container), allein nie; unter Windows auch mit acht parallelen Läufen nicht reproduzierbar): sie
+    // stammt aus dem Parser der CLI und nicht aus unserer Migrationshistorie, die der Test prüft. Jeder andere Fehler – und der zweite Fehlschlag – bricht ab, mit der Ausgabe der CLI.
+    const run = (url: string) =>
+      execFileSync(process.execPath, [path.resolve("node_modules/prisma/build/index.js"), "migrate", "status"], {
+        cwd: path.resolve("."),
+        env: { ...process.env, DATABASE_URL: url, CHECKPOINT_DISABLE: "1", PRISMA_HIDE_UPDATE_MESSAGE: "1" },
+        stdio: "pipe",
+        timeout: 60_000,
+      });
+    const status = (url: string) => {
+      try {
+        return run(url);
+      } catch (error) {
+        const output = `${(error as { stdout?: Buffer }).stdout ?? ""}${(error as { stderr?: Buffer }).stderr ?? ""}`;
+        if (!/input contains invalid characters/.test(output)) throw Object.assign(error as Error, { message: `${(error as Error).message}\n${output}` });
+        return run(url);
+      }
+    };
     assert.doesNotThrow(() => status(`file:${file}`));
     // … und meldet bei einer nicht migrierten Datenbank einen Fehler (Gegenprobe, damit die Prüfung aussagekräftig ist)
     assert.throws(() => status(`file:${path.join(root, "leer.db")}`));

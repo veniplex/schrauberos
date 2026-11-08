@@ -25,18 +25,23 @@ test("Wartezustand: der Auslöser eines Dialogs zeigt ein Lade-Symbol ohne Layou
     await new Promise((resolve) => setTimeout(resolve, 1500));
     await route.continue();
   });
-  const trigger = page.locator('a[href*="new=1"]').first();
+  // Nur ein sichtbarer Auslöser zählt (ein Link im geschlossenen Menü hat keine Fläche, `boundingBox()` wäre `null`); gemessen wird mit `getBoundingClientRect` im Seitenkontext, das auch dann
+  // eine Antwort gibt, wenn der Link beim Messen gerade ersetzt wird (langsame Läufe im Container: der Dialog kann schon offen sein)
+  const trigger = page.locator('a[href*="new=1"]:visible').first();
+  await expect(trigger).toBeVisible();
+  const size = () => trigger.evaluate((el) => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
   // die Ansage der Navigation (die Schnellsuche und das Seitenfach haben eigene Regionen ohne `no-print`)
   const live = page.locator("div[role='status'].sr-only.no-print");
   await expect(live, "die Live-Region ist schon vor dem Laden da und leer").toHaveText("");
-  const idle = await trigger.boundingBox();
+  const idle = await size();
+  expect(idle.width, "der Auslöser hat vor dem Klick eine Fläche").toBeGreaterThan(0);
   await trigger.click();
   await expect(page.locator(".nav-progress")).toBeVisible();
   await expect(trigger.locator("svg.animate-spin")).toBeVisible();
   await expect(live).toHaveText(/Wird geladen/);
-  const pending = await trigger.boundingBox();
-  expect(pending?.width, "Breite des Auslösers ändert sich beim Warten nicht").toBeCloseTo(idle!.width, 0);
-  expect(pending?.height, "Höhe des Auslösers ändert sich beim Warten nicht").toBeCloseTo(idle!.height, 0);
+  const pending = await size();
+  expect(pending.width, "Breite des Auslösers ändert sich beim Warten nicht").toBeCloseTo(idle.width, 0);
+  expect(pending.height, "Höhe des Auslösers ändert sich beim Warten nicht").toBeCloseTo(idle.height, 0);
   await expect(page.locator("dialog[open]")).toBeVisible();
   await expect(page.locator(".nav-progress")).toHaveCount(0);
   await expect(live).toHaveText("");
