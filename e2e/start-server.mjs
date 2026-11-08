@@ -18,7 +18,7 @@ mkdirSync(dataDir, { recursive: true });
 const child = spawn(process.execPath, [join(root, "node_modules", "next", "dist", "bin", "next"), "start", "-p", port, "-H", "127.0.0.1"], {
   cwd: root,
   stdio: "inherit",
-  env: { ...process.env, NODE_ENV: "production", DATA_DIR: dataDir, DATABASE_URL: `file:${join(dataDir, "schrauberos.db")}`, TZ: "Europe/Berlin", NEXT_TELEMETRY_DISABLED: "1", SCHRAUBEROS_E2E: "1" },
+  env: { ...process.env, NODE_ENV: "production", DATA_DIR: dataDir, DATABASE_URL: `file:${join(dataDir, "schrauberos.db")}`, TZ: "Europe/Berlin", NEXT_TELEMETRY_DISABLED: "1", SCHRAUBEROS_E2E: "1", NODE_TEST_CONTEXT: "child" },
 });
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
 child.on("exit", (code) => process.exit(code ?? 0));

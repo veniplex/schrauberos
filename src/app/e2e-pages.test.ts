@@ -23,7 +23,7 @@ const props = (state: string) => ({ params: Promise.resolve({ state }) });
 describe("Testseiten der Browser-CI", () => {
   it("ohne Testmodus antworten sie wie jede unbekannte Adresse (404)", async () => {
     delete process.env.SCHRAUBEROS_E2E;
-    for (const state of ["error", "reinstall", "x"]) {
+    for (const state of ["error", "reinstall", "loopback", "x"]) {
       assert.equal(await isNotFound(() => inApp(props(state))), true, `(app)/${state}`);
       assert.equal(await isNotFound(() => outside(props(state))), true, `fault/${state}`);
     }
@@ -38,5 +38,19 @@ describe("Testseiten der Browser-CI", () => {
     assert.ok(await outside(props("reinstall")), "Hinweis „Neuinstallation nötig“");
     assert.equal(await isNotFound(() => inApp(props("reinstall"))), true);
     assert.equal(await isNotFound(() => outside(props("gibts-nicht"))), true);
+  });
+
+  it("`loopback` erlaubt der Zielsperre den eigenen Rechner – nur mit Testmodus", async () => {
+    const { offsiteNetwork } = await import("@/lib/offsite/host-policy");
+    try {
+      delete process.env.SCHRAUBEROS_E2E;
+      assert.equal(await isNotFound(() => outside(props("loopback"))), true);
+      assert.equal(offsiteNetwork.allowLoopback, false, "ohne Testmodus bleibt die Sperre");
+      process.env.SCHRAUBEROS_E2E = "1";
+      assert.ok(await outside(props("loopback")));
+      assert.equal(offsiteNetwork.allowLoopback, true);
+    } finally {
+      offsiteNetwork.allowLoopback = false;
+    }
   });
 });

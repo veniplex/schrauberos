@@ -14,7 +14,9 @@ import { networkInterfaces } from "node:os";
  *  - Namen werden **aufgelöst und alle Antworten geprüft**; verbunden wird mit der geprüften Adresse (kein Wechsel zwischen Prüfung und Verbindung, `resolve.ts`).
  * Loopback ist nur in Tests erlaubt (`allowLoopbackForTests`, die Prüfung auf `NODE_TEST_CONTEXT` verhindert das im Betrieb).
  */
-export const offsiteNetwork = { allowLoopback: false };
+// Am globalen Objekt, nicht im Modul: Der gebaute Server enthält dieses Modul mehrfach (Seiten, Job-Runner), und die Browser-CI schaltet den Schalter in einem Bündel um und liest ihn in einem anderen.
+const shared = globalThis as typeof globalThis & { __sosOffsiteNetwork?: { allowLoopback: boolean } };
+export const offsiteNetwork = (shared.__sosOffsiteNetwork ??= { allowLoopback: false });
 
 /** Nur für Tests (Fake-Server auf 127.0.0.1): erlaubt Loopback-Ziele. Im Betrieb wirkungslos – es wirft. */
 export function allowLoopbackForTests(): void {
