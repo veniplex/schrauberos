@@ -744,6 +744,19 @@ return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h:
       assert.equal((await env.db.webhook.findUniqueOrThrow({ where: { id: row.id } })).droppedEvents, 1);
     });
 
+    it("Art. 18 beim Fan-out (Z6-4 L-2): zu einer eingeschränkten Sache legt das Ereignis gar keine Zustellung an – nicht pending, nicht held, auch nicht bei ausgeschaltetem Ziel", async () => {
+      const { row } = await setup();
+      const off = await env.db.webhook.create({ data: { name: "Aus", url: server.url, events: "order.closed", enabled: false, allowPrivate: true } });
+      const restricted = async (_resource: string, id: string) => id === "order_gesperrt";
+      assert.equal(await deliver.fanOutEvent(event("evt_fan_r", "order.closed", "order_gesperrt"), { isRestricted: restricted }), 0);
+      assert.equal(await env.db.webhookDelivery.count({ where: { eventId: "evt_fan_r" } }), 0, "keine Zeile, auch nicht für das ausgeschaltete Ziel");
+      assert.equal(await deliver.fanOutEvent(event("evt_fan_ok", "order.closed", "order_frei"), { isRestricted: restricted }), 2, "eine andere Sache wird wie immer angelegt");
+      assert.equal(await env.db.webhookDelivery.count({ where: { webhookId: { in: [row.id, off.id] } } }), 2);
+      // Fail-closed: zu einer Ressource ohne Prüfung gilt die Sache als eingeschränkt
+      const { isRestrictedEntity } = await import("@/modules/admin/api/restriction");
+      assert.equal(await isRestrictedEntity("gibt-es-nicht", "x"), true);
+    });
+
     it("Art. 18: eine unterdrückte Zustellung ist „unterdrückt“ (nicht „aufgegeben“), zählt nicht als Ausfall und lässt sich nicht erneut zustellen", async () => {
       const { row } = await setup();
       const { webhookHealth } = await import("./health");

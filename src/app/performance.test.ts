@@ -28,10 +28,6 @@ describe("Hintergrundunschärfe", () => {
     assert.match(guarded[1], /color-mix\(/);
   });
 
-  it("die klebenden Leisten (Kopfzeilen, Kalender-Tageskopf) tragen `glass-bar`", () => {
-    const sidebar = readFileSync(path.join(SRC, "components", "shell", "sidebar.tsx"), "utf8");
-    const calendar = readFileSync(path.join(SRC, "modules", "workshop", "appointments", "calendar.tsx"), "utf8");
-    assert.equal(sidebar.match(/glass-bar/g)?.length, 2);
-    assert.equal(calendar.match(/glass-bar/g)?.length, 2);
-  });
+  // (Z6-4 L-3: Das Zählen von `glass-bar` im Quelltext der Seitenleiste und des Kalenders ist entfallen – es prüfte Schreibweise statt Verhalten. Das Verhalten der Klasse ist oben festgelegt (CSS), ihre
+  // Wirkung an den klebenden Leisten prüfen die Bildvergleiche der Browser-CI.)
 });

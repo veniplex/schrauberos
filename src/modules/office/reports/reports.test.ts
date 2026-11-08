@@ -240,10 +240,8 @@ describe("Umsatz: Storno einer Schlussrechnung mit Anrechnung (Netto, Steuer und
     const json = JSON.parse(await api.text());
     assert.deepEqual(json.data.months, rep.months);
     assert.deepEqual(json.data.total, rep.total);
-    // Widget und Seiten haben keine eigene Rechnung: sie rufen revenueReport (dieselbe Quelle wie CSV und API)
-    const { readFileSync } = await import("node:fs");
-    assert.match(readFileSync(new URL("./widgets.tsx", import.meta.url), "utf8"), /revenueReport/);
-    assert.match(readFileSync(new URL("../../../app/(app)/(office)/reports/revenue/page.tsx", import.meta.url), "utf8"), /revenueReport/);
+    // (Z6-4 L-3: Es gibt keinen Quelltext-Mustertest mehr, der „revenueReport“ in Widget und Seite sucht. Dass CSV, API und Bericht dieselben Zahlen liefern, beweisen die Vergleiche oben am Verhalten;
+    // Widget und Seite zeigen sie über denselben Aufruf, und die Browser-CI (Seiteninventur, Bildvergleich der Berichte) prüft die Anzeige.)
   });
 });
 

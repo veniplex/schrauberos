@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 import { after, before, describe, it } from "node:test";
 import { isForbiddenHost, normalizeRemotePath, normalizeWebdavUrl, planDeletions, planUploads } from "@/lib/offsite/target";
+import { LINEAR_MAX_RATIO, measureLinearity } from "@/test/timing";
 import { startFakeWebdav, type FakeWebdav } from "@/test/fake-webdav";
 import { OffsiteError } from "./transport";
 import { parseMultistatus, WebdavTransport } from "./webdav";
@@ -105,42 +106,42 @@ describe("WebDAV-Ziel", () => {
 
 describe("Multistatus-Parser: linear, auch bei feindlichen Antworten (ZP5-3)", () => {
   const MIB = 1024 * 1024;
-  /** Zeit, die der Parser braucht – jede Eingabe hier ist 16 MiB groß (die frühere Obergrenze); der quadratische Parser brauchte dafür Stunden. */
-  const timed = (xml: string) => {
-    const start = performance.now();
-    const entries = parseMultistatus(xml);
-    return { entries, ms: performance.now() - start };
-  };
-  const LIMIT_MS = 2500;
-  const big = (unit: string, bytes = 16 * MIB) => unit.repeat(Math.ceil(bytes / unit.length));
+  /**
+   * Linearität statt fester Millisekunden (Z6-4 M-3): jede Eingabe wird in der Größe `n` und `4 n` erzeugt (`n` = 1 MiB, größte Eingabe 4 MiB); ein linearer Parser braucht für `4 n` etwa die vierfache
+   * Zeit, der frühere quadratische Regulärausdruck die sechzehnfache (bei 16 MiB Stunden). Das Verhältnis hängt nicht an der Last des Rechners.
+   */
+  const big = (unit: string, bytes: number) => unit.repeat(Math.ceil(bytes / unit.length));
 
-  const cases: Array<[string, string]> = [
-    ["Millionen offene response-Tags ohne Ende (der Fall des quadratischen Regulärausdrucks)", big("<D:response>")],
-    ["Millionen offene response-Tags mit href, ohne Ende", big("<D:response><D:href>/a</D:href>")],
-    ["nur '<' ohne '>'", big("<")],
-    ["Tag ohne Ende, immer wieder", big("<a ")],
-    ["tief verschachtelte Tags", big("<a>")],
-    ["ein href ohne Ende (Text ohne schließenden Tag)", `<response><href>${"x".repeat(16 * MIB)}`],
-    ["unterbrochener CDATA-Abschnitt", `<response><href><![CDATA[${"x".repeat(16 * MIB)}`],
-    ["unterbrochener Kommentar", `<!--${"-".repeat(16 * MIB)}`],
-    ["viele ineinander geschachtelte Entitäten und Kaufmannsund", `<response><href>${"&amp;".repeat(3 * MIB)}</href></response>`],
-    ["Millionen leerer resourcetype/collection-Tags", `<response><href>/x</href>${big("<resourcetype><collection/>", 15 * MIB)}</response>`],
-    ["Millionen schließende Tags", big("</response>")],
-    ["Millionen Verarbeitungsanweisungen und DOCTYPE", big("<?x?><!DOCTYPE a>")],
+  const cases: Array<[string, (n: number) => string]> = [
+    ["Millionen offene response-Tags ohne Ende (der Fall des quadratischen Regulärausdrucks)", (n) => big("<D:response>", n)],
+    ["Millionen offene response-Tags mit href, ohne Ende", (n) => big("<D:response><D:href>/a</D:href>", n)],
+    ["nur '<' ohne '>'", (n) => big("<", n)],
+    ["Tag ohne Ende, immer wieder", (n) => big("<a ", n)],
+    ["tief verschachtelte Tags", (n) => big("<a>", n)],
+    ["ein href ohne Ende (Text ohne schließenden Tag)", (n) => `<response><href>${"x".repeat(n)}`],
+    ["unterbrochener CDATA-Abschnitt", (n) => `<response><href><![CDATA[${"x".repeat(n)}`],
+    ["unterbrochener Kommentar", (n) => `<!--${"-".repeat(n)}`],
+    ["viele ineinander geschachtelte Entitäten und Kaufmannsund", (n) => `<response><href>${"&amp;".repeat(Math.ceil(n / 5))}</href></response>`],
+    ["Millionen leerer resourcetype/collection-Tags", (n) => `<response><href>/x</href>${big("<resourcetype><collection/>", n)}</response>`],
+    ["Millionen schließende Tags", (n) => big("</response>", n)],
+    ["Millionen Verarbeitungsanweisungen und DOCTYPE", (n) => big("<?x?><!DOCTYPE a>", n)],
   ];
-  for (const [name, xml] of cases) {
+  for (const [name, build] of cases) {
     it(name, () => {
-      const { entries, ms } = timed(xml);
-      assert.ok(ms < LIMIT_MS, `${Math.round(ms)} ms für ${xml.length} Zeichen`);
-      assert.ok(entries.length <= 5000, "die Zahl der Einträge ist begrenzt");
+      let entries = 0;
+      const { ratio, smallMs, largeMs } = measureLinearity(build, (xml) => (entries = parseMultistatus(xml).length), MIB);
+      assert.ok(ratio < LINEAR_MAX_RATIO, `vierfache Größe braucht das ${ratio.toFixed(1)}-fache (${Math.round(smallMs)} ms → ${Math.round(largeMs)} ms) – linear wäre etwa 4`);
+      assert.ok(entries <= 5000, "die Zahl der Einträge ist begrenzt");
     });
   }
 
   it("Einträge sind auf 5000 begrenzt, die Auswertung hört dann auf", () => {
     const xml = `<multistatus>${big("<response><href>/a/b.sobk</href><propstat><prop><getcontentlength>1</getcontentlength></prop></propstat></response>", 8 * MIB)}</multistatus>`;
-    const { entries, ms } = timed(xml);
+    const entries = parseMultistatus(xml);
     assert.equal(entries.length, 5000);
-    assert.ok(ms < LIMIT_MS);
+    // die Obergrenze verkürzt die Arbeit: 8 MiB mit Abbruch nach 5000 Einträgen dauern nicht länger als 1 MiB mit der gleichen Arbeit bis zum Abbruch (Verhältnis statt Millisekunden)
+    const { ratio } = measureLinearity((n) => `<multistatus>${big("<response><href>/a/b.sobk</href></response>", n)}</multistatus>`, (x) => parseMultistatus(x), MIB);
+    assert.ok(ratio < LINEAR_MAX_RATIO, `Verhältnis ${ratio.toFixed(1)}`);
   });
 
   it("wertet Kommentare, CDATA, selbstschließende Tags, Zeichenverweise und Namensräume richtig aus", () => {

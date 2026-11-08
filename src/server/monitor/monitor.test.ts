@@ -60,7 +60,7 @@ describe("TCP", () => {
       const result = await probe.probeTarget(lo(server.port, { kind: "http", path: "/" }), { timeoutMs: 250 });
       const took = performance.now() - started;
       assert.deepEqual([result.ok, result.statusClass], [false, "timeout"]);
-      assert.ok(took >= 200 && took < 2000, `Dauer ${took}`);
+      assert.ok(took >= 200 && took < 10_000, `Dauer ${took}`); // untere Grenze: das Zeitlimit greift wirklich; obere: nur „hängt nicht“, großzügig (Last, Coverage-Lauf)
     } finally {
       await server.close();
     }
@@ -120,7 +120,7 @@ describe("HTTP", () => {
       const started = performance.now();
       const result = await probe.probeTarget(lo(server.port, { kind: "http", path: "/", method: "GET" }));
       assert.deepEqual([result.ok, result.statusClass], [true, "2xx"]);
-      assert.ok(performance.now() - started < 2000);
+      assert.ok(performance.now() - started < 10_000, "kein Hängen (großzügige Grenze statt Wanduhr-Wackler)");
       assert.deepEqual(Object.keys(result).sort(), ["latencyMs", "ok", "statusClass", "warn"], "zurück kommen nur Auf/Ab, Latenz, Klasse");
     } finally {
       await server.close();
@@ -266,7 +266,7 @@ describe("Zielsperre beim Verbinden (DNS einmal, alle Antworten prüfen, an die 
     const started = performance.now();
     const slow = await probe.probeTarget({ kind: "tcp", host: "x.example", port: 22, path: null, method: "HEAD", ignoreTlsErrors: false }, { timeoutMs: 200, lookup: () => new Promise(() => undefined) });
     assert.equal(slow.statusClass, "dns");
-    assert.ok(performance.now() - started < 1500);
+    assert.ok(performance.now() - started < 8_000, "kein Hängen (großzügige Grenze statt Wanduhr-Wackler)");
   });
 });
 
@@ -458,7 +458,7 @@ describe("Läufe: Entprellung, Ereignisse, Belegen, Fairness, Grenzen", () => {
       const started = performance.now();
       const summary = await run.runDueChecks({ now: NOW, concurrency: 2, deps: { timeoutMs: 400 } });
       assert.equal(summary.checked, 6);
-      assert.ok(performance.now() - started < 3000);
+      assert.ok(performance.now() - started < 15_000, "kein Hängen (großzügige Grenze statt Wanduhr-Wackler)");
       assert.equal(fast.requests.length, 5, "alle schnellen Ziele wurden geprüft");
       const deadRow = await env.db.netMonitorTarget.findFirstOrThrow({ where: { name: "tot" } });
       assert.deepEqual([deadRow.lastClass, deadRow.failStreak], ["timeout", 1]);

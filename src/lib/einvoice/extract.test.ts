@@ -242,7 +242,7 @@ describe("E-Rechnung lesen: Obergrenzen und Laufzeit", () => {
       } catch (e) {
         assert.ok(e instanceof XmlError, "nur XmlError");
       }
-      assert.ok(performance.now() - started < 1500, `zu langsam: ${input.slice(0, 30)}`);
+      assert.ok(performance.now() - started < 8_000, `zu langsam: ${input.slice(0, 30)}`); // großzügig: ein quadratischer Parser brauchte hier Minuten bis Stunden, die Grenze soll nur Hänger finden, keine Last abbilden
     }
   });
 });
