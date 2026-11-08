@@ -91,7 +91,7 @@ check_running() {
   [ "$upload_status" = "401" ] || fail "$name: POST /api/backups/upload ohne Sitzung sollte 401 liefern, war $upload_status"
 
   # Die App hat in /data geschrieben (Datenbank, Einrichtungs-Token) – auch mit schreibgeschütztem Wurzeldateisystem
-  docker compose -p "$project" "$@" logs --no-color app | grep -q "Einrichtungs-Token" || fail "$name: kein Einrichtungs-Token im Log (Einrichtung nicht gestartet?)"
+  [[ "$(docker compose -p "$project" "$@" logs --no-color app)" == *"Einrichtungs-Token"* ]] || fail "$name: kein Einrichtungs-Token im Log (Einrichtung nicht gestartet?)"
   echo "ok: $name"
 }
 

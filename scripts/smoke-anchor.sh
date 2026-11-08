@@ -86,6 +86,8 @@ start() { # start <volume> [docker-Optionen …]
 }
 
 logs() { docker logs "$name" 2>&1; }
+# Das Log erst vollständig lesen, dann suchen: `logs | grep -q` bricht unter `pipefail` zufällig ab (grep -q schließt die Leitung, docker logs bekommt SIGPIPE)
+has_log() { local out; out="$(docker logs "$name" 2>&1)"; grep -q -- "$1" <<<"$out"; }
 state_json() { docker cp "$name:/data/app/state.json" - | tar -xO 2>/dev/null; }
 
 # ───── Gutfall ─────
@@ -94,8 +96,8 @@ run_happy() { # run_happy <Titel> [docker-Optionen …]
   echo "== $title =="
   local vol; vol="$(make_volume "$work/pkg" "$version")"
   start "$vol" "$@"
-  logs | grep -q "Version $version geprüft" || fail "$title: keine Erfolgszeile des Prüfers im Log."
-  logs | grep -q "Starte Launcher aus /data/app/versions/$version" || fail "$title: nicht die installierte Version gestartet."
+  has_log "Version $version geprüft" || fail "$title: keine Erfolgszeile des Prüfers im Log."
+  has_log "Starte Launcher aus /data/app/versions/$version" || fail "$title: nicht die installierte Version gestartet."
   # typische Aufrufe: nichts davon darf ins Paket schreiben
   for path in / /login /api/health "/_next/image?url=%2Ffavicon.ico&w=64&q=75" /favicon.ico "/_next/static/none.js"; do curl -sS -o /dev/null "${base_url}${path}" || true; done
   docker run --rm -v "$vol:/data:ro" -e DATA_DIR=/data --entrypoint /bootstrap "$image" --verify "/data/app/versions/$version" --expect-version "$version" >/dev/null \
@@ -111,8 +113,8 @@ run_happy "3. Gutfall (gehärtet: read_only, cap_drop ALL, no-new-privileges)" -
 run_rejected() { # run_rejected <Titel> <erwarteter Code> <Volume>
   local title="$1" code="$2" vol="$3"
   start "$vol"
-  logs | grep -q "abgelehnt (Code $code" || { logs | tail -n 30 >&2; fail "$title: erwartet wurde die Ablehnung mit Code $code."; }
-  logs | grep -q "Starte Launcher aus /app" || fail "$title: die eingebaute Version wurde nicht gestartet."
+  has_log "abgelehnt (Code $code" || { logs | tail -n 30 >&2; fail "$title: erwartet wurde die Ablehnung mit Code $code."; }
+  has_log "Starte Launcher aus /app" || fail "$title: die eingebaute Version wurde nicht gestartet."
   state_json | grep -q "integrity:$code" || { state_json >&2 || true; fail "$title: state.json trägt den Befund integrity:$code nicht."; }
   docker exec "$name" /bootstrap --healthcheck >/dev/null 2>&1 || fail "$title: Healthcheck schlägt fehl."
   docker rm -f "$name" >/dev/null
@@ -152,8 +154,8 @@ echo "== 5. Veraltete Version (unter der Untergrenze): keine Marke, kein Alarm =
 make_package "$work/old" "$older" >/dev/null
 vol="$(make_volume "$work/old" "$older")"
 start "$vol"
-logs | grep -q "veraltet oder passt nicht" || fail "Die veraltete Version wurde nicht als veraltet gemeldet."
-logs | grep -q "Starte Launcher aus /app" || fail "Die eingebaute Version läuft nicht."
+has_log "veraltet oder passt nicht" || fail "Die veraltete Version wurde nicht als veraltet gemeldet."
+has_log "Starte Launcher aus /app" || fail "Die eingebaute Version läuft nicht."
 state_json | grep -q "integrity" && fail "Eine veraltete Version darf keinen Integritätsbefund hinterlassen."
 docker rm -f "$name" >/dev/null
 echo "ok"
@@ -161,11 +163,11 @@ echo "ok"
 echo "== 6. Neustart nach Manipulation geht über den Starter =="
 vol="$(make_volume "$work/pkg" "$version")"
 start "$vol"
-logs | grep -q "Version $version geprüft" || fail "Der Gutfall lief nicht an."
+has_log "Version $version geprüft" || fail "Der Gutfall lief nicht an."
 vol_sh "$vol" "chmod u+w /data/app/versions/$version/server.js && printf 'x' >> /data/app/versions/$version/server.js" >/dev/null
 docker restart -t 30 "$name" >/dev/null
 waited=0
-until logs | grep -q "abgelehnt (Code 16"; do sleep 2; waited=$((waited + 2)); [ "$waited" -lt 120 ] || { logs | tail -n 30 >&2; fail "Nach dem Neustart wurde die veränderte Datei nicht abgelehnt."; }; done
+until has_log "abgelehnt (Code 16"; do sleep 2; waited=$((waited + 2)); [ "$waited" -lt 120 ] || { logs | tail -n 30 >&2; fail "Nach dem Neustart wurde die veränderte Datei nicht abgelehnt."; }; done
 docker rm -f "$name" >/dev/null
 echo "ok"
 

@@ -58,7 +58,7 @@ export function checkBundle(root) {
   return problems;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"))) {
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   const dir = process.argv[2];
   if (!dir) throw new Error("Aufruf: node scripts/check-bundle.mjs <verzeichnis>");
   if (!lstatSync(dir).isDirectory()) throw new Error(`${dir} ist kein Verzeichnis.`);
