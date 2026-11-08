@@ -29,8 +29,14 @@ const S_IFDIR = 0o040000;
 
 export async function startFakeSftp(): Promise<FakeSftp> {
   allowLoopbackForTests(); // das Ziel liegt auf 127.0.0.1; im Betrieb ist Loopback als Ziel verboten (lib/offsite/host-policy.ts)
-  const hostKey = utils.generateKeyPairSync("ed25519");
-  const parsed = utils.parseKey(hostKey.public);
+  // `utils.generateKeyPairSync` liefert gelegentlich (etwa 1 von 12) einen öffentlichen Schlüssel, den `parseKey` als „Malformed OpenSSH public key“ ablehnt
+  // (Eigenheit der Bibliothek, kein Fehler der Anwendung): neu erzeugen, bis er sich wieder einlesen lässt – sonst wackelte der ganze Test.
+  let hostKey = utils.generateKeyPairSync("ed25519");
+  let parsed = utils.parseKey(hostKey.public);
+  for (let attempt = 0; attempt < 20 && (Array.isArray(parsed) ? parsed[0] : parsed) instanceof Error; attempt++) {
+    hostKey = utils.generateKeyPairSync("ed25519");
+    parsed = utils.parseKey(hostKey.public);
+  }
   const key = Array.isArray(parsed) ? parsed[0] : parsed;
   if (key instanceof Error) throw key;
   const fingerprint = fingerprintFromHex(createHash("sha256").update(key.getPublicSSH()).digest("hex"));
