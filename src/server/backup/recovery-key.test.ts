@@ -208,7 +208,7 @@ describe("Restore mit und ohne Schlüssel", () => {
 
   it("ohne Schlüssel: secret.key bleibt, nicht lesbare Geheimnisse werden zurückgesetzt – im Audit-Log und als Hinweis für Administratoren", async () => {
     const { backup } = await backupWithKey();
-    await env.db.twoFactor.create({ data: { userId: adminId, secret: "v1:nicht:entschluesselbar:x", enabledAt: new Date() } });
+    await env.db.twoFactor.create({ data: { userId: adminId, secret: secrets.encryptSecret("totp-geheimnis") /* gut geformt, vom alten Schlüssel – ein unförmiger Wert wäre „beschädigt“ und wird nie zurückgesetzt */, enabledAt: new Date() } });
     newSecretKey();
     const current = secrets.secretKeyHex();
 

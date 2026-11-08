@@ -3,7 +3,7 @@ import { parseOpeningHours } from "@/lib/opening-hours";
 import type { SetupCheckDef } from "@/modules/types";
 import { readHolidayConfig } from "@/server/holidays";
 import { getPublicUrl } from "@/server/public-url";
-import { getWorkshop } from "@/server/workshop";
+import { getWorkshop, getWorkshopBilling } from "@/server/workshop";
 
 /**
  * Ist das Werkstattprofil vollständig? Anschrift (Straße, PLZ, Ort), mindestens ein Kontaktweg (Telefon oder E-Mail), eine Steuernummer oder USt-IdNr. und die IBAN – die Angaben,
@@ -25,7 +25,7 @@ export function hoursConfigured(raw: string | null | undefined): boolean {
 
 /** Einrichtungsschritte der Einstellungen: Profil, Öffnungszeiten, HTTPS (Hinweis nach Systemstatus) und die Zwei-Faktor-Anmeldung der Administration (empfohlen). */
 export const setupChecks: SetupCheckDef[] = [
-  { id: "profile", feature: "admin.settings", permission: "settings.manage", labelKey: "settings.checklist.profile.label", hintKey: "settings.checklist.profile.hint", href: "/settings", order: 10, done: async () => profileComplete(await getWorkshop()) },
+  { id: "profile", feature: "admin.settings", permission: "settings.manage", labelKey: "settings.checklist.profile.label", hintKey: "settings.checklist.profile.hint", href: "/settings", order: 10, done: async () => profileComplete(await getWorkshopBilling()) },
   { id: "hours", feature: "admin.settings", permission: "settings.manage", labelKey: "settings.checklist.hours.label", hintKey: "settings.checklist.hours.hint", href: "/settings", order: 11, done: async () => hoursConfigured((await getWorkshop()).openingHours) },
   { id: "holidays", feature: "admin.settings", permission: "settings.manage", labelKey: "settings.checklist.holidays.label", hintKey: "settings.checklist.holidays.hint", href: "/settings?tab=holidays", order: 12, recommended: true, done: async () => (await readHolidayConfig()).region !== "" },
   { id: "https", feature: "admin.settings", permission: "settings.manage", labelKey: "settings.checklist.https.label", hintKey: "settings.checklist.https.hint", href: "/settings?tab=security", order: 60, recommended: true, done: async ({ secure }) => secure },
