@@ -37,7 +37,7 @@ import {
   type UpdateState,
   type VersionMeta,
 } from "../lib/updates/state";
-import { incompatibleFile, inconclusiveFile, launcherCrashFile, pruneVersions, readMeta, readSmallFile, readState, removeMarker, verifyFailedFile, versionDir, writeState as writeStateFile } from "../lib/updates/store";
+import { incompatibleFile, inconclusiveFile, launcherCrashFile, pruneBlockedRemnants, pruneVersions, readMeta, readSmallFile, readState, removeMarker, verifyFailedFile, versionDir, writeState as writeStateFile } from "../lib/updates/store";
 
 /** Exit-Code des Launchers, wenn er die App absichtlich nicht startet (Rückfall-Version zu alt für die Datenbank): der Starter beendet dann den Container. */
 export const INCOMPATIBLE_EXIT_CODE = 78;
@@ -319,6 +319,13 @@ export function createLauncher(config: LauncherConfig, deps: LauncherDeps) {
       pruneVersions(versionsToKeep(readState()));
     } catch (error) {
       log(`Hinweis: Alte Versionen lassen sich nicht aufräumen (${(error as NodeJS.ErrnoException).code ?? "Fehler"}) – der Start geht trotzdem weiter.`);
+    }
+
+    try {
+      const removed = pruneBlockedRemnants();
+      if (removed > 0) log(`${removed} alte beiseitegeschobene Marker-Reste unter /data/app gelöscht.`);
+    } catch {
+      /* Aufräumen ist nie Bedingung für den Start */
     }
 
     // 1) Vorgemerkte Wiederherstellung einspielen (oder eine noch unbestätigte aus einem abgebrochenen Start wieder aufnehmen)

@@ -130,6 +130,46 @@ export function pruneVersions(keep: readonly string[], data = dataDir()): void {
   }
 }
 
+/** Namen, unter denen der Starter beim Beiseiteschieben eines Hindernisses unter einem Markernamen `<Marker>.blocked-<ms>` anlegt (`docker/bootstrap.c`, `write_marker`; `<ms>` ist die Laufzeituhr, kein Datum). */
+const BLOCKED_REMNANT = /^(?:launcher-crash|verify-failed|inconclusive|verify-ok|incompatible|integrity-reported)\.blocked-\d{1,20}$/;
+export const BLOCKED_KEEP = 3;
+export const BLOCKED_MAX_AGE_MS = 7 * 24 * 3600_000;
+
+/**
+ * Räumt die Reste auf, die der Starter beiseitegeschoben hat, weil unter einem Markernamen etwas anderes als eine Datei lag (`<Marker>.blocked-<ms>`, meist ein nicht leeres Verzeichnis, das die App angelegt hat).
+ * Es werden nur Einträge mit genau diesem Namensmuster angefasst (nie die Marker selbst, nie Versionen), nie einem Link gefolgt; die **neuesten `BLOCKED_KEEP`** bleiben (zur Ansicht), von den übrigen
+ * gehen die, deren Änderungszeit **älter als 7 Tage** ist. Wirft nie: ein Rest, der sich nicht löschen lässt, ist kein Grund, den Start aufzuhalten. Gibt die Zahl der gelöschten Reste zurück.
+ */
+export function pruneBlockedRemnants(data = dataDir(), now = Date.now()): number {
+  let names: string[];
+  try {
+    names = readdirSync(updatesDir(data)).filter((name) => BLOCKED_REMNANT.test(name));
+  } catch {
+    return 0;
+  }
+  const found: Array<{ full: string; mtime: number }> = [];
+  for (const name of names) {
+    const full = path.join(updatesDir(data), name);
+    try {
+      found.push({ full, mtime: lstatSync(full).mtimeMs });
+    } catch {
+      /* inzwischen verschwunden */
+    }
+  }
+  found.sort((a, b) => b.mtime - a.mtime);
+  let removed = 0;
+  for (const entry of found.slice(BLOCKED_KEEP)) {
+    if (now - entry.mtime <= BLOCKED_MAX_AGE_MS) continue;
+    try {
+      removeTreeSync(entry.full);
+      removed++;
+    } catch {
+      /* bleibt liegen; beim nächsten Start ein neuer Versuch */
+    }
+  }
+  return removed;
+}
+
 /** Gemerkte, vom Wurzelschlüssel beglaubigte Release-Schlüssel; die Datei wird bei jeder Verwendung neu geprüft (nie blind vertraut). */
 export function readEndorsements(data = dataDir()): Endorsement[] {
   try {
