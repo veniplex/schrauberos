@@ -31,7 +31,7 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.1",
     "@prisma/client": "^7.10.1",
-    "better-sqlite3": "12.11.1",
+    "better-sqlite3": "13.0.3",
     "clsx": "^2.1.1",
     "dotenv": "^18.0.9",
     "geist": "^1.9.1",
