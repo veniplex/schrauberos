@@ -22,7 +22,7 @@ Jede Änderung des Bestands ist eine **Bewegung**, die sich nicht mehr ändern o
   Maßgeblich ist der Stand im Moment des Buchens. Jede Inventur steht im Audit-Log. Am Handy steht jeder Artikel für sich (Name, darunter Nummer und Soll, darunter die Eingabe), am Tablet und
   Computer in Spalten. Die Liste zeigt **höchstens 500 Artikel** je Seite (nach Artikelnummer); gibt es mehr, sagt die Seite es und führt über **Weiter mit den nächsten Artikeln** zu den übrigen –
   jede Seite wird für sich gebucht.
-* **Beim Abschluss eines Auftrags** wird für jede Position mit Artikelverweis (Art *Teil*) die Menge abgebucht – **in derselben Transaktion** wie der Abschluss: Schlägt etwas fehl, bleibt der Auftrag
+* **Beim Abschluss eines Auftrags** wird für jede Position mit Artikelverweis (Art *Teil*) die Menge abgebucht – **gemeinsam mit dem Abschluss, in einem Schritt**: Schlägt etwas fehl, bleibt der Auftrag
   offen und nichts ist gebucht. Positionen ohne Artikelverweis (freier Text) werden nicht gebucht. Eine Position mit **negativer Menge** (Gutschrift) bucht einen Zugang. Derselbe Artikel in mehreren
   Positionen zählt zusammen.
 * **Wieder öffnen** eines abgeschlossenen Auftrags bucht zurück, was für ihn noch gebucht ist (Rückbuchung, auch eine Gutschrift wird wieder abgezogen): Danach steht der Bestand wie vor dem Abschluss,
