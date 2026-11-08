@@ -284,6 +284,23 @@ return verifyWebhook;`)(createHmac, timingSafeEqual, Buffer) as (s: string[], h:
     assert.equal(server.requests.length, 0);
   });
 
+  it("das Host-Gateway des Containers (der Docker-Host) bleibt auch mit der Freigabe gesperrt – als Literal, als Name und als Antwort eines Namens", async () => {
+    const gateway = await import("@/server/host-gateway");
+    gateway.setGatewayTestHooks({ gateways: ["172.17.0.1"] });
+    try {
+      const forbidden = (host: string, lookup?: () => Promise<Array<{ address: string; family: number }>>) =>
+        assert.rejects(target.resolveWebhookTarget(host, { allowPrivate: true }, lookup), (e: unknown) => e instanceof target.WebhookError && e.code === "forbiddenHost");
+      await forbidden("172.17.0.1");
+      await forbidden("::ffff:172.17.0.1");
+      await forbidden("host.docker.internal");
+      await forbidden("dienst.example", async () => [{ address: "172.17.0.1", family: 4 }]);
+      const neighbour = await target.resolveWebhookTarget("172.17.0.2", { allowPrivate: true });
+      assert.equal(neighbour.address, "172.17.0.2", "Nachbarn im selben Netz bleiben mit Freigabe erlaubt");
+    } finally {
+      gateway.setGatewayTestHooks({});
+    }
+  });
+
   it("TLS wird geprüft (unbekannte Zertifizierungsstelle → tls), Klartext nie zu öffentlichen Zielen, Zeitlimit und Antwortgrenze greifen", async () => {
     await setup({ respond: (_r, i) => (i === 1 ? { status: 200, delayMs: 2_000 } : i === 0 ? { status: 200, bodyBytes: 200_000 } : { status: 204 }) });
     send.setWebhookTestHooks({ lookup: lookupLocal }); // ohne die Zertifizierungsstelle des Test-Empfängers

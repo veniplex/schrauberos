@@ -29,6 +29,11 @@ const FORBIDDEN_NAMES = new Set(["metadata.google.internal", "metadata.goog", "i
 
 /** Übliche Namen des eigenen Rechners außer `localhost` (stehen in `/etc/hosts`); wie `localhost` nur in Tests erlaubt. Beim Verbinden prüft ohnehin die aufgelöste Adresse – das ist die frühe, verständliche Ablehnung. */
 const LOCAL_NAMES = new Set(["localhost", "localhost.localdomain", "localhost6", "localhost6.localdomain6", "ip6-localhost", "ip6-loopback"]);
+/**
+ * Namen, hinter denen die Container-Laufzeit den **Docker-Host** (den Server selbst) erreichbar macht – für jede ausgehende Verbindung (Überwachung, Webhooks, Off-Site, E-Mail) wie `localhost`
+ * gesperrt. Die Adresse dahinter (das Host-Gateway) sperrt `server/host-gateway.ts` beim Verbinden; hier ist die frühe, verständliche Ablehnung. Auch in Tests gesperrt (kein Test braucht sie).
+ */
+const HOST_ALIASES = new Set(["host.docker.internal", "gateway.docker.internal", "host.containers.internal", "host.lima.internal", "host.rancher-desktop.internal"]);
 const isLocalName = (name: string) => LOCAL_NAMES.has(name) || name.endsWith(".localhost");
 
 const toInt = (a: number, b: number, c: number, d: number) => (((a << 24) | (b << 16) | (c << 8) | d) >>> 0) as number;
@@ -171,7 +176,7 @@ export function isForbiddenHost(host: string): boolean {
   const canonical = canonicalHost(host);
   if (!canonical) return true;
   if (canonical.kind === "ip") return !isAllowedAddress(canonical.ip);
-  if (FORBIDDEN_NAMES.has(canonical.name)) return true;
+  if (FORBIDDEN_NAMES.has(canonical.name) || HOST_ALIASES.has(canonical.name)) return true;
   return !offsiteNetwork.allowLoopback && isLocalName(canonical.name);
 }
 

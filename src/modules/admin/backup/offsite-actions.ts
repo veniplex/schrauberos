@@ -10,6 +10,7 @@ import { fetchOffsiteBackup, testOffsite } from "@/server/backup/offsite/service
 import { getOffsiteCredentials, getOffsiteSettings, saveOffsiteCredentials, saveOffsiteSettings, saveUploadedNames, type OffsiteCredentials } from "@/server/backup/offsite/settings";
 import { checkPrivateKey } from "@/server/backup/offsite/private-key";
 import { fetchSftpHostKey } from "@/server/backup/offsite/sftp";
+import { isHostGatewayHost } from "@/server/host-gateway";
 import { OffsiteError } from "@/server/backup/offsite/transport";
 import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
@@ -65,7 +66,7 @@ const saveOffsiteOperation = defineOperation({
     let hostKey = "";
     if (input.protocol === "sftp") {
       host = (input.host ?? "").replace(/^\[|\]$/g, "");
-      const hostProblem = validateHost(host);
+      const hostProblem = validateHost(host) ?? (isHostGatewayHost(host) ? "forbiddenHost" : null);
       if (hostProblem) failField("host", `backup.offsite.errors.${hostProblem}` as MessageKey);
       port = input.port ?? 22;
       if (validatePort(port)) failField("port", "backup.offsite.errors.port");
@@ -77,6 +78,7 @@ const saveOffsiteOperation = defineOperation({
     } else {
       const normalized = normalizeWebdavUrl(input.url ?? "");
       if (!normalized.ok) failField("url", `backup.offsite.errors.${normalized.problem}` as MessageKey);
+      if (isHostGatewayHost(new URL(normalized.url).hostname)) failField("url", "backup.offsite.errors.forbiddenHost");
       url = normalized.url;
     }
 
@@ -133,7 +135,7 @@ const fetchHostKeyOperation = defineOperation({
   transaction: false,
   run: async ({ input }) => {
     const host = input.host.replace(/^\[|\]$/g, "");
-    const problem = validateHost(host);
+    const problem = validateHost(host) ?? (isHostGatewayHost(host) ? "forbiddenHost" : null);
     if (problem) failField("host", `backup.offsite.errors.${problem}` as MessageKey);
     try {
       return { fingerprint: await fetchSftpHostKey(host, input.port) };

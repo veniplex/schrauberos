@@ -33,6 +33,19 @@ describe("resolvePinned", () => {
     assert.deepEqual(await resolvePinned("[2606:4700:4700::1111]", async () => assert.fail("kein Lookup")), { address: "2606:4700:4700::1111", family: 6 });
   });
 
+  it("das Host-Gateway des Containers (der Docker-Host) ist gesperrt – als Literal, als Name und als Antwort eines Namens", async () => {
+    const gateway = await import("@/server/host-gateway");
+    gateway.setGatewayTestHooks({ gateways: ["172.17.0.1"] });
+    try {
+      assert.equal(await codeOf(resolvePinned("172.17.0.1", async () => assert.fail("kein Lookup für ein Literal"))), "forbiddenHost");
+      assert.equal(await codeOf(resolvePinned("host.docker.internal", answer("172.17.0.1"))), "forbiddenHost");
+      assert.equal(await codeOf(resolvePinned("nas.example.org", answer("172.17.0.1"))), "forbiddenHost");
+      assert.equal(await codeOf(resolvePinned("nas.example.org", answer("172.17.0.2"))), "ok", "Nachbarn im selben Netz bleiben erlaubt");
+    } finally {
+      gateway.setGatewayTestHooks({});
+    }
+  });
+
   it("Name, der auf Verbotenes zeigt (Metadaten, Loopback, IPv4-in-IPv6), wird abgewiesen", async () => {
     for (const bad of ["169.254.169.254", "127.0.0.1", "::1", "::ffff:a9fe:a9fe", "fd00:ec2::254", "0.0.0.0", "fe80::1", "224.0.0.1"]) {
       assert.equal(await codeOf(resolvePinned("harmlos.example.org", answer(bad))), "forbiddenHost", bad);

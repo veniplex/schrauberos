@@ -16,15 +16,8 @@ export type TargetInput = { kind: string; host: string; port?: number | null; pa
 export type NormalizedTarget = { kind: MonitorKind; host: string; port: number; path: string | null; method: MonitorMethod; intervalSec: number };
 export type TargetProblem = { field: "kind" | "host" | "port" | "path" | "method" | "intervalSec"; key: "invalid" | "forbiddenHost" | "credentials" | "port" | "path" | "interval" };
 
-/** Namen, hinter denen die Container-Laufzeit den **Docker-Host** (den Server selbst) erreichbar macht: für die Überwachung wie `localhost` gesperrt (die Adresse dahinter sperrt `server/monitor/gateway.ts`). */
-const HOST_ALIASES = new Set(["host.docker.internal", "gateway.docker.internal", "host.containers.internal", "host.lima.internal", "host.rancher-desktop.internal"]);
-
-/** Ist dieser Host (ohne Namensauflösung) als Ziel der Überwachung verboten? Die allgemeine Zielsperre plus die Namen des Docker-Hosts. */
-export function isForbiddenMonitorHost(host: string): boolean {
-  if (isForbiddenHost(host)) return true;
-  const canonical = canonicalHost(host);
-  return canonical?.kind === "name" && HOST_ALIASES.has(canonical.name);
-}
+/** Ist dieser Host (ohne Namensauflösung) als Ziel der Überwachung verboten? Die allgemeine Zielsperre (`isForbiddenHost`, samt den Namen des Docker-Hosts); die Adresse dahinter sperrt `server/host-gateway.ts`. */
+export const isForbiddenMonitorHost = isForbiddenHost;
 
 const HOST_CHARS = /^[A-Za-z0-9._:[\]-]+$/;
 const DEFAULT_PORT: Record<MonitorKind, number | null> = { tcp: null, http: 80, https: 443 };

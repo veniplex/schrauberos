@@ -252,7 +252,7 @@ describe("Grenzen des Rechts: Docker-Host gesperrt, Änderungen gedrosselt, Übe
   });
 
   it("das Host-Gateway des Containers und host.docker.internal gelten wie der eigene Rechner: beim Speichern abgelehnt", async () => {
-    const { setGatewayTestHooks } = await import("@/server/monitor/gateway");
+    const { setGatewayTestHooks } = await import("@/server/host-gateway");
     setGatewayTestHooks({ gateways: ["172.17.0.1"] });
     try {
       await login(["network.view", "network.monitor"]);

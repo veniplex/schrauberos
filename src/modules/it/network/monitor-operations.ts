@@ -4,7 +4,7 @@ import { MAX_TARGETS, MONITOR_KINDS, MONITOR_METHODS } from "@/lib/monitor/model
 import { normalizeTarget, targetKey } from "@/lib/monitor/target";
 import { loginThrottle } from "@/server/auth/throttle";
 import { defineOperation, fail, failField } from "@/server/operations";
-import { isHostGateway } from "@/server/monitor/gateway";
+import { isHostGateway } from "@/server/host-gateway";
 import { MONITOR_ENABLED_SETTING } from "@/server/monitor/run";
 import { setSetting } from "@/server/settings";
 

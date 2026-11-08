@@ -1,14 +1,15 @@
-import "server-only";
 import { existsSync, readFileSync } from "node:fs";
-import { addressKey } from "@/lib/offsite/host-policy";
+import { addressKey, canonicalHost } from "@/lib/offsite/host-policy";
 
 /**
  * Das **Host-Gateway des Containers** gilt für die Überwachung als „der eigene Rechner“: Im Container ist die Standardroute (`/proc/net/route`) die Brücke zum Docker-Host (`172.17.0.1`, `172.18.0.1` …) –
  * ein Ziel dort wäre ein Dienst auf dem Server selbst (zum Beispiel eine unverschlüsselte Docker-Schnittstelle oder eine Datenbank auf `0.0.0.0`), nicht ein Gerät im Firmennetz. Dieselbe Regel wie für
- * Loopback und die eigenen Schnittstellenadressen (`lib/offsite/host-policy.ts`), nur für die Überwachung (Off-Site-Backup und Webhooks haben ihre eigene, ausdrückliche Freigabe).
+ * Loopback und die eigenen Schnittstellenadressen (`lib/offsite/host-policy.ts`), **für jede ausgehende Verbindung der Anwendung** (Überwachung, Webhooks, Off-Site-Backup, E-Mail-Versand; Block 13d): Die Freigabe `allowPrivate` der Administration öffnet private Netze, nie den Server selbst.
+ *
+ * (Ohne `server-only`: auch `server/backup/offsite/resolve.ts` nutzt es, und dessen Test läuft ohne Harness; die Datei liest nur `/proc` und enthält nichts Geheimes.)
  *
  * Gesperrt wird nur **im Container** (Datei `/.dockerenv`, `/run/.containerenv` oder Kubernetes) und nur für **IPv4** – läuft die Anwendung ohne Container, ist die Standardroute der echte Router des
- * Firmennetzes und ein erlaubtes Ziel. Die Namen `host.docker.internal` & Co. sperrt `lib/monitor/target.ts`. Das Ergebnis wird kurz zwischengespeichert (die Route ändert sich praktisch nie).
+ * Firmennetzes und ein erlaubtes Ziel. Die Namen `host.docker.internal` & Co. sperrt `lib/offsite/host-policy.ts` (`isForbiddenHost`). Das Ergebnis wird kurz zwischengespeichert (die Route ändert sich praktisch nie).
  */
 const CACHE_MS = 60_000;
 
@@ -62,4 +63,10 @@ export function isHostGateway(address: string): boolean {
   if (gateways.size === 0) return false;
   const key = addressKey(address.trim().replace(/^\[|\]$/g, ""));
   return key !== null && gateways.has(key);
+}
+
+/** Ist dieser Host (Name oder Adresse, ohne Namensauflösung) ein Literal des Host-Gateways? Für Eingabeprüfungen auf dem Server; beim Verbinden prüft `isHostGateway` jede aufgelöste Adresse. */
+export function isHostGatewayHost(host: string): boolean {
+  const canonical = canonicalHost(host);
+  return canonical?.kind === "ip" && isHostGateway(canonical.ip);
 }

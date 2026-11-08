@@ -254,6 +254,21 @@ describe("Zielauflösung (Rebinding) und Verbindungsoptionen", () => {
     assert.equal(await code(resolveMailTarget("metadata.google.internal", { allowPrivate: true }, answer("93.184.216.34"))), "forbiddenHost");
   });
 
+  it("das Host-Gateway des Containers (der Docker-Host) bleibt auch mit der Freigabe gesperrt – als Literal, als Name und als Antwort eines Namens", async () => {
+    const { resolveMailTarget, MailError } = m.transport;
+    const gateway = await import("@/server/host-gateway");
+    const code = async (promise: Promise<unknown>) => (await promise.then(() => "ok", (e: unknown) => (e instanceof MailError ? e.code : "anders")));
+    gateway.setGatewayTestHooks({ gateways: ["172.17.0.1"] });
+    try {
+      assert.equal(await code(resolveMailTarget("172.17.0.1", { allowPrivate: true })), "forbiddenHost");
+      assert.equal(await code(resolveMailTarget("host.docker.internal", { allowPrivate: true }, answer("172.17.0.1"))), "forbiddenHost");
+      assert.equal(await code(resolveMailTarget("relay.example.org", { allowPrivate: true }, answer("172.17.0.1"))), "forbiddenHost");
+      assert.equal(await code(resolveMailTarget("relay.example.org", { allowPrivate: true }, answer("172.17.0.2"))), "ok", "Nachbarn im selben Netz bleiben mit Freigabe erlaubt");
+    } finally {
+      gateway.setGatewayTestHooks({});
+    }
+  });
+
   it("verbunden wird mit der geprüften Adresse; der Name dient nur der Prüfung des Zertifikats", async () => {
     const pin = await m.transport.resolveMailTarget("Mail.Example.ORG.", { allowPrivate: false }, answer("93.184.216.34"));
     assert.deepEqual([pin.address, pin.family, pin.private, pin.servername], ["93.184.216.34", 4, false, "mail.example.org"]);

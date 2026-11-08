@@ -235,7 +235,7 @@ export const backupDe = {
     note: "Die Dateien am Ziel sind mit dem Wiederherstellungsschlüssel verschlüsselt: Ohne ihn sind sie wertlos – auch für uns. Den Schlüssel und das Ziel getrennt aufbewahren.",
     errors: {
       host: "Bitte einen gültigen Servernamen oder eine IP-Adresse eingeben.",
-      forbiddenHost: "Diese Adresse ist als Ziel nicht erlaubt (der eigene Rechner, Verbindungs-lokal oder ein Metadaten-Dienst). Rechner im eigenen Netz sind erlaubt.",
+      forbiddenHost: "Diese Adresse ist als Ziel nicht erlaubt (der eigene Rechner – auch der Docker-Host –, Verbindungs-lokal oder ein Metadaten-Dienst). Rechner im eigenen Netz sind erlaubt.",
       port: "Der Anschluss muss zwischen 1 und 65535 liegen.",
       path: "Bitte ein gültiges Verzeichnis angeben (ohne „..“).",
       url: "Bitte eine gültige Adresse ohne Abfrage und ohne Anker eingeben.",

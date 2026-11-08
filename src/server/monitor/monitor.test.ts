@@ -274,7 +274,7 @@ describe("Zielsperre beim Verbinden (DNS einmal, alle Antworten prüfen, an die 
 
 describe("Host-Gateway des Containers (der Docker-Host ist „der eigene Rechner“)", () => {
   it("Standardroute aus /proc/net/route: little-endian Hex, nur 0.0.0.0/0 mit Gateway-Flag; Müll und andere Routen zählen nicht", async () => {
-    const gateway = await import("./gateway");
+    const gateway = await import("@/server/host-gateway");
     const table = [
       "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT",
       "eth0\t00000000\t010011AC\t0003\t0\t0\t0\t00000000\t0\t0\t0",
@@ -287,7 +287,7 @@ describe("Host-Gateway des Containers (der Docker-Host ist „der eigene Rechner
   });
 
   it("das Gateway wird beim Verbinden nie angesprochen – als Literal und als Antwort eines Namens; Nachbarn im selben Netz bleiben erlaubt", async () => {
-    const gateway = await import("./gateway");
+    const gateway = await import("@/server/host-gateway");
     gateway.setGatewayTestHooks({ gateways: ["172.17.0.1"] });
     try {
       await assert.rejects(() => resolveMod.resolveMonitorTarget("172.17.0.1", 500), { code: "blocked" });

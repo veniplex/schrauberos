@@ -2,6 +2,7 @@ import "server-only";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { canonicalHost, isAllowedAddress, isForbiddenHost, isPrivateAddress } from "@/lib/offsite/host-policy";
+import { isHostGateway } from "@/server/host-gateway";
 import type { DeliveryError } from "@/lib/webhooks/schedule";
 
 /**
@@ -25,7 +26,8 @@ export async function resolveWebhookTarget(host: string, options: { allowPrivate
   const canonical = canonicalHost(host);
   if (!canonical) throw new WebhookError("config");
   if (isForbiddenHost(host)) throw new WebhookError("forbiddenHost");
-  const allowed = (address: string) => isAllowedAddress(address) && (options.allowPrivate || !isPrivateAddress(address));
+  // Das Host-Gateway des Containers ist der Server selbst: auch mit der Freigabe `allowPrivate` nie erlaubt (`server/host-gateway.ts`)
+  const allowed = (address: string) => isAllowedAddress(address) && !isHostGateway(address) && (options.allowPrivate || !isPrivateAddress(address));
   if (canonical.kind === "ip") {
     if (!allowed(canonical.ip)) throw new WebhookError("forbiddenHost");
     return { address: canonical.ip, family: isIP(canonical.ip) as 4 | 6, private: isPrivateAddress(canonical.ip), servername: null };

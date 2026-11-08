@@ -4,6 +4,7 @@ import https from "node:https";
 import { isIP } from "node:net";
 import { Readable } from "node:stream";
 import { canonicalHost, isAllowedAddress, isForbiddenHost } from "@/lib/offsite/host-policy";
+import { isHostGateway } from "@/server/host-gateway";
 import { OffsiteError } from "./transport";
 
 /**
@@ -22,7 +23,11 @@ export async function resolvePinned(host: string, lookupImpl: Lookup = lookup as
   const canonical = canonicalHost(host);
   if (!canonical) throw new OffsiteError("config", "Adresse");
   if (isForbiddenHost(host)) throw new OffsiteError("forbiddenHost");
-  if (canonical.kind === "ip") return { address: canonical.ip, family: isIP(canonical.ip) as 4 | 6 };
+  // Das Host-Gateway des Containers ist der Server selbst (`server/host-gateway.ts`)
+  if (canonical.kind === "ip") {
+    if (isHostGateway(canonical.ip)) throw new OffsiteError("forbiddenHost");
+    return { address: canonical.ip, family: isIP(canonical.ip) as 4 | 6 };
+  }
 
   let timer: NodeJS.Timeout | undefined;
   try {
@@ -32,7 +37,7 @@ export async function resolvePinned(host: string, lookupImpl: Lookup = lookup as
     ]);
     if (addresses.length === 0) throw new OffsiteError("connect", "ENOTFOUND");
     // Jede Antwort muss erlaubt sein: ein Name mit einer erlaubten und einer verbotenen Adresse wäre ein Umlenkversuch
-    if (addresses.some((entry) => !isAllowedAddress(entry.address))) throw new OffsiteError("forbiddenHost");
+    if (addresses.some((entry) => !isAllowedAddress(entry.address) || isHostGateway(entry.address))) throw new OffsiteError("forbiddenHost");
     return { address: addresses[0].address, family: addresses[0].family as 4 | 6 };
   } catch (error) {
     if (error instanceof OffsiteError) throw error;

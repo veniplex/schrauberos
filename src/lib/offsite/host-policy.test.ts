@@ -77,6 +77,7 @@ describe("Adressrichtlinie für Off-Site-Ziele", () => {
     assert.equal(isAllowedAddress("127.0.0.1"), true);
     assert.equal(isAllowedAddress("::1"), true);
     assert.equal(isForbiddenHost("localhost"), false);
+    assert.equal(isForbiddenHost("host.docker.internal"), true, "die Namen des Docker-Hosts sind auch in Tests gesperrt");
     assert.deepEqual(normalizeWebdavUrl("http://127.0.0.1:8080/dav"), { ok: true, url: "http://127.0.0.1:8080/dav" });
     // alles andere bleibt verboten
     assert.equal(isAllowedAddress("169.254.169.254"), false);
