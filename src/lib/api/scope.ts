@@ -25,6 +25,8 @@ export const API_NEVER: ReadonlySet<string> = new Set([
   "customers.privacy",
   "orders.reopen",
   "checklists.reopen",
+  // Überwachungsziele lassen den Server Verbindungen ins eigene Netz aufbauen: mit einem Token wäre das ein Werkzeug zum Abtasten des Netzes. Die API liest nur den gemessenen Status (network.view).
+  "network.monitor",
 ]);
 
 /** Rechte der Plattform-/Verwaltungsfunktionen (Pflichtfunktionen oder Funktionen eines Pflichtmoduls). */

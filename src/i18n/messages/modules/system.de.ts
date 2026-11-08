@@ -16,6 +16,8 @@ export const systemDe = {
     outboxFailed_other: "{count} Ereignisse konnten nicht zugestellt werden und wurden aufgegeben (siehe „Ereignisse“).",
     webhookDeadLetters_one: "Eine Webhook-Zustellung wurde aufgegeben (siehe Verwaltung → API & Webhooks).",
     webhookDeadLetters_other: "{count} Webhook-Zustellungen wurden aufgegeben (siehe Verwaltung → API & Webhooks).",
+    monitorDown_one: "Ein Überwachungsziel ist nicht erreichbar (siehe IT & Netzwerk → Überwachung).",
+    monitorDown_other: "{count} Überwachungsziele sind nicht erreichbar (siehe IT & Netzwerk → Überwachung).",
     webhooksDisabled_one: "Ein Webhook ist ausgeschaltet, weil die Anwendung ihn selbst ausgeschaltet hat (Ziel meldet 410, Geheimnis unlesbar oder Wiederherstellung) – bitte prüfen und wieder einschalten.",
     webhooksDisabled_other: "{count} Webhooks sind ausgeschaltet, weil die Anwendung sie selbst ausgeschaltet hat (Ziel meldet 410, Geheimnis unlesbar oder Wiederherstellung) – bitte prüfen und wieder einschalten.",
     runnerStale: "Der Zeitgeber hat sich zuletzt {date} gemeldet – die Hintergrundaufgaben laufen vermutlich nicht mehr.",
@@ -71,6 +73,7 @@ export const systemDe = {
   names: {
     backup: { auto: "Automatisches Backup", offsite: "Off-Site-Backup übertragen", retention: "Backups aufräumen (Aufbewahrung)" },
     audit: { retention: "Audit-Log aufräumen (Aufbewahrung)" },
+    network: { monitor: "Netzwerk-Überwachung: Ziele prüfen", "monitor-prune": "Netzwerk-Überwachung: Verlauf aufräumen" },
     mail: { prune: "Sendeprotokoll aufräumen (Aufbewahrung)" },
     files: { purge: "Entfernte Dateien endgültig löschen" },
     billing: { "sent-files": "Versendete Belegkopien aufräumen" },

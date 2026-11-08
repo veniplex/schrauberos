@@ -11,6 +11,7 @@ import { isBehindProxy } from "@/server/auth/network";
 import { connectionIsSecure } from "@/server/auth/connection";
 import { systemInfo } from "@/server/system-info";
 import { webhookHealth } from "@/server/webhooks/health";
+import { monitorHealth } from "@/server/monitor/run";
 import { db } from "@/server/db";
 import { connectionNotices, evaluateSystem, problemTone, type SystemNotice, type SystemProblem } from "@/server/jobs/health";
 import { jobRunner } from "@/server/jobs";
@@ -28,7 +29,7 @@ const toneOf = (status: string | null) => JOB_STATUS_TONE[status as JobStatus] ?
 export default async function SystemPage() {
   await requirePermission("system.view");
   const { t, tp, td, date, number } = await getI18n();
-  const [jobs, runs, active, pending, failed, lastFailed, info, secure, behindProxy, webhooks] = await Promise.all([
+  const [jobs, runs, active, pending, failed, lastFailed, info, secure, behindProxy, webhooks, monitor] = await Promise.all([
     jobStatusRows(),
     recentJobRuns(30),
     activeFeatureSet(),
@@ -39,6 +40,7 @@ export default async function SystemPage() {
     connectionIsSecure(),
     isBehindProxy(),
     webhookHealth(),
+    activeFeatureSet().then((features) => monitorHealth(features.has("it.network"))),
   ]);
   const when = (d: Date | string) => date(d, { dateStyle: "short", timeStyle: "medium" });
   const nameOf = (id: string) => td(`system.names.${id}`, id);
@@ -49,6 +51,7 @@ export default async function SystemPage() {
     outboxFailed: failed,
     webhookDeadLetters: webhooks.deadLetters,
     webhooksDisabled: webhooks.disabledByApp,
+    monitorDown: monitor.down,
     runner,
     disk: info.disk,
     newestBackupAt: info.newestBackup?.createdAt ?? null,
@@ -74,6 +77,8 @@ export default async function SystemPage() {
         return tp("system.problem.outboxFailed", p.count);
       case "webhookDeadLetters":
         return tp("system.problem.webhookDeadLetters", p.count);
+      case "monitorDown":
+        return tp("system.problem.monitorDown", p.count);
       case "webhooksDisabled":
         return tp("system.problem.webhooksDisabled", p.count);
       case "runnerStale":

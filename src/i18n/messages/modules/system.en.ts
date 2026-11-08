@@ -18,6 +18,8 @@ export const systemEn: typeof systemDe = {
     outboxFailed_other: "{count} events could not be delivered and were abandoned (see “Events”).",
     webhookDeadLetters_one: "One webhook delivery was abandoned (see Administration → API & webhooks).",
     webhookDeadLetters_other: "{count} webhook deliveries were abandoned (see Administration → API & webhooks).",
+    monitorDown_one: "A monitoring target is not reachable (see IT & network → Monitoring).",
+    monitorDown_other: "{count} monitoring targets are not reachable (see IT & network → Monitoring).",
     webhooksDisabled_one: "A webhook is switched off because the application switched it off itself (target reports 410, secret unreadable or restore) – please check and switch it on again.",
     webhooksDisabled_other: "{count} webhooks are switched off because the application switched them off itself (target reports 410, secret unreadable or restore) – please check and switch them on again.",
     runnerStale: "The scheduler last reported at {date} – background jobs are probably no longer running.",
@@ -73,6 +75,7 @@ export const systemEn: typeof systemDe = {
   names: {
     backup: { auto: "Automatic backup", offsite: "Transfer off-site backup", retention: "Clean up backups (retention)" },
     audit: { retention: "Clean up audit log (retention)" },
+    network: { monitor: "Network monitoring: check targets", "monitor-prune": "Network monitoring: clean up history" },
     mail: { prune: "Clean up send log (retention)" },
     files: { purge: "Permanently delete removed files" },
     billing: { "sent-files": "Clean up sent document copies" },

@@ -13,4 +13,8 @@ export const pages = definePages("it.network", [
   { path: "/network/ip/[subnetId]/edit", kind: "edit", permission: "network.edit", params: { subnetId: { table: "NetSubnet" } } },
   { path: "/network/ip/[subnetId]", kind: "modal", permission: "network.edit", params: { subnetId: { table: "NetSubnet" } }, query: "?new=1" },
   { path: "/network/cabling", kind: "other", permission: "network.view" },
+  { path: "/network/monitoring", kind: "list", permission: "network.view" },
+  { path: "/network/monitoring/new", kind: "new", permission: "network.monitor" },
+  { path: "/network/monitoring/[id]", kind: "detail", permission: "network.view", params: { id: { table: "NetMonitorTarget" } } },
+  { path: "/network/monitoring/[id]/edit", kind: "edit", permission: "network.monitor", params: { id: { table: "NetMonitorTarget" } } },
 ]);

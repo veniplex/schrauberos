@@ -1,4 +1,5 @@
 import type { networkDe } from "./network.de";
+import { networkMonitorEn } from "./network-monitor.en";
 
 export const networkEn: typeof networkDe = {
   search: { devices: "Devices", ips: "IP addresses" },
@@ -9,7 +10,7 @@ export const networkEn: typeof networkDe = {
   },
   title: "IT & network",
   description: "Overview of devices, addresses, cabling and reachability in the company network.",
-  monitoringNotice: "Reachability is not checked automatically yet: the status of devices stays “unknown” until network monitoring is available. Devices, IPs and cabling are maintained by hand.",
+  monitor: networkMonitorEn,
   stats: { devices: "Devices", subnets: "Subnets", ips: "IP addresses", connections: "Connections" },
   sections: {
     device: "Device",
@@ -80,7 +81,7 @@ export const networkEn: typeof networkDe = {
     purchaseDate: "Purchased on",
     warrantyUntil: "Warranty until",
     monitorEnabled: "Monitor reachability",
-    monitorHint: "Marks the device for network monitoring. The application does not check reachability itself yet; the status stays “unknown”.",
+    monitorHint: "Marks the device for monitoring. Measuring starts once a target for this device is set up under “Monitoring” and monitoring is switched on; until then the status stays “unknown”.",
     vlanId: "VLAN ID",
     vlanName: "Name",
     description: "Description",

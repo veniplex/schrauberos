@@ -1,3 +1,5 @@
+import { networkMonitorDe } from "./network-monitor.de";
+
 export const networkDe = {
   search: { devices: "Geräte", ips: "IP-Adressen" },
   quick: { newDevice: "Neues Gerät" },
@@ -7,7 +9,7 @@ export const networkDe = {
   },
   title: "IT & Netzwerk",
   description: "Überblick über Geräte, Adressen, Verkabelung und Erreichbarkeit im Unternehmensnetzwerk.",
-  monitoringNotice: "Die Erreichbarkeit wird noch nicht automatisch geprüft: Der Status der Geräte bleibt „unbekannt“, bis die Netzwerk-Überwachung zur Verfügung steht. Geräte, IPs und Verkabelung sind von Hand gepflegt.",
+  monitor: networkMonitorDe,
   stats: { devices: "Geräte", subnets: "Subnetze", ips: "IP-Adressen", connections: "Verbindungen" },
   sections: {
     device: "Gerät",
@@ -78,7 +80,7 @@ export const networkDe = {
     purchaseDate: "Gekauft am",
     warrantyUntil: "Garantie bis",
     monitorEnabled: "Erreichbarkeit überwachen",
-    monitorHint: "Merkt das Gerät für die Netzwerk-Überwachung vor. Die Anwendung prüft die Erreichbarkeit noch nicht selbst; der Status bleibt „unbekannt“.",
+    monitorHint: "Merkt das Gerät für die Überwachung vor. Gemessen wird, sobald unter „Überwachung“ ein Ziel für dieses Gerät eingerichtet und die Überwachung eingeschaltet ist; bis dahin bleibt der Status „unbekannt“.",
     vlanId: "VLAN-ID",
     vlanName: "Name",
     description: "Beschreibung",

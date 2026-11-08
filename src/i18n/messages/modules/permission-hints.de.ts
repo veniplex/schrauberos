@@ -50,6 +50,7 @@ export const permissionHintsDe = {
     view: "Geräte, IP-Adressen, Verkabelung und Standorte ansehen.",
     edit: "Netzwerk-Einträge anlegen und ändern.",
     delete: "Netzwerk-Einträge löschen.",
+    monitor: "Überwachungsziele einrichten: Der Server baut dann regelmäßig Verbindungen zu den eingetragenen Adressen im eigenen Netz auf und zeigt, ob sie antworten. Nur an Vertrauenspersonen vergeben.",
   },
   invoices: {
     view: "Rechnungen und ihre Belege ansehen.",

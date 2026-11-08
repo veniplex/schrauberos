@@ -195,6 +195,7 @@ export const de = {
     devices: "Geräte",
     ipam: "IP-Verwaltung",
     cabling: "Verkabelung",
+    monitoring: "Überwachung",
   },
   areas: {
     workshop: "Werkstatt",
@@ -416,6 +417,7 @@ export const de = {
       view: "Netzwerk-Dokumentation ansehen",
       edit: "Netzwerk-Dokumentation bearbeiten",
       delete: "Netzwerk-Einträge löschen",
+      monitor: "Netzwerk-Überwachung einrichten (Überwachungsziele)",
     },
     invoices: {
       view: "Rechnungen ansehen",
@@ -691,7 +693,7 @@ export const de = {
     },
     deviceStatus: { active: "Aktiv", planned: "Geplant", spare: "Reserve", retired: "Ausgemustert" },
     ipKind: { static: "Statisch", dhcp_reservation: "DHCP-Reservierung", reserved: "Reserviert", gateway: "Gateway" },
-    linkState: { online: "Online", degraded: "Langsam", offline: "Offline", unknown: "Nicht überwacht" },
+    linkState: { online: "Online", degraded: "Eingeschränkt", offline: "Offline", unknown: "Status unbekannt" },
     weekday: {
       mon: "Montag",
       tue: "Dienstag",

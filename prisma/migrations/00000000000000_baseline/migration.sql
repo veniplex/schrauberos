@@ -453,6 +453,66 @@ CREATE TABLE "NetConnection" (
 );
 
 -- CreateTable
+CREATE TABLE "NetMonitorTarget" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "host" TEXT NOT NULL,
+    "port" INTEGER NOT NULL,
+    "path" TEXT,
+    "method" TEXT NOT NULL DEFAULT 'HEAD',
+    "ignoreTlsErrors" BOOLEAN NOT NULL DEFAULT false,
+    "intervalSec" INTEGER NOT NULL DEFAULT 300,
+    "enabled" BOOLEAN NOT NULL DEFAULT true,
+    "deviceId" TEXT,
+    "state" TEXT NOT NULL DEFAULT 'unknown',
+    "stateSince" DATETIME,
+    "failStreak" INTEGER NOT NULL DEFAULT 0,
+    "lastCheckAt" DATETIME,
+    "lastLatencyMs" INTEGER,
+    "lastClass" TEXT,
+    "nextCheckAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdByName" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "NetMonitorTarget_deviceId_fkey" FOREIGN KEY ("deviceId") REFERENCES "NetDevice" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "NetMonitorSample" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "targetId" TEXT NOT NULL,
+    "at" DATETIME NOT NULL,
+    "ok" BOOLEAN NOT NULL,
+    "latencyMs" INTEGER,
+    "statusClass" TEXT NOT NULL,
+    CONSTRAINT "NetMonitorSample_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "NetMonitorTarget" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "NetMonitorHour" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "targetId" TEXT NOT NULL,
+    "hour" DATETIME NOT NULL,
+    "checks" INTEGER NOT NULL,
+    "failures" INTEGER NOT NULL,
+    "latencySumMs" INTEGER NOT NULL,
+    "latencyCount" INTEGER NOT NULL,
+    "latencyMaxMs" INTEGER,
+    CONSTRAINT "NetMonitorHour_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "NetMonitorTarget" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "NetMonitorEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "targetId" TEXT NOT NULL,
+    "at" DATETIME NOT NULL,
+    "kind" TEXT NOT NULL,
+    "downSeconds" INTEGER,
+    CONSTRAINT "NetMonitorEvent_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "NetMonitorTarget" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Employee" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "personnelNumber" TEXT,
@@ -1387,6 +1447,30 @@ CREATE INDEX "NetConnection_fromDeviceId_idx" ON "NetConnection"("fromDeviceId")
 
 -- CreateIndex
 CREATE INDEX "NetConnection_toDeviceId_idx" ON "NetConnection"("toDeviceId");
+
+-- CreateIndex
+CREATE INDEX "NetMonitorTarget_deviceId_idx" ON "NetMonitorTarget"("deviceId");
+
+-- CreateIndex
+CREATE INDEX "NetMonitorTarget_nextCheckAt_idx" ON "NetMonitorTarget"("nextCheckAt");
+
+-- CreateIndex
+CREATE INDEX "NetMonitorSample_targetId_at_idx" ON "NetMonitorSample"("targetId", "at");
+
+-- CreateIndex
+CREATE INDEX "NetMonitorSample_at_idx" ON "NetMonitorSample"("at");
+
+-- CreateIndex
+CREATE INDEX "NetMonitorHour_hour_idx" ON "NetMonitorHour"("hour");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "NetMonitorHour_targetId_hour_key" ON "NetMonitorHour"("targetId", "hour");
+
+-- CreateIndex
+CREATE INDEX "NetMonitorEvent_targetId_at_idx" ON "NetMonitorEvent"("targetId", "at");
+
+-- CreateIndex
+CREATE INDEX "NetMonitorEvent_at_idx" ON "NetMonitorEvent"("at");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Employee_personnelNumber_key" ON "Employee"("personnelNumber");

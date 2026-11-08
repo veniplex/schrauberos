@@ -13,7 +13,7 @@ import { DEVICE_STATUSES, DEVICE_TYPES } from "@/modules/it/network/constants";
 import { warrantyState } from "@/modules/it/network/domain";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { checkDevices, listDevices } from "@/modules/it/network/queries";
+import { checkDevices, listDevices, monitoringEnabled } from "@/modules/it/network/queries";
 import { DeviceStatusBadge, LinkStateBadge, MonitoringNotice } from "@/modules/it/network/ui";
 import { SearchInput, Select } from "@/components/ui/form";
 
@@ -62,7 +62,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
   const total = sorted.length;
   const page = clampPage(list.page, total, list.pageSize);
   const devices = sorted.slice((page - 1) * list.pageSize, page * list.pageSize);
-  const checks = await checkDevices(devices);
+  const [checks, monitoring] = await Promise.all([checkDevices(devices), monitoringEnabled()]);
   const canEdit = session.can("network.edit");
   const filters = { q: sp.q?.trim() || undefined, type: type || undefined, status: status || undefined, location: sp.location || undefined };
   const links = listLinks("/network/devices", filters, list, DEFAULT);
@@ -117,9 +117,9 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
         </Select>
       </FilterBar>
 
-      {devices.some((d) => d.monitorEnabled) ? (
+      {!monitoring && devices.some((d) => d.monitorEnabled) ? (
         <div className="mb-4">
-          <MonitoringNotice t={t} />
+          <MonitoringNotice t={t} monitoring={monitoring} canOpen />
         </div>
       ) : null}
 

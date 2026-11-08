@@ -300,6 +300,10 @@ export const auditDe = {
       create: "Netzwerk-Eintrag angelegt",
       update: "Netzwerk-Eintrag geändert",
       delete: "Netzwerk-Eintrag gelöscht",
+      monitorCreate: "Überwachungsziel angelegt",
+      monitorUpdate: "Überwachungsziel geändert",
+      monitorDelete: "Überwachungsziel gelöscht",
+      monitorSwitch: "Netzwerk-Überwachung ein-/ausgeschaltet",
     },
     docs: {
       create: "Dokumentationsseite angelegt",

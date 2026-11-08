@@ -51,6 +51,7 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     view: "View devices, IP addresses, cabling and sites.",
     edit: "Create and change network entries.",
     delete: "Delete network entries.",
+    monitor: "Set up monitoring targets: the server then regularly opens connections to the addresses entered on your own network and shows whether they answer. Only give this to trusted people.",
   },
   invoices: {
     view: "View invoices and their documents.",

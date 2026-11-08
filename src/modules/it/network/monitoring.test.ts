@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { getStatusProvider, noMonitoring } from "./monitoring";
+import { noMonitoring } from "./monitoring";
 
 describe("Erreichbarkeit ohne Überwachung", () => {
   test("jedes Gerät hat den Status „unbekannt“, auch wenn die Überwachung vorgemerkt ist – es gibt keine erfundenen Werte", async () => {
@@ -11,9 +11,7 @@ describe("Erreichbarkeit ohne Überwachung", () => {
     for (const id of ["a", "b"]) {
       assert.equal(result.get(id)?.state, "unknown");
       assert.equal(result.get(id)?.latencyMs, null);
+      assert.equal(result.get(id)?.checkedAt, null);
     }
-  });
-  test("der Anbieter der Anwendung ist „keine Überwachung“", () => {
-    assert.equal(getStatusProvider().id, "none");
   });
 });

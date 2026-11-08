@@ -9,6 +9,7 @@ import { DEVICE_TYPES } from "@/modules/it/network/constants";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { MonitoringNotice } from "@/modules/it/network/ui";
+import { monitoringEnabled } from "@/modules/it/network/queries";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -27,7 +28,8 @@ export default async function NetworkOverviewPage() {
     db.netConnection.count(),
   ]);
 
-  // Die Erreichbarkeit wird (noch) nicht geprüft: Es gibt keinen Status, den die Übersicht zeigen könnte (nur den Hinweis, wenn Geräte zur Überwachung vorgemerkt sind)
+  // Die Übersicht zeigt keinen Gerätestatus (den liefern Geräteliste und Überwachung aus echten Messungen); sie weist nur darauf hin, wenn Geräte vorgemerkt sind, aber nichts gemessen wird
+  const monitoring = await monitoringEnabled();
   const monitoredCount = devices.filter((d) => d.monitorEnabled && d.status === "active").length;
 
   const warranty = devices
@@ -42,9 +44,9 @@ export default async function NetworkOverviewPage() {
     <>
       <PageHeader help="it.network" title={t("network.title")} description={t("network.description")} />
 
-      {monitoredCount > 0 ? (
+      {monitoredCount > 0 && !monitoring ? (
         <div className="mb-5">
-          <MonitoringNotice t={t} />
+          <MonitoringNotice t={t} monitoring={monitoring} canOpen />
         </div>
       ) : null}
 

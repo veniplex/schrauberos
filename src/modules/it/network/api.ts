@@ -1,9 +1,11 @@
 import { z } from "zod";
-import type { NetConnection, NetDevice, NetIp, NetLocation, NetSubnet, NetVlan } from "@/generated/prisma/client";
+import type { NetConnection, NetDevice, NetMonitorTarget, NetIp, NetLocation, NetSubnet, NetVlan } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
+import { MONITOR_KINDS, viewOf } from "@/lib/monitor/model";
 import { dayOrNull, iso, nullableString, oneOf, optionalDate, optionalRef, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
+import { isMonitoringEnabled } from "@/server/monitor/run";
 import { contains } from "@/server/search";
 import { DEVICE_STATUSES, DEVICE_TYPES, IP_KINDS } from "./constants";
 import {
@@ -362,4 +364,85 @@ export const connectionEndpoints = defineResource({
   remove: { permission: "network.delete", operation: deleteConnectionOperation },
 });
 
-export const endpoints = [...deviceEndpoints, ...locationEndpoints, ...vlanEndpoints, ...subnetEndpoints, ...ipEndpoints, ...connectionEndpoints];
+/* ───────────── Überwachung (nur lesend) ───────────── */
+
+/**
+ * `GET /network-status` und `GET /network-status-events`: der **gemessene** Zustand der Überwachungsziele und ihre Ausfälle. Nur lesend und nur mit `network.view` – Ziele anzulegen oder zu ändern ist eine Handlung
+ * mit dem gekennzeichneten Recht `network.monitor`, das kein Token tragen darf (`API_NEVER`; Begründung in `api-exceptions.ts`). Die Antwort enthält nie Host, Port, Pfad oder Antworttexte, nur Bezeichnung, Gerät,
+ * Zustand, Latenz, Ergebnisklasse und Zeitpunkte. **Ist die Überwachung ausgeschaltet, liefert die API keine Ziele** (es gibt nichts Gemessenes); eine veraltete Messung steht als `unknown` mit `stale: true`.
+ */
+const statusItem = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(MONITOR_KINDS),
+  deviceId: nullableString,
+  state: z.enum(["up", "warn", "down", "unknown"]),
+  stale: z.boolean(),
+  latencyMs: z.number().int().nullable(),
+  resultClass: nullableString,
+  lastCheckAt: nullableString,
+  stateSince: nullableString,
+  intervalSeconds: z.number().int(),
+});
+const statusSelect = { id: true, name: true, kind: true, deviceId: true, state: true, lastCheckAt: true, stateSince: true, lastLatencyMs: true, lastClass: true, intervalSec: true } as const;
+type StatusRow = Pick<NetMonitorTarget, keyof typeof statusSelect>;
+
+export const statusEndpoints = defineResource({
+  feature: "it.network",
+  tag: "Network",
+  name: "network-status",
+  singular: "monitoring target status",
+  path: "/network-status",
+  read: "network.view",
+  model: db.netMonitorTarget as unknown as Delegate<StatusRow>,
+  select: statusSelect,
+  scope: async () => ((await isMonitoringEnabled()) ? { enabled: true } : { AND: [{ enabled: true }, { enabled: false }] }),
+  item: statusItem,
+  toItem: (t): z.input<typeof statusItem> => {
+    const view = viewOf(t, new Date());
+    return {
+      id: t.id,
+      name: t.name,
+      kind: oneOf(MONITOR_KINDS, t.kind, "tcp"),
+      deviceId: t.deviceId,
+      state: view.state,
+      stale: view.stale,
+      latencyMs: t.lastLatencyMs,
+      resultClass: t.lastClass,
+      lastCheckAt: t.lastCheckAt ? iso(t.lastCheckAt) : null,
+      stateSince: t.stateSince ? iso(t.stateSince) : null,
+      intervalSeconds: t.intervalSec,
+    };
+  },
+  list: {
+    filters: z.strictObject({ deviceId: z.string().max(64).optional(), state: z.enum(["up", "warn", "down", "unknown"]).optional() }),
+    where: ({ deviceId, state }) => ({ ...(deviceId ? { deviceId } : {}), ...(state ? { state } : {}) }),
+    sorts: { name: (dir) => ({ name: dir }) },
+    defaultSort: [{ key: "name", dir: "asc" }],
+  },
+});
+
+const eventItem = z.object({ id: z.string(), targetId: z.string(), at: z.string(), kind: z.enum(["down", "up"]), downSeconds: z.number().int().nullable() });
+type EventRow = { id: string; targetId: string; at: Date; kind: string; downSeconds: number | null };
+
+export const statusEventEndpoints = defineResource({
+  feature: "it.network",
+  tag: "Network",
+  name: "network-status-events",
+  singular: "monitoring event",
+  path: "/network-status-events",
+  read: "network.view",
+  model: db.netMonitorEvent as unknown as Delegate<EventRow>,
+  scope: async () => ((await isMonitoringEnabled()) ? {} : { AND: [{ kind: "down" }, { kind: "up" }] }),
+  item: eventItem,
+  toItem: (e): z.input<typeof eventItem> => ({ id: e.id, targetId: e.targetId, at: iso(e.at), kind: e.kind === "up" ? "up" : "down", downSeconds: e.downSeconds }),
+  list: {
+    filters: z.strictObject({ targetId: z.string().max(64).optional(), kind: z.enum(["down", "up"]).optional() }),
+    where: ({ targetId, kind }) => ({ ...(targetId ? { targetId } : {}), ...(kind ? { kind } : {}) }),
+    sorts: { at: (dir) => ({ at: dir }) },
+    defaultSort: [{ key: "at", dir: "desc" }],
+  },
+});
+
+export const endpoints = [...deviceEndpoints, ...locationEndpoints, ...vlanEndpoints, ...subnetEndpoints, ...ipEndpoints, ...connectionEndpoints, ...statusEndpoints, ...statusEventEndpoints];
+

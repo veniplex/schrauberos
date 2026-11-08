@@ -605,7 +605,7 @@ model NetDevice {
   assignedTo     String?
   purchaseDate   DateTime?
   warrantyUntil  DateTime?
-  // Erreichbarkeits-Überwachung (aktuell nur Demo-Anzeige)
+  // Vormerken für die Erreichbarkeits-Überwachung; gemessen wird, sobald ein Überwachungsziel (NetMonitorTarget) auf das Gerät verweist
   monitorEnabled Boolean   @default(false)
   notes          String?
   createdAt      DateTime  @default(now())
@@ -615,6 +615,7 @@ model NetDevice {
   ips             NetIp[]
   connectionsFrom NetConnection[] @relation("ConnFrom")
   connectionsTo   NetConnection[] @relation("ConnTo")
+  monitorTargets  NetMonitorTarget[]
 
   @@index([type])
   @@index([locationId])
@@ -657,6 +658,95 @@ model NetConnection {
 
   @@index([fromDeviceId])
   @@index([toDeviceId])
+}
+
+// ───────────── Netzwerk-Überwachung (F12) ─────────────
+
+// Ein Ziel der Erreichbarkeitsprüfung: TCP-Verbindung oder HTTP(S)-Anfrage, nie ICMP. Gespeichert wird nur, was die Anwendung gemessen hat (Zustand, Latenz, Statusklasse) – nie ein Antworttext.
+model NetMonitorTarget {
+  id              String             @id @default(cuid())
+  name            String
+  // tcp | http | https
+  kind            String
+  // Name oder IP-Adresse in kanonischer Schreibweise (ohne Klammern); beim Prüfen wird sie erneut gegen die Zielsperre geprüft
+  host            String
+  port            Int
+  // nur http/https: Pfad samt Query (beginnt mit "/"), nie Zugangsdaten
+  path            String?
+  // HEAD | GET (nur http/https)
+  method          String             @default("HEAD")
+  // Zertifikatsfehler (abgelaufen, fremder Aussteller, falscher Name) nicht als Warnung melden
+  ignoreTlsErrors Boolean            @default(false)
+  intervalSec     Int                @default(300)
+  enabled         Boolean            @default(true)
+  deviceId        String?
+  device          NetDevice?         @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  // aktueller Zustand: unknown | up | warn | down (erst nach zwei aufeinanderfolgenden Fehlschlägen "down")
+  state           String             @default("unknown")
+  stateSince      DateTime?
+  failStreak      Int                @default(0)
+  lastCheckAt     DateTime?
+  lastLatencyMs   Int?
+  lastClass       String?
+  // Beginn der nächsten Prüfung; der Job belegt ein Ziel, indem er dieses Datum bedingt weiterschiebt (kein Doppellauf)
+  nextCheckAt     DateTime           @default(now())
+  createdByName   String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  // Cascade mit Absicht: Messwerte sind ein Betriebsprotokoll (7 Tage roh, 30 Tage als Stundenwerte), keine Nachweise über Fachdaten – das Audit-Log hält das Löschen des Ziels fest; die Oberfläche kündigt an, dass der Verlauf mitgelöscht wird
+  samples         NetMonitorSample[]
+  hours           NetMonitorHour[]
+  events          NetMonitorEvent[]
+
+  @@index([deviceId])
+  @@index([nextCheckAt])
+}
+
+// Einzelmessung (Rohwert, 7 Tage): ohne Antworttext, ohne Kopfzeilen
+model NetMonitorSample {
+  id          String           @id @default(cuid())
+  targetId    String
+  target      NetMonitorTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  at          DateTime
+  // erreichbar (inkl. Zertifikatswarnung)
+  ok          Boolean
+  latencyMs   Int?
+  // 2xx | 3xx | 4xx | 5xx | open | tlsWarning | timeout | refused | unreachable | dns | tls | blocked | protocol | error
+  statusClass String
+
+  @@index([targetId, at])
+  @@index([at])
+}
+
+// Verdichtete Stundenwerte (30 Tage): aus den Rohwerten, die älter als 7 Tage sind
+model NetMonitorHour {
+  id           String           @id @default(cuid())
+  targetId     String
+  target       NetMonitorTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  // Beginn der Stunde (UTC)
+  hour         DateTime
+  checks       Int
+  failures     Int
+  latencySumMs Int
+  latencyCount Int
+  latencyMaxMs Int?
+
+  @@unique([targetId, hour])
+  @@index([hour])
+}
+
+// Zustandswechsel: down = Ausfall (nach Entprellung), up = Wiederkehr (mit Dauer des Ausfalls)
+model NetMonitorEvent {
+  id          String           @id @default(cuid())
+  targetId    String
+  target      NetMonitorTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  at          DateTime
+  // down | up
+  kind        String
+  downSeconds Int?
+
+  @@index([targetId, at])
+  @@index([at])
 }
 
 // ───────────── Mitarbeiter ─────────────

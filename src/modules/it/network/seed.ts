@@ -81,6 +81,13 @@ async function demo(db: PrismaClient) {
   await link(swW, "1", apW, "eth0", "K-011");
   await link(swW, "2", pcW, "eth0", "K-012");
   await link(swW, "3", cam, "eth0", "K-013");
+
+  // Überwachungsziele für die Demo: ohne Messwerte (Zustand "unbekannt"), die Überwachung selbst bleibt ausgeschaltet – es gibt keinen erfundenen Status
+  const target = (name: string, kind: string, host: string, port: number, deviceId: string, path: string | null = null) =>
+    db.netMonitorTarget.create({ data: { name, kind, host, port, path, deviceId, intervalSec: 300, createdByName: "Demo" } });
+  await target("Firewall – Weboberfläche", "https", "192.168.10.1", 443, fw.id, "/");
+  await target("Domänencontroller – RDP", "tcp", "192.168.10.2", 3389, dc.id);
+  await target("NAS – Weboberfläche", "https", "192.168.10.4", 5001, nas.id, "/");
 }
 
 export const seeds: SeedDef[] = [{ id: "network", feature: "it.network", order: 110, demo }];

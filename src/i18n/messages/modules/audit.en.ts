@@ -302,6 +302,10 @@ export const auditEn: typeof auditDe = {
       create: "Network entry created",
       update: "Network entry changed",
       delete: "Network entry deleted",
+      monitorCreate: "Monitoring target created",
+      monitorUpdate: "Monitoring target changed",
+      monitorDelete: "Monitoring target deleted",
+      monitorSwitch: "Network monitoring switched on/off",
     },
     docs: {
       create: "Documentation page created",

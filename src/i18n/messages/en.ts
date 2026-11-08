@@ -194,6 +194,7 @@ export const en: Messages = {
     devices: "Devices",
     ipam: "IP management",
     cabling: "Cabling",
+    monitoring: "Monitoring",
   },
   areas: {
     workshop: "Workshop",
@@ -416,6 +417,7 @@ export const en: Messages = {
       view: "View network documentation",
       edit: "Edit network documentation",
       delete: "Delete network entries",
+      monitor: "Set up network monitoring (monitoring targets)",
     },
     invoices: {
       view: "View invoices",
@@ -691,7 +693,7 @@ export const en: Messages = {
     },
     deviceStatus: { active: "Active", planned: "Planned", spare: "Spare", retired: "Retired" },
     ipKind: { static: "Static", dhcp_reservation: "DHCP reservation", reserved: "Reserved", gateway: "Gateway" },
-    linkState: { online: "Online", degraded: "Slow", offline: "Offline", unknown: "Not monitored" },
+    linkState: { online: "Online", degraded: "Degraded", offline: "Offline", unknown: "Status unknown" },
     weekday: {
       mon: "Monday",
       tue: "Tuesday",

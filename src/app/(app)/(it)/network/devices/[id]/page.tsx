@@ -14,7 +14,7 @@ import { compareIPv4, nextFreeIp, warrantyState } from "@/modules/it/network/dom
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteDevice } from "@/modules/it/network/actions";
-import { checkDevices } from "@/modules/it/network/queries";
+import { checkDevices, monitoringEnabled } from "@/modules/it/network/queries";
 import { DeviceStatusBadge, LinkStateBadge, MonitoringNotice } from "@/modules/it/network/ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -44,7 +44,8 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   ]);
   if (!device) notFound();
 
-  const checks = await checkDevices([device]);
+  const [checks, monitoring] = await Promise.all([checkDevices([device]), monitoringEnabled()]);
+  const check = checks.get(device.id);
   const canEdit = session.can("network.edit");
   const w = warrantyState(device.warrantyUntil);
   const ips = [...device.ips].sort((a, b) => compareIPv4(a.address, b.address));
@@ -66,7 +67,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
           <span className="flex flex-wrap items-center gap-2">
             <Badge>{td(`enums.deviceType.${device.type}`, device.type)}</Badge>
             <DeviceStatusBadge status={device.status} td={td} />
-            {device.monitorEnabled ? <LinkStateBadge check={checks.get(device.id)} i18n={i18n} /> : null}
+            {device.monitorEnabled || check?.targets ? <LinkStateBadge check={check} i18n={i18n} /> : null}
           </span>
         }
         actions={
@@ -77,9 +78,9 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
           ) : null
         }
       />
-      {device.monitorEnabled ? (
+      {device.monitorEnabled && !monitoring ? (
         <div className="mb-5">
-          <MonitoringNotice t={t} />
+          <MonitoringNotice t={t} monitoring={monitoring} canOpen />
         </div>
       ) : null}
 
