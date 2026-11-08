@@ -3,6 +3,7 @@ import { runApiCleanup } from "@/server/api/cleanup";
 import { deliverOutbox, hasPendingOutbox, pruneOutbox } from "./outbox";
 import { pruneJobData } from "./maintenance";
 import { activeFeatureSet } from "./runner";
+import { describeVacuum, runIncrementalVacuum } from "./vacuum";
 import type { JobDef, OutboxHandlerDef } from "./types";
 
 /**
@@ -42,6 +43,13 @@ export function platformJobs(getAll: () => readonly JobDef[], handlers: () => re
         getAll().map((j) => j.id),
         now,
       )} gelöscht`,
+    },
+    {
+      // nach den Aufbewahrungsjobs (3:00 bis 3:50): freie Seiten der Datenbank zurückgeben, begrenzt je Lauf (siehe `server/jobs/vacuum.ts`)
+      id: "platform.incremental-vacuum",
+      schedule: { cron: "30 4 * * *" },
+      timeoutMs: 5 * 60_000,
+      run: async ({ signal }) => describeVacuum(await runIncrementalVacuum({ signal })),
     },
     {
       // abgelaufene Idempotenz-Schlüssel der API jedes Mal, alte Tokens einmal am Tag (siehe `server/api/cleanup.ts`)

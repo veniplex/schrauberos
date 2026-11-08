@@ -84,6 +84,7 @@ export const systemEn: typeof systemDe = {
       outbox: "Deliver events (outbox)",
       "outbox-prune": "Clean up delivered events",
       "jobs-prune": "Clean up old job results",
+      "incremental-vacuum": "Return free space of the database",
       "api-cleanup": "Clean up API data (keys, old tokens)",
     },
   },

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { BASELINE_NAME } from "../lib/migration-guard";
-import { appliedMigrations, listMigrations, MigrationError, REINSTALL_MESSAGE, runMigrations } from "./migrate";
+import { appliedMigrations, AUTO_VACUUM_INCREMENTAL, listMigrations, MigrationError, REINSTALL_MESSAGE, runMigrations } from "./migrate";
 
 const root = mkdtempSync(path.join(tmpdir(), "so-migrate-"));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -184,5 +184,78 @@ describe("Migrations-Läufer: fremde Migrationshistorie (alte Volumes)", () => {
     const file = path.join(root, "frisch.db");
     assert.ok((await runMigrations(file)).includes(BASELINE_NAME));
     assert.deepEqual(await runMigrations(file), []);
+  });
+});
+
+describe("Migrations-Läufer: auto_vacuum = INCREMENTAL (Z7)", () => {
+  const modeOf = (file: string) => {
+    const db = new Database(file, { readonly: true });
+    try {
+      return db.pragma("auto_vacuum", { simple: true });
+    } finally {
+      db.close();
+    }
+  };
+
+  it("eine neue Datenbank hat auto_vacuum = 2 (INCREMENTAL) und läuft im WAL-Modus – die Reihenfolge der Anweisungen ist entscheidend", async () => {
+    const file = path.join(root, "av-neu.db");
+    await runMigrations(file);
+    assert.equal(modeOf(file), AUTO_VACUUM_INCREMENTAL);
+    const db = new Database(file);
+    assert.equal(db.pragma("journal_mode", { simple: true }), "wal");
+    db.close();
+    // erst WAL, dann auto_vacuum bleibt wirkungslos (deshalb setzt der Läufer die Betriebsart zuerst)
+    const wrong = path.join(root, "av-falsch.db");
+    const w = new Database(wrong);
+    w.pragma("journal_mode = WAL");
+    w.pragma("auto_vacuum = INCREMENTAL");
+    w.exec("CREATE TABLE t (x)");
+    assert.equal(w.pragma("auto_vacuum", { simple: true }), 0);
+    w.close();
+  });
+
+  it("eine bestehende Datenbank mit anderer Betriebsart wird nicht angefasst", async () => {
+    const dir = makeMigrations("av-alt", { "20260101000000_one": `CREATE TABLE "A" ("id" INTEGER PRIMARY KEY);` });
+    const file = path.join(root, "av-alt.db");
+    const old = new Database(file);
+    old.exec(`CREATE TABLE "Alt" ("id" INTEGER PRIMARY KEY)`);
+    old.close();
+    assert.equal(modeOf(file), 0);
+    // fremde Tabelle ohne Historie → keine Veränderung (Baseline-Prüfung greift nur mit unserer Baseline; hier eigene Migration)
+    await runMigrations(file, dir);
+    assert.equal(modeOf(file), 0, "kein stilles VACUUM, keine Umstellung");
+  });
+
+  it("Löschen großer Datenmengen und PRAGMA incremental_vacuum verkleinern die Datei (auch nach einer Sicherungskopie)", async () => {
+    const file = path.join(root, "av-schrumpf.db");
+    await runMigrations(file);
+    const db = new Database(file);
+    try {
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      const base = statSync(file).size;
+      db.exec(`CREATE TABLE "Big" ("id" INTEGER PRIMARY KEY, "blob" TEXT)`);
+      const insert = db.prepare(`INSERT INTO "Big" ("blob") VALUES (?)`);
+      db.transaction(() => {
+        for (let i = 0; i < 3000; i++) insert.run("x".repeat(2000));
+      })();
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      const grown = statSync(file).size;
+      assert.ok(grown > 5_000_000, `Datei gewachsen (${grown})`);
+      db.exec(`DELETE FROM "Big"`);
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      assert.equal(statSync(file).size, grown, "ohne Aufräumen bleibt die Datei so groß (freie Seiten)");
+      assert.ok((db.pragma("freelist_count", { simple: true }) as number) > 1000);
+      db.pragma("incremental_vacuum(100000)");
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      const shrunk = statSync(file).size;
+      assert.ok(shrunk < base + 100_000 && shrunk < grown / 3, `Datei geschrumpft (${grown} → ${shrunk}, leere Datenbank ${base})`);
+      assert.equal(db.pragma("freelist_count", { simple: true }), 0);
+      // die Online-Sicherung (Backup, Restore) behält die Betriebsart
+      const copy = path.join(root, "av-kopie.db");
+      await db.backup(copy);
+      assert.equal(modeOf(copy), AUTO_VACUUM_INCREMENTAL);
+    } finally {
+      db.close();
+    }
   });
 });

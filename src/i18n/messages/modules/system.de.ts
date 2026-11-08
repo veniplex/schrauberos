@@ -82,6 +82,7 @@ export const systemDe = {
       outbox: "Ereignisse zustellen",
       "outbox-prune": "Zugestellte Ereignisse aufräumen",
       "jobs-prune": "Alte Ergebnisse der Aufgaben aufräumen",
+      "incremental-vacuum": "Freien Platz der Datenbank zurückgeben",
       "api-cleanup": "API-Daten aufräumen (Schlüssel, alte Tokens)",
     },
   },

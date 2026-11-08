@@ -13,6 +13,15 @@ import { BASELINE_NAME } from "../lib/migration-guard";
  * der Code ggf. nicht alle Migrationen der Datenbank (Migrationen sind abwärtskompatibel zu schreiben).
  */
 
+/**
+ * Die Datenbank wird mit `auto_vacuum = INCREMENTAL` angelegt (Wert 2): Aufbewahrungsjobs löschen laufend (Messwerte, Zustellprotokoll, Mail, Audit), und ohne diese Betriebsart
+ * schrumpft die Datei nie und jedes Backup kopiert die freien Seiten mit. Die Betriebsart steckt im Dateikopf und lässt sich nur **vor der ersten Tabelle** setzen – und **vor** `journal_mode = WAL`
+ * (der Wechsel in den WAL-Modus schreibt den Kopf; getestet in `migrate.test.ts`). Deshalb setzt der Läufer sie als allererste Anweisung auf einer neuen Datei; eine Zeile in der Baseline-Migration
+ * kann das nicht leisten (dort existiert `_prisma_migrations` längst, der Wert würde still ignoriert). Bestehende Dateien bleiben unverändert (der Befehl wirkt dort nicht); das Freigeben der
+ * Seiten besorgt der Job `platform.incremental-vacuum` (`server/jobs/vacuum.ts`).
+ */
+export const AUTO_VACUUM_INCREMENTAL = 2;
+
 export type MigrationFile = { name: string; sql: string; checksum: string };
 
 export class MigrationError extends Error {
@@ -125,6 +134,8 @@ export async function runMigrations(dbFile: string, dir = migrationsDir(), befor
   mkdirSync(path.dirname(dbFile), { recursive: true });
   const db = new Database(dbFile);
   try {
+    // Reihenfolge ist Pflicht: erst die Betriebsart (nur auf einer leeren Datei wirksam), dann der WAL-Modus (siehe AUTO_VACUUM_INCREMENTAL)
+    db.pragma(`auto_vacuum = ${AUTO_VACUUM_INCREMENTAL}`);
     db.pragma("journal_mode = WAL");
     db.pragma("busy_timeout = 10000");
     db.exec(CREATE_TABLE);
