@@ -80,3 +80,51 @@ describe("Dateispeicher", () => {
     assert.equal(existsSync(path.join(filesDir(), "doku", "buero")), false);
   });
 });
+
+describe("Namen mit Punkten und Sonderfällen (Z6-2 M3)", () => {
+  it("safeName fasst Punktfolgen zusammen und schützt reservierte Windows-Namen", () => {
+    assert.equal(safeName("Foto..png"), "Foto.png");
+    assert.equal(safeName("RE..2026"), "RE.2026");
+    assert.equal(safeName("a...b....c"), "a.b.c");
+    assert.equal(safeName("...."), "datei");
+    assert.equal(safeName("..."), "datei");
+    assert.equal(safeName(".versteckt"), "versteckt");
+    assert.equal(safeName("..\\..\\x"), "x");
+    assert.equal(safeName("Müller Co..GmbH"), "Mueller-Co.GmbH");
+    assert.equal(safeName("日本語"), "datei", "reine Nicht-Latin-Namen werden zu „datei“ (der Pfad besteht nur aus ASCII)");
+    assert.equal(safeName("Zoë–Åke"), "Zoe-Ake");
+    for (const reserved of ["CON", "con", "NUL", "COM1", "lpt9", "AUX.txt", "PRN"]) assert.match(safeName(reserved), /^_/, reserved);
+    for (const fine of ["CONTRACT", "COM10", "console", "NULL"]) assert.doesNotMatch(safeName(fine), /^_/, fine);
+    // Ergebnis ist immer ein gültiger Pfadbestandteil
+    for (const input of ["Foto..png", "....", "CON", "a/../b", "..a", "a..", "-.-", "._x", "x".repeat(300) + "..y"]) {
+      const name = safeName(input);
+      assert.doesNotThrow(() => resolveRel(`ordner/${name}`), `${input} → ${name}`);
+      assert.ok(!name.includes(".."), name);
+    }
+  });
+
+  it("storeFile legt Namen mit „..“ ab, statt zu scheitern (hochgeladenes Foto, Rechnungsnummer, Dokumentationsbild)", async () => {
+    const photo = await storeFile("doku/handbook", "Foto..png", bytes("bild"));
+    assert.equal(photo, "doku/handbook/Foto.png");
+    const invoice = await storeFile("rechnungen/2026/eingang", "2026-03-14_Mueller-Co..GmbH_RE..2026.pdf", bytes("beleg"));
+    assert.equal(invoice, "rechnungen/2026/eingang/2026-03-14_Mueller-Co.GmbH_RE.2026.pdf");
+    const dots = await storeFile("doku/handbook", "....", bytes("x"));
+    assert.match(dots, /^doku\/handbook\/datei(\.datei)?$/, "nur Punkte ergeben einen Ersatznamen, keinen Fehler");
+    const reserved = await storeFile("doku/handbook", "CON.pdf", bytes("x"));
+    assert.equal(reserved, "doku/handbook/_CON.pdf");
+    const unicode = await storeFile("doku/handbook", "Übung–Ärger.png", bytes("x"));
+    assert.equal(unicode, "doku/handbook/Uebung-Aerger.png");
+    const folder = await storeFile("doku/Ordner..Name", "a.png", bytes("x"));
+    assert.equal(folder, "doku/Ordner.Name/a.png");
+    // und sie lassen sich wieder umbenennen/verschieben
+    assert.equal(await moveFile(photo, "doku/handbook", "Foto..neu.png"), "doku/handbook/Foto.neu.png");
+    for (const rel of [invoice, dots, reserved, unicode, folder]) assert.ok(existsSync(resolveRel(rel)), rel);
+  });
+
+  it("der Beleg-Pfad aus Partner und Nummer ist gültig, auch mit „..“ im Namen", async () => {
+    const { invoiceFileLocation } = await import("@/modules/office/invoices/domain");
+    const location = invoiceFileLocation({ direction: "incoming", issueDate: new Date("2026-03-14T11:00:00Z"), number: "RE..2026", partyName: "Müller Co..GmbH" }, "application/pdf");
+    assert.equal(location.name, "2026-03-14_Mueller-Co.GmbH_RE.2026.pdf");
+    assert.ok(await storeFile(location.dir, location.name, bytes("beleg")));
+  });
+});
