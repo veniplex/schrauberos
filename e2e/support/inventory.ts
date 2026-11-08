@@ -17,6 +17,10 @@ export type InventoryEntry = {
   feature: string | null;
   /** Schlüsselseite mit Baseline-Screenshots */
   screenshot: boolean;
+  /** Ohne dieses Recht ist ein fremder Datensatz „nicht gefunden“ (siehe `PageDef.notFoundWithout`) */
+  notFoundWithout: string | null;
+  /** Zusätzlich verlangt: mindestens eines dieser Rechte (siehe `PageDef.alsoAnyOf`) */
+  alsoAnyOf: readonly string[];
 };
 
 /** Platzhalter, wenn es noch keine Datenbank gibt (`playwright test --list` ohne laufende App): nur die Namen der Tests werden gebraucht. */
@@ -40,7 +44,7 @@ export function loadInventory(): InventoryEntry[] {
   try {
     const entries: InventoryEntry[] = [];
     const add = (
-      page: { path: string; kind: PageKind; params?: Record<string, PageParam>; query?: string; key?: boolean },
+      page: { path: string; kind: PageKind; params?: Record<string, PageParam>; query?: string; key?: boolean; notFoundWithout?: string; alsoAnyOf?: readonly string[] },
       extra: Pick<InventoryEntry, "permission" | "public" | "feature">,
     ) => {
       let url = page.path;
@@ -52,7 +56,7 @@ export function loadInventory(): InventoryEntry[] {
         url = url.replace(`[${name}]`, encodeURIComponent(value));
         if ("value" in param) key = key.replace(`[${name}]`, value);
       }
-      entries.push({ key: `${key}${page.query ?? ""}`, url: `${url}${page.query ?? ""}`, kind: page.kind, screenshot: page.key ?? false, ...extra });
+      entries.push({ key: `${key}${page.query ?? ""}`, url: `${url}${page.query ?? ""}`, kind: page.kind, screenshot: page.key ?? false, notFoundWithout: page.notFoundWithout ?? null, alsoAnyOf: page.alsoAnyOf ?? [], ...extra });
     };
     for (const page of ALL_PAGES) add(page, { permission: page.permission, public: false, feature: page.feature });
     for (const page of PLATFORM_PAGES) add(page, { permission: null, public: page.public ?? false, feature: null });

@@ -33,10 +33,12 @@ for (const role of ROLE_KEYS.filter((r) => r !== "admin")) {
     const wrong: string[] = [];
     try {
       for (const entry of entries) {
-        const allowed = entry.permission === null || permissions.has(entry.permission);
+        const allowed = (entry.permission === null || permissions.has(entry.permission)) && (entry.alsoAnyOf.length === 0 || entry.alsoAnyOf.some((p) => permissions.has(p)));
         const res = await api.get(entry.url, { maxRedirects: 0 });
         const outcome = outcomeOf(res.status(), await res.text());
-        if (allowed && outcome !== "sichtbar") wrong.push(`${entry.key}: erwartet sichtbar, war ${outcome}`);
+        // Seiten mit eigenen Datensätzen: ohne das Zusatzrecht ist ein fremder Datensatz „nicht gefunden“
+        const ownOnly = entry.notFoundWithout !== null && !permissions.has(entry.notFoundWithout);
+        if (allowed && outcome !== "sichtbar" && !(ownOnly && outcome === "nicht gefunden")) wrong.push(`${entry.key}: erwartet sichtbar, war ${outcome}`);
         if (!allowed && outcome !== "gesperrt") wrong.push(`${entry.key}: erwartet gesperrt (${entry.permission}), war ${outcome}`);
       }
     } finally {

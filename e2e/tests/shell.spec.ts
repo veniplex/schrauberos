@@ -26,6 +26,9 @@ test("Handy: Das Seitenfach öffnet und schließt per Knopf und Escape, der Foku
 test("Sprunglink: Tab springt zum Inhalt", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "Tastaturbedienung am Desktop");
   await page.goto("/");
+  // Erst tippen, wenn die Seite fertig geladen und übernommen ist (ein Tab mitten in der Hydration traf in einem von zwei Läufen nicht den Sprunglink)
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "Zum Inhalt springen" });
   await expect(skip).toBeFocused();

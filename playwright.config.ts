@@ -15,7 +15,8 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 10_000, toHaveScreenshot: { maxDiffPixelRatio: 0.01 } },
   fullyParallel: true,
-  workers: process.env.CI ? 2 : 3,
+  // 1 500 Tests in vier Größen: lokal sechs Worker (rund 10 Minuten), in der Pipeline drei (GitHub-Runner haben vier Kerne)
+  workers: 3,
   retries: process.env.CI ? 1 : 0,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
@@ -27,7 +28,8 @@ export default defineConfig({
   webServer: {
     command: "node e2e/start-server.mjs",
     url: `${BASE_URL}/api/health`,
-    reuseExistingServer: false,
+    // E2E_REUSE=1 (nur beim Entwickeln von Tests): ein schon laufender Server samt eingerichteten Konten (e2e/.auth) wird weiterverwendet, statt alles frisch aufzusetzen
+    reuseExistingServer: process.env.E2E_REUSE === "1",
     timeout: 180_000,
     stdout: "pipe",
     stderr: "pipe",
@@ -39,6 +41,9 @@ export default defineConfig({
     storageState: authFile("admin"),
     // Der Service Worker (P3-5) ist nur in e2e/tests/pwa.spec.ts aktiv; sonst verfälschte sein Zwischenspeicher Messungen (Netz, Baselines, Screenshots)
     serviceWorkers: "block",
+    // Eine Aktion, die nie möglich wird, soll nach Sekunden scheitern – nicht erst am Zeitlimit des ganzen Tests
+    actionTimeout: 20_000,
+    navigationTimeout: 45_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

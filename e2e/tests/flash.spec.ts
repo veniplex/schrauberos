@@ -24,9 +24,9 @@ test("Löschen per Formular zeigt genau eine Meldung in einer Live-Region, das C
 
   // Löschen: Rückfrage im Dialog der Anwendung (kein Browser-Dialog) bestätigen
   await page.getByRole("button", { name: "Kunde löschen" }).click();
-  const confirm = page.getByRole("dialog");
-  await expect(confirm.getByRole("heading", { name: "Kunde löschen?" })).toBeVisible();
-  await confirm.getByRole("button", { name: "Kunde löschen" }).click();
+  const confirm = page.getByRole("dialog", { name: "Bitte bestätigen" });
+  await expect(confirm.getByText("Kunde wirklich löschen?")).toBeVisible();
+  await confirm.getByRole("button", { name: "Bestätigen" }).click();
   await page.waitForURL((url) => url.pathname === "/customers");
 
   // Genau eine Meldung, in der höflichen Region

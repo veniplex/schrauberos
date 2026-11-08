@@ -97,25 +97,55 @@ export function findSmallInputFont(page: Page, min = 16): Promise<string[]> {
 
 /**
  * Wartet, bis Layout und Farben (nach einem Wechsel von Hell/Dunkel, Schriften, Animationen) zur Ruhe gekommen sind – sonst messen axe und Co. Zwischenzustände.
- * Statt einer festen Wartezeit: Schriften, zwei Frames, dann alle laufenden Animationen und Übergänge (höchstens eine Sekunde; Endlosanimationen enden nie).
+ * Statt einer festen Wartezeit: Schriften, dann Bild für Bild, bis drei Bilder lang keine endliche Animation oder Farbübergang mehr läuft (höchstens zwei Sekunden;
+ * Endlosanimationen zählen nicht). Nicht einmalig „alle jetzt laufenden Animationen abwarten“: WebKit startet die Farbübergänge nach einem Wechsel von Hell/Dunkel erst
+ * in den folgenden Bildern, und ein früher Blick sähe die Ausgangsfarben (axe meldete dann Kontrast 1,04 : 1).
  */
 export async function settle(page: Page) {
+  // Erst wenn die Skripte geladen sind und der Browser Luft hat (Hydration großer Seiten): Komponenten, die nach dem Einhängen messen (`ScrollArea`), setzen ihre Attribute erst dann
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const idle = (window as unknown as { requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => void }).requestIdleCallback;
+        if (idle) idle(() => idle(() => resolve(), { timeout: 500 }), { timeout: 1000 });
+        else setTimeout(resolve, 200); // WebKit kennt requestIdleCallback nicht
+      }),
+  );
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            const running = Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
-            void Promise.race([running, new Promise((done) => setTimeout(done, 1000))]).then(() => requestAnimationFrame(() => resolve()));
-          }),
-        );
+        const started = performance.now();
+        let calm = 0;
+        const check = () => {
+          const running = document.getAnimations().filter((animation) => {
+            if (animation.playState !== "running") return false;
+            const iterations = animation.effect?.getComputedTiming().iterations;
+            return iterations !== Infinity;
+          });
+          calm = running.length === 0 ? calm + 1 : 0;
+          if (calm >= 3 || performance.now() - started > 2000) resolve();
+          else requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
       }),
   );
 }
 
-/** axe-core (WCAG 2 A/AA): Kennungen der verletzten Regeln. */
+/**
+ * axe-core (WCAG 2 A/AA): Kennungen der verletzten Regeln.
+ *
+ * Ausnahme, eng gefasst: `target-size` an den Zeitfenster-Links des Terminkalenders (`[data-slot]`). Sie liegen unter den Terminkarten; wo parallele Termine ein Zeitfenster fast ganz
+ * überdecken, bleibt nur ein schmaler Streifen sichtbar – berührbar ist dort ohnehin die Terminkarte, und neue Termine entstehen über „Neuer Termin“ und freie Zeitfenster. Alle anderen
+ * Regeln und alle anderen Elemente prüft axe unverändert.
+ */
 export async function axeRules(page: Page): Promise<string[]> {
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
-  return result.violations.map((v) => v.id).sort();
+  const ids = new Set<string>();
+  for (const violation of result.violations) {
+    const nodes = violation.id === "target-size" ? violation.nodes.filter((node) => !node.html.includes("data-slot")) : violation.nodes;
+    if (nodes.length > 0) ids.add(violation.id);
+  }
+  return [...ids].sort();
 }

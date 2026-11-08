@@ -13,7 +13,11 @@ import { axeRules, cspViolations, findOverflow, findSmallInputFont, findSmallTar
  */
 export function collectBrowserErrors(page: Page): () => string[] {
   const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`.slice(0, 300)));
+  page.on("pageerror", (error) => {
+    // WebKit meldet Vorlade-Anfragen von Next (`?_rsc=`), die ein Neuladen oder Seitenwechsel abbricht, als „access control checks“ – kein Fehler der Seite
+    if (/[?&]_rsc=\S+ due to access control checks/.test(error.message)) return;
+    errors.push(`pageerror: ${error.message}`.slice(0, 300));
+  });
   page.on("console", (message) => {
     if (message.type() === "error" && !/Failed to load resource/i.test(message.text())) errors.push(`console.error: ${message.text()}`.slice(0, 300));
   });
@@ -29,8 +33,11 @@ export async function assertNoErrorPage(page: Page, label: string): Promise<void
   if (count > 0) throw new Error(`${label}: Fehlerseite statt Inhalt (data-status="error")`);
 }
 
-/** Im Antworttext einer Seite (ohne Browser): Fehlerseite oder von Next eingebettete Fehlerkennung (`data-dgst`, Fehler im gestreamten Teil). */
-export const looksLikeErrorPage = (html: string) => /data-status="error"|\sdata-dgst="/.test(html);
+/**
+ * Im Antworttext einer Seite (ohne Browser): Fehlerseite oder von Next eingebettete Fehlerkennung (`data-dgst`, Fehler im gestreamten Teil). Die Kennungen der
+ * Weiterleitung (`NEXT_REDIRECT`: so leitet eine gesperrte Seite auf „Kein Zugriff“) und von „nicht gefunden“ (`NEXT_HTTP_ERROR_FALLBACK`) sind keine Fehler.
+ */
+export const looksLikeErrorPage = (html: string) => /data-status="error"|\sdata-dgst="(?!NEXT_REDIRECT;|NEXT_HTTP_ERROR_FALLBACK;)/.test(html);
 
 export type PageCheckOptions = {
   /** Schlüssel in den Baseline-Listen (Seitenmuster) */

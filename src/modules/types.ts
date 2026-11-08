@@ -127,6 +127,16 @@ export type PageDef = {
   query?: string;
   /** Schlüsselseite: bekommt Baseline-Screenshots */
   key?: boolean;
+  /**
+   * Die Seite zeigt nur eigene Datensätze: Wer das Leserecht hat, aber **dieses** Recht nicht, bekommt für einen fremden Datensatz „nicht gefunden“ (404) statt der Seite (z. B. ein fremder Zeiteintrag
+   * ohne `time.viewAll`). Die Rollenprüfung der Browser-CI erwartet dann für Rollen ohne dieses Recht „sichtbar oder nicht gefunden“.
+   */
+  notFoundWithout?: Permission;
+  /**
+   * Zusätzlich verlangtes Recht: **mindestens eines** dieser Rechte (zum Leserecht der Seite), sonst „Kein Zugriff“ – z. B. das Quellrecht eines Berichts (`SOURCE_RIGHTS`). Die Rollenprüfung der
+   * Browser-CI erwartet „gesperrt“ für Rollen, die keines davon haben.
+   */
+  alsoAnyOf?: readonly Permission[];
 };
 
 export function definePages(feature: FeatureId, pages: ReadonlyArray<Omit<PageDef, "feature">>): PageDef[] {

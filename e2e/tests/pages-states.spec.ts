@@ -26,7 +26,8 @@ test("Wartezustand: der Auslöser eines Dialogs zeigt ein Lade-Symbol ohne Layou
     await route.continue();
   });
   const trigger = page.locator('a[href*="new=1"]').first();
-  const live = page.locator("div[role='status'].sr-only");
+  // die Ansage der Navigation (die Schnellsuche und das Seitenfach haben eigene Regionen ohne `no-print`)
+  const live = page.locator("div[role='status'].sr-only.no-print");
   await expect(live, "die Live-Region ist schon vor dem Laden da und leer").toHaveText("");
   const idle = await trigger.boundingBox();
   await trigger.click();

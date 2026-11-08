@@ -50,7 +50,7 @@ test.describe("Status- und Fehlerseiten", () => {
   }
 
   test("state:kein-zugriff (Rolle ohne Recht)", async ({ browser }, info) => {
-    const context = await browser.newContext({ storageState: authFile("mechanic"), ...info.project.use });
+    const context = await browser.newContext({ ...info.project.use, storageState: authFile("mechanic") });
     const page = await context.newPage();
     try {
       await watchCsp(page);
@@ -101,7 +101,11 @@ test.describe("Erkennung von Fehlerseiten in der Browser-CI (Selbsttest)", () =>
     expect((await cspViolations(page)).join(" ")).toMatch(/script-src/);
   });
 
-  test("jede Antwort trägt die erzwungene CSP: Seiten, Statik und Programmschnittstelle (sonst ist die Prüfung der Verstöße in der Inventur blind)", async ({ page, request }) => {
+  test("jede Antwort trägt die erzwungene CSP: Seiten, Statik und Programmschnittstelle (sonst ist die Prüfung der Verstöße in der Inventur blind)", async ({ browser, request, baseURL }) => {
+    // Die Anmeldeseite wird für Angemeldete weitergeleitet: ohne Sitzung öffnen
+    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    try {
     const header = (headers: Record<string, string>, name: string) => headers[name];
     const response = await page.goto("/login");
     const csp = header(response?.headers() ?? {}, "content-security-policy") ?? "";
@@ -114,11 +118,16 @@ test.describe("Erkennung von Fehlerseiten in der Browser-CI (Selbsttest)", () =>
     expect(header(health.headers(), "content-security-policy") ?? "").toContain("default-src 'self'");
     const asset = await page.evaluate(() => Array.from(document.scripts).map((s) => s.src).find((src) => src.includes("/_next/static/")));
     if (asset) expect(header((await request.get(asset)).headers(), "content-security-policy") ?? "").toContain("default-src 'self'");
+    } finally {
+      await context.close();
+    }
   });
-  test("CSP mit Nonce (P1b-1): je Anfrage ein neuer Nonce, jedes Skript und jedes Stilelement der Seite trägt ihn – auch Anmeldung, Startseite und „Nicht gefunden“", async ({ request }) => {
+  test("CSP mit Nonce (P1b-1): je Anfrage ein neuer Nonce, jedes Skript und jedes Stilelement der Seite trägt ihn – auch Anmeldung, Startseite und „Nicht gefunden“", async ({ request, playwright, baseURL }) => {
     const nonceOf = (csp: string) => /'nonce-([^']+)'/.exec(csp)?.[1];
+    // Die Anmeldeseite wird für Angemeldete weitergeleitet: ohne Sitzung abrufen, die übrigen Seiten mit der Sitzung des Administrators
+    const anonymous = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
     const fetchPage = async (url: string) => {
-      const res = await request.get(url, { headers: { accept: "text/html" } });
+      const res = await (url === "/login" ? anonymous : request).get(url, { headers: { accept: "text/html" } });
       return { csp: res.headers()["content-security-policy"] ?? "", html: await res.text(), status: res.status() };
     };
     const first = await fetchPage("/login");
@@ -131,13 +140,16 @@ test.describe("Erkennung von Fehlerseiten in der Browser-CI (Selbsttest)", () =>
       const { csp, html } = await fetchPage(url);
       const nonce = nonceOf(csp);
       expect(nonce, `${url}: Nonce`).toBeTruthy();
-      const tags = [...html.matchAll(/<(script|style)[^>]*>/g)].map((m) => m[0]).filter((tag) => !/nomodule/i.test(tag)); // das Skript für alte Browser (noModule) läuft in keinem Browser mit CSP-Unterstützung
+      const tags = [...html.matchAll(/<(script|style)\b[^>]*>/g)].map((m) => m[0]).filter((tag) => !/\bnomodule\b/i.test(tag)); // das Skript für alte Browser (noModule) läuft in keinem Browser mit CSP-Unterstützung
       expect(tags.length, `${url}: Skripte vorhanden`).toBeGreaterThan(0);
       for (const tag of tags) expect(tag, `${url}: ${tag.slice(0, 80)}`).toContain(`nonce="${nonce}"`);
     }
+    await anonymous.dispose();
   });
 
-  test("CSP je Antwortart (P1b-1, ZP3-S-F9): Programmschnittstelle default-src 'none', Statik die Rückfall-Richtlinie, nie zwei Köpfe, Permissions-Policy mit Kamera für die eigene Herkunft", async ({ request, page }) => {
+  test("CSP je Antwortart (P1b-1, ZP3-S-F9): Programmschnittstelle default-src 'none', Statik die Rückfall-Richtlinie, nie zwei Köpfe, Permissions-Policy mit Kamera für die eigene Herkunft", async ({ request, browser, baseURL }) => {
+    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
     const api = await request.get("/api/v1/customers");
     expect(api.headers()["content-security-policy"]).toBe("default-src 'none'; frame-ancestors 'none'");
     const health = await request.get("/api/health");
@@ -149,5 +161,6 @@ test.describe("Erkennung von Fehlerseiten in der Browser-CI (Selbsttest)", () =>
       // Next führt mehrere Köpfe gleichen Namens mit Komma zusammen: genau eine Richtlinie hat genau ein script-src bzw. default-src
       expect((res.headers()["content-security-policy"] ?? "").match(/default-src/g)?.length ?? 0).toBe(1);
     }
+    await context.close();
   });
 });
