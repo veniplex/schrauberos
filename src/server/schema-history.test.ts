@@ -48,6 +48,20 @@ describe("Schema: Löschverhalten und Versionen", () => {
     restrict("TimeEntry", "employee");
   });
 
+  it("jeder Fremdschlüssel hat einen führenden Index (Löschen und Verknüpfen suchen sonst die ganze Tabelle ab)", () => {
+    const missing: string[] = [];
+    for (const m of schema.matchAll(/^model (\w+) \{\n([\s\S]*?)\n\}/gm)) {
+      const [, model, body] = m;
+      for (const rel of body!.matchAll(/@relation\((?:"[^"]*",\s*)?fields:\s*\[([^\]]+)\]/g)) {
+        const first = rel[1]!.split(",")[0]!.trim();
+        const lead = new RegExp(`@@(index|unique|id)\\(\\[${first}\\b`).test(body!);
+        const field = new RegExp(`^\\s*${first}\\s+\\S+.*@(unique|id)\\b`, "m").test(body!);
+        if (!lead && !field) missing.push(`${model}.${first}`);
+      }
+    }
+    assert.deepEqual(missing, []);
+  });
+
   it("die sechs bearbeitbaren Konfigurationstabellen haben updatedAt (Versionssperre)", () => {
     for (const model of ["Bay", "AppointmentType", "NetLocation", "NetVlan", "NetSubnet", "DocCategory"]) {
       const body = new RegExp(`model ${model} \\{\\n([\\s\\S]*?)\\n\\}`).exec(schema)?.[1] ?? "";

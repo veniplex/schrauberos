@@ -45,6 +45,10 @@ describe("Backups", () => {
     assert.ok(info.size > 0);
     assert.equal(info.fileCount, 1);
     assert.equal(info.fileBytes, 10);
+    // Z7: info.json nennt Format, Programmversion und Migrationen (Auskunft für künftige Leser; ältere Leser ignorieren unbekannte Felder)
+    const meta = JSON.parse(readFileSync(path.join(backupPath(info.name)!, "info.json"), "utf8")) as { format: number; app: string; files: number; bytes: number; migrations: string[] };
+    assert.deepEqual([meta.format, typeof meta.app, meta.files, meta.bytes], [1, "string", 1, 10]);
+    assert.ok(meta.migrations.includes("00000000000000_baseline"));
 
     // Datenbank: enthält den Stand und ist gültig
     const copy = path.join(data, "check.db");

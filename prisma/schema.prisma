@@ -78,6 +78,8 @@ model RecoveryNotice {
 
   user User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   acks RecoveryNoticeAck[]
+
+  @@index([userId])
 }
 
 model RecoveryNoticeAck {
@@ -89,6 +91,7 @@ model RecoveryNoticeAck {
   user   User           @relation(fields: [userId], references: [id], onDelete: Cascade) // Cascade: gehört zum Konto/Hinweis (Quittung, keine Historie)
 
   @@id([noticeId, userId])
+  @@index([userId])
 }
 
 model Role {
@@ -123,6 +126,7 @@ model UserRole {
   role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade) // Cascade: Zuordnung des Kontos
 
   @@id([userId, roleId])
+  @@index([roleId])
 }
 
 model Session {
@@ -473,6 +477,7 @@ model Appointment {
   @@index([bayId])
   @@index([typeId])
   @@index([assigneeId])
+  @@index([createdById])
 }
 
 // ───────────── Kalender-Abo (F10, workshop.appointments) ─────────────
@@ -1056,6 +1061,7 @@ model Invoice {
   @@index([source, docType, finalizedAt])
   @@index([orderId])
   @@index([sourceDocId])
+  @@index([vehicleId])
 }
 
 // Position eines Beleges der Rechnungserstellung (wie OrderItem: Netto-Einzelpreis in Cent, Menge in Tausendsteln, Sätze in Basispunkten, src/lib/line-items.ts). Löschen nur mit dem Entwurf.
@@ -1195,6 +1201,7 @@ model DocCategoryRole {
   role       Role        @relation(fields: [roleId], references: [id], onDelete: Cascade) // Cascade: Zuordnung des Kapitels
 
   @@id([categoryId, roleId])
+  @@index([roleId])
 }
 
 model DocPage {
@@ -1889,6 +1896,8 @@ model Checklist {
   @@index([orderId, createdAt])
   @@index([status, createdAt])
   @@index([signatureHash])
+  @@index([templateId])
+  @@index([versionId])
 }
 
 // Punkt einer Checkliste: Kopie des Vorlagenpunkts plus Ergebnis. updatedAt ist die Version des einzelnen Punkts (gleichzeitiges Abhaken).

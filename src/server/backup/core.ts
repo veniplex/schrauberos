@@ -6,8 +6,9 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 import { Semaphore } from "@/lib/semaphore";
-import { dataDir } from "@/lib/updates/store";
+import { dataDir, readMeta } from "@/lib/updates/store";
 import { databaseFile } from "@/server/db-client";
+import { appliedMigrations } from "@/server/migrate";
 import { BACKUP_KINDS, type BackupKind } from "./kinds";
 import type { BackupRetention } from "./settings";
 import { filesDir } from "@/server/files";
@@ -179,8 +180,14 @@ export async function assertPlainTree(dir: string): Promise<void> {
   });
 }
 
-export function writeInfo(dir: string, info: { files: number; bytes: number }): void {
-  writeFileSync(path.join(dir, "info.json"), JSON.stringify(info));
+/**
+ * Format der Sicherung (`info.json`): `format` zählt hoch, wenn sich Aufbau oder Bedeutung der Dateien ändern (Version 1: `database.db.gz` + `files/`); `app` ist die Version des Programms, das sie angelegt
+ * hat, `migrations` die Namen der Migrationen im Schnappschuss. Beides ist nur Auskunft (der Name des Ordners und `database.db.gz` bleiben das eigentliche Format); ältere Leser ignorieren unbekannte Felder.
+ */
+export const BACKUP_FORMAT = 1;
+
+export function writeInfo(dir: string, info: { files: number; bytes: number; migrations?: string[] }): void {
+  writeFileSync(path.join(dir, "info.json"), JSON.stringify({ format: BACKUP_FORMAT, app: readMeta(process.cwd())?.version ?? "dev", ...info }));
 }
 
 async function readInfo(dir: string): Promise<{ files: number; bytes: number }> {
@@ -210,11 +217,12 @@ export async function createBackup(kind: BackupKind, dbFile = databaseFile(), at
       source.close();
     }
     if (!checkDatabaseFile(rawDb)) throw new Error("Der Schnappschuss der Datenbank ist beschädigt.");
+    const migrations = appliedMigrations(rawDb);
     await gzipFile(rawDb, path.join(tmp, DB_ARCHIVE));
     for (const f of [rawDb, `${rawDb}-wal`, `${rawDb}-shm`]) rmSync(f, { force: true });
 
     const linked = await linkTree(filesDir(), path.join(/*turbopackIgnore: true*/ tmp, "files"));
-    writeInfo(tmp, { files: linked.count, bytes: linked.bytes });
+    writeInfo(tmp, { files: linked.count, bytes: linked.bytes, migrations });
     renameSync(tmp, path.join(root, name));
   } catch (error) {
     await removeTree(tmp).catch(() => undefined);

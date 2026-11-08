@@ -1352,7 +1352,16 @@ CREATE UNIQUE INDEX "RecoveryCode_userId_key" ON "RecoveryCode"("userId");
 CREATE UNIQUE INDEX "RecoveryCode_codeHash_key" ON "RecoveryCode"("codeHash");
 
 -- CreateIndex
+CREATE INDEX "RecoveryNotice_userId_idx" ON "RecoveryNotice"("userId");
+
+-- CreateIndex
+CREATE INDEX "RecoveryNoticeAck_userId_idx" ON "RecoveryNoticeAck"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Role_key_key" ON "Role"("key");
+
+-- CreateIndex
+CREATE INDEX "UserRole_roleId_idx" ON "UserRole"("roleId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Session_tokenHash_key" ON "Session"("tokenHash");
@@ -1425,6 +1434,9 @@ CREATE INDEX "Appointment_typeId_idx" ON "Appointment"("typeId");
 
 -- CreateIndex
 CREATE INDEX "Appointment_assigneeId_idx" ON "Appointment"("assigneeId");
+
+-- CreateIndex
+CREATE INDEX "Appointment_createdById_idx" ON "Appointment"("createdById");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CalendarFeedToken_userId_key" ON "CalendarFeedToken"("userId");
@@ -1559,6 +1571,9 @@ CREATE INDEX "Invoice_orderId_idx" ON "Invoice"("orderId");
 CREATE INDEX "Invoice_sourceDocId_idx" ON "Invoice"("sourceDocId");
 
 -- CreateIndex
+CREATE INDEX "Invoice_vehicleId_idx" ON "Invoice"("vehicleId");
+
+-- CreateIndex
 CREATE INDEX "InvoiceItem_invoiceId_position_idx" ON "InvoiceItem"("invoiceId", "position");
 
 -- CreateIndex
@@ -1587,6 +1602,9 @@ CREATE UNIQUE INDEX "InvoiceFile_path_key" ON "InvoiceFile"("path");
 
 -- CreateIndex
 CREATE INDEX "DocCategory_area_idx" ON "DocCategory"("area");
+
+-- CreateIndex
+CREATE INDEX "DocCategoryRole_roleId_idx" ON "DocCategoryRole"("roleId");
 
 -- CreateIndex
 CREATE INDEX "DocPage_area_idx" ON "DocPage"("area");
@@ -1770,6 +1788,12 @@ CREATE INDEX "Checklist_status_createdAt_idx" ON "Checklist"("status", "createdA
 
 -- CreateIndex
 CREATE INDEX "Checklist_signatureHash_idx" ON "Checklist"("signatureHash");
+
+-- CreateIndex
+CREATE INDEX "Checklist_templateId_idx" ON "Checklist"("templateId");
+
+-- CreateIndex
+CREATE INDEX "Checklist_versionId_idx" ON "Checklist"("versionId");
 
 -- CreateIndex
 CREATE INDEX "ChecklistItem_checklistId_position_idx" ON "ChecklistItem"("checklistId", "position");
