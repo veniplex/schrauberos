@@ -12,7 +12,7 @@ import { resetUnreadableSecondFactors } from "@/server/auth/second-factor";
 import { db } from "@/server/db";
 import { dropStaleRecoveryKey } from "@/server/recovery-key";
 import { KEY_CHECK_SETTING, secretKeyIssue } from "@/server/secret-key-issue";
-import { createSecretKey, decryptSecret, isSecretBlob, readSecretKey, SecretKeyUnavailableError } from "@/server/secrets";
+import { createSecretKey, isForeignSecret, readSecretKey, SecretKeyUnavailableError } from "@/server/secrets";
 import type { SecretConsumerDef } from "@/server/secret-consumers";
 import { setSetting } from "@/server/settings";
 
@@ -48,8 +48,8 @@ type Rows = { settings: Array<{ key: string; value: string }>; twoFactor: Array<
  * übrigen schon; der Fehler wird gemeldet (nur der Code), nie verschluckt, als wäre alles gut gegangen.
  */
 async function collectAffected(withWrap: boolean, consumers: readonly SecretConsumerDef[]): Promise<{ rows: Rows | null; failed: ReadonlySet<string> }> {
-  const settings = (await db.appSetting.findMany()).filter((row) => (isSecretBlob(row.value) && decryptSecret(row.value) === null) || (withWrap && WRAP_KEYS.includes(row.key)));
-  const twoFactor = (await db.twoFactor.findMany()).filter((row) => (row.enabledAt || row.secret) && (!row.secret || decryptSecret(row.secret) === null));
+  const settings = (await db.appSetting.findMany()).filter((row) => isForeignSecret(row.value) || (withWrap && WRAP_KEYS.includes(row.key)));
+  const twoFactor = (await db.twoFactor.findMany()).filter((row) => (row.enabledAt || row.secret) && (!row.secret || isForeignSecret(row.secret)));
   // Zeilen von Verbrauchern mit eigenen Tabellen (IT-Tresor): ihre verschlüsselten Blöcke gehören in dieselbe Sicherung
   const own: Record<string, Array<Record<string, unknown>>> = {};
   const failed = new Set<string>();

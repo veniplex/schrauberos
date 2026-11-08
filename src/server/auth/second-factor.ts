@@ -4,7 +4,7 @@ import { BACKUP_CODE_COUNT, generateBackupCodes, hashBackupCode, NEVER_MATCHING_
 import { base32Decode, base32Encode, generateTotpSecret, matchTotp } from "@/lib/totp";
 import { db } from "@/server/db";
 import { writeAudit } from "@/server/audit";
-import { decryptSecret, encryptSecret, readSecretKey, SecretKeyUnavailableError } from "@/server/secrets";
+import { decryptSecret, encryptSecret, isForeignSecret, readSecretKey, SecretKeyUnavailableError } from "@/server/secrets";
 import { authRuntime } from "./runtime";
 import { loginThrottle } from "./throttle";
 
@@ -78,13 +78,14 @@ export async function secondFactorRequired(userId: string): Promise<boolean> {
 }
 
 /**
- * Setzt jeden zweiten Faktor zurück, dessen Geheimnis bei **lesbarem** Schlüssel nicht entschlüsselt werden kann (fremder Schlüssel, beschädigt); hält es im Audit-Log fest.
+ * Setzt jeden zweiten Faktor zurück, dessen Geheimnis bei **lesbarem** Schlüssel nicht entschlüsselt werden kann (gut geformter `v1`-Wert eines fremden Schlüssels; höhere Formatversionen und beschädigte Werte nie); hält es im Audit-Log fest.
  * Gibt die Zahl der Konten zurück. Nur über `resetUnreadableSecrets` aufrufen (prüft die Bedingungen und sichert vorher die Zeilen); ohne lesbaren Schlüssel tut sie nichts.
  */
 export async function resetUnreadableSecondFactors(): Promise<number> {
   if (readSecretKey().state !== "readable") return 0;
   const rows = await db.twoFactor.findMany({ select: { userId: true, secret: true, enabledAt: true } });
-  const broken = rows.filter((row) => (row.enabledAt || row.secret) && !readSecret(row.secret));
+  // dieselbe Regel wie `secret-reset.ts` (Sicherung der Zeilen) und die Einstellungs-Geheimnisse: nur ein gut geformtes v1, das der Schlüssel nicht öffnet; ein künftiges v2 bleibt unberührt
+  const broken = rows.filter((row) => (row.enabledAt || row.secret) && (!row.secret || isForeignSecret(row.secret)));
   if (broken.length === 0) return 0;
   await db.$transaction(async (tx) => {
     for (const row of broken) await resetSecondFactor(tx, row.userId, "key");

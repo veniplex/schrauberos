@@ -50,6 +50,25 @@ const SECRET_BLOB = /^v1:[A-Za-z0-9+/]{16}:[A-Za-z0-9+/]{22}==:[A-Za-z0-9+/]*={0
 
 /** Sieht der Wert nach einem mit `encryptSecret` verschlüsselten Geheimnis aus? (Form, nicht Inhalt – ob er lesbar ist, sagt `decryptSecret`.) */
 export const isSecretBlob = (value: string): boolean => SECRET_BLOB.test(value);
+
+/**
+ * Was ist das für ein Geheimnis-Wert der Einstellungen (`v1:…`), ohne ihn zu öffnen? Wie bei gebundenen Blöcken (`boundBlobShape`, `b1`) und Tresorblöcken (`p1`): `ok` ist die Form von `v1`;
+ * `unsupported` trägt eine andere, höhere Version (`v2:…` – von einem neueren Programm geschrieben, nicht beschädigt; bei einem Rückfall auf diese Version bleibt es unberührt);
+ * `damaged` ist sonst nicht als Geheimnis geformt. Nur ein gut geformter `v1`-Wert, der mit dem lesbaren Schlüssel nicht aufgeht, ist „fremder Schlüssel“ (`isForeignSecret`).
+ */
+export function secretBlobShape(value: string): "ok" | "unsupported" | "damaged" {
+  if (SECRET_BLOB.test(value)) return "ok";
+  return /^v(?!1:)[1-9]\d*:/.test(value) ? "unsupported" : "damaged";
+}
+
+/**
+ * **Die eine Regel für „unlesbar, darf zurückgesetzt werden“** (Einstellungen, zweiter Faktor, Verbraucher): ein gut geformter `v1`-Wert, den der (lesbare) Schlüssel dieses Datenträgers nicht
+ * öffnet. Höhere Formatversionen (`v2:…`) und beschädigte Werte sind es nie – sie werden gemeldet, aber nicht automatisch angefasst. Wirft `SecretKeyUnavailableError`, wenn der Schlüssel nicht
+ * lesbar ist (dann ist nichts „fremd“, sondern nur gerade nicht erreichbar).
+ */
+export function isForeignSecret(value: string): boolean {
+  return isSecretBlob(value) && decryptSecret(value) === null;
+}
 const MARKER_KEYS = new Set([WRAPPED_SETTING_KEY, "secrets.keyCheck"]);
 
 function currentDatabaseFile(): string | null {

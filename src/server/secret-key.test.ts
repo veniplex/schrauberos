@@ -300,6 +300,35 @@ describe("Fremder, lesbarer Schlüssel (fremdes Volume)", () => {
     assert.equal((await env.db.twoFactor.findUniqueOrThrow({ where: { userId: user.id } })).secret, null);
   });
 
+  it("Formatversionen (Z7): ein künftiges v2 (Einstellung und zweiter Faktor) und beschädigte Werte werden nie zurückgesetzt – nur gut geformte v1-Werte eines fremden Schlüssels", async () => {
+    const user = await adminUser();
+    const foreignKey = randomBytes(32).toString("hex");
+    // gut geformtes v1, mit einem anderen Schlüssel verschlüsselt
+    const foreignV1 = secrets.encryptSecret("fremd");
+    writeKey(foreignKey);
+    const future = "v2:" + "A".repeat(16) + ":" + "B".repeat(22) + "==:" + "Zm9v";
+    await env.db.appSetting.createMany({ data: [{ key: "update.token", value: foreignV1 }, { key: "mail.password", value: future }, { key: "webhooks.secret", value: "keine-geheimnisform" }] });
+    await env.db.twoFactor.create({ data: { userId: user.id, secret: future, enabledAt: new Date(), lastStep: 0 } });
+
+    assert.equal(secrets.secretBlobShape(foreignV1), "ok");
+    assert.equal(secrets.secretBlobShape(future), "unsupported");
+    assert.equal(secrets.secretBlobShape("v10:x"), "unsupported");
+    assert.equal(secrets.secretBlobShape("keine-geheimnisform"), "damaged");
+    assert.equal(secrets.isForeignSecret(foreignV1), true);
+    assert.equal(secrets.isForeignSecret(future), false, "höhere Version: nicht lesbar für diesen Code, aber nie „fremd“");
+    assert.equal(secrets.decryptSecret(future), null, "Lesen liefert nichts (die Funktion gilt als nicht eingerichtet) …");
+
+    const consumers = await import("./secret-consumers");
+    // … zurückgesetzt wird es trotzdem nie: weder durch den Einstellungs-Helfer noch durch den Start-Reset
+    assert.equal(await consumers.resetUnreadableSettingSecrets(["mail.password", "webhooks.secret"]), 0);
+    assert.equal(await env.db.appSetting.count({ where: { key: { in: ["mail.password", "webhooks.secret"] } } }), 2);
+    await secretReset.resetUnreadableSecrets(undefined, { force: true });
+    assert.equal((await env.db.appSetting.findUniqueOrThrow({ where: { key: "mail.password" } })).value, future);
+    assert.equal((await env.db.appSetting.findUniqueOrThrow({ where: { key: "webhooks.secret" } })).value, "keine-geheimnisform");
+    assert.equal((await env.db.twoFactor.findUniqueOrThrow({ where: { userId: user.id } })).secret, future, "der künftige zweite Faktor bleibt");
+    assert.equal(await env.db.appSetting.count({ where: { key: "update.token" } }), 0, "das fremde v1 wurde (mit Sicherung) zurückgesetzt");
+  });
+
   it("ein Fehler beim Sichern verhindert das Zurücksetzen", async () => {
     const user = await adminUser();
     await withTwoFactor(user.id);

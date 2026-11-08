@@ -1,6 +1,6 @@
 import "server-only";
 import type { FeatureId } from "@/modules/catalog";
-import { decryptSecret } from "@/server/secrets";
+import { isForeignSecret } from "@/server/secrets";
 import { db } from "@/server/db";
 
 /**
@@ -34,14 +34,15 @@ export type SecretConsumerDef = {
 };
 
 /**
- * Hilfe für Geheimnisse in `AppSetting` (`setSecret`): Ist der gespeicherte Wert vorhanden, aber nicht entschlüsselbar, wird die Einstellung gelöscht. `after` läuft, wenn etwas
+ * Hilfe für Geheimnisse in `AppSetting` (`setSecret`): Ist der gespeicherte Wert ein gut geformter `v1`-Wert, den der Schlüssel dieses Datenträgers nicht öffnet (`isForeignSecret`), wird die Einstellung gelöscht;
+ * höhere Formatversionen (`v2:…`) und beschädigte Werte nie (dieselbe Regel wie in `secret-reset.ts`). `after` läuft, wenn etwas
  * gelöscht wurde (z. B. die abhängige Funktion ausschalten).
  */
 export async function resetUnreadableSettingSecrets(keys: readonly string[], after?: () => Promise<void>): Promise<number> {
   let count = 0;
   for (const key of keys) {
     const row = await db.appSetting.findUnique({ where: { key } });
-    if (row && decryptSecret(row.value) === null) {
+    if (row && isForeignSecret(row.value)) {
       await db.appSetting.deleteMany({ where: { key } });
       count++;
     }
