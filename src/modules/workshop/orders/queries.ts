@@ -3,8 +3,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import { computeTotals, type Totals } from "@/lib/line-items";
 import { normalizePlate } from "@/lib/plate";
 import type { Viewer } from "@/modules/types";
-import { customerContacts, customerDisplayName, customerNameSelect, unrestrictedOrder } from "@/modules/workshop/customers/public";
-import { vehicleTextWhere } from "@/modules/workshop/vehicles/public";
+import { customerContacts, customerDisplayName, customerNameSelect, isRestricted, restrictionSelect, unrestrictedCustomerWhere, unrestrictedOrder } from "@/modules/workshop/customers/public";
+import { vehicleRef, vehicleTextWhere } from "@/modules/workshop/vehicles/public";
+import type { MessageKey } from "@/i18n/translate";
+import type { AppSession } from "@/server/auth/session";
+import { fail } from "@/server/operations";
 import { db } from "@/server/db";
 import { contains, FULLTEXT_MIN_LENGTH, keyContains } from "@/server/search";
 import { getWorkshop } from "@/server/workshop";
@@ -38,7 +41,7 @@ export function orderListWhere(filters: OrderListFilters): Prisma.OrderWhereInpu
             { number: contains(term) },
             { vehicle: { is: { OR: vehicleTextWhere(term) } } },
             ...(plate ? [{ vehicle: { is: { plateNorm: { contains: plate } } } }] : []),
-            { customer: { is: { ...keyContains("nameKey", term), processingRestrictedAt: null } } },
+            { customer: { is: { ...keyContains("nameKey", term), ...unrestrictedCustomerWhere } } },
             ...(term.length >= FULLTEXT_MIN_LENGTH ? [{ request: contains(term) }] : []),
           ],
         }
@@ -183,9 +186,31 @@ export const orderForAppointment = (appointmentId: string) => db.order.findFirst
 export async function orderRef(orderId: string, client: Pick<Prisma.TransactionClient, "order"> = db): Promise<{ id: string; number: string; status: string; open: boolean; restricted: boolean; vehicleId: string; plate: string } | null> {
   const order = await client.order.findUnique({
     where: { id: orderId },
-    select: { id: true, number: true, status: true, vehicleId: true, vehicle: { select: { plate: true, customer: { select: { processingRestrictedAt: true } } } }, customer: { select: { processingRestrictedAt: true } } },
+    select: { id: true, number: true, status: true, vehicleId: true, vehicle: { select: { plate: true, customer: { select: restrictionSelect } } }, customer: { select: restrictionSelect } },
   });
-  return order ? { id: order.id, number: order.number, status: order.status, open: isOpen(order.status), restricted: Boolean(order.customer?.processingRestrictedAt || order.vehicle.customer?.processingRestrictedAt), vehicleId: order.vehicleId, plate: order.vehicle.plate } : null;
+  return order ? { id: order.id, number: order.number, status: order.status, open: isOpen(order.status), restricted: isRestricted(order.customer) || isRestricted(order.vehicle.customer), vehicleId: order.vehicleId, plate: order.vehicle.plate } : null;
+}
+
+/** Wer Aufträge in dieser Sitzung sehen darf: Funktion aktiv und `orders.view` – die eine Regel für alles, was sich an einen Auftrag hängt (Dateien, Checklisten …). */
+export const canSeeOrders = (actor: Pick<AppSession, "can" | "features">): boolean => actor.features.has("workshop.orders") && actor.can("orders.view");
+
+/**
+ * Der Auftrag als **Eigentümer einer neuen Sache** (Datei, Checkliste): ohne Recht oder Funktion `forbidden`; unbekannt oder Kunde bzw. Fahrzeughalter mit eingeschränkter Verarbeitung (Art. 18) `notFound`;
+ * nicht mehr offen ein Fehler mit dem Meldungsschlüssel des Aufrufers. Liefert Kennung, Nummer, Fahrzeug und Kennzeichen. `client` darf die Transaktion der Operation sein.
+ */
+export async function orderOwner(
+  actor: Pick<AppSession, "can" | "features">,
+  orderId: string,
+  closedKey: MessageKey,
+  client?: Pick<Prisma.TransactionClient, "order" | "vehicle">,
+): Promise<{ id: string; number: string; vehicleId: string; plate: string }> {
+  if (!canSeeOrders(actor)) fail("forbidden");
+  const order = await orderRef(orderId, client);
+  if (!order || order.restricted) fail("notFound");
+  if (!order.open) fail("invalid", closedKey);
+  const vehicle = await vehicleRef(order.vehicleId, client);
+  if (!vehicle || vehicle.restricted) fail("notFound");
+  return { id: order.id, number: order.number, vehicleId: order.vehicleId, plate: order.plate };
 }
 
 /** Aufträge zur Auswahl beim Stempeln: offene Aufträge (Angenommen, In Arbeit, Fertig), neueste zuerst, ohne Kunden mit eingeschränkter Verarbeitung. */
@@ -215,15 +240,15 @@ export async function orderForBilling(orderId: string, client: Pick<Prisma.Trans
       mileageKm: true,
       acceptedAt: true,
       closedAt: true,
-      vehicle: { select: { id: true, plate: true, make: true, model: true, customer: { select: { processingRestrictedAt: true } } } },
-      customer: { select: { processingRestrictedAt: true, archivedAt: true } },
+      vehicle: { select: { id: true, plate: true, make: true, model: true, customer: { select: restrictionSelect } } },
+      customer: { select: { ...restrictionSelect, archivedAt: true } },
       items: { orderBy: { position: "asc" }, select: { id: true, kind: true, description: true, unit: true, quantityMilli: true, unitCents: true, taxBp: true, discountBp: true, refType: true, refId: true } },
     },
   });
   if (!order) return null;
   const { customer, vehicle: { customer: holder, ...vehicle }, ...rest } = order;
   // eingeschränkt: der Kunde des Auftrags **oder der Halter seines Fahrzeugs** (`customers/public.ts`)
-  return { ...rest, vehicle, restricted: Boolean(customer?.processingRestrictedAt || holder?.processingRestrictedAt), open: isOpen(order.status) };
+  return { ...rest, vehicle, restricted: isRestricted(customer) || isRestricted(holder), open: isOpen(order.status) };
 }
 
 /**

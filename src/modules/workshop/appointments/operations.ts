@@ -3,7 +3,7 @@ import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { isHexColor } from "@/lib/color";
 import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, QUICK_STATUSES } from "@/modules/workshop/appointments/constants";
-import { unrestrictedDocument } from "@/modules/workshop/customers/public";
+import { isRestricted, restrictionSelect, searchableCustomerWhere, unrestrictedDocument } from "@/modules/workshop/customers/public";
 import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { defineOperation, fail, failField, type RunContext } from "@/server/operations";
 import { FEED_EXPIRY_CHOICES, feedExpiry, feedTokenHint, generateFeedToken, hashFeedToken } from "./feed-token";
@@ -36,7 +36,7 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
   if (!window) failField("date", "validation.invalid");
   const { startsAt, endsAt } = window;
 
-  const vehicle = d.vehicleId ? await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true, archivedAt: true, customer: { select: { processingRestrictedAt: true } } } }) : null;
+  const vehicle = d.vehicleId ? await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, customerId: true, archivedAt: true, customer: { select: restrictionSelect } } }) : null;
   if (d.vehicleId && !vehicle) failField("vehicleId", "validation.invalid");
 
   // Alle Verweise müssen existieren (statt eines Datenbankfehlers); Terminart, Arbeitsplatz, Mitarbeiter, Fahrzeug und Kunde müssen aktiv (nicht archiviert) sein –
@@ -45,14 +45,14 @@ async function saveAppointmentRun({ input: d, principal, tx, audit }: RunContext
   if (d.id && !current) fail("notFound");
   if (vehicle?.archivedAt && vehicle.id !== current?.vehicleId) failField("vehicleId", "validation.invalid");
   // Neue Verknüpfung mit dem Fahrzeug eines Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO): nein – ein bestehender Termin behält sein Fahrzeug
-  if (vehicle?.customer?.processingRestrictedAt && vehicle.id !== current?.vehicleId) failField("vehicleId", "appointments.errors.customerRestricted");
+  if (isRestricted(vehicle?.customer) && vehicle?.id !== current?.vehicleId) failField("vehicleId", "appointments.errors.customerRestricted");
 
   // Kunde: Hat das Fahrzeug einen Halter, ist der Termin dessen Kunde (ein anderer wäre ein Widerspruch). Sonst gilt der gewählte Kunde – auch ohne Fahrzeug.
   let customerId: string | null = vehicle?.customerId ?? null;
   if (vehicle?.customerId) {
     if (d.customerId && d.customerId !== vehicle.customerId) failField("customerId", "appointments.errors.customerMismatch");
   } else if (d.customerId) {
-    const customer = await tx.customer.findFirst({ where: { id: d.customerId, OR: [{ archivedAt: null, processingRestrictedAt: null }, { id: current?.customerId ?? "" }] }, select: { id: true } });
+    const customer = await tx.customer.findFirst({ where: { id: d.customerId, OR: [searchableCustomerWhere, { id: current?.customerId ?? "" }] }, select: { id: true } });
     if (!customer) failField("customerId", "validation.invalid");
     customerId = customer.id;
   }

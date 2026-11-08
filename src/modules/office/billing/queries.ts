@@ -6,6 +6,7 @@ import { contains, keyContains } from "@/server/search";
 import { getWorkshop } from "@/server/workshop";
 import { INVOICE_TYPES, QUOTE_TYPES } from "./constants";
 import { viewOf, type DocView, type ViewRow } from "./view";
+import { isUnusable, usabilitySelect } from "@/modules/workshop/customers/public";
 
 /**
  * Lesezugriffe der Rechnungserstellung (README, „Datenzugriff“): Abfragen mit ausdrücklichem `select`/`include`, Betrachter nur dort, wo Daten vom Recht abhängen. Kunden erscheinen nur als Name
@@ -127,9 +128,9 @@ export async function documentDetail(id: string) {
     db.invoicePayment.findMany({ where: { invoiceId: id }, orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] }),
     db.invoice.findMany({ where: { sourceDocId: id }, select: { id: true, docType: true, number: true, finalizedAt: true }, orderBy: { createdAt: "asc" } }),
     db.invoice.findFirst({ where: { cancelsInvoiceId: id }, select: { id: true, number: true } }),
-    row.customerId ? db.customer.findUnique({ where: { id: row.customerId }, select: { email: true, processingRestrictedAt: true, anonymizedAt: true } }) : null,
+    row.customerId ? db.customer.findUnique({ where: { id: row.customerId }, select: { email: true, ...usabilitySelect } }) : null,
   ]);
-  const restricted = Boolean(customer?.processingRestrictedAt || customer?.anonymizedAt);
+  const restricted = isUnusable(customer);
   const sendTo = restricted ? null : ((customer?.email?.trim() || view.recipient.email) ?? null);
   const original = row.cancelsInvoiceId ? await db.invoice.findUnique({ where: { id: row.cancelsInvoiceId }, select: { id: true } }) : null;
   // Ein Abschlag, den eine festgeschriebene Schlussrechnung anrechnet, lässt sich nicht stornieren (erst die Schlussrechnung)

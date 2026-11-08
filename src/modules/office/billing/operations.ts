@@ -21,6 +21,7 @@ import { amountColumns, assertCustomerUsable, stripControl, checkInputOf, findLi
 import { dueDayKey, finalizeProblems, isDraft, mailContent, documentFileName, docTitle, remainingCents, statusAfterPayments } from "./domain";
 import { loadDocView } from "./queries";
 import { viewPayable } from "./view";
+import { isUnusable, usabilitySelect } from "@/modules/workshop/customers/public";
 
 /**
  * Operationen der Rechnungserstellung (F3). Alle Belege liegen in der Tabelle der Rechnungen (`Invoice`, `source = "billing"`): Ein **Entwurf** hat keine Nummer und ist frei änderbar und löschbar;
@@ -136,10 +137,10 @@ export const saveDraftOperation = defineOperation({
     let vehicle: { id: string; label: string } | null = null;
     if (d.vehicleId) {
       if (!principal.features.has("workshop.vehicles")) failField("vehicleId", "validation.invalid");
-      const found = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true, make: true, model: true, customerId: true, archivedAt: true, customer: { select: { processingRestrictedAt: true, anonymizedAt: true } } } });
+      const found = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true, make: true, model: true, customerId: true, archivedAt: true, customer: { select: usabilitySelect } } });
       if (!found || (found.archivedAt && found.id !== current?.vehicleId)) failField("vehicleId", "validation.invalid");
       // Fahrzeug eines Kunden mit eingeschränkter Verarbeitung (Art. 18): keine neue Verknüpfung; eine bestehende bleibt
-      if ((found.customer?.processingRestrictedAt || found.customer?.anonymizedAt) && found.id !== current?.vehicleId) failField("vehicleId", "billing.errors.restricted");
+      if (isUnusable(found.customer) && found.id !== current?.vehicleId) failField("vehicleId", "billing.errors.restricted");
       if (found.customerId && customer && found.customerId !== customer.id) failField("vehicleId", "billing.errors.vehicleCustomer");
       vehicle = { id: found.id, label: [found.plate, [found.make, found.model].filter(Boolean).join(" ")].filter(Boolean).join(" · ") };
     }
@@ -233,8 +234,8 @@ async function commit(tx: Tx, input: z.output<typeof commitInput>, principal: { 
   if (!isDraft(doc)) fail("inUse", "billing.errors.notDraft");
   if (expect === "invoice" ? !isInvoiceType(doc.docType) || doc.docType === "credit" : !isQuoteType(doc.docType)) fail("invalid", "billing.errors.wrongKind");
   if (doc.customerId) {
-    const customer = await tx.customer.findUnique({ where: { id: doc.customerId }, select: { processingRestrictedAt: true, anonymizedAt: true, customerNumber: true } });
-    if (customer?.processingRestrictedAt || customer?.anonymizedAt) fail("invalid", "billing.errors.restricted");
+    const customer = await tx.customer.findUnique({ where: { id: doc.customerId }, select: { ...usabilitySelect, customerNumber: true } });
+    if (isUnusable(customer)) fail("invalid", "billing.errors.restricted");
   }
   if (!(await claimRow(tx.invoice, doc.id, input.version))) fail("conflict");
 
@@ -654,8 +655,8 @@ async function mailRecipient(client: Pick<PrismaClient | Prisma.TransactionClien
     select: { customerId: true, buyerEmail: true, snapshot: { select: { rEmail: true } }, cancelledBy: { select: { id: true } } },
   });
   if (!row) return null;
-  const customer = row.customerId ? await client.customer.findUnique({ where: { id: row.customerId }, select: { email: true, processingRestrictedAt: true, anonymizedAt: true } }) : null;
-  const restricted = Boolean(row.customerId && (!customer || customer.processingRestrictedAt || customer.anonymizedAt));
+  const customer = row.customerId ? await client.customer.findUnique({ where: { id: row.customerId }, select: { email: true, ...usabilitySelect } }) : null;
+  const restricted = Boolean(row.customerId && (!customer || isUnusable(customer)));
   const docEmail = (row.snapshot ? row.snapshot.rEmail : row.buyerEmail)?.trim() || null;
   return { email: restricted ? null : (docEmail ?? (customer?.email?.trim() || null)), restricted, cancelled: row.cancelledBy !== null };
 }

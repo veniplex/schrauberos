@@ -2,7 +2,7 @@ import "server-only";
 import { addMonths as addMonthsTo } from "@/lib/month";
 import { addDaysToKey as addDaysTo, daysBetweenKeys, dayKey, startOfDay, wallOf } from "@/lib/zone";
 import type { Viewer } from "@/modules/types";
-import { unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
+import { restrictedCustomerWhere, unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { contains, keyContains } from "@/server/search";
@@ -163,7 +163,7 @@ export async function revenueByMonth(viewer: Viewer, months: readonly string[]):
 const openWhere = (direction: "outgoing" | "incoming"): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, { direction, status: "open", docType: { in: ["invoice", "partial", "final"] }, grossCents: { gt: 0 } }] });
 const creditsWhere = (direction: "outgoing" | "incoming"): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, { direction, status: "open", docType: { in: ["invoice", "partial", "final"] }, grossCents: { lt: 0 } }] });
 const UNRESTRICTED_PARTY: Prisma.InvoiceWhereInput = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
-const RESTRICTED_PARTY: Prisma.InvoiceWhereInput = { customerId: { not: null }, customer: { is: { processingRestrictedAt: { not: null } } } };
+const RESTRICTED_PARTY: Prisma.InvoiceWhereInput = { customerId: { not: null }, customer: { is: restrictedCustomerWhere } };
 
 const OPEN_SUMS = { grossCents: true, deductedCents: true, paidCents: true } as const;
 type OpenSums = { grossCents: number | null; deductedCents: number | null; paidCents: number | null };

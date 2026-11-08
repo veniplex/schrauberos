@@ -1,10 +1,10 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { normalizePlate } from "@/lib/plate";
 import { unrestrictedByCustomer, unrestrictedOrder } from "@/modules/workshop/customers/public";
-import { orderRef } from "@/modules/workshop/orders/public";
-import { vehicleRef } from "@/modules/workshop/vehicles/public";
+import { canSeeOrders, orderOwner } from "@/modules/workshop/orders/public";
+import { canSeeVehicles, vehicleOwner } from "@/modules/workshop/vehicles/public";
 import type { AppSession } from "@/server/auth/session";
-import { fail, type Tx } from "@/server/operations";
+import type { Tx } from "@/server/operations";
 import type { FileOwnerType } from "./constants";
 
 /**
@@ -16,9 +16,6 @@ import type { FileOwnerType } from "./constants";
  */
 
 type Actor = Pick<AppSession, "can" | "features">;
-
-export const canSeeVehicles = (actor: Actor): boolean => actor.features.has("workshop.vehicles") && actor.can("vehicles.view");
-export const canSeeOrders = (actor: Actor): boolean => actor.features.has("workshop.orders") && actor.can("orders.view");
 
 const UNRESTRICTED = unrestrictedByCustomer;
 /** Ein Auftrag zählt als eingeschränkt, wenn sein Kunde **oder der Halter seines Fahrzeugs** eingeschränkt verarbeitet wird (`customers/public.ts`: die eine Auslegung für alle Funktionen). */
@@ -48,18 +45,11 @@ export type OwnerAccess = { type: FileOwnerType; id: string; label: string; dir:
  * unbekannt oder eingeschränkter Kunde: `notFound`; archiviertes Fahrzeug und nicht offener Auftrag: Fehler mit Meldung. `client` darf die Transaktion der Operation sein.
  */
 export async function ownerAccess(principal: Actor, type: FileOwnerType, id: string, client?: Tx): Promise<OwnerAccess> {
+  // Recht, Funktion, Art. 18, Archiv und offener Auftrag prüfen `vehicleOwner`/`orderOwner` – eine Regel für Dateien und Checklisten (Z6-3 M-5)
   if (type === "vehicle") {
-    if (!canSeeVehicles(principal)) fail("forbidden");
-    const ref = await vehicleRef(id, client);
-    if (!ref || ref.restricted) fail("notFound");
-    if (ref.archived) fail("invalid", "files.errors.vehicleArchived");
+    const ref = await vehicleOwner(principal, id, "files.errors.vehicleArchived", client);
     return { type, id: ref.id, label: ref.plate, dir: `fahrzeuge/${normalizePlate(ref.plate) || "ohne-kennzeichen"}` };
   }
-  if (!canSeeOrders(principal)) fail("forbidden");
-  const ref = await orderRef(id, client);
-  if (!ref || ref.restricted) fail("notFound");
-  if (!ref.open) fail("invalid", "files.errors.orderClosed");
-  const vehicle = await vehicleRef(ref.vehicleId, client);
-  if (!vehicle || vehicle.restricted) fail("notFound");
+  const ref = await orderOwner(principal, id, "files.errors.orderClosed", client);
   return { type, id: ref.id, label: ref.number, dir: `auftraege/${ref.number}` };
 }

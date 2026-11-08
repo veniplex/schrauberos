@@ -8,7 +8,7 @@ import { centsText, day, dayOrNull, iso, isoOrNull, nullableString, oneOf, optio
 import { defineResource, ID_SHAPE, type Delegate } from "@/server/api/resource";
 import type { ApiEndpoint } from "@/server/api/types";
 import { db } from "@/server/db";
-import { unrestrictedByCustomer, unrestrictedDocument, unrestrictedOrder } from "@/modules/workshop/customers/public";
+import { unrestrictedByCustomer, unrestrictedCustomerWhere, unrestrictedDocument, unrestrictedOrder } from "@/modules/workshop/customers/public";
 import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { PdfError } from "@/server/pdf";
 import { apiProblem, runApiOperation } from "@/server/operations";
@@ -226,7 +226,7 @@ const toInput = (b: Record<string, unknown>): Record<string, unknown> => ({ ...b
 
 /** Kunde (und Fahrzeug) für die API sichtbar? Sonst gibt es den Elternteil für sie nicht (404, nichts wird angelegt). */
 async function parentsVisible(b: { customerId?: string | null; vehicleId?: string | null }): Promise<boolean> {
-  if (b.customerId && (await db.customer.count({ where: { id: b.customerId, processingRestrictedAt: null } })) === 0) return false;
+  if (b.customerId && (await db.customer.count({ where: { id: b.customerId, ...unrestrictedCustomerWhere } })) === 0) return false;
   if (b.vehicleId && (await db.vehicle.count({ where: { id: b.vehicleId, ...unrestrictedByCustomer } })) === 0) return false;
   return true;
 }

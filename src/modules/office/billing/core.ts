@@ -2,7 +2,7 @@ import type { z } from "zod";
 import type { Workshop } from "@/generated/prisma/client";
 import { computeTotals, type Totals } from "@/lib/line-items";
 import type { lineItemsSchema } from "@/lib/line-items-schema";
-import { customerDisplayName } from "@/modules/workshop/customers/public";
+import { customerDisplayName, isUnusable, usabilitySelect } from "@/modules/workshop/customers/public";
 import { fail, failField, type Tx } from "@/server/operations";
 import { ALLOWED_TAX_BP, ITEM_KINDS } from "./constants";
 import type { FinalizeCheckInput } from "./domain";
@@ -89,10 +89,10 @@ export type RecipientColumns = { partyName: string; partyStreet: string | null; 
 export async function findLinkableCustomer(tx: Tx, customerId: string, current: string | null) {
   const customer = await tx.customer.findUnique({
     where: { id: customerId },
-    select: { id: true, firstName: true, lastName: true, company: true, email: true, street: true, zip: true, city: true, customerNumber: true, archivedAt: true, processingRestrictedAt: true, anonymizedAt: true },
+    select: { id: true, firstName: true, lastName: true, company: true, email: true, street: true, zip: true, city: true, customerNumber: true, archivedAt: true, ...usabilitySelect },
   });
   // Eingeschränkte Verarbeitung (Art. 18 DSGVO) und anonymisierte Kunden: nie verknüpfen; archivierte nur, wenn die Verknüpfung schon besteht
-  if (!customer || customer.processingRestrictedAt || customer.anonymizedAt || (customer.archivedAt && customer.id !== current)) return null;
+  if (!customer || isUnusable(customer) || (customer.archivedAt && customer.id !== current)) return null;
   return { ...customer, displayName: customerDisplayName(customer) };
 }
 
@@ -102,8 +102,8 @@ export async function findLinkableCustomer(tx: Tx, customerId: string, current: 
  */
 export async function assertCustomerUsable(tx: Tx, customerId: string | null): Promise<void> {
   if (!customerId) return;
-  const customer = await tx.customer.findUnique({ where: { id: customerId }, select: { processingRestrictedAt: true, anonymizedAt: true } });
-  if (!customer || customer.processingRestrictedAt || customer.anonymizedAt) fail("invalid", "billing.errors.restricted");
+  const customer = await tx.customer.findUnique({ where: { id: customerId }, select: usabilitySelect });
+  if (!customer || isUnusable(customer)) fail("invalid", "billing.errors.restricted");
 }
 
 /** Schnappschuss von Absender (Profil) und Empfänger (Beleg) als Spalten der Tabelle `InvoiceSnapshot` (ohne Kennung). */

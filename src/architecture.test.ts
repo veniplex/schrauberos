@@ -554,6 +554,29 @@ describe("Datenzugriff", () => {
     assert.deepEqual(offenders, []);
   });
 
+  /**
+   * Die Art.-18-Bedingung (eingeschränkte Verarbeitung, `processingRestrictedAt`) steht nur in `customers/` (Modul und Kundenseiten); alle anderen Funktionen fragen über die Helfer aus `customers/public.ts`
+   * (`unrestrictedCustomerWhere`, `restrictedCustomerWhere`, `searchableCustomerWhere`, `restrictionSelect`/`usabilitySelect` + `isRestricted`/`isUnusable`, `unrestrictedBy…`). Eine künftige Änderung der
+   * Auslegung geschieht dann an einer Stelle (Z6-3 M-4). Die Liste der Altlasten bleibt leer; Einträge dürfen nur verschwinden.
+   */
+  const ART18_LEGACY: Record<string, string> = {};
+  const inCustomers = (file: string) => file.startsWith("modules/workshop/customers/") || file.startsWith("app/(app)/(workshop)/customers/");
+  const violatesArt18 = (file: string, text: string) => !inCustomers(file) && /processingRestrictedAt/.test(code(text));
+
+  it("`processingRestrictedAt` kommt nur in customers/ vor (Modul und Kundenseiten) – sonst die Helfer aus customers/public.ts", () => {
+    const offenders = sources.filter(({ file, text }) => !(file in ART18_LEGACY) && violatesArt18(file, text)).map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  it("die Liste der Art.-18-Altlasten schrumpft nur: jeder Eintrag verletzt die Regel noch und die Datei existiert", () => {
+    for (const [file, reason] of Object.entries(ART18_LEGACY)) {
+      const source = sources.find((s) => s.file === file);
+      assert.ok(source, `${file}: Datei gibt es nicht mehr – Eintrag streichen`);
+      assert.ok(violatesArt18(source.file, source.text), `${file}: verletzt die Regel nicht mehr – Eintrag streichen`);
+      assert.ok(reason.length >= 20, `${file}: Begründung fehlt`);
+    }
+  });
+
   it("keine Voll-Relationen auf Kunden und Mitarbeiter (`include: { customer: true }`): immer `select` – `customerNameSelect` für den Namen, `customerContacts` für Kontaktdaten", () => {
     const wildcard = /\b(?:customer|employee|driver)\s*:\s*true\b/;
     const offenders = sources.filter(({ file, text }) => (file.startsWith("app/") || file.startsWith("modules/")) && !/\/seed\.ts$/.test(file) && wildcard.test(code(text))).map(({ file }) => file);

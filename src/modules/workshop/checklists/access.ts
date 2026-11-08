@@ -1,7 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { unrestrictedByCustomer, unrestrictedByVehicle } from "@/modules/workshop/customers/public";
-import { orderRef } from "@/modules/workshop/orders/public";
-import { vehicleRef } from "@/modules/workshop/vehicles/public";
+import { canSeeOrders, orderOwner } from "@/modules/workshop/orders/public";
+import { canSeeVehicles, vehicleOwner } from "@/modules/workshop/vehicles/public";
 import type { AppSession } from "@/server/auth/session";
 import { fail, type Tx } from "@/server/operations";
 
@@ -12,9 +12,6 @@ import { fail, type Tx } from "@/server/operations";
  */
 
 type Actor = Pick<AppSession, "can" | "features">;
-
-export const canSeeVehicles = (actor: Actor): boolean => actor.features.has("workshop.vehicles") && actor.can("vehicles.view");
-export const canSeeOrders = (actor: Actor): boolean => actor.features.has("workshop.orders") && actor.can("orders.view");
 
 /** Checkliste, deren Fahrzeughalter und (falls am Auftrag) Auftragskunde nicht eingeschränkt sind – unabhängig vom Betrachter (API-Sichtbarkeit und Webhooks teilen sie). */
 export const unrestrictedChecklistWhere: Prisma.ChecklistWhereInput = { AND: [unrestrictedByVehicle, { OR: [{ orderId: null }, { order: { is: unrestrictedByCustomer } }] }] };
@@ -36,18 +33,10 @@ export type Owner = { vehicleId: string; orderId: string | null; plate: string; 
  */
 export async function ownerAccess(principal: Actor, target: { vehicleId?: string; orderId?: string }, client?: Tx): Promise<Owner> {
   if (target.orderId) {
-    if (!canSeeOrders(principal)) fail("forbidden");
-    const order = await orderRef(target.orderId, client);
-    if (!order || order.restricted) fail("notFound");
-    if (!order.open) fail("invalid", "checklists.errors.orderClosed");
-    const vehicle = await vehicleRef(order.vehicleId, client);
-    if (!vehicle || vehicle.restricted) fail("notFound");
+    const order = await orderOwner(principal, target.orderId, "checklists.errors.orderClosed", client);
     return { vehicleId: order.vehicleId, orderId: order.id, plate: order.plate, label: `${order.number} · ${order.plate}` };
   }
   if (!target.vehicleId) fail("invalid", "checklists.errors.ownerRequired");
-  if (!canSeeVehicles(principal)) fail("forbidden");
-  const vehicle = await vehicleRef(target.vehicleId, client);
-  if (!vehicle || vehicle.restricted) fail("notFound");
-  if (vehicle.archived) fail("invalid", "checklists.errors.vehicleArchived");
+  const vehicle = await vehicleOwner(principal, target.vehicleId, "checklists.errors.vehicleArchived", client);
   return { vehicleId: vehicle.id, orderId: null, plate: vehicle.plate, label: vehicle.plate };
 }

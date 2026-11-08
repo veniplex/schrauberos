@@ -6,7 +6,7 @@ import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { searchKey } from "@/lib/search-key";
-import { customerDisplayName, customerNameSelect, unrestrictedByCustomer } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect, isRestricted, restrictionSelect, unrestrictedByCustomer, unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
 import { parseMonthInput } from "@/lib/month";
 import { writeAudit } from "@/server/audit";
 import { auditActorName, defineOperation, fail, failField, failFields } from "@/server/operations";
@@ -96,12 +96,12 @@ export const saveVehicleOperation = defineOperation({
     // Archivierte Fahrzeuge zählen nicht (sie sind außer Dienst; so wird ein Kennzeichen frei, wenn das Altfahrzeug archiviert ist).
     const duplicate = await tx.vehicle.findFirst({
       where: { plateNorm, archivedAt: null, ...(id ? { id: { not: id } } : {}) },
-      select: { id: true, plate: true, customerId: true, customer: { select: { processingRestrictedAt: true } } },
+      select: { id: true, plate: true, customerId: true, customer: { select: restrictionSelect } },
       orderBy: { createdAt: "asc" },
     });
     // Was die Warnung über das vorhandene Fahrzeug verraten darf (Art. 18 DSGVO, Datensparsamkeit): Kennung und Kennzeichen nur, wenn die Person Fahrzeuge sehen darf **und** der Halter nicht eingeschränkt verarbeitet
     // wird; der Name des Halters zusätzlich nur mit `customers.view`. Sonst nur „es gibt schon eines“ – ohne Namen, Kennung oder Halter. Ein solches Fahrzeug wird auch nie als „Altfahrzeug“ archiviert.
-    const duplicateVisible = Boolean(duplicate && !duplicate.customer?.processingRestrictedAt && principal.can("vehicles.view"));
+    const duplicateVisible = Boolean(duplicate && !isRestricted(duplicate.customer) && principal.can("vehicles.view"));
     if (duplicate && ((!d.allowDuplicate && !d.archiveDuplicate) || (d.archiveDuplicate && !duplicateVisible))) {
       if (!duplicateVisible) failFields({ plate: { key: "vehicles.errors.plateExistsHidden" } }, {});
       const holder = duplicate.customerId && principal.can("customers.view") ? await tx.customer.findUnique({ where: { id: duplicate.customerId }, select: customerNameSelect }) : null;
@@ -113,7 +113,7 @@ export const saveVehicleOperation = defineOperation({
     }
 
     // Ein Kunde mit eingeschränkter Verarbeitung (Art. 18 DSGVO) lässt sich nicht neu verknüpfen; das Fahrzeug, das er schon hält, bleibt bearbeitbar
-    if (customerId && !(await tx.customer.findFirst({ where: { id: customerId, OR: [{ processingRestrictedAt: null }, ...(id ? [{ vehicles: { some: { id } } }] : [])] }, select: { id: true } }))) failField("customerId", "validation.invalid");
+    if (customerId && !(await tx.customer.findFirst({ where: { id: customerId, OR: [unrestrictedCustomerWhere, ...(id ? [{ vehicles: { some: { id } } }] : [])] }, select: { id: true } }))) failField("customerId", "validation.invalid");
 
     const data = vehicleRecord({ plate, ...d });
 
@@ -163,7 +163,7 @@ export const transferVehicleOperation = defineOperation({
     if (!vehicle) fail("notFound");
     const newId = d.newCustomerId ?? null;
     if (newId === vehicle.customerId) failField("newCustomerId", "vehicles.errors.sameOwner");
-    if (newId && !(await tx.customer.findFirst({ where: { id: newId, processingRestrictedAt: null }, select: { id: true } }))) failField("newCustomerId", "validation.invalid");
+    if (newId && !(await tx.customer.findFirst({ where: { id: newId, ...unrestrictedCustomerWhere }, select: { id: true } }))) failField("newCustomerId", "validation.invalid");
 
     const when = noon(d.date);
     await tx.vehicleOwnership.updateMany({ where: { vehicleId: vehicle.id, toDate: null }, data: { toDate: when } });

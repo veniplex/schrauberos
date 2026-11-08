@@ -5,6 +5,7 @@ import { claimRow } from "@/lib/concurrency";
 import { RIM_TYPES, TIRE_SEASONS, TIRE_SET_STATUSES, type TirePosition } from "@/modules/workshop/tires/constants";
 import { isValidSeasonWindow, parseTireRows, type RawTireRow } from "@/modules/workshop/tires/domain";
 import { defineOperation, fail, failFields, type RunContext } from "@/server/operations";
+import { isRestricted, restrictionSelect } from "@/modules/workshop/customers/public";
 
 const optInt = (min: number, max: number) => z.coerce.number().int().min(min).max(max).optional();
 
@@ -64,10 +65,10 @@ export function tireSetRecord(d: TireSetInput, vehicleId: string) {
 /** Gemeinsamer Ablauf von Anlegen und Ändern (je ein eigenes Recht, daher zwei Operationen). */
 async function saveTireSetRun({ input: d, tx, audit }: RunContext<TireSetInput, undefined>): Promise<{ id: string }> {
   const { tires } = parseTireRows(d.tires as Partial<Record<TirePosition, RawTireRow>>, d.spare);
-  const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true, customer: { select: { processingRestrictedAt: true } } } });
+  const vehicle = await tx.vehicle.findUnique({ where: { id: d.vehicleId }, select: { id: true, plate: true, customer: { select: restrictionSelect } } });
   if (!vehicle) failFields({ vehicleId: { key: "validation.required" } });
   // Neue Verknüpfung mit dem Fahrzeug eines Kunden mit eingeschränkter Verarbeitung (Art. 18 DSGVO): nein – ein bestehender Satz bleibt bearbeitbar (er behält sein Fahrzeug)
-  if (vehicle.customer?.processingRestrictedAt && (!d.id || (await tx.tireSet.findUnique({ where: { id: d.id }, select: { vehicleId: true } }))?.vehicleId !== vehicle.id)) failFields({ vehicleId: { key: "tires.errors.customerRestricted" } });
+  if (isRestricted(vehicle.customer) && (!d.id || (await tx.tireSet.findUnique({ where: { id: d.id }, select: { vehicleId: true } }))?.vehicleId !== vehicle.id)) failFields({ vehicleId: { key: "tires.errors.customerRestricted" } });
 
   const data = tireSetRecord(d, vehicle.id);
 

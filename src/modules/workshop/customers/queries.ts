@@ -45,6 +45,19 @@ export const searchableCustomerWhere = { archivedAt: null, processingRestrictedA
 
 /** Nur Verarbeitung nicht eingeschränkt (für Stellen, die archivierte Kunden weiter zeigen, aber nie eingeschränkte). */
 export const unrestrictedCustomerWhere = { processingRestrictedAt: null } as const satisfies Prisma.CustomerWhereInput;
+/** Das Gegenteil: Kunden, deren Verarbeitung eingeschränkt ist (Art. 18 DSGVO). */
+export const restrictedCustomerWhere = { processingRestrictedAt: { not: null } } as const satisfies Prisma.CustomerWhereInput;
+
+/**
+ * **Die eine Stelle für die Art.-18-Bedingung** (Z7): Außerhalb von `customers/` kommt `processingRestrictedAt` nirgends vor (Architekturtest). Wer prüfen will, ob ein Kunde eingeschränkt oder für neue Vorgänge
+ * unbrauchbar ist, wählt `restrictionSelect` bzw. `usabilitySelect` mit und fragt `isRestricted`/`isUnusable`; wer filtert, nimmt `unrestrictedCustomerWhere`/`restrictedCustomerWhere`/`searchableCustomerWhere`.
+ * Ändert sich die Auslegung (weitere Zustände, Sperrfristen), geschieht das hier und nirgends sonst.
+ */
+export const restrictionSelect = { processingRestrictedAt: true } as const satisfies Prisma.CustomerSelect;
+/** Wie `restrictionSelect`, dazu die Anonymisierung (ein anonymisierter Kunde ist für neue Belege ebenso unbrauchbar). */
+export const usabilitySelect = { processingRestrictedAt: true, anonymizedAt: true } as const satisfies Prisma.CustomerSelect;
+export const isRestricted = (customer: { processingRestrictedAt: Date | null } | null | undefined): boolean => Boolean(customer?.processingRestrictedAt);
+export const isUnusable = (customer: { processingRestrictedAt: Date | null; anonymizedAt: Date | null } | null | undefined): boolean => Boolean(customer?.processingRestrictedAt || customer?.anonymizedAt);
 
 /**
  * **Die eine Auslegung von „eingeschränkt“ (Art. 18 DSGVO) für alles, was an einem Kunden und/oder Fahrzeug hängt** – Aufträge, Belege, Termine, Dateien, Checklisten, Reifensätze, Fahrzeuge:

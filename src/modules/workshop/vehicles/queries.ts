@@ -7,8 +7,11 @@ import { normalizePlate } from "@/lib/plate";
 import { dayKey } from "@/lib/zone";
 import type { Permission } from "@/modules/catalog";
 import type { Viewer } from "@/modules/types";
-import { customerContacts, customerNameSelect, unrestrictedByCustomer } from "@/modules/workshop/customers/public";
+import { customerContacts, customerNameSelect, isRestricted, restrictionSelect, unrestrictedByCustomer, unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
+import type { MessageKey } from "@/i18n/translate";
+import type { AppSession } from "@/server/auth/session";
 import { db } from "@/server/db";
+import { fail } from "@/server/operations";
 import { keyContains, searchWhere } from "@/server/search";
 import { INSPECTION_SOON_MONTHS } from "./domain";
 
@@ -18,7 +21,7 @@ import { INSPECTION_SOON_MONTHS } from "./domain";
  */
 export function vehicleTextWhere(term: string): Prisma.VehicleWhereInput[] {
   const plate = normalizePlate(term);
-  return [...(plate ? [{ plateNorm: { contains: plate } }] : []), keyContains("searchKey", term), { customer: { is: { ...keyContains("nameKey", term), processingRestrictedAt: null } } }];
+  return [...(plate ? [{ plateNorm: { contains: plate } }] : []), keyContains("searchKey", term), { customer: { is: { ...keyContains("nameKey", term), ...unrestrictedCustomerWhere } } }];
 }
 
 /** Filter der Fahrzeugliste – dieselben für die Liste und die Druckliste. */
@@ -57,9 +60,24 @@ export function vehicleListWhere(filters: VehicleListFilters, can: (permission: 
 export async function vehicleRef(vehicleId: string, client: Pick<Prisma.TransactionClient, "vehicle"> = db): Promise<{ id: string; plate: string; description: string; archived: boolean; restricted: boolean } | null> {
   const vehicle = await client.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { id: true, plate: true, make: true, model: true, archivedAt: true, customer: { select: { processingRestrictedAt: true } } },
+    select: { id: true, plate: true, make: true, model: true, archivedAt: true, customer: { select: restrictionSelect } },
   });
-  return vehicle ? { id: vehicle.id, plate: vehicle.plate, description: [vehicle.make, vehicle.model].filter(Boolean).join(" "), archived: vehicle.archivedAt !== null, restricted: Boolean(vehicle.customer?.processingRestrictedAt) } : null;
+  return vehicle ? { id: vehicle.id, plate: vehicle.plate, description: [vehicle.make, vehicle.model].filter(Boolean).join(" "), archived: vehicle.archivedAt !== null, restricted: isRestricted(vehicle.customer) } : null;
+}
+
+/** Wer Fahrzeuge in dieser Sitzung sehen darf: Funktion aktiv und `vehicles.view` – die eine Regel für alles, was sich an ein Fahrzeug hängt (Dateien, Checklisten …). */
+export const canSeeVehicles = (actor: Pick<AppSession, "can" | "features">): boolean => actor.features.has("workshop.vehicles") && actor.can("vehicles.view");
+
+/**
+ * Das Fahrzeug als **Eigentümer einer neuen Sache** (Datei, Checkliste): ohne Recht oder Funktion `forbidden`; unbekannt oder Halter mit eingeschränkter Verarbeitung (Art. 18) `notFound`; archiviert ein
+ * Fehler mit dem Meldungsschlüssel des Aufrufers. Liefert Kennung und Kennzeichen. `client` darf die Transaktion der Operation sein.
+ */
+export async function vehicleOwner(actor: Pick<AppSession, "can" | "features">, vehicleId: string, archivedKey: MessageKey, client?: Pick<Prisma.TransactionClient, "vehicle">): Promise<{ id: string; plate: string }> {
+  if (!canSeeVehicles(actor)) fail("forbidden");
+  const ref = await vehicleRef(vehicleId, client);
+  if (!ref || ref.restricted) fail("notFound");
+  if (ref.archived) fail("invalid", archivedKey);
+  return { id: ref.id, plate: ref.plate };
 }
 
 /** Kennzeichen zu Fahrzeug-Kennungen (Anzeige von Dateien). */

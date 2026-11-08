@@ -13,4 +13,4 @@
 export { ORDER_STATUSES, type OrderStatus } from "./constants";
 export { isOpen as isOrderOpen } from "./domain";
 export { appendOrderItems, createOrderInTx, createOrderOperation, type AppendedLine, type OrderChange } from "./operations";
-export { orderForBilling, orderLabels, orderLines, orderRef, restrictedOrderIds, stampableOrders } from "./queries";
+export { canSeeOrders, orderForBilling, orderLabels, orderLines, orderOwner, orderRef, restrictedOrderIds, stampableOrders } from "./queries";

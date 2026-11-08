@@ -13,6 +13,7 @@ import { auditActorName, defineOperation, fail, failField, fieldErrors, Operatio
 import { runOperationHooks } from "@/server/operations/hooks";
 import { ORDER_COUNTER, ORDER_ITEM_KINDS, type ApprovalMethod, type OrderEventKind, type OrderStatus } from "./constants";
 import { CLOSABLE, canStep, formatOrderNumber, isOpen, mileageDecision, sameName } from "./domain";
+import { isRestricted, restrictionSelect, searchableCustomerWhere } from "@/modules/workshop/customers/public";
 
 /**
  * Operationen der Werkstattaufträge. Kette: Anlegen → Status (In Arbeit, Fertig, zurück, Storniert) → **Abschließen** („Abgeholt“) → ggf. **Wieder öffnen**.
@@ -76,7 +77,7 @@ export type CreateOrderInput = z.output<typeof createOrderInput>;
 export async function createOrderRun({ input: d, principal, tx, audit, emit }: RunContext<CreateOrderInput, undefined>): Promise<{ id: string; number: string; mileage: "none" | "write" | "keep" }> {
   const vehicle = await tx.vehicle.findUnique({
     where: { id: d.vehicleId },
-    select: { id: true, plate: true, customerId: true, archivedAt: true, customer: { select: { processingRestrictedAt: true } } },
+    select: { id: true, plate: true, customerId: true, archivedAt: true, customer: { select: restrictionSelect } },
   });
   if (!vehicle || vehicle.archivedAt) failField("vehicleId", "validation.invalid");
 
@@ -84,9 +85,9 @@ export async function createOrderRun({ input: d, principal, tx, audit, emit }: R
   let customerId: string | null = vehicle.customerId;
   if (vehicle.customerId) {
     if (d.customerId && d.customerId !== vehicle.customerId) failField("customerId", "orders.errors.customerMismatch");
-    if (vehicle.customer?.processingRestrictedAt) failField("vehicleId", "orders.errors.customerRestricted");
+    if (isRestricted(vehicle.customer)) failField("vehicleId", "orders.errors.customerRestricted");
   } else if (d.customerId) {
-    const customer = await tx.customer.findFirst({ where: { id: d.customerId, archivedAt: null, processingRestrictedAt: null }, select: { id: true } });
+    const customer = await tx.customer.findFirst({ where: { id: d.customerId, ...searchableCustomerWhere }, select: { id: true } });
     if (!customer) failField("customerId", "validation.invalid");
     customerId = customer.id;
   }

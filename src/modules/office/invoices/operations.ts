@@ -13,6 +13,7 @@ import { storeFile } from "@/server/files";
 import { takeUploadBudget } from "@/server/upload-budget";
 import { allocateDocumentNumber } from "@/server/invoice-numbering";
 import { removeInvoiceFile, syncInvoiceFile } from "./files";
+import { unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
 
 
 /** Die Felder einer Rechnung, wie Formular und CSV-Import sie kennen (ohne Kennung, Version, Beleg und Kunden-Verknüpfung). */
@@ -110,7 +111,7 @@ export const saveInvoiceOperation = defineOperation({
 
     const current = d.id ? await tx.invoice.findUnique({ where: { id: d.id }, select: { finalizedAt: true, customerId: true, source: true } }) : null;
     // Ein Kunde mit eingeschränkter Verarbeitung (Art. 18 DSGVO) lässt sich nicht neu verknüpfen; eine bestehende Verknüpfung bleibt
-    if (d.customerId && !(await tx.customer.findFirst({ where: { id: d.customerId, OR: [{ processingRestrictedAt: null }, { id: current?.customerId ?? "" }] }, select: { id: true } }))) failField("customerId", "validation.invalid");
+    if (d.customerId && !(await tx.customer.findFirst({ where: { id: d.customerId, OR: [unrestrictedCustomerWhere, { id: current?.customerId ?? "" }] }, select: { id: true } }))) failField("customerId", "validation.invalid");
 
     const data = invoiceRecord(d, d.customerId ?? null);
 
