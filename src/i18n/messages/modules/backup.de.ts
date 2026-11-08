@@ -139,6 +139,10 @@ export const backupDe = {
     consumers: { auth: { totp: "Zwei-Faktor-Anmeldung (die Personen richten sie neu ein)" }, updates: { token: "Update-Token (unter Einstellungen → Updates neu eintragen)" }, backup: { offsite: "Off-Site-Backup (ausgeschaltet; Zugangsdaten und Schlüssel neu einrichten)" }, mail: { password: "E-Mail-Versand (ausgeschaltet; unter Einstellungen → E-Mail das Passwort neu eintragen)" }, it: { vault: "IT-Tresor (die Einträge bleiben, die Zugangsdaten müssen neu eingegeben werden)" } },
     ack: "Verstanden",
   },
+  holdings: {
+    names: { it: { vault: "IT-Tresor" } },
+    notice: "Einträge des {names} sind an den Geheimnisschlüssel gebunden: {count} vorhanden. Wiederherstellungsschlüssel erzeugen, Sicherungen herunterladen oder wiederherstellen und die Vergabe der zugehörigen Rechte stehen deshalb mit dem Vermerk „betroffen“ im Audit-Log. Wer den Wiederherstellungsschlüssel und eine Sicherung hat, kann diese Einträge auch außerhalb der Anwendung lesen – den Schlüssel wie ein Passwort behandeln.",
+  },
   keyIssue: {
     title: "Der Geheimnisschlüssel (secret.key) ist nicht verfügbar",
     missing: "Die Datei secret.key fehlt, obwohl die Datenbank verschlüsselte Geheimnisse enthält. Die Zwei-Faktor-Anmeldung, das Update-Token und die Off-Site-Zugangsdaten sind gesperrt; Konten mit zweitem Faktor kommen nur noch mit einem Sicherungscode hinein. Es wurde nichts gelöscht und kein neuer Schlüssel angelegt.",

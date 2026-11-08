@@ -4,6 +4,7 @@ import { z } from "zod";
 import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { confirmRecoveryKey, issueRecoveryKey } from "@/server/recovery-key";
 import { resetSecretsByAdministrator } from "@/server/secret-reset";
+import { secretHoldings, withHoldings } from "@/server/secret-holdings";
 import { SecretKeyUnavailableError } from "@/server/secrets";
 import { defineAction, defineOperation, fail } from "@/server/operations";
 
@@ -11,6 +12,9 @@ import { defineAction, defineOperation, fail } from "@/server/operations";
  * Wiederherstellungsschlüssel (P1b-4a): erzeugen und als gesichert bestätigen. Nur Administratoren mit erneuter Passwortabfrage; der Klartext steht **nur in der Antwort der Aktion**
  * (`state`) – nie in URL, Log, Audit oder Datenbank. Neu erzeugen ersetzt Hülle und Off-Site-Hauptschlüssel; der bisherige Schlüssel wird für neue Backups wertlos
  * (bereits abgelegte Off-Site-Dateien bleiben mit dem alten Schlüssel verschlüsselt).
+ *
+ * **Auffälliges Audit bei vorhandenen Tresor-Einträgen:** Wer den Wiederherstellungsschlüssel kennt (er wird hier einmal angezeigt) und eine Sicherung hat, kann `secret.key` und damit den Tresor außerhalb der
+ * Anwendung lesen, ohne das Tresor-Recht und ohne `vault.reveal`. Gibt es Tresor-Einträge, vermerkt der Eintrag `secrets.keyCreated` das (`Tresor betroffen (n Einträge)`, nie Inhalt) – siehe `secret-holdings.ts`.
  */
 const createRecoveryKeyOperation = defineOperation({
   name: "admin.backup.createRecoveryKey",
@@ -21,10 +25,11 @@ const createRecoveryKeyOperation = defineOperation({
   prepare: async ({ input, principal }) => {
     if (!principal.user.isAdmin) fail("forbidden", "recovery.account.errors.adminOnly");
     await confirmOwnPassword(principal.user.id, input.password);
+    return { holdings: await secretHoldings() };
   },
-  run: async ({ tx, audit }) => {
+  run: async ({ tx, audit, prepared }) => {
     const key = await issueRecoveryKey(tx);
-    audit({ target: "–" }); // nie der Schlüssel selbst
+    audit({ target: withHoldings("–", prepared.holdings) }); // nie der Schlüssel selbst
     return { key };
   },
 });

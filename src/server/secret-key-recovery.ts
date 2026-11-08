@@ -3,6 +3,7 @@ import { secretKeyCheck, WRAPPED_SETTING_KEY } from "@/lib/secret-wrap";
 import { audit } from "@/server/audit";
 import { openWrappedSecretKey } from "@/server/recovery-key-input";
 import { KEY_CHECK_SETTING, secretKeyIssue } from "@/server/secret-key-issue";
+import { secretHoldings, withHoldings } from "@/server/secret-holdings";
 import { readSecretKey, setAsideSecretKey, writeSecretKeyFile } from "@/server/secrets";
 import { getSetting } from "@/server/settings";
 
@@ -34,6 +35,6 @@ export async function reconstructSecretKey(input: string): Promise<ReconstructRe
   } catch {
     return { ok: false, reason: "unwritable" };
   }
-  await audit("secrets.keyReconstructed", { actor: { id: null, name: "–" }, target: issue.kind });
+  await audit("secrets.keyReconstructed", { actor: { id: null, name: "–" }, target: withHoldings(issue.kind, await secretHoldings()) });
   return { ok: true };
 }

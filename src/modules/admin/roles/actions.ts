@@ -7,7 +7,9 @@ import { formObject } from "@/lib/forms";
 import { checkRoleChange, checkRoleDelete, type Denial } from "@/lib/rbac";
 import { isPermission } from "@/modules/catalog";
 import { defineAction, defineOperation, fail } from "@/server/operations";
+import { auditRoleExplicitChange } from "@/server/rbac/explicit-audit";
 import { loadActor, toRights } from "@/server/rbac/hierarchy";
+import { secretHoldings } from "@/server/secret-holdings";
 
 const deniedKey = (denial: Denial) => `rbac.denied.${denial}` as MessageKey;
 
@@ -36,9 +38,13 @@ const saveRoleOperation = defineOperation({
   permission: "roles.manage",
   input: saveInput,
   audit: (input) => (input.id ? "role.update" : "role.create"),
+  // abhängige Einträge (Tresor) vor der Transaktion zählen: für den Vermerk bei der Vergabe ausdrücklicher Rechte
+  prepare: async () => ({ holdings: await secretHoldings() }),
   // Prüfen (Rechte-Hierarchie, Version) und Schreiben in einer Transaktion
-  run: async ({ input: d, principal, tx, audit }) => {
+  run: async ({ input: d, principal, prepared, tx, audit }) => {
     const submitted = d.permissions;
+    let beforePermissions: readonly string[] = [];
+    let afterPermissions: readonly string[] = submitted;
     const actor = await loadActor(tx, principal.user.id);
     let roleId: string;
     if (d.id) {
@@ -49,6 +55,8 @@ const saveRoleOperation = defineOperation({
       const denied = checkRoleChange(actor, toRights(role), next);
       if (denied) fail("forbidden", deniedKey(denied));
       if (!(await claimRow(tx.role, role.id, d.version))) fail("conflict");
+      beforePermissions = role.permissions.map((p) => p.permission);
+      afterPermissions = next;
       await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
       await tx.role.update({
         where: { id: role.id },
@@ -62,6 +70,8 @@ const saveRoleOperation = defineOperation({
       if (await tx.role.findUnique({ where: { key } })) key = `${key}-${Date.now().toString(36)}`;
       roleId = (await tx.role.create({ data: { key, name: d.name, description: d.description ?? null, permissions: { create: submitted.map((permission) => ({ permission })) } } })).id;
     }
+    // Ausdrücklich zu vergebende Rechte (Tresor) hinzugefügt oder entzogen: eigener Audit-Eintrag je Recht (Rolle und Recht), nicht nur der Rollenname
+    await auditRoleExplicitChange(tx, principal, { id: roleId, name: d.name }, beforePermissions, afterPermissions, prepared.holdings);
     audit({ target: d.name, entityId: roleId });
     return { roleId };
   },

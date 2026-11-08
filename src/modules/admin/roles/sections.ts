@@ -12,6 +12,7 @@ import { ROLE_TEMPLATES, templatePermissions } from "@/modules/role-templates";
  */
 export async function permissionSections(): Promise<MaskSection[]> {
   const [{ t, td, has }, active] = await Promise.all([getI18n(), getActiveFeatureIds()]);
+  // Ein Kennzeichen je Recht (Regel 9): „Nur Administratoren“ geht vor „Nur ausdrücklich“ geht vor die übrigen (Tresor: „Nur ausdrücklich“ statt „Anzeigen“/„Sensibel“ – der Katalog führt sie weiter unter `marked`)
   const markOf = (key: string): string | undefined => {
     if (isAdminOnly(key)) return t("roles.marks.adminOnly");
     if (isExplicitOnly(key)) return t("roles.marks.explicitOnly");

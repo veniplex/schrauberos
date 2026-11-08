@@ -35,6 +35,9 @@ async function classify() {
   return { unreadable, damaged, unsupported };
 }
 
+/** Anzahl der Einträge mit hinterlegten Zugangsdaten (für den Hinweis „Tresor betroffen“ im Audit-Log bei Schlüsselvorgängen; liest nur zählend) */
+export const vaultEntryCount = (): Promise<number> => db.vaultEntry.count({ where: { wrappedKey: { not: null } } });
+
 /** Die Zeilen, die ein Zurücksetzen anfassen würde (nur `unreadable`) – für die Sicherung vor dem Zurücksetzen. Fehler werden nicht verschluckt (`secret-reset.ts` setzt dann für diesen Verbraucher nichts zurück). */
 export async function affectedVaultRows(): Promise<Array<Record<string, unknown>>> {
   return (await classify()).unreadable.map((row) => ({ ...row }));

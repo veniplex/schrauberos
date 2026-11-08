@@ -12,6 +12,7 @@ import { RETENTION_MAX_DAYS, RETENTION_MAX_KEEP, saveBackupSettings, type Backup
 import { jobRunner } from "@/server/jobs";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { scheduleRestart } from "@/server/restart";
+import { secretHoldings, withHoldings } from "@/server/secret-holdings";
 
 const none = z.object({});
 
@@ -94,7 +95,8 @@ const restoreBackupOperation = defineOperation({
       logError("backup", error);
       fail("failed", "backup.errors.restoreFailed");
     }
-    setAudit({ target: secretKeyRestored ? `${input.name} · mit Wiederherstellungsschlüssel` : input.name });
+    // Gibt es Tresor-Einträge, steht im Eintrag, dass der Tresor betroffen ist (Wiederherstellung mit Schlüssel macht ihn wieder lesbar, ohne Schlüssel werden seine Zugangsdaten zurückgesetzt)
+    setAudit({ target: withHoldings(secretKeyRestored ? `${input.name} · mit Wiederherstellungsschlüssel` : input.name, await secretHoldings()) });
     afterCommit(() => scheduleRestart());
     return { name: input.name };
   },

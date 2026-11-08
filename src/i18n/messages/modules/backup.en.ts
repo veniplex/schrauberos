@@ -141,6 +141,10 @@ export const backupEn: typeof backupDe = {
     consumers: { auth: { totp: "Two-factor login (people set it up again)" }, updates: { token: "Update token (enter it again under Settings → Updates)" }, backup: { offsite: "Off-site backup (switched off; set up credentials and key again)" }, mail: { password: "Email sending (switched off; enter the password again under Settings → Email)" }, it: { vault: "IT vault (the entries stay, the credentials must be entered again)" } },
     ack: "Understood",
   },
+  holdings: {
+    names: { it: { vault: "IT vault" } },
+    notice: "Entries of the {names} are bound to the secret key: {count} present. Creating the recovery key, downloading or restoring backups and granting the related permissions are therefore marked “affected” in the audit log. Anyone holding the recovery key and a backup can read these entries outside the application – treat the key like a password.",
+  },
   keyIssue: {
     title: "The secret key (secret.key) is not available",
     missing: "The file secret.key is missing although the database contains encrypted secrets. Two-factor sign-in, the update token and the off-site credentials are locked; accounts with a second factor can only sign in with a backup code. Nothing was deleted and no new key was created.",

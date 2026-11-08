@@ -4,9 +4,9 @@ Eine **Rolle** bündelt Rechte; ein Benutzer kann mehrere Rollen haben, die Rech
 Rechte nach Bereich und Funktion gegliedert (ansehen, anlegen, bearbeiten, löschen …). Mitgeliefert sind Administrator,
 Geschäftsführung, Büro / Verwaltung, Serviceberater, Mechaniker, Lager und IT-Administrator – sie lassen sich anpassen.
 
-* **Administrator-Rollen** haben immer alle Rechte, auch für künftige Funktionen.
+* **Administrator-Rollen** haben alle Rechte, auch für künftige Funktionen – **außer den ausdrücklich zu vergebenden** (Kennzeichnung „Nur ausdrücklich“, zurzeit „Tresor ansehen“ und „Tresor verwalten“ des IT-Tresors). Die bekommt auch ein Administrator nur über eine Rolle, die sie enthält; er kann sie sich aber selbst geben – jede Vergabe und jeder Entzug steht im Audit-Log (Rolle, Recht, Konto), bei vorhandenen Tresor-Einträgen mit dem Vermerk „Tresor betroffen“.
 * **Die Maske ist für viele Rechte gebaut:** Jedes Recht trägt eine **Kurzbeschreibung** (was die Person damit tun kann) und, wo nötig, eine Kennzeichnung – „Nur Administratoren“,
-  „Sensibel“, „Export“, „Import“. Die Rechte sind in **einklappbaren Gruppen** nach Funktion geordnet; offen sind die Gruppen, in denen die Rolle schon Rechte hat
+  „Nur ausdrücklich“, „Sensibel“, „Export“, „Import“. Die Rechte sind in **einklappbaren Gruppen** nach Funktion geordnet; offen sind die Gruppen, in denen die Rolle schon Rechte hat
   (**Alle aufklappen** / **Alle zuklappen** öffnen oder schließen alles). Die **Suche** über der Liste findet Rechte nach Name, Beschreibung und Kennzeichnung („Export“, „Rechnung“, „löschen“) und blendet
   alles andere aus – abgewählt wird dadurch nichts, gespeichert wird immer die ganze Auswahl.
 * **Rollenvorlagen:** „Mechaniker“, „Büro“ und „Leitung“ füllen die Auswahl vor und ersetzen die bisherige; erst **Speichern** übernimmt sie. Name und Beschreibung werden nur gefüllt, wenn sie noch leer sind.

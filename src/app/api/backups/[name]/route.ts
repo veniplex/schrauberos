@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/server/auth/session";
 import { audit } from "@/server/audit";
 import { backupPath } from "@/server/backup/core";
+import { secretHoldings, withHoldings } from "@/server/secret-holdings";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
   const dir = backupPath(name);
   if (!dir || !existsSync(dir)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  await audit("backup.download", { target: name });
+  // Eine Sicherung enthält die Datenbank samt Hülle des Wiederherstellungsschlüssels: zusammen mit dem Schlüssel lässt sich der Tresor außerhalb der Anwendung lesen – gibt es Tresor-Einträge, steht das im Eintrag
+  await audit("backup.download", { target: withHoldings(name, await secretHoldings()) });
   // Datenbank (bereits gzip) und Belege sind kaum weiter komprimierbar: ein einfaches tar genügt
   const pack = tar.c({ cwd: dir, portable: true }, ["."]);
   pack.on("error", (error) => console.error("[backup] Archiv konnte nicht erstellt werden:", error));

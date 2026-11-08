@@ -11,7 +11,9 @@ import { revokeAccess } from "@/server/auth/revoke";
 import { resetSecondFactor } from "@/server/auth/second-factor";
 import { loginThrottle, normalizeUsername } from "@/server/auth/throttle";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
+import { auditUserExplicitChange } from "@/server/rbac/explicit-audit";
 import { loadActor, loadRoles, toRights } from "@/server/rbac/hierarchy";
+import { secretHoldings } from "@/server/secret-holdings";
 import type { Prisma } from "@/generated/prisma/client";
 
 const deniedKey = (denial: Denial) => `rbac.denied.${denial}` as MessageKey;
@@ -55,7 +57,7 @@ const saveUserOperation = defineOperation({
   input: saveInput,
   audit: (input) => (input.id ? "user.update" : "user.create"),
   // aufwendig, deshalb vor der Transaktion
-  prepare: async ({ input, principal }) => ({ passwordHash: input.password ? await hashPassword(input.password, accountOwner(principal.user.id)) : undefined }),
+  prepare: async ({ input, principal }) => ({ passwordHash: input.password ? await hashPassword(input.password, accountOwner(principal.user.id)) : undefined, holdings: await secretHoldings() }),
   run: async ({ input: d, principal, prepared, tx, audit }) => {
     // Prüfen und Schreiben gehören zusammen: Rechte-Hierarchie, Schutz des letzten Administrators und Speichern in einer Transaktion
     const actor = await loadActor(tx, principal.user.id);
@@ -102,6 +104,10 @@ const saveUserOperation = defineOperation({
       userId = (await tx.user.create({ data: { ...base, username: d.username, authSource: "local", roles: { create: roles.map((r) => ({ roleId: r.id })) } } })).id;
     }
     audit({ target: d.username, entityId: userId });
+    // Eine Rolle mit ausdrücklich zu vergebenden Rechten (Tresor) dem Konto gegeben oder entzogen: eigener Audit-Eintrag je Recht (Konto, Rolle, Recht)
+    const roleNames = new Map((await tx.role.findMany({ where: { id: { in: [...new Set([...before, ...roles].map((r) => r.id))] } }, select: { id: true, name: true } })).map((r) => [r.id, r.name]));
+    const named = (list: typeof roles) => list.map((r) => ({ id: r.id, name: roleNames.get(r.id) ?? r.id, permissions: r.permissions }));
+    await auditUserExplicitChange(tx, principal, { id: userId, username: d.username }, named(before), named(roles), prepared.holdings);
 
     // Passwort geändert oder deaktiviert -> Sitzungen, bekannte Geräte und API-Tokens beenden – in derselben Transaktion (kein Zustand dazwischen,
     // kein verschlucktes Fehlschlagen nach dem Commit)

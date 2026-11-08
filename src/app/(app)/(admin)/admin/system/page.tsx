@@ -12,6 +12,7 @@ import { connectionIsSecure } from "@/server/auth/connection";
 import { systemInfo } from "@/server/system-info";
 import { webhookHealth } from "@/server/webhooks/health";
 import { monitorHealth } from "@/server/monitor/run";
+import { secretHoldings } from "@/server/secret-holdings";
 import { db } from "@/server/db";
 import { connectionNotices, evaluateSystem, problemTone, type SystemNotice, type SystemProblem } from "@/server/jobs/health";
 import { jobRunner } from "@/server/jobs";
@@ -29,10 +30,10 @@ const toneOf = (status: string | null) => JOB_STATUS_TONE[status as JobStatus] ?
 export default async function SystemPage() {
   await requirePermission("system.view");
   const { t, tp, td, date, number } = await getI18n();
-  const [jobs, runs, active, pending, failed, lastFailed, info, secure, behindProxy, webhooks, monitor] = await Promise.all([
+  const active = await activeFeatureSet();
+  const [jobs, runs, pending, failed, lastFailed, info, secure, behindProxy, webhooks, monitor, holdings] = await Promise.all([
     jobStatusRows(),
     recentJobRuns(30),
-    activeFeatureSet(),
     db.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
     db.outboxEvent.count({ where: { failedAt: { not: null } } }),
     db.outboxEvent.findFirst({ where: { failedAt: { not: null } }, orderBy: { failedAt: "desc" }, select: { lastError: true } }),
@@ -40,7 +41,8 @@ export default async function SystemPage() {
     connectionIsSecure(),
     isBehindProxy(),
     webhookHealth(),
-    activeFeatureSet().then((features) => monitorHealth(features.has("it.network"))),
+    monitorHealth(active.has("it.network")),
+    secretHoldings(),
   ]);
   const when = (d: Date | string) => date(d, { dateStyle: "short", timeStyle: "medium" });
   const nameOf = (id: string) => td(`system.names.${id}`, id);
@@ -126,6 +128,9 @@ export default async function SystemPage() {
             {noticeText(n)}
           </Alert>
         ))}
+        {holdings.length > 0 ? (
+          <Alert tone="info">{t("backup.holdings.notice", { names: holdings.map((h) => td(`backup.holdings.names.${h.id}`, h.label)).join(", "), count: holdings.reduce((n, h) => n + h.count, 0) })}</Alert>
+        ) : null}
         <p className="text-xs text-ink-muted">{runner.lastTickAt ? t("system.runner.lastActive", { date: when(runner.lastTickAt) }) : t("system.runner.notYet")}</p>
 
         <Card title={t("system.server.title")}>

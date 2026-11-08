@@ -25,6 +25,12 @@ export type SecretConsumerDef = {
    * **Scheitert diese Abfrage, setzt `secret-reset.ts` für diesen Verbraucher nichts zurück** (erst sichern, dann zurücksetzen) und meldet es; die übrigen Verbraucher laufen weiter. Nur Zeilen, die der Verbraucher hier meldet, darf sein `resetUnreadable` anfassen.
    */
   affectedRows?: () => Promise<Array<Record<string, unknown>>>;
+  /**
+   * Wie viele Einträge dieses Verbrauchers von `secret.key` abhängen (IT-Tresor: Einträge mit hinterlegten Zugangsdaten) und wie sie im Audit-Log heißen (`label`). Vorgänge, die `secret.key` oder Backups
+   * in fremde Hände bringen können (Wiederherstellungsschlüssel erzeugen, Backup herunterladen oder wiederherstellen, Rechte vergeben), vermerken im Audit-Log **auffällig**, dass solche Einträge existieren
+   * (`server/secret-holdings.ts`) – nie deren Inhalt –, und die Administration sieht den Hinweis im Systemstatus. Verbraucher mit einzelnen Geheimnissen (Update-Token …) brauchen das nicht.
+   */
+  holdings?: { label: string; count: () => Promise<number> };
 };
 
 /**

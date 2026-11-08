@@ -140,11 +140,15 @@ export const auditEn: typeof auditDe = {
       update: "User changed",
       delete: "User deleted",
       unlock: "Sign-in delay lifted",
+      explicitGrant: "Role with an explicit-only permission (e.g. IT vault) given to an account",
+      explicitRevoke: "Role with an explicit-only permission (e.g. IT vault) taken from an account",
     },
     role: {
       create: "Role created",
       update: "Role changed",
       delete: "Role deleted",
+      explicitGrant: "Explicit-only permission (e.g. IT vault) added to a role",
+      explicitRevoke: "Explicit-only permission (e.g. IT vault) removed from a role",
     },
     module: {
       enable: "Module/feature switched on",

@@ -12,5 +12,5 @@ export const usersFeature = defineFeature({
     { id: "users", href: "/admin/users", labelKey: "nav.users", icon: "users", permission: "users.view", order: 100 },
   ],
   routes: ["admin/users"],
-  auditActions: ["user.create", "user.update", "user.delete", "user.unlock"],
+  auditActions: ["user.create", "user.update", "user.delete", "user.unlock", "user.explicitGrant", "user.explicitRevoke"],
 });

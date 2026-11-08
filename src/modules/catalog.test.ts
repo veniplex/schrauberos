@@ -107,6 +107,29 @@ describe("Katalog", () => {
     for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(!ADMIN_ONLY_PERMISSIONS.has(p), `${role.key}: ${p} ist adminOnly`);
   });
 
+  it("explicitOnly-Rechte (nur ausdrücklich, auch für Administratoren): echte Rechte der eigenen Funktion, gekennzeichnet, nie adminOnly, in keiner Standardrolle, keiner Rollenvorlage und keinem API-Token, und nie Teil dessen, was „Administrator“ bedeutet", async () => {
+    const { EXPLICIT_ONLY_PERMISSIONS, ADMIN_IMPLIED_PERMISSIONS, isExplicitOnly } = await import("./catalog");
+    const { ROLE_TEMPLATES, templatePermissions } = await import("./role-templates");
+    const { isApiForbidden } = await import("@/lib/api/scope");
+    assert.ok(EXPLICIT_ONLY_PERMISSIONS.size >= 2, "mindestens die beiden Tresor-Rechte");
+    // Tippfehler fallen auf: jeder Eintrag in explicitOnly ist ein Recht derselben Funktion
+    for (const f of FEATURES) {
+      for (const p of (f.permissions as { explicitOnly?: readonly string[] }).explicitOnly ?? []) {
+        assert.ok((f.permissions.keys as readonly string[]).includes(p), `${fullFeatureId(f)}: explicitOnly nennt ${p}, das es in der Gruppe nicht gibt (Tippfehler wirkt nie)`);
+        assert.ok(!ADMIN_ONLY_PERMISSIONS.has(p), `${p}: zugleich adminOnly (ein Recht der Verwaltung vergibt nur der Administrator – „nur ausdrücklich“ meint das Gegenteil)`);
+        assert.ok(MARKED_PERMISSIONS.has(p), `${p}: ausdrücklich zu vergebende Rechte brauchen eine Kennzeichnung (Regel 9)`);
+        assert.ok(isApiForbidden(p), `${p}: nie in einem API-Token`);
+      }
+    }
+    for (const p of EXPLICIT_ONLY_PERMISSIONS) {
+      assert.ok(isExplicitOnly(p));
+      assert.ok(!ADMIN_IMPLIED_PERMISSIONS.includes(p as never), `${p}: Administrator bedeutet alle Rechte außer diesen`);
+      for (const role of DEFAULT_ROLES) assert.ok(!(role.permissions as readonly string[]).includes(p), `${role.key}: ${p}`);
+      for (const template of ROLE_TEMPLATES) assert.ok(!(templatePermissions(template) as readonly string[]).includes(p), `Rollenvorlage ${template.id}: ${p}`);
+    }
+    assert.equal(ADMIN_IMPLIED_PERMISSIONS.length + EXPLICIT_ONLY_PERMISSIONS.size, ALL_PERMISSIONS.length, "Administrator = alle Rechte minus die ausdrücklichen");
+  });
+
   it("gekennzeichnete Rechte (Export, Import …) gehören zur eigenen Funktion und stecken in keiner Standardrolle (Regel 9); jedes Recht mit Namen .export/.import ist gekennzeichnet", () => {
     for (const f of FEATURES) {
       const marked = (f.permissions as { marked?: Record<string, readonly string[]> }).marked ?? {};

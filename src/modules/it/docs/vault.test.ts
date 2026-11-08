@@ -636,6 +636,107 @@ describe("Klartext nirgends sonst", () => {
   });
 });
 
+describe("Ehrlichkeit statt Schein: Schlüsselvorgänge und Rechtevergabe stehen mit „Tresor betroffen“ im Audit-Log", () => {
+  let roleActions: typeof import("@/modules/admin/roles/actions");
+  let userActions: typeof import("@/modules/admin/users/actions");
+  let keyActions: typeof import("@/modules/admin/backup/key-actions");
+  let holdings: typeof import("@/server/secret-holdings");
+  before(async () => {
+    roleActions = await import("@/modules/admin/roles/actions");
+    userActions = await import("@/modules/admin/users/actions");
+    keyActions = await import("@/modules/admin/backup/key-actions");
+    holdings = await import("@/server/secret-holdings");
+  });
+  const explicit = async () => (await env.db.auditLog.findMany({ where: { action: { contains: "explicit" } }, orderBy: { createdAt: "asc" } })).map((e) => `${e.action} ${e.target}`);
+  const adminLogin = async () => {
+    const role = await env.role({ key: "admin", isAdmin: true, isSystem: true });
+    const user = await env.user({ username: "admin-1", password: PASSWORD, roles: [role] });
+    await env.signIn(user);
+    return { role, user };
+  };
+
+  it("Selbstvergabe: ein Administrator, der sich eine Rolle mit Tresor-Recht gibt, hinterlässt je Recht einen eigenen Eintrag (Rolle und Recht, Konto und Rolle) – mit Vermerk, wenn Tresor-Einträge existieren", async () => {
+    const { user } = await adminLogin();
+    await makeEntry("Router");
+    await makeEntry("Switch");
+    // neue Rolle mit ausdrücklichen Rechten (und einem gewöhnlichen)
+    assert.ok(await redirectOf(() => roleActions.saveRole({}, form({ name: "Reporting", permission: ["docsIt.view", "docsIt.vault", "docsIt.vaultManage"] }))));
+    const role = await env.db.role.findFirstOrThrow({ where: { name: "Reporting" } });
+    assert.deepEqual(await explicit(), [
+      "role.explicitGrant Reporting: docsIt.vault · Tresor betroffen (2 Einträge)",
+      "role.explicitGrant Reporting: docsIt.vaultManage · Tresor betroffen (2 Einträge)",
+    ]);
+    // dem eigenen Konto geben
+    const fresh = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
+    assert.ok(await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(fresh), username: user.username, name: user.name, active: "on", roleId: [...fresh.roles.map((r) => r.roleId), role.id] }))));
+    const logs = await explicit();
+    assert.deepEqual(logs.slice(2), [
+      "user.explicitGrant admin-1 ← Reporting: docsIt.vault · Tresor betroffen (2 Einträge)",
+      "user.explicitGrant admin-1 ← Reporting: docsIt.vaultManage · Tresor betroffen (2 Einträge)",
+    ]);
+    // nur Rechtenamen und Beschriftungen – nie Inhalte
+    assertNoPlaintext(JSON.stringify(await env.db.auditLog.findMany()), "Audit");
+  });
+
+  it("Entzug ebenfalls: Recht aus der Rolle genommen, Rolle dem Konto entzogen; unveränderte Rechte und gewöhnliche Rechte erzeugen keinen Eintrag", async () => {
+    const { user } = await adminLogin();
+    const role = await env.role({ key: "tresor", name: "Tresor", permissions: ["docsIt.view", "docsIt.vault"] });
+    const fresh = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
+    await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(fresh), username: user.username, name: user.name, active: "on", roleId: [...fresh.roles.map((r) => r.roleId), role.id] })));
+    assert.deepEqual(await explicit(), ["user.explicitGrant admin-1 ← Tresor: docsIt.vault"], "ohne Tresor-Einträge kein Vermerk");
+    // Rolle ändern: vault bleibt, ein gewöhnliches Recht kommt dazu → kein Eintrag
+    let current = await env.db.role.findUniqueOrThrow({ where: { id: role.id } });
+    await redirectOf(() => roleActions.saveRole({}, form({ id: role.id, version: versionOf(current), name: "Tresor", permission: ["docsIt.view", "docsIt.vault", "docsIt.edit"] })));
+    assert.equal((await explicit()).length, 1);
+    // vault entziehen
+    current = await env.db.role.findUniqueOrThrow({ where: { id: role.id } });
+    await redirectOf(() => roleActions.saveRole({}, form({ id: role.id, version: versionOf(current), name: "Tresor", permission: ["docsIt.view"] })));
+    // Rolle dem Konto entziehen (nach dem Entzug des Rechts enthält sie keins mehr: kein weiterer Eintrag), danach die Rechte nicht mehr vorhanden
+    assert.deepEqual(await explicit(), ["user.explicitGrant admin-1 ← Tresor: docsIt.vault", "role.explicitRevoke Tresor: docsIt.vault"]);
+    // Rolle mit Tresor-Recht neu anlegen, Konto zuweisen und wieder entziehen
+    const again = await env.role({ key: "tresor2", name: "Tresor zwei", permissions: ["docsIt.vault"] });
+    let u = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
+    await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(u), username: user.username, name: user.name, active: "on", roleId: [...u.roles.map((r) => r.roleId), again.id] })));
+    u = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
+    await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(u), username: user.username, name: user.name, active: "on", roleId: u.roles.map((r) => r.roleId).filter((id) => id !== again.id) })));
+    assert.deepEqual((await explicit()).slice(2), ["user.explicitGrant admin-1 ← Tresor zwei: docsIt.vault", "user.explicitRevoke admin-1 ← Tresor zwei: docsIt.vault"]);
+  });
+
+  it("Wiederherstellungsschlüssel erzeugen: der Eintrag secrets.keyCreated sagt, dass der Tresor betroffen ist (Anzahl, nie Inhalt); ohne Tresor-Einträge bleibt er wie vorher", async () => {
+    await adminLogin();
+    const first = (await keyActions.createRecoveryKey({}, form({ password: PASSWORD }))) as { ok?: boolean };
+    assert.equal(first.ok, true);
+    assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { action: "secrets.keyCreated" } })).target, "–");
+    await env.db.auditLog.deleteMany();
+    await makeEntry("Router");
+    await keyActions.createRecoveryKey({}, form({ password: PASSWORD }));
+    assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { action: "secrets.keyCreated" } })).target, "– · Tresor betroffen (1 Eintrag)");
+    assertNoPlaintext(JSON.stringify(await env.db.auditLog.findMany()), "Audit");
+  });
+
+  it("Sicherung herunterladen: backup.download nennt die Sicherung und – bei Tresor-Einträgen – dass der Tresor betroffen ist", async () => {
+    await adminLogin();
+    const { createBackup } = await import("@/server/backup/core");
+    const route = await import("@/app/api/backups/[name]/route");
+    await makeEntry("Router");
+    const backup = await createBackup("manual");
+    const response = await route.GET(new Request(`http://localhost/api/backups/${backup.name}`), { params: Promise.resolve({ name: backup.name }) });
+    assert.equal(response.status, 200);
+    await response.body?.cancel();
+    assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { action: "backup.download" } })).target, `${backup.name} · Tresor betroffen (1 Eintrag)`);
+  });
+
+  it("Hinweis für die Administration: secretHoldings nennt den Tresor mit Anzahl (nur Einträge mit hinterlegten Zugangsdaten), sonst nichts", async () => {
+    assert.deepEqual(await holdings.secretHoldings(), []);
+    await env.db.vaultEntry.create({ data: { title: "Leer", kind: "other" } });
+    assert.deepEqual(await holdings.secretHoldings(), [], "ein Eintrag ohne Zugangsdaten hängt nicht am Schlüssel");
+    await makeEntry("Router");
+    assert.deepEqual(await holdings.secretHoldings(), [{ id: "it.vault", feature: "it.docs", label: "Tresor", count: 1 }]);
+    assert.equal(holdings.withHoldings("x", await holdings.secretHoldings()), "x · Tresor betroffen (1 Eintrag)");
+    assert.equal(holdings.withHoldings("x", []), "x");
+  });
+});
+
 describe("Zustände von secret.key", () => {
   it("Datei fehlt: kein neuer Schlüssel (der Tresor hält Geheimnisse), alles bleibt gesperrt – Anzeigen, Anlegen, Ändern; nichts wird gelöscht oder zurückgesetzt", async () => {
     await login(BOTH);
