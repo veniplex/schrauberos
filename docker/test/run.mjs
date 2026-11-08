@@ -11,7 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 
 if (process.platform === "win32") {
-  const wslPath = spawnSync("wsl", ["wslpath", "-a", resolve(here, "../..")], { encoding: "utf8" });
+  const wslPath = spawnSync("wsl", ["wslpath", "-a", resolve(here, "../..").replaceAll("\\", "/")], { encoding: "utf8" }); // Schrägstriche: wsl.exe reicht Rückstriche an die Shell durch, die sie verschluckt
   if (wslPath.status !== 0) {
     console.error("Kein WSL gefunden: die nativen Tests brauchen Linux (gcc/clang). Siehe README, Abschnitt Tests.");
     process.exit(process.env.REQUIRE_NATIVE === "1" ? 1 : 0);
