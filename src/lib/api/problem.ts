@@ -23,6 +23,7 @@ export const PROBLEMS = {
   idempotency_in_progress: { status: 409, title: "Request in progress", detail: "A request with this Idempotency-Key is still being processed." },
   rate_limited: { status: 429, title: "Too many requests", detail: "Rate limit exceeded; retry later." },
   service_unavailable: { status: 503, title: "Service unavailable", detail: "The service is busy; retry shortly." },
+  storage_full: { status: 507, title: "Insufficient storage", detail: "The server is almost out of disk space; uploads are paused until space is freed." },
   internal_error: { status: 500, title: "Internal error", detail: "The request could not be processed." },
 } as const;
 

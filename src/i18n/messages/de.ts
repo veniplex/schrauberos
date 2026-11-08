@@ -127,6 +127,8 @@ export const de = {
       duplicate: "Dieser Eintrag existiert bereits.",
       inUse: "Dieser Eintrag wird noch verwendet und kann nicht geändert werden.",
       busy: "Die Datenbank ist gerade ausgelastet. Bitte gleich noch einmal versuchen.",
+      storageFull: "Der Speicherplatz auf dem Server ist fast voll – Dateien werden vorerst nicht mehr angenommen. Bitte Platz schaffen (Verwaltung → Backups: alte Backups löschen oder die Aufbewahrung verkürzen) und es dann noch einmal versuchen.",
+      uploadLimit: "Zu viele Uploads in kurzer Zeit. Bitte in einigen Minuten noch einmal versuchen.",
       failed: "Das hat nicht geklappt. Bitte noch einmal versuchen.",
       badRequest: "Die Anfrage ist ungültig.",
     },

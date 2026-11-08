@@ -1,20 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ByteBudget, RateLimiter } from "@/lib/rate-limit";
 import { FILE_MAX_BYTES } from "@/modules/workshop/files/constants";
 import { uploadFileOperation } from "@/modules/workshop/files/operations";
 import { getSession } from "@/server/auth/session";
 import { isBehindProxy } from "@/server/auth/network";
 import { isSameOriginUpload } from "@/server/request-guard";
+import { retryAfterSeconds, takeUploadBudget } from "@/server/upload-budget";
 import type { OperationFailure } from "@/server/operations";
-
-/**
- * Drossel der Oberfläche je Konto und Stunde (im Arbeitsspeicher, ein Prozess): höchstens 200 Dateien und 500 MB. Ein fehlerhaftes Skript oder ein Dauerlauf (hochladen, entfernen, wiederholen)
- * kann das Volume so nicht in Minuten füllen – es hält zugleich die Datenbank. Gezählt wird die angekündigte Größe jeder Anfrage; abgewiesen wird mit 429 und `Retry-After`.
- */
-const UPLOADS_PER_HOUR = 200;
-const UPLOAD_BYTES_PER_HOUR = 500 * 1024 * 1024;
-const uploadRate = new RateLimiter({ max: UPLOADS_PER_HOUR, windowMs: 3_600_000 });
-const uploadBytes = new ByteBudget({ maxBytes: UPLOAD_BYTES_PER_HOUR, windowMs: 3_600_000 });
 
 /** Mehr als die Datei selbst darf der Body nicht haben (Formularfelder, Rand): größere Anfragen werden gar nicht erst gelesen. */
 const BODY_OVERHEAD = 64 * 1024;
@@ -36,6 +27,8 @@ function statusOf(failure: OperationFailure): number {
       return 409;
     case "busy":
       return 503;
+    case "storageFull":
+      return 507;
     case "failed":
       return 500;
     default:
@@ -59,9 +52,9 @@ export async function POST(request: NextRequest) {
   const announced = header === null || header.trim() === "" ? Number.NaN : Number(header);
   if (!Number.isInteger(announced) || announced < 0) return NextResponse.json({ error: "lengthRequired" }, { status: 411 });
   if (announced > FILE_MAX_BYTES + BODY_OVERHEAD) return NextResponse.json({ error: "size" }, { status: 413 });
-  const decision = uploadRate.take(session.user.id);
-  const bytesDecision = decision.allowed ? uploadBytes.take(session.user.id, announced) : decision;
-  if (!bytesDecision.allowed) return NextResponse.json({ error: "rateLimited" }, { status: 429, headers: { "Retry-After": String(Math.max(1, Math.ceil(bytesDecision.retryAfterMs / 1000))) } });
+  // gemeinsame Drossel aller Uploads je Konto und Stunde (`server/upload-budget.ts`: 200 Dateien, 500 MB)
+  const budget = takeUploadBudget(session.user.id, announced);
+  if (!budget.allowed) return NextResponse.json({ error: "rateLimited" }, { status: 429, headers: { "Retry-After": String(retryAfterSeconds(budget)) } });
   const key = request.headers.get("idempotency-key");
   if (key !== null && !KEY_SHAPE.test(key)) return NextResponse.json({ error: "invalid" }, { status: 400 });
 

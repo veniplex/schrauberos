@@ -121,6 +121,7 @@ function operationOf(endpoint: ApiEndpoint): Json {
     responses["413"] = problemRef(endpoint.upload ? `The upload is larger than ${Math.round(endpoint.upload.maxBytes / 1_048_576)} MiB.` : "The request body is larger than 1 MiB.");
     responses["415"] = problemRef(endpoint.upload ? "The body is not multipart/form-data." : "The body is not application/json.");
   }
+  if (endpoint.upload) responses["507"] = problemRef("The server is almost out of disk space; uploads are paused until space is freed.");
   // 422: ungültige Eingabe/Filter; bei schreibenden Aufrufen auch Idempotency-Key ungültig oder wiederverwendet
   if (hasBody || endpoint.query || endpoint.list || writes) responses["422"] = { $ref: "#/components/responses/Validation" };
   if (endpoint.ifMatch) {

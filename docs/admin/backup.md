@@ -34,6 +34,7 @@ Unter **Backups** sichert und stellt die Anwendung ihre Daten wieder her – ohn
   zurückgesetzt; das Ergebnis steht auf der Backup-Seite.
 * **Weitere automatische Backups:** vor jedem Update („Vor Update“) und vor Änderungen an der Datenbank-Struktur
   („Vor Datenbank-Änderung“).
+* **Speicherplatz:** Ist der Datenträger fast voll, nimmt die Anwendung **keine Dateien mehr an** (Fotos, Belege, Bilder der Dokumentation, Datei-Uploads der Programmierschnittstelle), sobald nach dem Ablegen weniger als 5 % des Datenträgers, mindestens aber 256 MB frei blieben – die Meldung lautet „Der Speicherplatz auf dem Server ist fast voll“. Diese Reserve gehört der Datenbank, den Sitzungen und dem Audit-Log: Anmeldung und alle Eingaben ohne Datei funktionieren weiter, sodass Sie hier **Platz schaffen** können (alte Backups löschen, Aufbewahrung verkürzen). Der Systemstatus warnt schon früher (ab 10 % frei). Zusätzlich gilt eine gemeinsame Obergrenze je Konto von 200 Uploads und 500 MB pro Stunde.
 * Ein Backup einer **neueren** Programmversion lässt sich nicht in eine ältere einspielen; die Seite weist darauf hin.
 
 Belege und Bilder liegen als normale Dateien auf dem Server, auch ohne die Anwendung auffindbar (Rechnungen nach Jahr, Eingang/Ausgang,

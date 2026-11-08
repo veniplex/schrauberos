@@ -28,7 +28,7 @@ import { csvChunks } from "./writer";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
 
-const STATUS: Record<ErrorCode, number> = { invalid: 422, unauthenticated: 401, forbidden: 403, notFound: 404, conflict: 409, duplicate: 409, inUse: 409, busy: 503, failed: 500 };
+const STATUS: Record<ErrorCode, number> = { invalid: 422, unauthenticated: 401, forbidden: 403, notFound: 404, conflict: 409, duplicate: 409, inUse: 409, busy: 503, storageFull: 507, failed: 500 };
 
 /** Anmeldung und Herkunft – gemeinsam für Export und Import; liefert die Sitzung oder die fertige Absage. */
 async function authenticate(request: Request): Promise<AppSession | Response> {

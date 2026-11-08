@@ -3,6 +3,8 @@ import { truncateName } from "@/lib/file-delivery";
 import { checkUpload } from "@/lib/upload-sniff";
 import { db } from "@/server/db";
 import { removeFile, storeFile } from "@/server/files";
+import { OperationError } from "@/server/operations/errors";
+import { retryAfterSeconds, takeUploadBudget } from "@/server/upload-budget";
 import { getSession } from "@/server/auth/session";
 import { audit } from "@/server/audit";
 import { isBehindProxy } from "@/server/auth/network";
@@ -29,6 +31,9 @@ export async function POST(request: NextRequest) {
   const announced = header === null || header.trim() === "" ? Number.NaN : Number(header);
   if (!Number.isInteger(announced) || announced < 0) return NextResponse.json({ error: "lengthRequired" }, { status: 411 });
   if (announced > DOC_IMAGE_MAX_BYTES + BODY_OVERHEAD) return NextResponse.json({ error: "size" }, { status: 413 });
+  // gemeinsame Drossel aller Uploads je Konto und Stunde (`server/upload-budget.ts`)
+  const budget = takeUploadBudget(session.user.id, announced);
+  if (!budget.allowed) return NextResponse.json({ error: "rateLimited" }, { status: 429, headers: { "Retry-After": String(retryAfterSeconds(budget)) } });
 
   const form = await request.formData().catch(() => null);
   const area = String(form?.get("area") ?? "");
@@ -44,7 +49,14 @@ export async function POST(request: NextRequest) {
   // Typ und Endung richten sich nach dem erkannten Inhalt, nicht nach dem hochgeladenen Namen
   const mime = checked.mime;
   const ext = ({ "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" } as Record<string, string>)[mime] ?? "img";
-  const path = await storeFile(`doku/${area}`, `${file.name.replace(/\.[^.]*$/, "") || "bild"}.${ext}`, data);
+  let path: string;
+  try {
+    path = await storeFile(`doku/${area}`, `${file.name.replace(/\.[^.]*$/, "") || "bild"}.${ext}`, data);
+  } catch (error) {
+    // Datenträger fast voll (Platzschutz in `storeFile`): 507 mit klarer Antwort statt eines allgemeinen Fehlers
+    if (error instanceof OperationError && error.failure.code === "storageFull") return NextResponse.json({ error: "storageFull" }, { status: 507 });
+    throw error;
+  }
   try {
     const image = await db.docImage.create({ data: { area, name: truncateName(file.name), mime, size: file.size, path } });
     await audit("docs.imageUpload", { target: `${area}: ${truncateName(file.name, 80)}`, entityId: image.id });

@@ -3,7 +3,9 @@ import { link, mkdir, rm, unlink, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { safeName } from "@/lib/filename";
+import { diskSpace } from "@/lib/disk";
 import { dataDir } from "@/lib/updates/store";
+import { OperationError } from "@/server/operations/errors";
 
 export { safeName };
 
@@ -32,6 +34,21 @@ export function resolveRel(rel: string): string {
 const join = (dir: string, name: string) => `${dir}/${name}`;
 
 /**
+ * Platzschutz (Z7): Uploads stoppen **deutlich vor** SQLite. Nach dem Ablegen müssen mindestens `max(256 MiB, 5 % des Datenträgers)` frei bleiben – diese Reserve gehört der Datenbank, den Sitzungen, dem
+ * Audit-Log und den Backups. Sonst könnte ein voller Datenträger auch die Anmeldung sperren (Sitzung und Protokoll brauchen Schreibzugriff), und die Rettung läge in der Weboberfläche, die man dann nicht mehr
+ * betreten kann. Meldet das Dateisystem den Platz nicht, wird nichts abgewiesen. Der Fehler ist ein `OperationError` (Code `storageFull`): Operationen melden ihn als Meldung bzw. HTTP 507.
+ */
+export const UPLOAD_RESERVE_MIN_BYTES = 256 * 1024 * 1024;
+export const UPLOAD_RESERVE_FRACTION = 0.05;
+
+export async function assertRoomFor(bytes: number): Promise<void> {
+  const space = await diskSpace(dataDir());
+  if (!space) return;
+  const reserve = Math.max(UPLOAD_RESERVE_MIN_BYTES, Math.ceil(space.totalBytes * UPLOAD_RESERVE_FRACTION));
+  if (space.freeBytes - bytes < reserve) throw new OperationError({ code: "storageFull" });
+}
+
+/**
  * Legt eine Datei unter `dir/fileName` ab (Ordner werden angelegt) und liefert den relativen Pfad. Gibt es den Namen schon,
  * wird `-2`, `-3` … vor der Endung angehängt. Geschrieben wird erst in eine Zwischendatei und dann atomar eingehängt.
  */
@@ -42,9 +59,17 @@ export async function storeFile(dir: string, fileName: string, data: Uint8Array)
   const base = safeName(stem, 100);
   const safeExt = ext ? `.${safeName(ext.slice(1), 10).toLowerCase()}` : "";
 
+  await assertRoomFor(data.byteLength);
   await mkdir(tmpDir(), { recursive: true });
   const tmp = path.join(tmpDir(), `${randomBytes(8).toString("hex")}.part`);
-  await writeFile(tmp, data, { flag: "wx" });
+  try {
+    await writeFile(tmp, data, { flag: "wx" });
+  } catch (error) {
+    // Platte voll mitten im Schreiben (trotz Reserve, z. B. ein anderer Prozess war schneller): halbe Zwischendatei weg, klare Meldung statt eines allgemeinen Fehlers
+    await rm(tmp, { force: true }).catch(() => undefined);
+    if ((error as NodeJS.ErrnoException).code === "ENOSPC") throw new OperationError({ code: "storageFull" });
+    throw error;
+  }
   try {
     await mkdir(resolveRel(dirParts.join("/")), { recursive: true });
     for (let n = 1; n < 1000; n++) {

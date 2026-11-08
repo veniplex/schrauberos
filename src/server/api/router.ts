@@ -5,6 +5,7 @@ import { problemOf, type ProblemFields } from "@/lib/api/problem";
 import { logError } from "@/lib/log-safe";
 import { apiEndpoints } from "@/modules/api";
 import { apiProblem, ApiProblemError, getApiAuthenticator, problemResponse, type Principal } from "@/server/operations";
+import { retryAfterSeconds, takeUploadBudget } from "@/server/upload-budget";
 import "./auth";
 import { hashBody, IDEMPOTENCY_KEY_SHAPE, completeIdempotency, releaseIdempotency, reserveIdempotency } from "./idempotency";
 import { buildOpenApi } from "./openapi";
@@ -253,6 +254,12 @@ async function dispatch(request: Request, principal: Principal, tokenId: string,
   const endpoint = match.compiled.endpoint;
   if (!mayCall(principal, endpoint)) throw apiProblem("forbidden");
 
+  // Datei-Uploads zählen gegen dieselbe Stundendrossel je Konto wie die Oberfläche (`server/upload-budget.ts`); angekündigte Größe, ohne Längenangabe die Obergrenze des Endpunkts
+  if (endpoint.upload && endpoint.method === "POST") {
+    const declared = Number(request.headers.get("content-length"));
+    const budget = takeUploadBudget(principal.user.id, Number.isFinite(declared) && declared > 0 ? declared : endpoint.upload.maxBytes);
+    if (!budget.allowed) throw apiProblem("rate_limited", undefined, { "retry-after": String(retryAfterSeconds(budget)) });
+  }
   const { query, body, text, file } = await parseInput(endpoint, request, url.searchParams);
   const call: ApiCall = {
     request,

@@ -126,6 +126,8 @@ export const en: Messages = {
       duplicate: "This entry already exists.",
       inUse: "This entry is still in use and cannot be changed.",
       busy: "The database is busy right now. Please try again in a moment.",
+      storageFull: "The server is almost out of disk space – files are not accepted for now. Please free up space (Administration → Backups: delete old backups or shorten retention) and try again.",
+      uploadLimit: "Too many uploads in a short time. Please try again in a few minutes.",
       failed: "That did not work. Please try again.",
       badRequest: "The request is invalid.",
     },

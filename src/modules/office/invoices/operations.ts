@@ -10,6 +10,7 @@ import { INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE
 import { dayKey } from "@/lib/zone";
 import { defineOperation, fail, failField, mapPrismaError, type Tx } from "@/server/operations";
 import { storeFile } from "@/server/files";
+import { takeUploadBudget } from "@/server/upload-budget";
 import { allocateDocumentNumber } from "@/server/invoice-numbering";
 import { removeInvoiceFile, syncInvoiceFile } from "./files";
 
@@ -82,10 +83,12 @@ export const saveInvoiceOperation = defineOperation({
   audit: (input) => (input.id ? "invoice.update" : "invoice.create"),
   // Der Beleg kommt als normale Datei in den Dateispeicher (lesbarer Pfad), in der Datenbank steht nur der Pfad.
   // Das geschieht vor der Transaktion; `finish` räumt die Datei wieder weg, wenn nichts gespeichert wurde.
-  prepare: async ({ input: d }) => {
+  prepare: async ({ input: d, principal }) => {
     const file = d.file;
     if (!file || file.size === 0) return { upload: null, stored: null as string | null };
     if (file.size > INVOICE_FILE_MAX_BYTES) failField("file", "invoices.errors.fileSize");
+    // gemeinsame Drossel aller Uploads je Konto und Stunde (Formular und API)
+    if (!takeUploadBudget(principal.user.id, file.size).allowed) fail("busy", "common.errors.uploadLimit");
     // Der Inhalt entscheidet, nicht der gemeldete Typ: HTML als „.pdf“ oder „.png“ wird abgelehnt; gespeichert wird der erkannte Typ
     const data = new Uint8Array(await file.arrayBuffer());
     const checked = checkUpload(data, file.type, INVOICE_FILE_TYPES);

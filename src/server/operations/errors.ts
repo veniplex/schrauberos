@@ -21,6 +21,8 @@ export type ErrorCode =
   | "inUse"
   /** Datenbank vorübergehend nicht erreichbar/überlastet (Transaktion kam nicht zustande): später wiederholen */
   | "busy"
+  /** Der Datenträger ist (fast) voll: Uploads stoppen deutlich vor SQLite, damit Anmeldung und Protokoll weiter schreiben können */
+  | "storageFull"
   /** unerwarteter Fehler */
   | "failed";
 
@@ -46,6 +48,7 @@ export const DEFAULT_KEYS: Record<ErrorCode, MessageKey> = {
   duplicate: "common.errors.duplicate",
   inUse: "common.errors.inUse",
   busy: "common.errors.busy",
+  storageFull: "common.errors.storageFull",
   failed: "common.errors.failed",
 };
 

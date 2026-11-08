@@ -80,6 +80,8 @@ export function failureToProblem(failure: OperationFailure, rename: Rename = {})
       return problemOf("in_use", extra);
     case "busy":
       return problemOf("service_unavailable");
+    case "storageFull":
+      return problemOf("storage_full");
     case "failed":
       return problemOf("internal_error");
   }
