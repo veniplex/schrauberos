@@ -28,8 +28,8 @@ export function parseLogoDataUrl(dataUrl: string | null | undefined): { mime: Lo
 }
 
 /** Adresse des Logos für `<img src>`; `null`, wenn es keins (oder nur ein nicht mehr zugelassenes) gibt. `v` ändert sich mit dem Profil und umgeht den Zwischenspeicher. */
-export function logoSrc(workshop: { logoDataUrl: string | null; updatedAt: Date }): string | null {
-  const { logoDataUrl } = workshop;
-  if (!logoDataUrl || !LOGO_TYPES.some((type) => logoDataUrl.startsWith(`data:${type};base64,`))) return null;
+export function logoSrc(workshop: { logoMime: string | null; updatedAt: Date }): string | null {
+  // `logoMime` kommt aus dem Kopf der Daten-URL (`getWorkshop()`); das Logo selbst wird nicht mehr bei jeder Anfrage gelesen
+  if (!workshop.logoMime || !(LOGO_TYPES as readonly string[]).includes(workshop.logoMime)) return null;
   return `${LOGO_PATH}?v=${workshop.updatedAt.getTime()}`;
 }

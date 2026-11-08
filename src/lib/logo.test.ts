@@ -20,8 +20,8 @@ describe("Logo (P3-5)", () => {
   });
 
   it("die Adresse trägt die Änderungszeit; ohne (zugelassenes) Logo gibt es keine", () => {
-    assert.equal(logoSrc({ logoDataUrl: png, updatedAt: at }), `/api/logo?v=${at.getTime()}`);
-    assert.equal(logoSrc({ logoDataUrl: svg, updatedAt: at }), null, "ein früher gespeichertes SVG wird nicht mehr angezeigt");
-    assert.equal(logoSrc({ logoDataUrl: null, updatedAt: at }), null);
+    assert.equal(logoSrc({ logoMime: "image/png", updatedAt: at }), `/api/logo?v=${at.getTime()}`);
+    assert.equal(logoSrc({ logoMime: null, updatedAt: at }), null, "ein früher gespeichertes SVG hat keinen zugelassenen Typ im Kopf der Daten-URL (getWorkshop liefert null)");
+    assert.equal(logoSrc({ logoMime: "image/svg+xml", updatedAt: at }), null);
   });
 });

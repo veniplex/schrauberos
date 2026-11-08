@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { errorResponse } from "@/lib/file-delivery";
 import { getSession } from "@/server/auth/session";
-import { getWorkshop } from "@/server/workshop";
+import { getWorkshopLogo } from "@/server/workshop";
 import { PdfError, pdfResponse } from "@/server/pdf";
 import { buildDocumentPdf, logoForPdf } from "@/modules/office/billing/documents";
 import { documentFileName } from "@/modules/office/billing/domain";
@@ -22,8 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const loaded = await loadDocView(id);
   if (!loaded) return errorResponse(404, "Not found");
   try {
-    const workshop = await getWorkshop();
-    const bytes = await buildDocumentPdf(loaded.view, { logo: logoForPdf(workshop.logoDataUrl) });
+    const bytes = await buildDocumentPdf(loaded.view, { logo: logoForPdf(await getWorkshopLogo()) });
     return pdfResponse(bytes, { name: documentFileName(loaded.view.docType, loaded.view.number, "pdf"), download: request.nextUrl.searchParams.get("download") === "1" });
   } catch (error) {
     // zu viele Positionen/zu viel Text: ein klarer Fehler statt eines Absturzes

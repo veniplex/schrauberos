@@ -12,7 +12,7 @@ import { unrestrictedByCustomer, unrestrictedCustomerWhere, unrestrictedDocument
 import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { PdfError } from "@/server/pdf";
 import { apiProblem, runApiOperation } from "@/server/operations";
-import { getWorkshop } from "@/server/workshop";
+import { getWorkshopLogo } from "@/server/workshop";
 import { CREATABLE_TYPES, DOC_TYPES, ITEM_KINDS, OFFER_STATUSES, PAYMENT_METHODS } from "./constants";
 import { documentFileName } from "./domain";
 import { buildDocumentPdf, logoForPdf } from "./documents";
@@ -429,7 +429,7 @@ const documentActions: ApiEndpoint[] = [
       if (!loaded) throw apiProblem("not_found");
       let bytes: Buffer;
       try {
-        bytes = await buildDocumentPdf(loaded.view, { logo: logoForPdf((await getWorkshop()).logoDataUrl) });
+        bytes = await buildDocumentPdf(loaded.view, { logo: logoForPdf(await getWorkshopLogo()) });
       } catch (error) {
         if (error instanceof PdfError) throw apiProblem("validation_failed", { reason: "billing.errors.pdf" });
         throw error;

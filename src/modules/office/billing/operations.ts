@@ -15,7 +15,7 @@ import { removeFile, storeFile } from "@/server/files";
 import { PdfError } from "@/server/pdf/errors";
 import { defineOperation, fail, failField, mapPrismaError, OperationError, type Tx } from "@/server/operations";
 import { EinvoiceError } from "@/lib/einvoice/ubl";
-import { getWorkshop } from "@/server/workshop";
+import { getWorkshopLogo } from "@/server/workshop";
 import { CREATABLE_TYPES, OFFER_VALIDITY_DAYS, PAYMENT_METHODS, SENT_FILES_DIR, SENT_QUOTE_FILES_KEEP_DAYS, isInvoiceType, isQuoteType } from "./constants";
 import { amountColumns, assertCustomerUsable, stripControl, checkInputOf, findLinkableCustomer, itemInputOf, loadWorkshop, normalizeItems, replaceItems, snapshotColumns, totalsOf } from "./core";
 import { dueDayKey, finalizeProblems, isDraft, mailContent, documentFileName, docTitle, remainingCents, statusAfterPayments } from "./domain";
@@ -692,8 +692,7 @@ export const sendDocumentOperation = defineOperation({
     const wantXml = Boolean(input.includeXml) && isInvoiceType(view.docType);
     const stored: string[] = [];
     try {
-      const workshop = await getWorkshop();
-      const pdf = await buildDocumentPdf(view, { logo: logoForPdf(workshop.logoDataUrl) });
+      const pdf = await buildDocumentPdf(view, { logo: logoForPdf(await getWorkshopLogo()) });
       const year = view.issueDay.slice(0, 4);
       const pdfName = documentFileName(view.docType, view.number, "pdf");
       const files: Prepared["files"] = [];

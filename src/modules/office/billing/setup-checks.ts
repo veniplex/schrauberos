@@ -1,7 +1,7 @@
 import "server-only";
 import { isValidIban } from "@/lib/bank-tax";
 import type { SetupCheckDef } from "@/modules/types";
-import { getWorkshop } from "@/server/workshop";
+import { getWorkshopBilling } from "@/server/workshop";
 
 const filled = (value: string | null | undefined): boolean => Boolean(value && value.trim());
 
@@ -20,7 +20,7 @@ export const setupChecks: SetupCheckDef[] = [
     order: 14,
     recommended: true,
     done: async () => {
-      const w = await getWorkshop();
+      const w = await getWorkshopBilling();
       return filled(w.street) && filled(w.zip) && filled(w.city) && (filled(w.taxNumber) || filled(w.vatId)) && filled(w.iban) && isValidIban(w.iban ?? "") && filled(w.phone) && filled(w.email);
     },
   },

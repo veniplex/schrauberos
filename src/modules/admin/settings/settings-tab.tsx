@@ -1,4 +1,4 @@
-import { getWorkshop } from "@/server/workshop";
+import { getWorkshopBilling } from "@/server/workshop";
 import type { SettingsTabDef } from "@/modules/types";
 import { getAuditRetentionDays } from "@/server/audit-retention";
 import { isBehindProxy } from "@/server/auth/network";
@@ -15,7 +15,7 @@ import { HolidaysSettingsTab } from "./holiday-tab";
 import { WorkshopForm } from "./workshop-form";
 
 async function WorkshopSettingsTab() {
-  const w = await getWorkshop();
+  const w = await getWorkshopBilling();
   const all = Intl.supportedValuesOf("timeZone");
   const timezones = all.includes(w.timezone) ? all : [w.timezone, ...all];
   const now = new Date();

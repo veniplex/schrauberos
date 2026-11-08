@@ -3,7 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { startOfDay } from "@/lib/zone";
 import { db } from "@/server/db";
 import { contains, keyContains } from "@/server/search";
-import { getWorkshop } from "@/server/workshop";
+import { getWorkshopBilling } from "@/server/workshop";
 import { INVOICE_TYPES, QUOTE_TYPES } from "./constants";
 import { viewOf, type DocView, type ViewRow } from "./view";
 import { isUnusable, usabilitySelect } from "@/modules/workshop/customers/public";
@@ -26,7 +26,7 @@ export const viewInclude = {
 
 /** Das Ansichtsmodell eines Beleges der Rechnungserstellung (PDF, XRechnung, Detailseite); `null`, wenn es ihn nicht gibt oder er nicht aus der Rechnungserstellung stammt. */
 export async function loadDocView(id: string): Promise<{ view: DocView; row: ViewRow } | null> {
-  const [row, workshop] = await Promise.all([db.invoice.findFirst({ where: { id, source: "billing" }, include: viewInclude }), getWorkshop()]);
+  const [row, workshop] = await Promise.all([db.invoice.findFirst({ where: { id, source: "billing" }, include: viewInclude }), getWorkshopBilling()]);
   return row ? { view: viewOf(row as ViewRow, workshop), row: row as ViewRow } : null;
 }
 

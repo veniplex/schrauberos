@@ -77,7 +77,7 @@ export type ViewRow = Invoice & {
 
 const day = (value: Date | null): string | null => (value ? dayKey(value) : null);
 
-export function viewOf(row: ViewRow, workshop: Workshop): DocView {
+export function viewOf(row: ViewRow, workshop: Omit<Workshop, "logoDataUrl">): DocView {
   const snap = row.snapshot;
   const sender: SenderView = snap
     ? {
