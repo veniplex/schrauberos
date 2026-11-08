@@ -234,9 +234,9 @@ export function Checkbox({
   ...props
 }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "className"> & { label: ReactNode; hint?: ReactNode; className?: string }) {
   return (
-    <label className={clsx("flex min-h-(--tap-row) min-w-(--tap-row) items-start gap-2.5 py-[max(0px,calc((var(--tap-row)_-_1.25rem)/2))] text-sm", className)}>
-      {/* 20 px große Fläche; Ziel ist die ganze Zeile (das Label), mindestens --tap-row hoch */}
-      <input {...props} type="checkbox" className="size-5 shrink-0 accent-[var(--accent)]" />
+    <label className={clsx("flex min-h-(--tap-row) min-w-(--tap-row) items-start gap-2.5 py-[max(0px,calc((var(--tap-row)_-_1.5rem)/2))] text-sm", className)}>
+      {/* 24 px große Fläche (WCAG 2.2 „Zielgröße“, axe `target-size`); Ziel ist die ganze Zeile (das Label), mindestens --tap-row hoch */}
+      <input {...props} type="checkbox" className="size-6 shrink-0 accent-[var(--accent)]" />
       <span>
         {label}
         {hint ? <span className="mt-0.5 block text-xs text-ink-muted">{hint}</span> : null}

@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isInternalHref, isLocalImageSrc } from "@/lib/markdown-url";
 import { slugify } from "@/lib/slug";
+import { MarkdownScroll } from "./markdown-scroll";
 
 function textOf(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
@@ -33,10 +34,19 @@ export function Markdown({ source, taskLabels }: { source: string; taskLabels?: 
                 {children}
               </a>
             ),
-          // Tabellen horizontal scrollbar machen
+          // Tabellen und Codeblöcke horizontal scrollbar machen (per Tastatur erreichbar, wenn sie überlaufen)
           table: ({ children }) => (
             <div className="md-table">
-              <table>{children}</table>
+              <MarkdownScroll kind="table">
+                <table>{children}</table>
+              </MarkdownScroll>
+            </div>
+          ),
+          pre: ({ children }) => (
+            <div className="md-pre">
+              <MarkdownScroll kind="code">
+                <pre>{children}</pre>
+              </MarkdownScroll>
             </div>
           ),
           // Kästchen einer Aufgabenliste (nur Anzeige): ohne Name wären sie ein unbeschriftetes Formularfeld; der Zustand wird angesagt, der Text der Aufgabe folgt direkt dahinter

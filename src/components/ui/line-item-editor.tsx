@@ -178,13 +178,14 @@ export function LineItemEditor({
         </div>
       ) : null}
 
-      <ul className="flex flex-col gap-3 @5xl:gap-2">
+      {/* Keine Liste: Jede Position ist eine benannte Gruppe (role="group"); ein `<li>` mit anderer Rolle bricht die Listenregel (axe `list`) */}
+      <div className="flex flex-col gap-3 @5xl:gap-2">
         {state.rows.map((row: EditorRow, index) => {
           const parsed = evaluation.rows[index]?.parsed;
           const lineNet = parsed ? money(lineResult(parsed).netCents) : "–";
           const options = taxRates.includes(row.taxRate) || exempt ? taxRates : [...taxRates, row.taxRate];
           return (
-            <li key={row.key} role="group" aria-label={t("ui.lineItems.position", { n: index + 1 })} className={clsx("grid grid-cols-2 gap-3 rounded-md border border-line bg-surface p-3 @lg:grid-cols-4", "@5xl:items-start @5xl:gap-2 @5xl:border-0 @5xl:bg-transparent @5xl:p-0", COLUMNS)}>
+            <div key={row.key} role="group" aria-label={t("ui.lineItems.position", { n: index + 1 })} className={clsx("grid grid-cols-2 gap-3 rounded-md border border-line bg-surface p-3 @lg:grid-cols-4", "@5xl:items-start @5xl:gap-2 @5xl:border-0 @5xl:bg-transparent @5xl:p-0", COLUMNS)}>
               <p className="col-span-full flex items-center justify-between text-sm font-semibold @5xl:sr-only">{t("ui.lineItems.position", { n: index + 1 })}</p>
               <div className="col-span-full flex flex-col gap-2 @5xl:col-span-1">
                 <Field label={t("ui.lineItems.description")} labelClassName="@5xl:sr-only" error={issueText(index, row.key, "description")}>
@@ -248,10 +249,10 @@ export function LineItemEditor({
                   <Trash2 className="size-4" aria-hidden />
                 </Button>
               </div>
-            </li>
+            </div>
           );
         })}
-      </ul>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button disabled={disabled || state.rows.length >= MAX_LINES} onClick={addRow}>

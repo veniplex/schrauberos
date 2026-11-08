@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { after, afterEach, before, describe, it } from "node:test";
 import { createElement } from "react";
-import { computeTotals, lineItemsInput, serializeDraft, createEditorState } from "@/lib/line-items";
+import { computeTotals, serializeDraft, createEditorState } from "@/lib/line-items";
+import { lineItemsInput } from "@/lib/line-items-schema";
 import { act, installDom, type MountedView, type TestDom } from "@/test/dom";
 import { blur, byText, click, key, mountI18n, plain, type } from "@/test/ui";
 import { DRAFT_STATE_EVENT } from "./form-draft";
@@ -35,7 +36,7 @@ async function mountEditor(props: Record<string, unknown> = {}, locale: "de" | "
   return {
     root,
     form: root.querySelector("form") as HTMLFormElement,
-    rows: () => Array.from(root.querySelectorAll<HTMLElement>("li[role='group']")),
+    rows: () => Array.from(root.querySelectorAll<HTMLElement>("[role='group']")).filter((el) => /^Position \d+$/.test(el.getAttribute("aria-label") ?? "")),
     submitted: () => JSON.parse((root.querySelector("input[name='items']") as HTMLInputElement).value) as Array<Record<string, unknown>>,
     summary: () => plain(root.querySelector("dl")?.textContent),
     field: (row: HTMLElement, label: RegExp) => {

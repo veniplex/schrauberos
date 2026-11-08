@@ -1,6 +1,8 @@
 /** Texte der UI-Bausteine für Aufträge, Rechnungen, Zeiterfassung und Berichte (F0): Positionen-Editor, Verlauf, Checkliste, Stempeln, Geheimnisfeld, Diagramm, Zeitraum, Druck, Unterschrift, Foto-Galerie, PDF. */
 export const uiDe = {
   money: { invalid: "Bitte einen Betrag eingeben, z. B. 12,50." },
+  /** Namen der waagerecht scrollbaren Bereiche in Markdown-Seiten (`ScrollArea`) */
+  markdown: { table: "Tabelle", code: "Codeblock" },
   lineItems: {
     group: "Positionen",
     description: "Beschreibung",

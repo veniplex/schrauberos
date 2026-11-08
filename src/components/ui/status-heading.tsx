@@ -14,7 +14,15 @@ export function StatusHeading({ children }: { children: ReactNode }) {
     ref.current?.focus({ preventScroll: true });
   }, []);
   useEffect(() => {
-    if (title) document.title = title;
+    if (!title) return;
+    const apply = () => {
+      if (document.title !== title) document.title = title;
+    };
+    apply();
+    // Fehlergrenze der Wurzel: Das Layout zeichnet seinen Titel (Metadaten, streamend) mitunter erst nach diesem Effekt noch einmal – dann bliebe der Anwendungsname stehen. Darum ein paar
+    // begrenzte Wiederholungen (kein Beobachter: Ein zweiter Schreiber würde mit ihm hin und her wechseln).
+    const timers = [100, 500, 1500].map((ms) => window.setTimeout(apply, ms));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [title]);
   return (
     <h1 ref={ref} tabIndex={-1} className="text-xl font-semibold outline-none">

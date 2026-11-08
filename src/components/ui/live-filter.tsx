@@ -7,6 +7,9 @@ import { useI18n } from "@/i18n/client";
 import { Button } from "./buttons";
 import { LIVE_FILTER_DELAY_MS, liveFilterUrl } from "./live-filter-url";
 
+/** Ereignis, mit dem „Zurücksetzen“ dem Live-Filter des Formulars meldet, dass eine ausstehende Anwendung entfällt */
+const RESET_EVENT = "live-filter-reset";
+
 /** Felder, die erst nach einer Pause im Tippen filtern (Texteingaben); alles andere (Auswahl, Häkchen, Datum) filtert sofort. */
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLTextAreaElement || (target instanceof HTMLInputElement && ["text", "search", "number", "email", "tel", "url"].includes(target.type));
@@ -43,11 +46,15 @@ export function LiveFilter() {
     form.addEventListener("input", schedule);
     form.addEventListener("change", schedule);
     form.addEventListener("submit", cancel);
+    // „Zurücksetzen“ (siehe unten) meldet sich vor dem Leeren der Felder: Ein Tippen davor löst beim Wechsel des Fokus auf den Knopf noch ein `change` aus, dessen Wartezeit sonst nach dem
+    // Zurücksetzen ablief und die Adresse mit leeren Werten (`?q=&…`) überschrieb
+    form.addEventListener(RESET_EVENT, cancel);
     return () => {
       clearTimeout(timer);
       form.removeEventListener("input", schedule);
       form.removeEventListener("change", schedule);
       form.removeEventListener("submit", cancel);
+      form.removeEventListener(RESET_EVENT, cancel);
     };
   }, [router]);
 
@@ -72,6 +79,7 @@ export function ResetFilterButton({ href, children }: { href: string; children: 
       variant="ghost"
       aria-busy={pending || undefined}
       onClick={(event) => {
+        event.currentTarget.closest("form")?.dispatchEvent(new Event(RESET_EVENT));
         for (const field of Array.from(event.currentTarget.closest("form")?.elements ?? [])) {
           if (field instanceof HTMLInputElement && field.type !== "hidden" && field.type !== "submit" && field.type !== "button") {
             if (field.type === "checkbox" || field.type === "radio") field.checked = false;

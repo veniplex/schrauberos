@@ -194,7 +194,7 @@ export async function DataTable<R>({
                       return (
                         <td key={c.id} className={clsx(c.align === "end" && "text-right tabular", c.priority === "low" && LOW, !main && "[&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10", c.className)}>
                           {main && href ? (
-                            <Link href={href} className="inline-flex min-h-(--tap-row) items-center font-medium after:absolute after:inset-0">
+                            <Link href={href} className="inline-flex min-h-(--tap-row) min-w-(--tap-row) items-center font-medium after:absolute after:inset-0">
                               {c.cell(row)}
                             </Link>
                           ) : (

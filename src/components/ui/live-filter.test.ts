@@ -92,6 +92,31 @@ describe("LiveFilter", () => {
 });
 
 describe("ResetFilterButton", () => {
+  it("verwirft eine ausstehende Wartezeit des Live-Filters (Tippen, dann sofort Zurücksetzen: die Adresse bleibt die der Liste ohne Filter)", async () => {
+    const { ResetFilterButton, LiveFilter } = await import("./live-filter");
+    const { I18nProvider } = await import("@/i18n/client");
+    const { de } = await import("@/i18n/messages/de");
+    const pushed: string[] = [];
+    const form = createElement(
+      "form",
+      { action: "/customers", method: "get" },
+      createElement("input", { name: "q", type: "search", defaultValue: "" }),
+      createElement(LiveFilter),
+      // eslint-disable-next-line react/no-children-prop -- siehe unten
+      createElement(ResetFilterButton, { href: "/customers", children: "Zurücksetzen" }),
+    );
+    view = await mount(await withRouter(createElement(I18nProvider, { locale: "de", messages: de } as never, form), { pushed }));
+    const root = view.container;
+    const input = root.querySelector("input[name='q']") as HTMLInputElement;
+    await act(() => {
+      input.value = "Auto";
+      input.dispatchEvent(new window.Event("change", { bubbles: true }));
+    });
+    await act(() => (root.querySelector("button") as HTMLButtonElement).click());
+    await sleep(LIVE_FILTER_DELAY_MS + 100);
+    assert.deepEqual(pushed, ["/customers"], "nur das Zurücksetzen, nicht die verspätete Anwendung des Tippens");
+  });
+
   it("leert Text, Kontrollkästchen und stellt Auswahlfelder auf den neutralen Eintrag – versteckte Felder (Sortierung) bleiben – und lädt die Liste ohne Filter", async () => {
     const { ResetFilterButton } = await import("./live-filter");
     const pushed: string[] = [];

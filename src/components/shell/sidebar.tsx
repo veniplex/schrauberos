@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Menu as MenuIcon, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/buttons";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -69,6 +69,7 @@ export function Sidebar({
   const pathname = usePathname();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const [lastPath, setLastPath] = useState(pathname);
   const [collapsed, setCollapsed] = useState(() => new Set(initialCollapsed));
 
@@ -162,7 +163,7 @@ export function Sidebar({
       {/* `contents`: Der Wrapper bildet keinen eigenen Kasten – sonst wäre er nur so hoch wie die Kopfzeile, und `sticky` hätte nirgends Platz zum Kleben */}
       <div className="no-print contents lg:hidden">
         <header className="sticky top-0 z-30 flex min-h-(--sticky-top) items-center gap-2 border-b border-line glass-bar px-3 pt-[env(safe-area-inset-top)]">
-          <Button variant="secondary" size="icon" aria-label={t("nav.menu")} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}>
+          <Button ref={menuButton} variant="secondary" size="icon" aria-label={t("nav.menu")} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}>
             <MenuIcon className="size-4" aria-hidden />
           </Button>
           <span className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">{workshopName}</span>
@@ -170,7 +171,7 @@ export function Sidebar({
           {quickNew}
           {accountCompact}
         </header>
-        <Drawer open={open} onClose={() => setOpen(false)} label={t("nav.main")} closeLabel={t("nav.menuClose")}>
+        <Drawer open={open} onClose={() => setOpen(false)} label={t("nav.main")} closeLabel={t("nav.menuClose")} returnFocusTo={menuButton}>
           {content(account)}
         </Drawer>
       </div>

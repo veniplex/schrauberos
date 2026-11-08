@@ -87,7 +87,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
 
       <FilterBar
         keep={sortFields(list, DEFAULT)}
-        columns="sm:grid-cols-[minmax(0,1fr)_11rem_13rem_10rem_9rem_auto]"
+        columns="sm:grid-cols-[minmax(0,1fr)_11rem_13rem] xl:grid-cols-[minmax(0,1fr)_11rem_13rem_10rem_9rem_auto]"
         active={Boolean(q || noOwnerOnly || inspection || month || archived !== "active")}
         extrasOpen={noOwnerOnly || Boolean(inspection || month) || archived !== "active"}
         resetHref="/vehicles"

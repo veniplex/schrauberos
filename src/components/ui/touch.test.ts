@@ -59,7 +59,7 @@ describe("Touch-Fundament", () => {
   it("kein Element der App setzt autoFocus an den Bausteinen vorbei (Verhalten selbst: form.test.ts)", () => {
     const direct = walk(SRC)
       .filter((f) => !f.includes(`${path.sep}ui${path.sep}`))
-      .filter((f) => /<(textarea|select|button|input)[^>]*autoFocus/.test(readFileSync(f, "utf8")));
+      .filter((f) => /<(textarea|select|button|input)\b[^>]*autoFocus/.test(readFileSync(f, "utf8")));
     assert.deepEqual(direct, []);
   });
 });
@@ -67,8 +67,8 @@ describe("Touch-Fundament", () => {
 describe("Touch-Feinschliff (P3-1)", () => {
   const ui = (file: string) => readFileSync(path.join(SRC, "components", "ui", file), "utf8");
 
-  it("Kästchen: 20 px Fläche, ganze Zeile (Label) als Ziel", () => {
-    assert.match(ui("form-fields.tsx"), /<label className=\{clsx\("flex min-h-\(--tap-row\) min-w-\(--tap-row\)[^"]*"[\s\S]{0,300}type="checkbox" className="size-5 /);
+  it("Kästchen: 24 px Fläche, ganze Zeile (Label) als Ziel", () => {
+    assert.match(ui("form-fields.tsx"), /<label className=\{clsx\("flex min-h-\(--tap-row\) min-w-\(--tap-row\)[^"]*"[\s\S]{0,300}type="checkbox" className="size-6 /);
   });
 
   it("reduzierte Bewegung stoppt Spinner, Skeleton und Fortschrittsbalken", () => {

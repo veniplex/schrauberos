@@ -117,7 +117,7 @@ function OpenConfirmDialog({ title, description, confirmLabel, cancelLabel, vari
  * `message` erklärt die Folgen; der Titel ist die Beschriftung der Aktion mit Fragezeichen („Kunde löschen?“), die Bestätigung trägt dieselbe Beschriftung –
  * bei reinen Symbolknöpfen der `aria-label`. `title`/`confirmLabel` überschreiben das.
  *
- * `label`: Symbolknopf mit Beschriftung (Löschen in Tabellenzeilen). Unter `md` steht der **Text sichtbar** neben dem Symbol (Touch: kein Raten, was das Symbol tut), am
+ * `label`: Symbolknopf mit Beschriftung (Löschen in Tabellenzeilen; die Kinder sind das Symbol – steht als Kind schon ein Text, wird er nicht noch einmal ausgegeben). Unter `md` steht der **Text sichtbar** neben dem Symbol (Touch: kein Raten, was das Symbol tut), am
  * Desktop nur das Symbol mit dem Text für Screenreader (`sr-only`) und als `title` – es gibt bewusst keinen eigenen Tooltip-Baustein.
  */
 export function ConfirmSubmitButton({
@@ -169,7 +169,7 @@ export function ConfirmSubmitButton({
       >
         {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
         {children}
-        {label ? <span className="md:sr-only">{label}</span> : null}
+        {label && typeof children !== "string" ? <span className="md:sr-only">{label}</span> : null}
       </button>
       <ConfirmDialog
         open={open}

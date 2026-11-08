@@ -35,11 +35,11 @@ function FileActions({ file }: { file: FileItem }) {
   if (!file.mayChange) return null;
   return (
     <div className="flex w-full flex-col gap-1.5">
-      <form action={dispatch} className="flex gap-1.5">
+      <form action={dispatch} className="flex flex-wrap gap-1.5">
         <input type="hidden" name="id" value={file.id} />
         <input type="hidden" name="version" value={file.version} />
         <input type="hidden" name="category" value={file.category} />
-        <Input name="caption" defaultValue={file.caption ?? ""} maxLength={CAPTION_MAX} aria-label={t("files.caption")} placeholder={t("files.caption")} className="min-w-0 flex-1" />
+        <Input name="caption" defaultValue={file.caption ?? ""} maxLength={CAPTION_MAX} aria-label={t("files.caption")} placeholder={t("files.caption")} className="min-w-32 flex-1" />
         <Button type="submit" size="sm" disabled={pending}>
           {t("common.save")}
         </Button>

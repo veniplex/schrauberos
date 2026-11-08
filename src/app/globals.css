@@ -541,11 +541,12 @@ html[data-form-actions] {
 .md blockquote > :first-child { margin-top: 0; }
 .md blockquote > :last-child { margin-bottom: 0; }
 .md code { @apply rounded-sm bg-surface-2 px-1.5 py-0.5 font-mono text-[0.9em]; }
-.md pre { @apply my-4 overflow-x-auto rounded-md border border-line bg-surface-2 p-4; }
+.md .md-pre { @apply my-4 overflow-hidden rounded-md border border-line bg-surface-2; }
+.md pre { @apply m-0 p-4; }
 .md pre code { @apply bg-transparent p-0 text-[13px]; }
 .md hr { @apply my-6 border-line; }
 .md img { @apply my-4 h-auto max-w-full rounded-md border border-line; }
-.md .md-table { @apply my-4 overflow-x-auto rounded-md border border-line; }
+.md .md-table { @apply my-4 overflow-hidden rounded-md border border-line; }
 .md table { @apply w-full border-collapse text-sm; }
 .md th { @apply border-b border-line bg-surface-2 px-3 py-2 text-left font-medium; }
 .md td { @apply border-b border-line px-3 py-2 align-top; }

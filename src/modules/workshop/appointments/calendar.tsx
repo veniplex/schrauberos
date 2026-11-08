@@ -147,11 +147,11 @@ function AppointmentBlock({ a, ctx, startMin, spanStart, spanEnd, lane, lanes }:
         a.status === "in_progress" && "ring-1 ring-accent",
       )}
     >
-      {/* ein Link, dessen Fläche den ganzen Block deckt (`after`): Schnellstatus-Knöpfe können darüber liegen, ohne in einem Link zu stehen */}
+      {/* ein Link, dessen Fläche den ganzen Block deckt (`after`; `-my-px` + `calc(100% + 2px)`: auch über den Rand hinweg, sonst misst das Ziel bei 44 px Rasterschritt nur 42 px): Schnellstatus-Knöpfe können darüber liegen, ohne in einem Link zu stehen */}
       <Link
         href={calendarHref(ctx.view, ctx.date, appointmentOpenParams(a.id, ctx.canEdit))}
         title={tooltip}
-        className="block h-full min-h-0 scroll-mt-16 overflow-hidden rounded-[inherit] px-1.5 py-1 after:absolute after:inset-0 after:rounded-[inherit]"
+        className="-my-px block h-[calc(100%+2px)] min-h-0 scroll-mt-16 overflow-hidden rounded-[inherit] px-1.5 py-1 after:absolute after:inset-0 after:rounded-[inherit]"
       >
         <span className="flex items-center gap-1 tabular text-ink-muted">
           {time}

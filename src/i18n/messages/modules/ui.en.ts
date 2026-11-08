@@ -2,6 +2,7 @@ import type { uiDe } from "./ui.de";
 
 export const uiEn: typeof uiDe = {
   money: { invalid: "Please enter an amount, e.g. 12.50." },
+  markdown: { table: "Table", code: "Code block" },
   lineItems: {
     group: "Line items",
     description: "Description",
