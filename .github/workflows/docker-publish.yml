@@ -193,13 +193,13 @@ jobs:
       - name: App starten (frische Daten, wie in der Browser-CI)
         run: |
           node e2e/start-server.mjs > server.log 2>&1 &
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             curl -fsS http://127.0.0.1:3100/api/health >/dev/null && exit 0
             sleep 2
           done
           cat server.log
           exit 1
-      - name: Lighthouse (nur Warnungen, siehe lighthouserc.json)
+      - name: Lighthouse (Schwellen siehe lighthouserc.json)
         run: npx --yes @lhci/cli@0.15.1 autorun --config=lighthouserc.json
       - name: Bericht
         if: ${{ !cancelled() }}

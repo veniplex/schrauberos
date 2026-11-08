@@ -1,5 +1,5 @@
 {
-  "$comment": "Lighthouse-CI (P3-6), mobil. ALLE Schwellen sind PLATZHALTER (konservative Startwerte, nur Warnungen), bis die erste Messung vorliegt: Nach dem ersten Lauf (Artefakt lighthouse-report) die gemessenen Werte mit Abstand eintragen, dann die Stufe von warn auf error heben. Gemessen werden nur Seiten ohne Anmeldung (/setup: Gerüst, Schrift und Stile der Anwendung; /offline: installierbar, Service Worker). Angemeldete Seiten: Block 13 (Cookie über das Playwright-Setup). Siehe README, Abschnitt Browser-CI.",
+  "$comment": "Lighthouse-CI (P3-6), mobil (Lighthouse 12.6 aus @lhci/cli 0.15.1: Kategorien Leistung, Zugänglichkeit, Best Practices, SEO; PWA-Prüfungen gibt es dort nicht mehr – die Installierbarkeit prüft e2e/tests/pwa.spec.ts). Schwellen aus der ersten echten Messung (Block 13c, 2026-11-08, Chrome 150 unter Windows 11, App im gehärteten Container, Standard-Drosselung 'mobile slow 4G' simuliert): /setup Leistung 0,87-0,90 (über /login mit Weiterleitung 0,77), Zugänglichkeit 1,00, Best Practices 1,00, LCP 3,5-4,0 s, CLS <= 0,012, TBT <= 85 ms; /offline Leistung 0,99-1,00, LCP 0,9 s, TBT <= 117 ms; angemeldet (Cookie, Demodaten) /, /customers, /appointments, /orders: Leistung 0,86-0,88, Zugänglichkeit 0,99-1,00, Best Practices 1,00, LCP 3,85-4,03 s, CLS 0, TBT <= 27 ms. Zugänglichkeit, Best Practices, CLS und viewport sind deterministisch und strikt (error); Leistung, LCP und TBT hängen vom Rechner ab (GitHub-Runner sind langsamer als der Messrechner) und tragen deshalb großen Abstand und die Median-Aggregation – nach dem ersten CI-Lauf enger ziehen. SEO ist bewusst nicht bewertet: Die Anwendung ist nur für angemeldete Benutzer da und liefert 'noindex, nofollow'. Angemeldete Seiten misst der Job nicht (er startet eine frische Anwendung ohne Konto); von Hand: Cookie der Sitzung als collect.settings.extraHeaders (README, Abschnitt Browser-CI).",
   "ci": {
     "collect": {
       "url": ["http://127.0.0.1:3100/setup", "http://127.0.0.1:3100/offline"],
@@ -10,16 +10,32 @@
       }
     },
     "assert": {
-      "assertions": {
-        "categories:performance": ["warn", { "minScore": 0.5 }],
-        "categories:accessibility": ["warn", { "minScore": 0.9 }],
-        "categories:best-practices": ["warn", { "minScore": 0.9 }],
-        "largest-contentful-paint": ["warn", { "maxNumericValue": 4000 }],
-        "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.1 }],
-        "total-blocking-time": ["warn", { "maxNumericValue": 600 }],
-        "viewport": ["warn", { "minScore": 1 }],
-        "installable-manifest": ["warn", { "minScore": 1 }]
-      }
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": ".*",
+          "assertions": {
+            "categories:accessibility": ["error", { "minScore": 0.95 }],
+            "categories:best-practices": ["error", { "minScore": 0.95 }],
+            "cumulative-layout-shift": ["error", { "maxNumericValue": 0.05 }],
+            "viewport": ["error", { "minScore": 1 }],
+            "total-blocking-time": ["error", { "maxNumericValue": 400, "aggregationMethod": "median" }]
+          }
+        },
+        {
+          "matchingUrlPattern": ".*/setup$",
+          "assertions": {
+            "categories:performance": ["error", { "minScore": 0.65, "aggregationMethod": "median" }],
+            "largest-contentful-paint": ["error", { "maxNumericValue": 6000, "aggregationMethod": "median" }]
+          }
+        },
+        {
+          "matchingUrlPattern": ".*/offline$",
+          "assertions": {
+            "categories:performance": ["error", { "minScore": 0.85, "aggregationMethod": "median" }],
+            "largest-contentful-paint": ["error", { "maxNumericValue": 2500, "aggregationMethod": "median" }]
+          }
+        }
+      ]
     },
     "upload": {
       "target": "filesystem",
