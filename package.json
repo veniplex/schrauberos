@@ -70,7 +70,7 @@
     "happy-dom": "^21.0.4",
     "selfsigned": "^5.5.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^7"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true,
