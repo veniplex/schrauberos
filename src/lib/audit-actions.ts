@@ -21,6 +21,7 @@ export const PLATFORM_AUDIT_ACTIONS = [
   "auth.twoFactorReset",
   "auth.sessionRevoked",
   "auth.logoutEverywhere",
+  "auth.restoreSessionsRevoked",
   "auth.deviceRevoked",
   "account.password",
   "account.profile",

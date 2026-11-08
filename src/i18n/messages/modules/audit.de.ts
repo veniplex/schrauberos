@@ -126,6 +126,7 @@ export const auditDe = {
       twoFactorReset: "Zwei-Faktor-Anmeldung zurückgesetzt",
       sessionRevoked: "Sitzung beendet",
       logoutEverywhere: "Überall abgemeldet",
+      restoreSessionsRevoked: "Sitzungen und bekannte Geräte nach Wiederherstellung beendet",
       deviceRevoked: "Bekanntes Gerät vergessen",
       logout: "Abgemeldet",
     },

@@ -66,6 +66,37 @@ describe("API-Tokens nach einer Wiederherstellung", () => {
   });
 });
 
+describe("Sitzungen und gemerkte Geräte nach einer Wiederherstellung (Z7)", () => {
+  it("mit Merker enden alle Sitzungen und Geräte (das Cookie von vor der Wiederherstellung ist danach ungültig), im Audit-Log festgehalten; ohne Merker und nach der Bestätigung bleiben neue Sitzungen", async () => {
+    const sessionModule = await import("./auth/session");
+    const user = await env.user({ username: `sess-${Math.random().toString(36).slice(2)}` });
+    await env.signIn(user);
+    await env.db.knownDevice.create({ data: { userId: user.id, tokenHash: "d".repeat(64) } });
+    assert.ok(await sessionModule.getSession(), "vor der Wiederherstellung angemeldet");
+
+    await startup.revokeApiTokensAfterRestore();
+    assert.ok(await sessionModule.getSession(), "ohne Merker bleibt alles (normaler Neustart)");
+    assert.equal(await env.db.knownDevice.count(), 1);
+
+    markApplied();
+    await startup.revokeApiTokensAfterRestore();
+    assert.equal(await env.db.session.count(), 0);
+    assert.equal(await env.db.knownDevice.count(), 0);
+    // Die Sitzungsprüfung liest je Anfrage frisch (React-cache gilt nur innerhalb einer Anfrage): das alte Cookie führt zu keiner Sitzung
+    assert.equal(await sessionModule.getSession(), null, "das Sitzungs-Cookie von vor der Wiederherstellung ist ungültig");
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "auth.restoreSessionsRevoked" } });
+    assert.match(entry.target ?? "", /^1 Sitzungen, 1 Geräte \(Sicherung schrauberos-20260101T020000Z-manual\)$/);
+
+    // zweiter Start vor der Bestätigung: nichts mehr zu tun, kein weiterer Eintrag; nach der Bestätigung bleibt eine neue Sitzung
+    await startup.revokeApiTokensAfterRestore();
+    assert.equal(await env.db.auditLog.count({ where: { action: "auth.restoreSessionsRevoked" } }), 1);
+    rmSync(path.join(restoreDir(), "applied.json"));
+    await env.signIn(user);
+    await startup.revokeApiTokensAfterRestore();
+    assert.equal(await env.db.session.count(), 1);
+  });
+});
+
 describe("Abo-Adressen des Kalenders nach einer Wiederherstellung (F10)", () => {
   it("mit Merker werden alle Abo-Adressen gelöscht (ein inzwischen widerrufenes Token wäre mit der Sicherung wieder gültig) und im Audit-Log festgehalten; ohne Merker bleiben sie", async () => {
     const user = await env.user({ username: `feed-${Math.random().toString(36).slice(2)}` });

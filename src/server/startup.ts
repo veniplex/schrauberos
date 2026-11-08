@@ -37,7 +37,7 @@ export function applyTimezone(timezone: string): boolean {
 /**
  * Nach einer Wiederherstellung (der Launcher hat die Datenbank getauscht und noch nicht bestätigt: `restore/applied.json`) gelten **keine API-Tokens** mehr: Die
  * Sicherung kennt keine Widerrufe, die seitdem geschehen sind – ein inzwischen widerrufenes (etwa gestohlenes) Token wäre sonst wieder gültig. Alle Tokens werden beim ersten
- * Start widerrufen (und im Audit-Log festgehalten); neue Tokens sind schnell erzeugt. Ebenso entfallen die Abo-Adressen des Kalenders (`CalendarFeedToken`). Läuft bei jedem Start bis zur Bestätigung (idempotent). Liefert die Anzahl.
+ * Start widerrufen (und im Audit-Log festgehalten); neue Tokens sind schnell erzeugt. Ebenso enden **alle Sitzungen und gemerkten Geräte** (alle melden sich neu an) und entfallen die Abo-Adressen des Kalenders (`CalendarFeedToken`). Läuft bei jedem Start bis zur Bestätigung (idempotent). Liefert die Anzahl.
  *
  * **Webhooks werden nach jeder Wiederherstellung ausgeschaltet** (Grund `restore`, mit oder ohne Wiederherstellungsschlüssel): Eine Kopie – etwa eine Testinstanz, die mit einer Sicherung der Produktivinstanz aufgesetzt wird –
  * darf nie an die Empfänger der Produktivinstanz senden, und gesicherte wartende Zustellungen sollen nicht ungeprüft nachgeholt werden (sie werden zurückgestellt, `held`). Die Verwaltung zeigt den Hinweis im
@@ -52,6 +52,12 @@ export async function revokeApiTokensAfterRestore(dataRoot?: string): Promise<nu
     // Dasselbe gilt für die Abo-Adressen des Kalenders (F10): Ein inzwischen widerrufenes oder ersetztes Token (etwa nach einem Diebstahl) wäre mit der Sicherung wieder gültig
     const feeds = await tx.calendarFeedToken.deleteMany({});
     if (feeds.count > 0) await writeAudit(tx, "calendarFeed.restoreRevoked", { target: `${feeds.count} (Sicherung ${applied.from})`, actor: { id: null, name: "System" } });
+    // Sitzungen und gemerkte Geräte: Die Sicherung kennt keine Abmeldungen, Passwortwechsel und Sperrungen seitdem – das Cookie eines Angreifers (Sitzung bis 14 Tage, Gerät bis 180 Tage) oder eines inzwischen
+    // gelöschten/deaktivierten Kontos wäre mit der Sicherung wieder gültig. Alle müssen sich neu anmelden. Das geschieht nur beim ersten Start nach dem Einspielen (der Launcher bestätigt die Wiederherstellung, sobald
+    // die App gesund ist); danach angelegte Sitzungen bleiben.
+    const sessions = await tx.session.deleteMany({});
+    const devices = await tx.knownDevice.deleteMany({});
+    if (sessions.count + devices.count > 0) await writeAudit(tx, "auth.restoreSessionsRevoked", { target: `${sessions.count} Sitzungen, ${devices.count} Geräte (Sicherung ${applied.from})`, actor: { id: null, name: "System" } });
     // Webhooks: ausschalten (nur die eingeschalteten – ein bewusst ausgeschaltetes Ziel behält seinen Grund) und wartende Zustellungen zurückstellen
     const hooks = await tx.webhook.findMany({ where: { enabled: true }, select: { id: true, name: true } });
     for (const hook of hooks) {

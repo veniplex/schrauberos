@@ -127,6 +127,7 @@ export const auditEn: typeof auditDe = {
       twoFactorReset: "Two-factor sign-in reset",
       sessionRevoked: "Session ended",
       logoutEverywhere: "Signed out everywhere",
+      restoreSessionsRevoked: "Sessions and known devices ended after restore",
       deviceRevoked: "Known device forgotten",
       loginThrottled: "Sign-in throttled (too many failed attempts)",
       logout: "Signed out",
