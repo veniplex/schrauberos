@@ -56,5 +56,6 @@ export async function platformTopics(): Promise<HelpTopicRef[]> {
 export async function readHelpPage(doc: string): Promise<HelpPage | null> {
   if (!/^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(doc)) return null;
   const source = await readFile(path.join(DOCS_DIR, `${doc}.md`), "utf8").catch(() => null);
-  return source === null ? null : parse(source);
+  // Zeilenenden vereinheitlichen: Eine Datei mit CRLF (Windows-Arbeitskopie) hätte sonst keine erkannte Überschrift (der Punkt im Muster passt nicht auf CR)
+  return source === null ? null : parse(source.replace(/\r\n?/g, "\n"));
 }
