@@ -21,7 +21,11 @@ const entries = (action: string) => env.db.auditLog.findMany({ where: { action }
 let carId: string;
 
 beforeEach(async () => {
+  await env.db.fleetMileage.deleteMany();
+  await env.db.fleetCost.deleteMany();
   await env.db.fleetVehicle.deleteMany();
+  await env.db.absence.deleteMany();
+  await env.db.fleetLicenseCheck.deleteMany();
   await env.db.employee.deleteMany();
   await env.db.auditLog.deleteMany();
   env.browser.reset();
@@ -62,13 +66,20 @@ describe("Dienstfahrzeug speichern", () => {
     assert.equal((await entries("fleet.update")).length, 1);
   });
 
-  it("Löschen braucht fleet.delete und nimmt Kilometerstände und Kosten mit", async () => {
-    await env.db.fleetMileage.create({ data: { fleetVehicleId: carId, date: new Date(), km: 10 } });
+  it("Löschen braucht fleet.delete; mit Kilometerständen oder Kosten (Historie) wird nicht gelöscht, ohne Verlauf schon (Z7: Restrict)", async () => {
+    const mileage = await env.db.fleetMileage.create({ data: { fleetVehicleId: carId, date: new Date(), km: 10 } });
     await login(["fleet.edit"]);
     assert.equal(await redirectOf(() => actions.deleteFleetVehicle(form({ id: carId }))), "/forbidden");
     await login(["fleet.delete"]);
+    await actions.deleteFleetVehicle(form({ id: carId }));
+    assert.equal(await env.db.fleetVehicle.count({ where: { id: carId } }), 1, "mit Kilometerstand bleibt das Fahrzeug");
+    assert.equal(await env.db.fleetMileage.count(), 1);
+    await env.db.fleetMileage.delete({ where: { id: mileage.id } });
+    await env.db.fleetCost.create({ data: { fleetVehicleId: carId, date: new Date(), category: "fuel", amountCents: 100 } });
+    await actions.deleteFleetVehicle(form({ id: carId }));
+    assert.equal(await env.db.fleetVehicle.count({ where: { id: carId } }), 1, "mit Kosten bleibt das Fahrzeug");
+    await env.db.fleetCost.deleteMany();
     assert.equal(await redirectOf(() => actions.deleteFleetVehicle(form({ id: carId }))), "/fleet");
-    assert.equal(await env.db.fleetMileage.count(), 0);
     assert.equal((await entries("fleet.delete"))[0].target, "B XX 1");
   });
 });

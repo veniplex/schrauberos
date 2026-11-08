@@ -8,7 +8,7 @@ import { endOfDayIn, startOfDayIn, todayInput } from "@/lib/dates";
 import { addDaysToKey, dayKey, daysBetweenKeys } from "@/lib/zone";
 import { getHolidays } from "@/server/holidays";
 import { absenceHints, type AbsenceHints, type PlannedAbsence } from "./absence-overlap";
-import { ABSENCE_TYPES, employeeName, type AbsenceType } from "./domain";
+import { ABSENCE_TYPES, employeeName, type AbsenceType, type EmployeeDeletionDeps } from "./domain";
 import { getEmployeeRules } from "./settings";
 import { vacationBalance, type VacationBalance } from "./vacation";
 import { parseWorkWeekdays } from "./work-pattern";
@@ -159,6 +159,12 @@ export async function getEmployeeDetail(viewer: Viewer, id: string) {
     absences: absences.map((a) => ({ id: a.id, employeeId: a.employeeId, type: a.type, startDate: a.startDate, endDate: a.endDate, note: a.note, version: a.version }) satisfies AbsenceView),
     qualifications,
   };
+}
+
+/** Was am Mitarbeiter hängt und das Löschen sperrt (nur Zählungen, nie Inhalte): Abwesenheiten, Führerscheinkontrollen, Zeiteinträge. */
+export async function employeeDeletionDeps(id: string): Promise<EmployeeDeletionDeps> {
+  const row = await db.employee.findUnique({ where: { id }, select: { _count: { select: { absences: true, licenseChecks: true, timeEntries: true } } } });
+  return row?._count ?? { absences: 0, licenseChecks: 0, timeEntries: 0 };
 }
 
 /**

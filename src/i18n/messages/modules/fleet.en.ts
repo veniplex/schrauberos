@@ -12,7 +12,8 @@ export const fleetEn: typeof fleetDe = {
   new: "Add vehicle",
   edit: "Edit vehicle",
   delete: "Delete vehicle",
-  confirmDelete: "Delete company vehicle {plate} including its mileage and cost history?",
+  confirmDelete: "Really delete company vehicle {plate}?",
+  deleteBlockedHint: "A vehicle with mileage readings or costs is never deleted (history). Set its status to “Sold” instead: the vehicle stays with its history.",
   deleteConfirm: "Delete entry?",
   searchPlaceholder: "Plate, model, VIN or driver …",
   empty: "No vehicles found.",
@@ -78,6 +79,7 @@ export const fleetEn: typeof fleetDe = {
   costCategories: { fuel: "Fuel/charging", service: "Service", repair: "Repair", tires: "Tyres", tax: "Tax", insurance: "Insurance", other: "Other" },
   dueKinds: { hu: "Inspection", service: "Service", serviceKm: "Service", insurance: "Insurance", leasing: "Leasing" },
   errors: {
+    inUse: "This vehicle cannot be deleted: {mileage} mileage readings, {costs} cost entries. Set its status to “Sold” instead: the vehicle stays with its history.",
     amount: "Invalid amount, e.g. 49.90.",
     kmLower: "The mileage is below the last recorded value ({km} km).",
     plateExists: "There is already a company vehicle with this plate.",

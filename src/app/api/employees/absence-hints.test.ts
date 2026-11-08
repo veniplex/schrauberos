@@ -15,6 +15,8 @@ after(() => env.cleanup());
 let employeeId = "";
 beforeEach(async () => {
   await env.db.absence.deleteMany();
+  await env.db.absence.deleteMany();
+  await env.db.fleetLicenseCheck.deleteMany();
   await env.db.employee.deleteMany();
   await env.db.session.deleteMany();
   await env.db.user.deleteMany();

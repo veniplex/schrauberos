@@ -152,6 +152,7 @@ export const restoreDocVersion = defineAction(restoreDocVersionOperation, {
 
 const categoryInput = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   area,
   name: z.string().trim().min(1).max(60),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
@@ -164,13 +165,14 @@ const saveDocCategoryOperation = defineOperation({
   permissionFor: editPermissionFor,
   input: categoryInput,
   audit: "docs.categorySave",
-  run: async ({ input: { id, area: a, name, sortOrder, roleIds: wanted }, tx, audit }) => {
+  run: async ({ input: { id, version, area: a, name, sortOrder, roleIds: wanted }, tx, audit }) => {
     // Nur existierende Rollen übernehmen; leer = das Kapitel sehen alle mit Leserecht
     const roleIds = (await tx.role.findMany({ where: { id: { in: wanted } }, select: { id: true } })).map((r) => r.id);
     let saved;
     if (id) {
       const cat = await tx.docCategory.findFirst({ where: { id, area: a } });
       if (!cat) fail("notFound");
+      if (!(await claimRow(tx.docCategory, id, version))) fail("conflict");
       saved = await tx.docCategory.update({ where: { id }, data: { name, sortOrder, roles: { deleteMany: {}, create: roleIds.map((roleId) => ({ roleId })) } } });
     } else {
       saved = await tx.docCategory.create({ data: { area: a, name, sortOrder, roles: { create: roleIds.map((roleId) => ({ roleId })) } } });

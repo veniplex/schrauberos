@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
+import { de } from "@/i18n/messages/de";
 import { versionOf } from "@/lib/concurrency";
 import { createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
 
@@ -79,7 +80,26 @@ describe("VLANs, Subnetze und IP-Adressen", () => {
     assert.ok((await actions.saveVlan({}, form({ vlanId: 4095, name: "Zu hoch" }))).fieldErrors?.vlanId);
     assert.equal(await env.db.netVlan.count(), 1);
     const vlan = await env.db.netVlan.findFirstOrThrow();
-    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, vlanId: 10, name: "Umbenannt" }))).ok, true, "die eigene Nummer bleibt erlaubt");
+    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, version: versionOf(vlan), vlanId: 10, name: "Umbenannt" }))).ok, true, "die eigene Nummer bleibt erlaubt");
+  });
+
+  it("gleichzeitiges Bearbeiten (Z7): VLAN und Subnetz tragen eine Version; wer mit veraltetem Stand speichert, überschreibt nichts", async () => {
+    await login(["network.edit"]);
+    await actions.saveVlan({}, form({ vlanId: 30, name: "Drucker" }));
+    const vlan = await env.db.netVlan.findFirstOrThrow();
+    const stale = versionOf(vlan);
+    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, version: stale, vlanId: 30, name: "Drucker 2" }))).ok, true);
+    const lost = await actions.saveVlan({}, form({ id: vlan.id, version: stale, vlanId: 30, name: "Überschrieben" }));
+    assert.equal(lost.error, de.common.conflict);
+    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, vlanId: 30, name: "Ohne Version" }))).error, de.common.conflict, "ohne Version gibt es keine Speicherung");
+    assert.equal((await env.db.netVlan.findUniqueOrThrow({ where: { id: vlan.id } })).name, "Drucker 2");
+
+    await redirectOf(() => subnet());
+    const net = await env.db.netSubnet.findFirstOrThrow();
+    const old = versionOf(net);
+    await redirectOf(() => subnet({ id: net.id, version: old, name: "Büro 2" }));
+    assert.equal((await subnet({ id: net.id, version: old, name: "Veraltet" })).error, de.common.conflict);
+    assert.equal((await env.db.netSubnet.findUniqueOrThrow({ where: { id: net.id } })).name, "Büro 2");
   });
 
   it("Subnetz: nur echte Netzadressen; Gateway/DHCP/DNS werden geprüft; doppelte Netze abgelehnt", async () => {
@@ -138,7 +158,8 @@ describe("Standorte und Kabel", () => {
     await login(["network.edit", "network.delete"]);
     assert.equal((await actions.saveLocation({}, form({ name: "Serverraum", sortOrder: 1 }))).ok, true);
     const loc = await env.db.netLocation.findFirstOrThrow();
-    assert.equal((await actions.saveLocation({}, form({ id: loc.id, name: "Serverraum EG" }))).ok, true);
+    assert.equal((await actions.saveLocation({}, form({ id: loc.id, version: versionOf(loc), name: "Serverraum EG" }))).ok, true);
+    assert.equal((await actions.saveLocation({}, form({ id: loc.id, version: versionOf(loc), name: "Veraltet" }))).error, de.common.conflict, "Z7: Standorte tragen eine Version");
     await actions.deleteLocation(form({ id: loc.id }));
     assert.equal(await env.db.netLocation.count(), 0);
     assert.deepEqual(await targets(), ["network.create location: Serverraum", "network.update location: Serverraum EG", "network.delete location: Serverraum EG"]);
@@ -206,7 +227,7 @@ describe("Subnetze: Überschneidung, /31, /32 und IP-Eindeutigkeit je Netz (P4b-
     assert.equal(await env.db.netSubnet.count(), 2);
     // ein vorhandenes Netz ändern: es überschneidet sich nicht mit sich selbst
     const own = await env.db.netSubnet.findFirstOrThrow({ where: { name: "Büro" } });
-    assert.ok(await redirectOf(() => subnet({ id: own.id, name: "Büro neu", cidr: "192.168.1.0/24", vlanId: v10 })));
+    assert.ok(await redirectOf(() => subnet({ id: own.id, version: versionOf(own), name: "Büro neu", cidr: "192.168.1.0/24", vlanId: v10 })));
   });
 
   it("ohne `network.view` nennt die Überschneidungsmeldung weder Namen noch Netz des vorhandenen Eintrags", async () => {

@@ -63,6 +63,7 @@ beforeEach(async () => {
   await env.db.orderItem.deleteMany();
   await env.db.orderEvent.deleteMany();
   await env.db.order.deleteMany();
+  await env.db.tireSet.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.counter.deleteMany();
   await env.db.auditLog.deleteMany();

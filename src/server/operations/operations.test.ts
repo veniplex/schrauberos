@@ -36,6 +36,7 @@ beforeEach(async () => {
   await env.db.auditLog.deleteMany();
   await env.db.outboxEvent.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
+  await env.db.tireSet.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.customer.deleteMany();
   hooks.setOperationHooksForTest(null);

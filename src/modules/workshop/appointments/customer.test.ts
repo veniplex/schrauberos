@@ -22,9 +22,11 @@ const create = (fields: Record<string, string | number | undefined> = {}) => act
 beforeEach(async () => {
   await env.db.appointment.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
+  await env.db.tireSet.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.customer.deleteMany();
   await env.db.absence.deleteMany();
+  await env.db.fleetLicenseCheck.deleteMany();
   await env.db.employee.deleteMany();
   await env.db.auditLog.deleteMany();
   await env.db.user.deleteMany();

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
+import { versionOf } from "@/lib/concurrency";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteSubnet } from "@/modules/it/network/actions";
@@ -32,6 +33,7 @@ export default async function EditSubnetPage({ params }: { params: Promise<{ sub
           vlans={vlans}
           initial={{
             id: subnet.id,
+            version: versionOf(subnet),
             name: subnet.name,
             cidr: subnet.cidr,
             vlanId: subnet.vlanId ?? "",

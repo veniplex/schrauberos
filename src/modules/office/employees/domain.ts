@@ -52,3 +52,11 @@ export function visibleAbsenceType(type: string, canSeeSensitive: boolean): Abse
   if (type === "sick" && !canSeeSensitive) return "masked";
   return (ABSENCE_TYPES as readonly string[]).includes(type) ? (type as AbsenceType) : "other";
 }
+
+/**
+ * Löschschutz (Z7): Ein Mitarbeiter mit Abwesenheiten, Führerscheinkontrollen oder Zeiteinträgen ist **nicht löschbar** (Historie, Aufzeichnungspflicht; im Schema `Restrict`) – er wird
+ * auf „inaktiv“ gesetzt. Qualifikationen gehören zur Person und fallen beim Löschen mit weg.
+ */
+export type EmployeeDeletionDeps = { absences: number; licenseChecks: number; timeEntries: number };
+
+export const employeeDeletable = (deps: EmployeeDeletionDeps): boolean => deps.absences === 0 && deps.licenseChecks === 0 && deps.timeEntries === 0;

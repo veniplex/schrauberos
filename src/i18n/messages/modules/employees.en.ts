@@ -15,7 +15,8 @@ export const employeesEn: typeof employeesDe = {
   new: "Add employee",
   edit: "Edit employee",
   delete: "Delete employee",
-  confirmDelete: "Really delete employee “{name}”? Absences and qualifications are deleted as well.",
+  confirmDelete: "Really delete employee “{name}”? Their qualifications are deleted as well.",
+  deleteBlockedHint: "An employee with absences, licence checks or time entries is never deleted (history, record-keeping duty). Set them to “inactive” instead: they stay with their history but no longer appear in selection fields.",
   searchPlaceholder: "Name, personnel no., job title, email …",
   empty: "No employees found.",
   emptyHint: "Add the first employee or adjust the filters.",
@@ -122,6 +123,7 @@ export const employeesEn: typeof employeesDe = {
     duplicate: "This exact absence is already recorded – it cannot be saved again.",
   },
   errors: {
+    inUse: "This employee cannot be deleted: {absences} absences, {licenseChecks} licence checks, {timeEntries} time entries. Set them to “inactive” instead: they stay with their history but no longer appear in selection fields.",
     leaveBeforeHire: "The end date is before the start date.",
     numberTaken: "This personnel number is already in use.",
     userTaken: "This account already belongs to {name}.",

@@ -25,8 +25,8 @@ import {
 
 /**
  * API-Ressourcen „Netzwerk-Dokumentation“ unter `/api/v1/network-…`: Geräte, Standorte, VLANs, Subnetze, IP-Adressen und Kabelverbindungen. Dieselben Prüfungen
- * wie in der Oberfläche (IP im Subnetz, Adresse eindeutig, MAC normalisiert, Port nicht doppelt belegt). Standorte, VLANs, Subnetze und Verbindungen haben keine
- * Version (kein `If-Match`).
+ * wie in der Oberfläche (IP im Subnetz, Adresse eindeutig, MAC normalisiert, Port nicht doppelt belegt). Geräte, Standorte, VLANs, Subnetze und IP-Adressen tragen eine
+ * Version (`ETag`, Änderungen verlangen `If-Match`); Verbindungen haben keine Version.
  */
 const ref = optionalRef;
 
@@ -138,7 +138,7 @@ export const deviceEndpoints = defineResource({
 /* ───────────── Standorte ───────────── */
 
 const locationBody = z.strictObject({ name: z.string().trim().min(1).max(80), description: text(200), sortOrder: z.number().int().min(0).max(999).optional() });
-const locationItem = z.object({ id: z.string(), name: z.string(), description: nullableString, sortOrder: z.number().int() });
+const locationItem = z.object({ id: z.string(), version: z.string(), name: z.string(), description: nullableString, sortOrder: z.number().int() });
 
 export const locationEndpoints = defineResource({
   feature: "it.network",
@@ -149,7 +149,8 @@ export const locationEndpoints = defineResource({
   read: "network.view",
   model: db.netLocation as unknown as Delegate<NetLocation>,
   item: locationItem,
-  toItem: (l): z.input<typeof locationItem> => ({ id: l.id, name: l.name, description: l.description, sortOrder: l.sortOrder }),
+  version: versionOf,
+  toItem: (l): z.input<typeof locationItem> => ({ id: l.id, version: versionOf(l), name: l.name, description: l.description, sortOrder: l.sortOrder }),
   list: {
     filters: z.strictObject({}),
     sorts: { name: (dir) => ({ name: dir }), sortOrder: (dir) => ({ sortOrder: dir }) },
@@ -160,7 +161,7 @@ export const locationEndpoints = defineResource({
     permission: "network.edit",
     operation: saveLocationOperation,
     current: (l) => ({ name: l.name, description: l.description, sortOrder: l.sortOrder }),
-    toInput: (merged, { id }) => ({ ...merged, id }),
+    toInput: (merged, { id, version }) => ({ ...merged, id, version }),
   },
   remove: { permission: "network.delete", operation: deleteLocationOperation },
 });
@@ -173,7 +174,7 @@ const vlanBody = z.strictObject({
   name: z.string().trim().min(1).max(60),
   description: text(200),
 });
-const vlanItem = z.object({ id: z.string(), number: z.number().int(), name: z.string(), description: nullableString });
+const vlanItem = z.object({ id: z.string(), version: z.string(), number: z.number().int(), name: z.string(), description: nullableString });
 const vlanInput = ({ number, ...rest }: Record<string, unknown>): Record<string, unknown> => ({ ...rest, vlanId: number });
 
 export const vlanEndpoints = defineResource({
@@ -185,7 +186,8 @@ export const vlanEndpoints = defineResource({
   read: "network.view",
   model: db.netVlan as unknown as Delegate<NetVlan>,
   item: vlanItem,
-  toItem: (v): z.input<typeof vlanItem> => ({ id: v.id, number: v.vlanId, name: v.name, description: v.description }),
+  version: versionOf,
+  toItem: (v): z.input<typeof vlanItem> => ({ id: v.id, version: versionOf(v), number: v.vlanId, name: v.name, description: v.description }),
   list: {
     filters: z.strictObject({}),
     sorts: { number: (dir) => ({ vlanId: dir }), name: (dir) => ({ name: dir }) },
@@ -196,7 +198,7 @@ export const vlanEndpoints = defineResource({
     permission: "network.edit",
     operation: saveVlanOperation,
     current: (v) => ({ number: v.vlanId, name: v.name, description: v.description }),
-    toInput: (merged, { id }) => ({ ...vlanInput(merged), id }),
+    toInput: (merged, { id, version }) => ({ ...vlanInput(merged), id, version }),
     rename: { vlanId: "number" },
   },
   remove: { permission: "network.delete", operation: deleteVlanOperation },
@@ -220,6 +222,7 @@ const subnetBody = z.strictObject({
 });
 const subnetItem = z.object({
   id: z.string(),
+  version: z.string(),
   name: z.string(),
   cidr: z.string(),
   vlanId: nullableString,
@@ -239,7 +242,8 @@ export const subnetEndpoints = defineResource({
   read: "network.view",
   model: db.netSubnet as unknown as Delegate<NetSubnet>,
   item: subnetItem,
-  toItem: (s): z.input<typeof subnetItem> => ({ id: s.id, name: s.name, cidr: s.cidr, vlanId: s.vlanId, gateway: s.gateway, dnsServers: s.dnsServers, dhcpStart: s.dhcpStart, dhcpEnd: s.dhcpEnd, description: s.description }),
+  version: versionOf,
+  toItem: (s): z.input<typeof subnetItem> => ({ id: s.id, version: versionOf(s), name: s.name, cidr: s.cidr, vlanId: s.vlanId, gateway: s.gateway, dnsServers: s.dnsServers, dhcpStart: s.dhcpStart, dhcpEnd: s.dhcpEnd, description: s.description }),
   list: {
     filters: z.strictObject({ vlanId: z.string().max(64).optional() }),
     where: ({ vlanId }) => (vlanId ? { vlanId } : {}),
@@ -251,7 +255,7 @@ export const subnetEndpoints = defineResource({
     permission: "network.edit",
     operation: saveSubnetOperation,
     current: (s) => ({ name: s.name, cidr: s.cidr, vlanId: s.vlanId, gateway: s.gateway, dnsServers: s.dnsServers, dhcpStart: s.dhcpStart, dhcpEnd: s.dhcpEnd, description: s.description }),
-    toInput: (merged, { id }) => ({ ...merged, id }),
+    toInput: (merged, { id, version }) => ({ ...merged, id, version }),
   },
   remove: { permission: "network.delete", operation: deleteSubnetOperation },
 });

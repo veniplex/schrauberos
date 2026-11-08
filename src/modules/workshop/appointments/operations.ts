@@ -188,15 +188,16 @@ export const saveSettingsOperation = defineOperation({
 /* ───────────── Arbeitsplätze ───────────── */
 
 /** Arbeitsplatz anlegen/ändern; `active` (nicht archiviert) bleibt beim Ändern unverändert, wenn es fehlt – Archivieren und Wiederaktivieren sind eigene Operationen. */
-const bayInput = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(60), sortOrder: z.coerce.number().int().min(0).max(999).default(0), active: z.boolean().optional() });
+const bayInput = z.object({ id: z.string().optional(), version: z.string().optional(), name: z.string().trim().min(1).max(60), sortOrder: z.coerce.number().int().min(0).max(999).default(0), active: z.boolean().optional() });
 
 export const saveBayOperation = defineOperation({
   name: "appointments.saveBay",
   permission: "appointments.configure",
   input: bayInput,
   audit: "settings.appointments",
-  run: async ({ input: { id, ...data }, tx, audit }) => {
+  run: async ({ input: { id, version, ...data }, tx, audit }) => {
     // Neue Arbeitsplätze sind immer aktiv; archiviert wird über die eigene Operation
+    if (id && !(await claimRow(tx.bay, id, version))) fail("conflict");
     const saved = id ? await tx.bay.update({ where: { id }, data }) : await tx.bay.create({ data: { ...data, active: true } });
     audit({ target: `Bay: ${saved.name}`, entityId: saved.id });
     return { id: saved.id };
@@ -238,6 +239,7 @@ export const archiveBayOperation = defineOperation({
 
 const typeInput = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   name: z.string().trim().min(1).max(60),
   color: z.string().refine(isHexColor),
   defaultMinutes: z.coerce.number().int().min(5).max(720),
@@ -251,7 +253,8 @@ export const saveTypeOperation = defineOperation({
   permission: "appointments.configure",
   input: typeInput,
   audit: "settings.appointments",
-  run: async ({ input: { id, ...data }, tx, audit }) => {
+  run: async ({ input: { id, version, ...data }, tx, audit }) => {
+    if (id && !(await claimRow(tx.appointmentType, id, version))) fail("conflict");
     const saved = id ? await tx.appointmentType.update({ where: { id }, data }) : await tx.appointmentType.create({ data: { ...data, active: true } });
     audit({ target: `Type: ${saved.name}`, entityId: saved.id });
     return { id: saved.id };

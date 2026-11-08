@@ -282,7 +282,8 @@ CREATE TABLE "Bay" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
-    "sortOrder" INTEGER NOT NULL DEFAULT 0
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
@@ -293,7 +294,8 @@ CREATE TABLE "AppointmentType" (
     "defaultMinutes" INTEGER NOT NULL DEFAULT 60,
     "active" BOOLEAN NOT NULL DEFAULT true,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
-    "kind" TEXT NOT NULL DEFAULT 'general'
+    "kind" TEXT NOT NULL DEFAULT 'general',
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
@@ -353,7 +355,7 @@ CREATE TABLE "TireSet" (
     "notes" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "TireSet_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "TireSet_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -376,7 +378,8 @@ CREATE TABLE "NetLocation" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "description" TEXT,
-    "sortOrder" INTEGER NOT NULL DEFAULT 0
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
@@ -384,7 +387,8 @@ CREATE TABLE "NetVlan" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "vlanId" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
-    "description" TEXT
+    "description" TEXT,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
@@ -398,6 +402,7 @@ CREATE TABLE "NetSubnet" (
     "dhcpEnd" TEXT,
     "description" TEXT,
     "vlanId" TEXT,
+    "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "NetSubnet_vlanId_fkey" FOREIGN KEY ("vlanId") REFERENCES "NetVlan" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
@@ -567,7 +572,7 @@ CREATE TABLE "Absence" (
     "note" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Absence_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "Absence_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -626,7 +631,7 @@ CREATE TABLE "FleetMileage" (
     "date" DATETIME NOT NULL,
     "km" INTEGER NOT NULL,
     "note" TEXT,
-    CONSTRAINT "FleetMileage_fleetVehicleId_fkey" FOREIGN KEY ("fleetVehicleId") REFERENCES "FleetVehicle" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "FleetMileage_fleetVehicleId_fkey" FOREIGN KEY ("fleetVehicleId") REFERENCES "FleetVehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -638,7 +643,7 @@ CREATE TABLE "FleetCost" (
     "amountCents" INTEGER NOT NULL,
     "km" INTEGER,
     "note" TEXT,
-    CONSTRAINT "FleetCost_fleetVehicleId_fkey" FOREIGN KEY ("fleetVehicleId") REFERENCES "FleetVehicle" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "FleetCost_fleetVehicleId_fkey" FOREIGN KEY ("fleetVehicleId") REFERENCES "FleetVehicle" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -650,7 +655,7 @@ CREATE TABLE "FleetLicenseCheck" (
     "method" TEXT,
     "note" TEXT,
     "checkedByName" TEXT,
-    CONSTRAINT "FleetLicenseCheck_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "FleetLicenseCheck_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -811,7 +816,8 @@ CREATE TABLE "DocCategory" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "area" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "sortOrder" INTEGER NOT NULL DEFAULT 0
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable

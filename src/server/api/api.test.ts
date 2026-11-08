@@ -30,6 +30,7 @@ beforeEach(async () => {
   await env.db.apiToken.deleteMany();
   await env.db.auditLog.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
+  await env.db.tireSet.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.customer.deleteMany();
   await env.db.featureSetting.deleteMany();

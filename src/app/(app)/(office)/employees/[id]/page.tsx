@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Pencil, Trash2 } from "lucide-react";
 import { monthKeyOf } from "@/lib/zone";
-import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, TextLink, StatusBadge } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -11,13 +11,14 @@ import { currentYear, toDateInput } from "@/lib/dates";
 import { DUE_TONE, dueState } from "@/lib/due";
 import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
 import { getHolidays } from "@/server/holidays";
-import { employeeName, workdaysBetween } from "@/modules/office/employees/domain";
-import { employeeTitle, getEmployeeDetail, getQualificationForEdit, getVacationBalance } from "@/modules/office/employees/queries";
+import { employeeDeletable, employeeName, workdaysBetween } from "@/modules/office/employees/domain";
+import { employeeDeletionDeps, employeeTitle, getEmployeeDetail, getQualificationForEdit, getVacationBalance } from "@/modules/office/employees/queries";
 import { VacationSummary } from "@/modules/office/employees/vacation-summary";
 import { parseWorkWeekdays } from "@/modules/office/employees/work-pattern";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { deleteAbsence, deleteEmployee, deleteQualification } from "@/modules/office/employees/actions";
 import { QualificationForm } from "@/modules/office/employees/forms";
+import { ArchivePanel } from "@/components/archive/archive-panel";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -44,6 +45,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const pattern = parseWorkWeekdays(e.workWeekdays);
   const editingQualification = canEdit && sp.editQualification ? await getQualificationForEdit(session, sp.editQualification) : null;
   const returnTo = `/employees/${e.id}`;
+  const deletionDeps = session.can("employees.delete") ? await employeeDeletionDeps(e.id) : null;
 
   return (
     <>
@@ -228,13 +230,23 @@ export default async function EmployeePage({ params, searchParams }: { params: P
             </Card>
           ) : null}
 
-          {session.can("employees.delete") ? (
-            <DangerZone title={t("common.dangerZone")}>
-              <form action={deleteEmployee}>
-                <input type="hidden" name="id" value={e.id} />
-                <ConfirmSubmitButton message={t("employees.confirmDelete", { name: employeeName(e) })}>{t("employees.delete")}</ConfirmSubmitButton>
-              </form>
-            </DangerZone>
+          {deletionDeps ? (
+            <ArchivePanel
+              id={e.id}
+              archived={false}
+              deps={[
+                { kind: "absences", count: deletionDeps.absences },
+                { kind: "licenseChecks", count: deletionDeps.licenseChecks },
+                { kind: "timeEntries", count: deletionDeps.timeEntries },
+              ]}
+              canArchive={false}
+              canDelete
+              deletable={employeeDeletable(deletionDeps)}
+              remove={deleteEmployee}
+              deleteLabel={t("employees.delete")}
+              confirmDelete={t("employees.confirmDelete", { name: employeeName(e) })}
+              blockedHint={t("employees.deleteBlockedHint")}
+            />
           ) : null}
         </div>
       </div>

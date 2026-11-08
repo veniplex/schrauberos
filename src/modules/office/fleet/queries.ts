@@ -33,6 +33,8 @@ export async function getFleetVehicleDetail(id: string) {
       driver: { select: { id: true, firstName: true, lastName: true, licenseChecks: { orderBy: { checkedAt: "desc" }, take: 1 } } },
       mileage: { orderBy: [{ date: "desc" }, { km: "desc" }], take: 30 },
       costs: { orderBy: { date: "desc" }, take: 50 },
+      // für den Löschschutz (ein Fahrzeug mit Verlauf wird nicht gelöscht)
+      _count: { select: { mileage: true, costs: true } },
     },
   });
 }

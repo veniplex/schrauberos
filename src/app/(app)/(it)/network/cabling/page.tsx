@@ -8,6 +8,7 @@ import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-pa
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
+import { versionOf } from "@/lib/concurrency";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteConnection, deleteLocation } from "@/modules/it/network/actions";
@@ -144,7 +145,7 @@ async function LocationsTab({ canEdit, canDelete, tp }: { canEdit: boolean; canD
               <li key={l.id} className="flex flex-wrap items-start gap-3 px-5 py-3">
                 <div className="min-w-0 flex-1">
                   {canEdit ? (
-                    <LocationForm initial={{ id: l.id, name: l.name, description: l.description ?? "", sortOrder: l.sortOrder }} />
+                    <LocationForm initial={{ id: l.id, version: versionOf(l), name: l.name, description: l.description ?? "", sortOrder: l.sortOrder }} />
                   ) : (
                     <p className="text-sm">
                       <span className="font-medium">{l.name}</span>

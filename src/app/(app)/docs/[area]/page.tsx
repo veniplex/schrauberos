@@ -9,6 +9,7 @@ import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Pagination } from "@/components/ui/pagination";
 import { getI18n } from "@/i18n/server";
 import { clampPage, listLinks, pageWindow, parseListParams } from "@/lib/list-params";
+import { versionOf } from "@/lib/concurrency";
 import { db } from "@/server/db";
 import { contains } from "@/server/search";
 import { requireDocArea, visibleChapters, visiblePages } from "@/capabilities/docs/access";
@@ -85,7 +86,7 @@ export default async function DocsIndexPage({ params, searchParams }: { params: 
                 {categories.map((c) => (
                   <li key={c.id} className="flex items-start gap-1.5">
                     <div className="min-w-0 flex-1">
-                      <CategoryForm area={area} roles={roles} initial={{ id: c.id, name: c.name, sortOrder: c.sortOrder, roleIds: c.roles.map((r) => r.roleId) }} />
+                      <CategoryForm area={area} roles={roles} initial={{ id: c.id, version: versionOf(c), name: c.name, sortOrder: c.sortOrder, roleIds: c.roles.map((r) => r.roleId) }} />
                     </div>
                     {c._count.pages > 0 ? (
                       <Button type="button" variant="danger" size="sm" disabled aria-label={t("docs.categoryNotEmptyHint")} title={t("docs.categoryNotEmptyHint")}>

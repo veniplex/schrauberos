@@ -15,13 +15,14 @@ export function CategoryForm({
 }: {
   area: string;
   roles: ChapterRole[];
-  initial?: { id: string; name: string; sortOrder: number; roleIds: string[] };
+  initial?: { id: string; version: string; name: string; sortOrder: number; roleIds: string[] };
 }) {
   const { t } = useI18n();
   return (
     <Form action={saveDocCategory} className="flex flex-col gap-2">
       <input type="hidden" name="area" value={area} />
       {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {initial ? <input type="hidden" name="version" value={initial.version} /> : null}
       <div className="flex flex-wrap items-center gap-2">
         <Input name="name" defaultValue={initial?.name} placeholder={t("docs.fields.categoryName")} aria-label={t("docs.fields.categoryName")} className="min-w-36 flex-1" maxLength={60} required />
         <Input name="sortOrder" type="number" min={0} defaultValue={initial?.sortOrder ?? 0} aria-label={t("common.sortOrder")} className="w-20" />

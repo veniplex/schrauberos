@@ -30,6 +30,8 @@ function sessionOf(options: { id?: string; isAdmin?: boolean; twoFactor?: boolea
 const stateOf = async (session: never, secure = false) => Object.fromEntries((await registry.setupChecksFor(session, secure)).map((r) => [r.id, r.done]));
 
 beforeEach(async () => {
+  await env.db.absence.deleteMany();
+  await env.db.fleetLicenseCheck.deleteMany();
   await env.db.employee.deleteMany();
   await env.db.recoveryCode.deleteMany();
   await env.db.appSetting.deleteMany();

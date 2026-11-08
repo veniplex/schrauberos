@@ -24,7 +24,7 @@ after(() => env.cleanup());
 
 beforeEach(async () => {
   state.resetApiLimiters();
-  for (const table of ["apiIdempotencyKey", "apiToken", "auditLog", "appointment", "tireSet", "invoice", "absence", "qualification", "fleetLicenseCheck", "fleetVehicle", "employee", "vehicleOwnership", "vehicle", "customer", "netConnection", "netIp", "netSubnet", "netVlan", "netDevice", "netLocation", "bay", "appointmentType"] as const) {
+  for (const table of ["apiIdempotencyKey", "apiToken", "auditLog", "appointment", "tireSet", "invoice", "absence", "qualification", "fleetLicenseCheck", "fleetMileage", "fleetCost", "fleetVehicle", "employee", "vehicleOwnership", "vehicle", "customer", "netConnection", "netIp", "netSubnet", "netVlan", "netDevice", "netLocation", "bay", "appointmentType"] as const) {
     await (env.db[table] as unknown as { deleteMany(): Promise<unknown> }).deleteMany();
   }
   token = (await makeToken(env, { admin: true, scope: grantablePermissions(), rateLimitPerMinute: 6000 })).token;
@@ -342,8 +342,11 @@ describe("Fuhrpark", () => {
     assert.equal(check.json.data.nextDue, "2026-07-15");
     assert.match(check.json.data.checkedByName, /API Besitzer/);
     assert.equal((await api("DELETE", `/fleet-costs/${cost.json.data.id}`)).status, 204);
+    // Historie (Kilometerstände) sperrt das Löschen: 409, das Fahrzeug bleibt (Schema: Restrict)
+    assert.equal((await api("DELETE", `/fleet-vehicles/${car.id}`)).status, 409);
+    assert.equal(await env.db.fleetVehicle.count(), 1);
+    await env.db.fleetMileage.deleteMany();
     assert.equal((await api("DELETE", `/fleet-vehicles/${car.id}`)).status, 204);
-    assert.equal(await env.db.fleetMileage.count(), 0);
   });
 });
 
@@ -373,7 +376,11 @@ describe("Netzwerk-Dokumentation", () => {
     assert.equal((await api("POST", "/network-ips", { body: { subnetId: subnet.json.data.id, address: "192.168.10.20" } })).json.fields.address.code, "network.errors.ipTaken");
     const moved = await api("PATCH", `/network-ips/${ip.json.data.id}`, { body: { hostname: "sw1.lan" }, headers: ifMatch(ip.json.data) });
     assert.deepEqual([moved.json.data.hostname, moved.json.data.address], ["sw1.lan", "192.168.10.20"]);
-    assert.equal((await api("PATCH", `/network-vlans/${vlan.json.data.id}`, { body: { name: "Büro neu" } })).json.data.name, "Büro neu");
+    // Konfigurationstabellen tragen eine Version: ohne If-Match 428, mit veraltetem ETag 412, sonst gespeichert
+    assert.equal((await api("PATCH", `/network-vlans/${vlan.json.data.id}`, { body: { name: "Büro neu" } })).status, 428);
+    const renamed = await api("PATCH", `/network-vlans/${vlan.json.data.id}`, { body: { name: "Büro neu" }, headers: ifMatch(vlan.json.data) });
+    assert.equal(renamed.json.data.name, "Büro neu");
+    assert.equal((await api("PATCH", `/network-vlans/${vlan.json.data.id}`, { body: { name: "Veraltet" }, headers: ifMatch(vlan.json.data) })).status, 412);
 
     const cable = await api("POST", "/network-connections", { body: { fromDeviceId: device.id, fromPort: "1", toDeviceId: device2.id, toPort: "eth0" } });
     assert.equal(cable.status, 201);

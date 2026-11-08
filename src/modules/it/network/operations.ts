@@ -78,6 +78,7 @@ export const deleteDeviceOperation = defineOperation({
 
 const vlanInput = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   vlanId: z.coerce.number().int().min(1).max(4094),
   name: z.string().trim().min(1).max(60),
   description: z.string().max(200).optional(),
@@ -88,10 +89,11 @@ export const saveVlanOperation = defineOperation({
   permission: "network.edit",
   input: vlanInput,
   audit: (input) => (input.id ? "network.update" : "network.create"),
-  run: async ({ input: { id, ...d }, tx, audit }) => {
+  run: async ({ input: { id, version, ...d }, tx, audit }) => {
     const dup = await tx.netVlan.findFirst({ where: { vlanId: d.vlanId, ...(id ? { id: { not: id } } : {}) } });
     if (dup) failField("vlanId", "network.errors.vlanExists");
     const data = { vlanId: d.vlanId, name: d.name, description: d.description ?? null };
+    if (id && !(await claimRow(tx.netVlan, id, version))) fail("conflict");
     const saved = id ? await tx.netVlan.update({ where: { id }, data }) : await tx.netVlan.create({ data });
     audit({ target: `VLAN: ${saved.vlanId} ${saved.name}`, entityId: saved.id });
     return { id: saved.id };
@@ -116,6 +118,7 @@ export const deleteVlanOperation = defineOperation({
 
 const subnetInput = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   name: z.string().trim().min(1).max(80),
   cidr: z.string().max(18),
   vlanId: z.string().optional(),
@@ -133,7 +136,7 @@ export const saveSubnetOperation = defineOperation({
   permission: "network.edit",
   input: subnetInput,
   audit: (input) => (input.id ? "network.update" : "network.create"),
-  run: async ({ input: { id, allowOverlap, ...d }, principal, tx, audit }) => {
+  run: async ({ input: { id, version, allowOverlap, ...d }, principal, tx, audit }) => {
     const net = parseCidr(d.cidr);
     if (!net) failField("cidr", "network.errors.cidr");
     const cidr = `${formatIPv4(net.network)}/${net.prefix}`;
@@ -181,6 +184,7 @@ export const saveSubnetOperation = defineOperation({
       dhcpEnd: d.dhcpEnd ?? null,
       description: d.description ?? null,
     };
+    if (id && !(await claimRow(tx.netSubnet, id, version))) fail("conflict");
     const saved = id ? await tx.netSubnet.update({ where: { id }, data }) : await tx.netSubnet.create({ data });
     audit({ target: `subnet: ${saved.name} (${saved.cidr})`, entityId: saved.id });
     return { id: saved.id };
@@ -276,6 +280,7 @@ export const deleteIpOperation = defineOperation({
 
 const locationInput = z.object({
   id: z.string().optional(),
+  version: z.string().optional(),
   name: z.string().trim().min(1).max(80),
   description: z.string().max(200).optional(),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
@@ -286,8 +291,9 @@ export const saveLocationOperation = defineOperation({
   permission: "network.edit",
   input: locationInput,
   audit: (input) => (input.id ? "network.update" : "network.create"),
-  run: async ({ input: { id, ...d }, tx, audit }) => {
+  run: async ({ input: { id, version, ...d }, tx, audit }) => {
     const data = { name: d.name, description: d.description ?? null, sortOrder: d.sortOrder };
+    if (id && !(await claimRow(tx.netLocation, id, version))) fail("conflict");
     const saved = id ? await tx.netLocation.update({ where: { id }, data }) : await tx.netLocation.create({ data });
     audit({ target: `location: ${saved.name}`, entityId: saved.id });
     return { id: saved.id };

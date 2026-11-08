@@ -450,6 +450,7 @@ describe("Einlagerungsbestand", () => {
 describe("Fälligkeiten", () => {
   const today = "2026-11-07";
   before(async () => {
+    await env.db.tireSet.deleteMany();
     await env.db.vehicle.deleteMany();
     const erika = ids.erika;
     const mk = (plate: string, due: string | null, extra: Record<string, unknown> = {}) => env.db.vehicle.create({ data: { plate, plateNorm: plate.replace(/\W/g, ""), make: "VW", model: "Golf", inspectionDue: due, ...extra } as never });
@@ -460,6 +461,8 @@ describe("Fälligkeiten", () => {
     await mk("B-V 5", "2027-02"); // außerhalb der Vorschau
     await mk("B-V 6", "2026-11", { archivedAt: new Date() });
     await mk("B-V 7", "2026-11", { customerId: ids.restricted });
+    await env.db.fleetMileage.deleteMany();
+    await env.db.fleetCost.deleteMany();
     await env.db.fleetVehicle.deleteMany();
     await env.db.fleetVehicle.create({ data: { plate: "F-1", huDue: await noon("2026-12-15") } });
     await env.db.fleetVehicle.create({ data: { plate: "F-2", serviceDue: await noon("2026-10-20") } });

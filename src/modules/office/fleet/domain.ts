@@ -88,3 +88,11 @@ export function costPerKm(costs: ReadonlyArray<{ date: Date; amountCents: number
 export function currentMileage(mileage: Array<{ km: number }>): number | null {
   return mileage.length ? Math.max(...mileage.map((m) => m.km)) : null;
 }
+
+/**
+ * Löschschutz (Z7): Ein Firmenfahrzeug mit Kilometerständen oder Kosten ist **nicht löschbar** (Historie; im Schema `Restrict`) – es wird auf „Verkauft“ gesetzt. Ein versehentlich angelegtes
+ * Fahrzeug ohne Verlauf lässt sich löschen.
+ */
+export type FleetDeletionDeps = { mileage: number; costs: number };
+
+export const fleetVehicleDeletable = (deps: FleetDeletionDeps): boolean => deps.mileage === 0 && deps.costs === 0;

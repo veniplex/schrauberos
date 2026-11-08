@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { getI18n } from "@/i18n/server";
+import { versionOf } from "@/lib/concurrency";
 import { parseCidr } from "@/modules/it/network/domain";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -91,7 +92,7 @@ export default async function IpamPage() {
                 <li key={v.id} className="flex flex-wrap items-start gap-3 px-5 py-3">
                   {canEdit ? (
                     <div className="min-w-0 flex-1">
-                      <VlanForm initial={{ id: v.id, vlanId: v.vlanId, name: v.name, description: v.description ?? "" }} />
+                      <VlanForm initial={{ id: v.id, version: versionOf(v), vlanId: v.vlanId, name: v.name, description: v.description ?? "" }} />
                     </div>
                   ) : (
                     <div className="min-w-0 flex-1 text-sm">

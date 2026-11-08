@@ -14,7 +14,8 @@ export const employeesDe = {
   new: "Mitarbeiter anlegen",
   edit: "Mitarbeiter bearbeiten",
   delete: "Mitarbeiter löschen",
-  confirmDelete: "Mitarbeiter „{name}“ wirklich löschen? Abwesenheiten und Qualifikationen werden mit gelöscht.",
+  confirmDelete: "Mitarbeiter „{name}“ wirklich löschen? Die Qualifikationen werden mit gelöscht.",
+  deleteBlockedHint: "Ein Mitarbeiter mit Abwesenheiten, Führerscheinkontrollen oder Zeiteinträgen wird nicht gelöscht (Historie, Aufzeichnungspflicht). Stattdessen auf „inaktiv“ setzen: Er bleibt mit seiner Geschichte erhalten, erscheint aber nicht mehr in Auswahlfeldern.",
   searchPlaceholder: "Name, Personalnummer, Funktion, E-Mail …",
   empty: "Keine Mitarbeiter gefunden.",
   emptyHint: "Den ersten Mitarbeiter anlegen oder die Filter anpassen.",
@@ -121,6 +122,7 @@ export const employeesDe = {
     duplicate: "Genau diese Abwesenheit ist schon eingetragen – sie lässt sich nicht noch einmal speichern.",
   },
   errors: {
+    inUse: "Dieser Mitarbeiter kann nicht gelöscht werden: {absences} Abwesenheiten, {licenseChecks} Führerscheinkontrollen, {timeEntries} Zeiteinträge. Stattdessen auf „inaktiv“ setzen: Er bleibt mit seiner Geschichte erhalten, erscheint aber nicht mehr in Auswahlfeldern.",
     leaveBeforeHire: "Der Austritt liegt vor dem Eintritt.",
     numberTaken: "Diese Personalnummer ist bereits vergeben.",
     userTaken: "Dieses Konto gehört bereits zu {name}.",

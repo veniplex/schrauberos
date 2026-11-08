@@ -35,30 +35,30 @@ export const deleteAppointment = defineAction(deleteAppointmentOperation, {
   redirectOnError: (formData) => safeReturn(String(formData.get("returnTo") ?? ""), "/appointments", "/appointments"),
 });
 
-export const saveAppointmentSettings = defineAction(saveSettingsOperation, { form: formObject, revalidate: ["/appointments"], message: "common.saved" });
+export const saveAppointmentSettings = defineAction(saveSettingsOperation, { form: formObject, revalidate: ["/appointments", "/admin/settings"], message: "common.saved" });
 
 export const saveBay = defineAction(saveBayOperation, {
   form: formObject,
-  revalidate: ["/appointments"],
+  revalidate: ["/appointments", "/admin/settings"],
   message: "common.saved",
 });
 
-export const deleteBay = defineAction(deleteBayOperation, { revalidate: ["/appointments"], message: "common.deleted" });
+export const deleteBay = defineAction(deleteBayOperation, { revalidate: ["/appointments", "/admin/settings"], message: "common.deleted" });
 
 export const saveAppointmentType = defineAction(saveTypeOperation, {
   form: formObject,
-  revalidate: ["/appointments"],
+  revalidate: ["/appointments", "/admin/settings"],
   message: "common.saved",
 });
 
-export const deleteAppointmentType = defineAction(deleteTypeOperation, { revalidate: ["/appointments"], message: "common.deleted" });
+export const deleteAppointmentType = defineAction(deleteTypeOperation, { revalidate: ["/appointments", "/admin/settings"], message: "common.deleted" });
 
 /** Archivieren bzw. Wiederaktivieren (Formularfeld `archived` = „1“ oder „0“). */
 const archivedForm = (fd: FormData) => ({ id: String(fd.get("id") ?? ""), archived: fd.get("archived") === "1" });
 
-export const archiveBay = defineAction(archiveBayOperation, { form: archivedForm, revalidate: ["/appointments"], message: "common.saved" });
+export const archiveBay = defineAction(archiveBayOperation, { form: archivedForm, revalidate: ["/appointments", "/admin/settings"], message: "common.saved" });
 
-export const archiveAppointmentType = defineAction(archiveTypeOperation, { form: archivedForm, revalidate: ["/appointments"], message: "common.saved" });
+export const archiveAppointmentType = defineAction(archiveTypeOperation, { form: archivedForm, revalidate: ["/appointments", "/admin/settings"], message: "common.saved" });
 
 /**
  * Kalender-Abo erzeugen/erneuern: Die Antwort trägt den **Klartext der Abo-Adresse** (`feed.token`, einmalig – nur im Zustand der Seite, nie in URL, Log oder Audit); die Adresse selbst setzt die Seite aus

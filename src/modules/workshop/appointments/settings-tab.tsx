@@ -4,6 +4,7 @@ import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { ColorInput, Field, Input, Select } from "@/components/ui/form";
 import { Badge, Card } from "@/components/ui/layout";
 import { getI18n } from "@/i18n/server";
+import { versionOf } from "@/lib/concurrency";
 import { db } from "@/server/db";
 import type { SettingsTabDef } from "@/modules/types";
 import { APPOINTMENT_KINDS } from "./constants";
@@ -34,6 +35,7 @@ async function BaysCards() {
             <li key={b.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <form action={saveBay} className="flex flex-1 flex-wrap items-center gap-3">
                 <input type="hidden" name="id" value={b.id} />
+                <input type="hidden" name="version" value={versionOf(b)} />
                 <Input name="name" defaultValue={b.name} aria-label={t("appointments.settings.bays.name")} className="min-w-40 flex-1" required maxLength={60} />
                 <Input name="sortOrder" type="number" min={0} defaultValue={b.sortOrder} aria-label={t("appointments.settings.sortOrder")} className="w-20" />
                 <SubmitButton variant="secondary" size="sm">{t("common.save")}</SubmitButton>
@@ -80,6 +82,7 @@ async function TypesCards() {
   const fields = (v?: (typeof types)[number]) => (
     <>
       {v ? <input type="hidden" name="id" value={v.id} /> : null}
+      {v ? <input type="hidden" name="version" value={versionOf(v)} /> : null}
       <Input name="name" defaultValue={v?.name} aria-label={t("appointments.settings.types.name")} placeholder={t("appointments.settings.types.name")} className="min-w-40 flex-1" required maxLength={60} />
       <ColorInput name="color" defaultValue={v?.color ?? "#2459c9"} aria-label={t("appointments.settings.types.color")} />
       <Input name="defaultMinutes" type="number" min={5} max={720} step={5} defaultValue={v?.defaultMinutes ?? 60} aria-label={t("appointments.settings.types.minutes")} className="w-24" required />

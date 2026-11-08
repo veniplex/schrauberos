@@ -11,7 +11,8 @@ export const fleetDe = {
   new: "Fahrzeug anlegen",
   edit: "Fahrzeug bearbeiten",
   delete: "Fahrzeug löschen",
-  confirmDelete: "Firmenfahrzeug {plate} samt Kilometer- und Kostenverlauf löschen?",
+  confirmDelete: "Firmenfahrzeug {plate} wirklich löschen?",
+  deleteBlockedHint: "Ein Fahrzeug mit Kilometerständen oder Kosten wird nicht gelöscht (Historie). Stattdessen den Status auf „Verkauft“ setzen: Das Fahrzeug bleibt mit seinem Verlauf erhalten.",
   deleteConfirm: "Eintrag löschen?",
   searchPlaceholder: "Kennzeichen, Modell, FIN oder Fahrer …",
   empty: "Keine Fahrzeuge gefunden.",
@@ -77,6 +78,7 @@ export const fleetDe = {
   costCategories: { fuel: "Tanken/Laden", service: "Service", repair: "Reparatur", tires: "Reifen", tax: "Steuer", insurance: "Versicherung", other: "Sonstiges" },
   dueKinds: { hu: "HU/AU", service: "Service", serviceKm: "Service", insurance: "Versicherung", leasing: "Leasing" },
   errors: {
+    inUse: "Dieses Fahrzeug kann nicht gelöscht werden: {mileage} Kilometerstände, {costs} Kostenbuchungen. Stattdessen den Status auf „Verkauft“ setzen: Das Fahrzeug bleibt mit seinem Verlauf erhalten.",
     amount: "Ungültiger Betrag, z. B. 49,90.",
     kmLower: "Der Kilometerstand liegt unter dem zuletzt erfassten Wert ({km} km).",
     plateExists: "Es gibt schon ein Firmenfahrzeug mit diesem Kennzeichen.",

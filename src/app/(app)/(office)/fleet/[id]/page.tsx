@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
-import { Badge, Card, DefinitionList, EmptyState, Plate, Table, TextLink, StatusBadge, DangerZone } from "@/components/ui/layout";
+import { Badge, Card, DefinitionList, EmptyState, Plate, Table, TextLink, StatusBadge } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -12,7 +12,8 @@ import { DUE_TONE, dueState } from "@/lib/due";
 import { FLEET_STATUS_TONE } from "@/modules/office/fleet/status-tone";
 import type { FleetStatus } from "@/modules/office/fleet/domain";
 import { employeeName } from "@/modules/office/employees/public";
-import { COST_CATEGORIES, costPeriod, currentMileage, fleetDues } from "@/modules/office/fleet/domain";
+import { COST_CATEGORIES, costPeriod, currentMileage, fleetDues, fleetVehicleDeletable } from "@/modules/office/fleet/domain";
+import { ArchivePanel } from "@/components/archive/archive-panel";
 import { formatCents } from "@/lib/money";
 import { INTL_LOCALE } from "@/i18n/config";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
@@ -236,12 +237,21 @@ export default async function FleetVehiclePage({ params }: { params: Promise<{ i
           </Card>
 
           {session.can("fleet.delete") ? (
-            <DangerZone title={t("common.dangerZone")}>
-              <form action={deleteFleetVehicle}>
-                <input type="hidden" name="id" value={v.id} />
-                <ConfirmSubmitButton message={t("fleet.confirmDelete", { plate: v.plate })}>{t("fleet.delete")}</ConfirmSubmitButton>
-              </form>
-            </DangerZone>
+            <ArchivePanel
+              id={v.id}
+              archived={false}
+              deps={[
+                { kind: "mileage", count: v._count.mileage },
+                { kind: "costs", count: v._count.costs },
+              ]}
+              canArchive={false}
+              canDelete
+              deletable={fleetVehicleDeletable(v._count)}
+              remove={deleteFleetVehicle}
+              deleteLabel={t("fleet.delete")}
+              confirmDelete={t("fleet.confirmDelete", { plate: v.plate })}
+              blockedHint={t("fleet.deleteBlockedHint")}
+            />
           ) : null}
         </div>
       </div>

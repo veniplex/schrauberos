@@ -22,6 +22,8 @@ const save = (fields: Record<string, string | number | boolean | ReadonlyArray<n
 const entries = (action: string) => env.db.auditLog.findMany({ where: { action } });
 
 beforeEach(async () => {
+  await env.db.absence.deleteMany();
+  await env.db.fleetLicenseCheck.deleteMany();
   await env.db.employee.deleteMany();
   await env.db.auditLog.deleteMany();
   env.browser.reset();
@@ -75,6 +77,33 @@ describe("Mitarbeiter speichern", () => {
     assert.equal(await env.db.employee.count(), 0);
     assert.equal((await entries("employee.delete"))[0].target, "Erika Muster");
   });
+
+  it("Historie verschwindet nie mit dem Mitarbeiter (Z7, Schema: Restrict): mit Abwesenheit oder Führerscheinkontrolle nicht löschbar, Qualifikationen fallen mit weg", async () => {
+    await login(["employees.edit", "employees.delete"]);
+    await redirectOf(() => save());
+    const emp = await env.db.employee.findFirstOrThrow();
+    const absence = await env.db.absence.create({ data: { employeeId: emp.id, type: "vacation", startDate: new Date("2030-01-07T12:00:00Z"), endDate: new Date("2030-01-08T12:00:00Z") } });
+    await actions.deleteEmployee(form({ id: emp.id }));
+    assert.equal(await env.db.employee.count(), 1, "mit Abwesenheit bleibt der Mitarbeiter");
+    assert.equal(await env.db.absence.count(), 1);
+    await env.db.absence.delete({ where: { id: absence.id } });
+    await env.db.fleetLicenseCheck.create({ data: { employeeId: emp.id, checkedAt: new Date(), nextDue: new Date() } });
+    await actions.deleteEmployee(form({ id: emp.id }));
+    assert.equal(await env.db.employee.count(), 1, "mit Führerscheinkontrolle bleibt der Mitarbeiter");
+    await env.db.fleetLicenseCheck.deleteMany();
+    await env.db.qualification.create({ data: { employeeId: emp.id, name: "Ersthelfer" } });
+    assert.equal(await redirectOf(() => actions.deleteEmployee(form({ id: emp.id }))), "/employees");
+    assert.equal(await env.db.qualification.count(), 0, "Qualifikationen gehören zur Person");
+  });
+
+  it("auch direkt in der Datenbank verhindert das Schema das stille Löschen der Historie", async () => {
+    await login(["employees.edit"]);
+    await redirectOf(() => save());
+    const emp = await env.db.employee.findFirstOrThrow();
+    await env.db.fleetLicenseCheck.create({ data: { employeeId: emp.id, checkedAt: new Date(), nextDue: new Date() } });
+    await assert.rejects(() => env.db.employee.delete({ where: { id: emp.id } }), /Foreign key/);
+    assert.equal(await env.db.fleetLicenseCheck.count(), 1);
+  });
 });
 
 describe("Sensible Daten: Notfallkontakt", () => {
@@ -92,6 +121,8 @@ describe("Sensible Daten: Notfallkontakt", () => {
     assert.deepEqual([after.emergencyName, after.emergencyPhone, after.emergencyRelation], ["Hans Muster", "0171 1234567", "Ehemann"], "unverändert");
     assert.equal(after.jobTitle, "Neu");
 
+    await env.db.absence.deleteMany();
+    await env.db.fleetLicenseCheck.deleteMany();
     await env.db.employee.deleteMany();
     await redirectOf(() => save(emergency));
     assert.equal((await env.db.employee.findFirstOrThrow()).emergencyName, null, "ohne Recht wird beim Anlegen nichts gespeichert");

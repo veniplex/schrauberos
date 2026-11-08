@@ -2,7 +2,7 @@ import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
-import { ABSENCE_TYPES, DEPARTMENTS, employeeName } from "@/modules/office/employees/domain";
+import { ABSENCE_TYPES, DEPARTMENTS, employeeDeletable, employeeName } from "@/modules/office/employees/domain";
 import { writeAudit } from "@/server/audit";
 import { defineOperation, fail, failField } from "@/server/operations";
 import { DEFAULT_WORK_WEEKDAYS, formatWorkWeekdays } from "./work-pattern";
@@ -123,8 +123,10 @@ export const deleteEmployeeOperation = defineOperation({
   input: z.object({ id: z.string().min(1) }),
   audit: "employee.delete",
   run: async ({ input, tx, audit }) => {
-    const employee = await tx.employee.findUnique({ where: { id: input.id }, select: { firstName: true, lastName: true } });
+    const employee = await tx.employee.findUnique({ where: { id: input.id }, select: { firstName: true, lastName: true, _count: { select: { absences: true, licenseChecks: true, timeEntries: true } } } });
     if (!employee) fail("notFound");
+    // Historie (Abwesenheiten, Führerscheinkontrollen, Zeiteinträge) verschwindet nie mit dem Mitarbeiter: Löschen nur ohne sie, sonst auf inaktiv setzen
+    if (!employeeDeletable(employee._count)) fail("inUse", "employees.errors.inUse", employee._count);
     await tx.employee.delete({ where: { id: input.id } });
     audit({ target: employeeName(employee), entityId: input.id });
     return { id: input.id };

@@ -8,7 +8,7 @@ import { nonZero, type Dependency } from "@/lib/archive-filter";
 type FormAction = (formData: FormData) => Promise<void>;
 
 /**
- * Löschschutz und Archiv eines Datensatzes (P4b-2) für die Detailseiten von Kunden und Fahrzeugen: zeigt **vor** dem Löschen oder Archivieren, was daran hängt (Zählung), bietet
+ * Löschschutz und Archiv eines Datensatzes (P4b-2) für die Detailseiten von Kunden und Fahrzeugen (ohne `archive`/`unarchive` nur Löschschutz, z. B. Mitarbeiter und Firmenfahrzeuge, die statt des Archivs über ihren Status „inaktiv“/„verkauft“ ausgeblendet werden): zeigt **vor** dem Löschen oder Archivieren, was daran hängt (Zählung), bietet
  * Archivieren bzw. Wiederaktivieren an und das Löschen nur, wenn nichts mehr daran hängt (`deletable`) – sonst steht der Weg „archivieren“ da statt einer Sackgasse.
  * Die Aktionen prüfen ihr Recht selbst; `canArchive`/`canDelete` blenden die Knöpfe nur aus.
  */
@@ -26,6 +26,7 @@ export async function ArchivePanel({
   confirmDelete,
   confirmArchive,
   notes,
+  blockedHint,
 }: {
   id: string;
   archived: boolean;
@@ -33,8 +34,8 @@ export async function ArchivePanel({
   canArchive: boolean;
   canDelete: boolean;
   deletable: boolean;
-  archive: FormAction;
-  unarchive: FormAction;
+  archive?: FormAction;
+  unarchive?: FormAction;
   remove: FormAction;
   deleteLabel: string;
   confirmDelete: string;
@@ -42,6 +43,8 @@ export async function ArchivePanel({
   confirmArchive?: string;
   /** Zusätzliche Hinweise unter der Zählung (z. B. offene Termine) */
   notes?: readonly string[];
+  /** Text, wenn das Löschen gesperrt ist (Standard: Löschen nur ohne Abhängigkeiten, sonst archivieren) */
+  blockedHint?: string;
 }) {
   if (!canArchive && !canDelete) return null;
   const { t, tp } = await getI18n();
@@ -68,7 +71,7 @@ export async function ArchivePanel({
         </div>
         {archived ? <p className="text-ink-muted">{t("archive.notice")}</p> : null}
         <div className="flex flex-wrap gap-2">
-          {canArchive ? (
+          {canArchive && archive && unarchive ? (
             archived ? (
               <form action={unarchive}>
                 <input type="hidden" name="id" value={id} />
@@ -94,7 +97,7 @@ export async function ArchivePanel({
             </form>
           ) : null}
         </div>
-        {canDelete && !deletable ? <p className="text-ink-muted">{t("archive.hintDelete")}</p> : null}
+        {canDelete && !deletable ? <p className="text-ink-muted">{blockedHint ?? t("archive.hintDelete")}</p> : null}
       </div>
     </DangerZone>
   );

@@ -163,7 +163,9 @@ describe("Kapitel", () => {
     assert.equal(state.ok, true);
     const cat = await env.db.docCategory.findFirstOrThrow({ include: { roles: true } });
     assert.deepEqual(cat.roles.map((r) => r.roleId), [boss.id]);
-    await actions.saveDocCategory({}, form({ area: "handbook", id: cat.id, name: "Intern 2" }));
+    assert.ok((await actions.saveDocCategory({}, form({ area: "handbook", id: cat.id, name: "Ohne Version" }))).error, "Z7: ohne Version gibt es keine Speicherung");
+    await actions.saveDocCategory({}, form({ area: "handbook", id: cat.id, version: versionOf(cat), name: "Intern 2" }));
+    assert.ok((await actions.saveDocCategory({}, form({ area: "handbook", id: cat.id, version: versionOf(cat), name: "Veraltet" }))).error, "Z7: veralteter Stand ist ein Konflikt");
     const open = await env.db.docCategory.findUniqueOrThrow({ where: { id: cat.id }, include: { roles: true } });
     assert.deepEqual([open.name, open.roles.length], ["Intern 2", 0], "ohne Auswahl sehen alle mit Leserecht das Kapitel");
     assert.equal((await entries("docs.categorySave")).length, 2);
@@ -172,7 +174,7 @@ describe("Kapitel", () => {
   it("ein Kapitel eines anderen Bereichs lässt sich nicht ändern oder löschen", async () => {
     await login(["handbook.edit"]);
     const foreign = await env.db.docCategory.create({ data: { area: "it", name: "Fremdes" } });
-    const changed = await actions.saveDocCategory({}, form({ area: "handbook", id: foreign.id, name: "Gekapert" }));
+    const changed = await actions.saveDocCategory({}, form({ area: "handbook", id: foreign.id, version: versionOf(foreign), name: "Gekapert" }));
     assert.ok(changed.error);
     assert.equal(await redirectOf(() => actions.deleteDocCategory(form({ area: "handbook", id: foreign.id }))), "/docs/handbook");
     const still = await env.db.docCategory.findUniqueOrThrow({ where: { id: foreign.id } });

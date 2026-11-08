@@ -3,7 +3,7 @@ import { z } from "zod";
 import { claimRow } from "@/lib/concurrency";
 import { dateText, moneyCents } from "@/lib/zod-fields";
 import { formatPlate, normalizePlate } from "@/lib/plate";
-import { COST_CATEGORIES, FLEET_STATUSES, FUEL_TYPES, nextLicenseCheck } from "@/modules/office/fleet/domain";
+import { COST_CATEGORIES, FLEET_STATUSES, FUEL_TYPES, fleetVehicleDeletable, nextLicenseCheck } from "@/modules/office/fleet/domain";
 import { defineOperation, fail, failField, failFields } from "@/server/operations";
 import type { Tx } from "@/server/operations";
 
@@ -103,8 +103,10 @@ export const deleteFleetVehicleOperation = defineOperation({
   input: z.object({ id: z.string().min(1) }),
   audit: "fleet.delete",
   run: async ({ input, tx, audit }) => {
-    const car = await tx.fleetVehicle.findUnique({ where: { id: input.id }, select: { plate: true } });
+    const car = await tx.fleetVehicle.findUnique({ where: { id: input.id }, select: { plate: true, _count: { select: { mileage: true, costs: true } } } });
     if (!car) fail("notFound");
+    // Kilometerstände und Kosten sind Historie und verschwinden nie mit dem Fahrzeug: Löschen nur ohne sie, sonst auf „Verkauft“ setzen
+    if (!fleetVehicleDeletable(car._count)) fail("inUse", "fleet.errors.inUse", car._count);
     await tx.fleetVehicle.delete({ where: { id: input.id } });
     audit({ target: car.plate, entityId: input.id });
     return { id: input.id };

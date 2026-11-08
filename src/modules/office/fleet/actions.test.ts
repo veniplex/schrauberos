@@ -34,6 +34,8 @@ describe("Fuhrpark: Referenzprüfung", () => {
 
 describe("Fuhrpark: Kennzeichen-Dublette", () => {
   it("warnt bei gleichem Kennzeichen (andere Schreibweise) mit dem vorhandenen Fahrzeug; „Trotzdem“ speichert, das Fahrzeug selbst zählt nicht als Dublette", async () => {
+    await env.db.fleetMileage.deleteMany();
+    await env.db.fleetCost.deleteMany();
     await env.db.fleetVehicle.deleteMany();
     const first = await env.db.fleetVehicle.create({ data: { plate: "B-FW 100" } });
     const warning = await actions.saveFleetVehicle({}, form({ plate: "b fw-100" }));

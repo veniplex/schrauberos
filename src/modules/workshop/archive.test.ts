@@ -26,6 +26,7 @@ beforeEach(async () => {
   await env.db.appointment.deleteMany();
   await env.db.tireSet.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
+  await env.db.tireSet.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.customer.deleteMany();
   await env.db.auditLog.deleteMany();

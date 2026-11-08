@@ -41,6 +41,7 @@ after(async () => {
 beforeEach(async () => {
   await env.db.absence.deleteMany();
   await env.db.qualification.deleteMany();
+  await env.db.fleetLicenseCheck.deleteMany();
   await env.db.employee.deleteMany();
   sql = [];
 });

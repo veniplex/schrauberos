@@ -26,6 +26,7 @@ beforeEach(async () => {
   await env.db.tireSet.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
   await env.db.vehicleOwnership.deleteMany();
+  await env.db.tireSet.deleteMany();
   await env.db.vehicle.deleteMany();
   await env.db.invoice.deleteMany();
   await env.db.customer.deleteMany();
@@ -561,6 +562,7 @@ describe("Import: Fahrzeuge", () => {
     const before = await env.db.vehicle.findMany({ select });
     await env.db.vehicleOwnership.deleteMany();
     await env.db.vehicleOwnership.deleteMany();
+    await env.db.tireSet.deleteMany();
     await env.db.vehicle.deleteMany();
     assert.equal((await apply("vehicles", out)).status, 200);
     assert.deepEqual(await env.db.vehicle.findMany({ select }), before);

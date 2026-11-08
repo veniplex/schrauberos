@@ -155,11 +155,18 @@ describe("Termin: Speichern, Konflikte, Audit", () => {
     await actions.saveBay(form({ name: "Grube 7", sortOrder: 2 }));
     const created = await env.db.bay.findFirstOrThrow({ where: { name: "Grube 7" } });
     assert.equal(created.active, true, "neue Arbeitsplätze sind aktiv");
-    await actions.saveBay(form({ id: created.id, name: "Grube 7", sortOrder: 2 })); // Speichern ändert den Archivstatus nicht
+    const bayVersion = versionOf(created);
+    await actions.saveBay(form({ id: created.id, version: bayVersion, name: "Grube 7", sortOrder: 2 })); // Speichern ändert den Archivstatus nicht
+    // Z7: Konfigurationszeilen tragen eine Version – wer mit dem alten Stand speichert (oder ganz ohne Version), überschreibt nichts
+    await actions.saveBay(form({ id: created.id, version: bayVersion, name: "Veraltet", sortOrder: 9 }));
+    await actions.saveBay(form({ id: created.id, name: "Ohne Version", sortOrder: 9 }));
+    assert.deepEqual((await env.db.bay.findUniqueOrThrow({ where: { id: created.id } })).name, "Grube 7", "der Konflikt überschreibt nichts");
     assert.equal((await env.db.bay.findUniqueOrThrow({ where: { id: created.id } })).active, true);
     await actions.saveAppointmentType(form({ name: "Sonderart", color: "#112233", defaultMinutes: 45 }));
     const type = await env.db.appointmentType.findFirstOrThrow({ where: { name: "Sonderart" } });
-    await actions.saveAppointmentType(form({ name: "Sonderart", color: "kein-hex", defaultMinutes: 45, id: type.id }));
+    await actions.saveAppointmentType(form({ name: "Sonderart", color: "kein-hex", defaultMinutes: 45, id: type.id, version: versionOf(type) }));
+    await actions.saveAppointmentType(form({ name: "Veraltet", color: "#445566", defaultMinutes: 45, id: type.id, version: String(Number(versionOf(type)) - 5) }));
+    assert.equal((await env.db.appointmentType.findUniqueOrThrow({ where: { id: type.id } })).name, "Sonderart", "veraltete Version: Konflikt");
     assert.equal((await env.db.appointmentType.findUniqueOrThrow({ where: { id: type.id } })).color, "#112233", "ungültige Farbe wird nicht gespeichert");
     // Löschschutz: Hängen Termine daran, ist Löschen gesperrt – archiviert wird stattdessen (der Termin behält Platz und Art)
     await env.db.appointment.create({ data: { title: "Hängt dran", startsAt: new Date("2030-06-03T07:00:00Z"), endsAt: new Date("2030-06-03T08:00:00Z"), bayId: created.id, typeId: type.id } });
