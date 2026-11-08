@@ -20,6 +20,20 @@ export function formObject(fd: FormData): Record<string, string> {
   return out;
 }
 
+/**
+ * Wie `formObject`, aber die genannten Felder (Passwörter) kommen **roh** durch: Passwörter werden nie getrimmt oder sonst verändert (führende und abschließende Leerzeichen gehören dazu –
+ * sonst passt das gesetzte Passwort nicht zu dem, was später bei der Anmeldung eingetippt wird, die roh liest). Ein leeres Feld entfällt wie bei `formObject`.
+ */
+export function formObjectRaw(fd: FormData, rawFields: readonly string[]): Record<string, string> {
+  const out = formObject(fd);
+  for (const name of rawFields) {
+    const v = fd.get(name);
+    if (typeof v === "string" && v !== "") out[name] = v;
+    else delete out[name];
+  }
+  return out;
+}
+
 /** Zod-Fehler -> { feldname: übersetzte Meldung } (für die Aktionen vor der Sitzung: Anmeldung, Einrichtung, Notzugang). Abbildung: `fieldMessages`. */
 export function fieldErrors(error: ZodError, t: Translator["t"]): Record<string, string> {
   return Object.fromEntries(Object.entries(fieldMessages(error)).map(([name, m]) => [name, t(m.key, m.params)]));

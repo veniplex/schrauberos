@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import type { MessageKey } from "@/i18n/translate";
-import { formObject } from "@/lib/forms";
+import { formObjectRaw } from "@/lib/forms";
 import { claimRow } from "@/lib/concurrency";
 import { checkGrantRole, checkManageUser, type Denial } from "@/lib/rbac";
 import { accountOwner, hashPassword, MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/server/auth/password";
@@ -118,7 +118,7 @@ const saveUserOperation = defineOperation({
 
 export const saveUser = defineAction(saveUserOperation, {
   form: (fd) => ({
-    ...formObject(fd),
+    ...formObjectRaw(fd, ["password"]), // das Passwort wird nie getrimmt (die Anmeldung liest es roh)
     roleIds: [...new Set(fd.getAll("roleId").map(String))],
     active: fd.get("active") === "on",
     mustChangePassword: fd.get("mustChangePassword") === "on",

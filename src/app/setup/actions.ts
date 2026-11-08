@@ -14,7 +14,7 @@ import { checkSetupToken, removeSetupToken } from "@/server/setup-token";
 import { getI18n } from "@/i18n/server";
 import type { RecoveryActionState } from "@/lib/recovery-code";
 import { replaceRecoveryCode } from "@/server/auth/recovery";
-import { fieldErrors, formObject } from "@/lib/forms";
+import { fieldErrors, formObjectRaw } from "@/lib/forms";
 import { applyPreset } from "@/modules/features";
 import { FEATURES, MODULES } from "@/modules/catalog";
 import { PRESETS, presetChoices } from "@/modules/presets";
@@ -40,7 +40,7 @@ export async function completeSetup(_prev: RecoveryActionState, formData: FormDa
   const { t, date } = await getI18n();
   // Gibt es schon einen Benutzer, ist die Einrichtung vorbei – vor allem anderen (kein Token-Test, keine Zeitzone)
   if ((await db.user.count()) > 0) redirect("/login");
-  const parsed = schema.safeParse(formObject(formData));
+  const parsed = schema.safeParse(formObjectRaw(formData, ["password", "confirm"])); // Passwörter roh, nie getrimmt
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error, t) };
   const d = parsed.data;
   const token = checkSetupToken(d.token);

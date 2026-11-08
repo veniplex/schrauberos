@@ -82,6 +82,19 @@ describe("saveUser – Rechte-Hierarchie", () => {
     assert.equal(await hashOf(victim), before);
   });
 
+  it("das Passwort wird roh gespeichert, nie getrimmt (Z6-1 L2): neu angelegt und geändert mit Randleerzeichen", async () => {
+    const { scryptVerify } = await import("@/server/auth/scrypt");
+    const password = "  rand-leerzeichen-123  ";
+    const created = await redirectOf(() => actions.saveUser({}, form({ username: "randleer", name: "Rand", password, roleId: [lowRole.id] })));
+    assert.equal(created, "/admin/users");
+    const row = await env.db.user.findUniqueOrThrow({ where: { username: "randleer" } });
+    assert.equal(await scryptVerify(password, row.passwordHash!), true);
+    assert.equal(await scryptVerify(password.trim(), row.passwordHash!), false);
+    const changed = "\tgeaendert-456 ";
+    await redirectOf(() => edit(basic, { password: changed, roleId: [lowRole.id] }));
+    assert.equal(await scryptVerify(changed, (await hashOf(basic))!), true);
+  });
+
   it("deaktiviert oder ändert die E-Mail eines mächtigeren Kontos nicht", async () => {
     assertDenied((await edit(victim, { active: false })));
     assertDenied((await edit(victim, { email: "x@example.org" })));

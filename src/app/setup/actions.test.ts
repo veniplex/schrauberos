@@ -78,6 +78,16 @@ describe("completeSetup", () => {
     assert.equal((await env.db.workshop.findUniqueOrThrow({ where: { id: "default" } })).timezone, "America/New_York");
   });
 
+  it("das Passwort wird roh gespeichert, nie getrimmt (Z6-1 L2): mit Randleerzeichen eingerichtet, mit denselben Leerzeichen anmelden", async () => {
+    const token = tokenMod.ensureSetupToken(true, { log: () => {} })!;
+    const password = "  rand-leerzeichen-123  ";
+    assert.equal((await actions.completeSetup({}, setupForm(token, { password, confirm: password }))).ok, true);
+    const { scryptVerify } = await import("@/server/auth/scrypt");
+    const hash = (await env.db.user.findFirstOrThrow()).passwordHash!;
+    assert.equal(await scryptVerify(password, hash), true);
+    assert.equal(await scryptVerify(password.trim(), hash), false, "die getrimmte Fassung passt nicht");
+  });
+
   it("stellt die Termine der Cron-Jobs auf die gewählte Zeitzone um (vorher berechnet in der Zeitzone des Prozesses)", async () => {
     const { jobRunner } = await import("@/server/jobs");
     process.env.TZ = "UTC";

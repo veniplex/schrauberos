@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { login, logout, type LoginResult } from "@/server/auth/session";
+import { getSession, login, logout, type LoginResult } from "@/server/auth/session";
 import { currentClientIp } from "@/server/auth/network";
 import { readDeviceToken } from "@/server/auth/devices";
 import { loginThrottle, nameFingerprint, normalizeUsername } from "@/server/auth/throttle";
@@ -67,9 +67,13 @@ function verifyUrl(next: FormDataEntryValue | null): string {
   return target === "/" ? "/login/verify" : `/login/verify?next=${encodeURIComponent(target)}`;
 }
 
-/** Abmelden; mit dem Häkchen „Dieses Gerät vergessen“ wird zusätzlich das bekannte Gerät dieses Browsers vergessen. */
+/**
+ * Abmelden; mit dem Häkchen „Dieses Gerät vergessen“ wird zusätzlich das bekannte Gerät dieses Browsers vergessen. Ins Audit-Log kommt der Eintrag **nur mit gültiger Sitzung**: Die Aktion ist öffentlich
+ * erreichbar, ohne Sitzung wäre jeder Aufruf eine Schreibung (unbegrenztes Wachstum der Tabelle durch Fremde).
+ */
 export async function logoutAction(formData?: FormData) {
-  await audit("auth.logout");
+  const session = await getSession();
+  if (session) await audit("auth.logout", { actor: { id: session.user.id, name: session.user.name } });
   await logout({ forgetDevice: formData?.get("forgetDevice") === "on" });
   redirect("/login");
 }
