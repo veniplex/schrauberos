@@ -7,7 +7,7 @@ import { emptyState, parseState, type UpdateState, type VersionMeta } from "./st
 /** Dateizugriff auf das Update-Verzeichnis (`<DATA_DIR>/app`) und auf version.json. Von App und Launcher genutzt. */
 
 /** Datenverzeichnis: im Container `/data` (DATA_DIR), in der Entwicklung `.data` im Projektordner. */
-export const dataDir = () => process.env.DATA_DIR ?? path.resolve(".data");
+export const dataDir = () => process.env.DATA_DIR ?? path.resolve(/*turbopackIgnore: true*/ ".data");
 export const updatesDir = (data = dataDir()) => path.join(data, "app");
 export const versionsDir = (data = dataDir()) => path.join(updatesDir(data), "versions");
 export const versionDir = (version: string, data = dataDir()) => path.join(versionsDir(data), version);

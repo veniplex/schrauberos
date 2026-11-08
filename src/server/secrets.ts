@@ -37,7 +37,7 @@ export class SecretKeyUnavailableError extends Error {
 export function readSecretKey(file = secretKeyFile()): SecretKeyState {
   let raw: string;
   try {
-    raw = readFileSync(file, "utf8");
+    raw = readFileSync(/*turbopackIgnore: true*/ file, "utf8");
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     return code === "ENOENT" ? { state: "missing" } : { state: "unreadable", reason: code ?? "read" };

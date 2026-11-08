@@ -56,4 +56,4 @@ const starterVerifier: TreeVerifier = async ({ dir, version, now }) => {
   return parseStarterVerdict(result.code, result.stdout);
 };
 
-export const verifyInstalledTree: TreeVerifier = (input) => (injected ?? (existsSync(starterBinary()) ? starterVerifier : referenceVerifier))(input);
+export const verifyInstalledTree: TreeVerifier = (input) => (injected ?? (existsSync(/*turbopackIgnore: true*/ starterBinary()) ? starterVerifier : referenceVerifier))(input);

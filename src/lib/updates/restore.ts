@@ -66,7 +66,7 @@ const sidecars = (file: string) => SUFFIXES.map((s) => `${file}${s}`);
 function moveWithSidecars(from: string, to: string): void {
   for (const f of sidecars(to)) rmSync(f, { force: true });
   renameSync(from, to);
-  for (const s of SUFFIXES) if (existsSync(`${from}${s}`)) renameSync(`${from}${s}`, `${to}${s}`);
+  for (const s of SUFFIXES) if (existsSync(/*turbopackIgnore: true*/ `${from}${s}`)) renameSync(/*turbopackIgnore: true*/ `${from}${s}`, /*turbopackIgnore: true*/ `${to}${s}`);
 }
 
 function removeWithSidecars(file: string): void {

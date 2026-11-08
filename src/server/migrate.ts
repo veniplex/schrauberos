@@ -47,7 +47,7 @@ const CREATE_TABLE = `CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
 export const migrationsDir = () => path.join(process.cwd(), "prisma", "migrations");
 
 export function listMigrations(dir = migrationsDir()): MigrationFile[] {
-  return readdirSync(dir, { withFileTypes: true })
+  return readdirSync(/*turbopackIgnore: true*/ dir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && /^\d{14}_[\w-]+$/.test(d.name))
     .map((d) => d.name)
     .sort()
@@ -85,7 +85,7 @@ function hasUserTables(db: Database.Database): boolean {
 function inspectDatabase(dbFile: string): { applied: Map<string, string>; hasUserTables: boolean } | null {
   if (!existsSync(dbFile)) return null;
   // Auch ein lesender Zugriff auf eine Datenbank im WAL-Modus legt -wal/-shm an; was es vorher nicht gab, räumen wir danach wieder weg
-  const sidecars = ["-wal", "-shm"].map((suffix) => dbFile + suffix).filter((file) => !existsSync(file));
+  const sidecars = ["-wal", "-shm"].map((suffix) => dbFile + suffix).filter((file) => !existsSync(/*turbopackIgnore: true*/ file));
   const db = new Database(dbFile, { readonly: true, fileMustExist: true });
   try {
     const hasHistory = (db.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = '_prisma_migrations'`).get() as { n: number }).n > 0;
