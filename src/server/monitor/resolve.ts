@@ -1,13 +1,15 @@
 import "server-only";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { canonicalHost, isAllowedAddress, isForbiddenHost } from "@/lib/offsite/host-policy";
+import { isForbiddenMonitorHost } from "@/lib/monitor/target";
+import { canonicalHost, isAllowedAddress } from "@/lib/offsite/host-policy";
 import { Semaphore } from "@/lib/semaphore";
+import { isHostGateway } from "./gateway";
 
 /**
  * Ziel einer Erreichbarkeitsprüfung beim **Verbinden**: Name **einmal** auflösen, **jede** Antwort gegen die Zielsperre prüfen (`lib/offsite/host-policy.ts`), danach nur mit den geprüften Adressen
  * verbinden – zwischen Prüfung und Verbindung gibt es keine zweite Auflösung (DNS-Rebinding). Anders als bei Webhooks sind **private Adressen erlaubt** (das interne Netz ist gerade das Ziel);
- * gesperrt bleiben Loopback und die eigenen Schnittstellen, „dieses Netz“, Link-Local samt Metadaten-Diensten, Multicast und Reserviertes – für jeden, auch für Administratoren.
+ * gesperrt bleiben Loopback, die eigenen Schnittstellen und im Container das Host-Gateway, „dieses Netz“, Link-Local samt Metadaten-Diensten, Multicast und Reserviertes – für jeden, auch für Administratoren.
  *
  * Namensauflösung belegt einen Thread des libuv-Pools (derselbe Pool wie scrypt und Dateizugriffe): höchstens zwei Auflösungen gleichzeitig, jede mit Zeitlimit.
  */
@@ -23,6 +25,9 @@ export type Lookup = (name: string, options: { all: true; verbatim: true }) => P
 
 const dnsLane = new Semaphore(2, 16);
 
+/** Erlaubt: nicht in einem gesperrten Bereich und nicht das Host-Gateway des Containers (der Docker-Host ist „der eigene Rechner“, `gateway.ts`) */
+const allowed = (address: string): boolean => isAllowedAddress(address) && !isHostGateway(address);
+
 /** Nur für Tests: vorgegebene Namensauflösung (Rebinding, mehrere Antworten). Im Betrieb wirkungslos – es wirft. */
 export const monitorTestHooks: { lookup?: Lookup } = {};
 export function setMonitorTestHooks(hooks: { lookup?: Lookup }): void {
@@ -32,9 +37,9 @@ export function setMonitorTestHooks(hooks: { lookup?: Lookup }): void {
 
 export async function resolveMonitorTarget(host: string, timeoutMs: number, lookupImpl: Lookup = monitorTestHooks.lookup ?? (lookup as Lookup)): Promise<{ addresses: PinnedAddress[]; servername: string | null }> {
   const canonical = canonicalHost(host);
-  if (!canonical || isForbiddenHost(host)) throw new MonitorBlocked("blocked");
+  if (!canonical || isForbiddenMonitorHost(host)) throw new MonitorBlocked("blocked");
   if (canonical.kind === "ip") {
-    if (!isAllowedAddress(canonical.ip)) throw new MonitorBlocked("blocked");
+    if (!allowed(canonical.ip)) throw new MonitorBlocked("blocked");
     return { addresses: [{ address: canonical.ip, family: isIP(canonical.ip) as 4 | 6 }], servername: null };
   }
   let timer: NodeJS.Timeout | undefined;
@@ -45,7 +50,7 @@ export async function resolveMonitorTarget(host: string, timeoutMs: number, look
     ]);
     if (answers.length === 0) throw new MonitorBlocked("dns");
     // Jede Antwort muss erlaubt sein: ein Name mit einer erlaubten und einer verbotenen Adresse wäre ein Umlenkversuch
-    if (answers.some((answer) => !isAllowedAddress(answer.address))) throw new MonitorBlocked("blocked");
+    if (answers.some((answer) => !allowed(answer.address))) throw new MonitorBlocked("blocked");
     return { addresses: answers.map((a) => ({ address: a.address, family: (a.family === 6 ? 6 : 4) as 4 | 6 })), servername: canonical.name };
   } catch (error) {
     throw error instanceof MonitorBlocked ? error : new MonitorBlocked("dns");

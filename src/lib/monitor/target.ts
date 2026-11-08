@@ -6,15 +6,25 @@ import { MAX_INTERVAL_SECONDS, MIN_INTERVAL_SECONDS, MONITOR_KINDS, MONITOR_METH
  * beim Prüfen (`server/monitor/resolve.ts`). Festgelegt (Tests in `target.test.ts`):
  *  - **Host** nur als Name oder Adresse in einfacher Schreibweise (Buchstaben, Ziffern, `.`, `-`, `_`, IPv6 mit `:`): kein `@`, `/`, `?`, `#`, kein Leerraum; jede Schreibweise einer Adresse
  *    (Dezimal, Hex, Oktal, IPv4-in-IPv6) wird vereinheitlicht und wie die kanonische Adresse bewertet. **Verboten** (auch für Administratoren): der eigene Rechner (Loopback, eigene
- *    Schnittstellen), „dieses Netz“, Link-Local samt Metadaten-Diensten, Multicast und Reserviertes. **Erlaubt**: private Netze (RFC 1918, ULA) – das interne Netz ist gerade das Ziel.
+ *    Schnittstellen, im Container das Host-Gateway und `host.docker.internal`), „dieses Netz“, Link-Local samt Metadaten-Diensten, Multicast und Reserviertes. **Erlaubt**: private Netze (RFC 1918, ULA) – das interne Netz ist gerade das Ziel.
  *  - **Port** 1–65535; bei HTTP(S) Standard 80/443.
  *  - **Pfad** nur bei HTTP(S): beginnt mit `/`, höchstens 300 Zeichen, ohne Leerraum und Steuerzeichen, kann den Host nicht wechseln (`//host`); **keine Zugangsdaten** in der Adresse (`user:pass@`).
- *    Der Benutzer setzt keine Kopfzeilen – die Anfrage trägt nur `Host`, einen festen `User-Agent` und `Connection: close`.
+ *    Der Benutzer setzt keine Kopfzeilen – die Anfrage trägt nur `Host`, einen festen `User-Agent`, `Accept` und `Connection: close` (vier Kopfzeilen).
  *  - Eine eingefügte Adresse (`https://host:8443/pfad`) wird in Art, Host, Port und Pfad zerlegt.
  */
 export type TargetInput = { kind: string; host: string; port?: number | null; path?: string | null; method?: string | null; intervalSec?: number | null };
 export type NormalizedTarget = { kind: MonitorKind; host: string; port: number; path: string | null; method: MonitorMethod; intervalSec: number };
 export type TargetProblem = { field: "kind" | "host" | "port" | "path" | "method" | "intervalSec"; key: "invalid" | "forbiddenHost" | "credentials" | "port" | "path" | "interval" };
+
+/** Namen, hinter denen die Container-Laufzeit den **Docker-Host** (den Server selbst) erreichbar macht: für die Überwachung wie `localhost` gesperrt (die Adresse dahinter sperrt `server/monitor/gateway.ts`). */
+const HOST_ALIASES = new Set(["host.docker.internal", "gateway.docker.internal", "host.containers.internal", "host.lima.internal", "host.rancher-desktop.internal"]);
+
+/** Ist dieser Host (ohne Namensauflösung) als Ziel der Überwachung verboten? Die allgemeine Zielsperre plus die Namen des Docker-Hosts. */
+export function isForbiddenMonitorHost(host: string): boolean {
+  if (isForbiddenHost(host)) return true;
+  const canonical = canonicalHost(host);
+  return canonical?.kind === "name" && HOST_ALIASES.has(canonical.name);
+}
 
 const HOST_CHARS = /^[A-Za-z0-9._:[\]-]+$/;
 const DEFAULT_PORT: Record<MonitorKind, number | null> = { tcp: null, http: 80, https: 443 };
@@ -47,7 +57,7 @@ export function normalizeTarget(input: TargetInput): { ok: true; value: Normaliz
   if (!host || host.length > 253 || !HOST_CHARS.test(host)) return bad("host", "invalid");
   const canonical = canonicalHost(host);
   if (!canonical) return bad("host", "invalid");
-  if (isForbiddenHost(host)) return bad("host", "forbiddenHost");
+  if (isForbiddenMonitorHost(host)) return bad("host", "forbiddenHost");
 
   const resolvedPort = port === undefined || port === null ? DEFAULT_PORT[kind] : port;
   if (resolvedPort === null || !Number.isInteger(resolvedPort) || resolvedPort < 1 || resolvedPort > 65_535) return bad("port", "port");

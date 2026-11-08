@@ -272,6 +272,38 @@ describe("Zielsperre beim Verbinden (DNS einmal, alle Antworten prüfen, an die 
 
 /* ───────────── Läufe gegen die Datenbank ───────────── */
 
+describe("Host-Gateway des Containers (der Docker-Host ist „der eigene Rechner“)", () => {
+  it("Standardroute aus /proc/net/route: little-endian Hex, nur 0.0.0.0/0 mit Gateway-Flag; Müll und andere Routen zählen nicht", async () => {
+    const gateway = await import("./gateway");
+    const table = [
+      "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT",
+      "eth0\t00000000\t010011AC\t0003\t0\t0\t0\t00000000\t0\t0\t0",
+      "eth0\t000011AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0",
+      "eth1\t0000A8C0\t0100A8C0\t0003\t0\t0\t0\t00FFFFFF\t0\t0\t0",
+      "zzzz\tnicht-hex\t010011AC\t0003\t0\t0\t0\t00000000\t0\t0\t0",
+    ].join("\n");
+    assert.deepEqual(gateway.parseDefaultGateways(table), ["172.17.0.1"]);
+    assert.deepEqual(gateway.parseDefaultGateways(""), []);
+  });
+
+  it("das Gateway wird beim Verbinden nie angesprochen – als Literal und als Antwort eines Namens; Nachbarn im selben Netz bleiben erlaubt", async () => {
+    const gateway = await import("./gateway");
+    gateway.setGatewayTestHooks({ gateways: ["172.17.0.1"] });
+    try {
+      await assert.rejects(() => resolveMod.resolveMonitorTarget("172.17.0.1", 500), { code: "blocked" });
+      await assert.rejects(() => resolveMod.resolveMonitorTarget("::ffff:172.17.0.1", 500), { code: "blocked" });
+      await assert.rejects(() => resolveMod.resolveMonitorTarget("host.docker.internal", 500), { code: "blocked" });
+      await assert.rejects(() => resolveMod.resolveMonitorTarget("dienst.example", 500, async () => [{ address: "172.17.0.1", family: 4 }]), { code: "blocked" });
+      const neighbour = await resolveMod.resolveMonitorTarget("172.17.0.2", 500);
+      assert.deepEqual(neighbour.addresses, [{ address: "172.17.0.2", family: 4 }]);
+      const outcome = await probe.probeTarget({ kind: "tcp", host: "172.17.0.1", port: 22, path: null, method: "HEAD", ignoreTlsErrors: false });
+      assert.equal(outcome.statusClass, "blocked");
+    } finally {
+      gateway.setGatewayTestHooks({});
+    }
+  });
+});
+
 describe("Läufe: Entprellung, Ereignisse, Belegen, Fairness, Grenzen", () => {
   beforeEach(async () => {
     allowLoopbackForTests();
@@ -288,7 +320,7 @@ describe("Läufe: Entprellung, Ereignisse, Belegen, Fairness, Grenzen", () => {
       await make(server.port);
       assert.equal(await run.hasDueTargets(NOW), false);
       const summary = await run.runDueChecks({ now: NOW });
-      assert.deepEqual(summary, { checked: 0, up: 0, down: 0, skipped: 0, errors: 0 });
+      assert.deepEqual(summary, { checked: 0, up: 0, down: 0, skipped: 0, errors: 0, wentDown: 0, cameBack: 0 });
       assert.equal(server.connections, 0);
       assert.equal(await env.db.netMonitorSample.count(), 0);
     } finally {
@@ -462,12 +494,97 @@ describe("Läufe: Entprellung, Ereignisse, Belegen, Fairness, Grenzen", () => {
     }
   });
 
+  it("Messungen ändern updatedAt (die Version des Bearbeiten-Formulars) nie: kein „von jemand anderem geändert“ wegen einer Messung", async () => {
+    await enable();
+    const server = await startTcp();
+    try {
+      const target = await make(server.port);
+      const before = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: target.id } });
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      const summary = await run.runDueChecks({ now: NOW });
+      assert.equal(summary.checked, 1);
+      const after = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: target.id } });
+      assert.equal(after.state, "up");
+      assert.equal(after.updatedAt.getTime(), before.updatedAt.getTime(), "Belegen und Buchen lassen updatedAt stehen");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("Belegen schiebt das Ziel nur um die Haltedauer weiter, nicht um ein Intervall: ein Absturz mitten in der Prüfung verliert die Messung nicht", async () => {
+    await enable();
+    const hold = await startTcp({ hold: true });
+    try {
+      const target = await env.db.netMonitorTarget.create({ data: { name: "haengt", kind: "http", host: "127.0.0.1", port: hold.port, path: "/", intervalSec: 3600, nextCheckAt: at(-1) } });
+      const check = run.runDueChecks({ now: NOW, deps: { timeoutMs: 300 } });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const during = (await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: target.id } })).nextCheckAt;
+      await check;
+      assert.equal(during.toISOString(), new Date(NOW.getTime() + run.CLAIM_LEASE_MS).toISOString(), "belegt nur für die Haltedauer, nicht für die Stunde des Intervalls");
+      assert.ok(run.CLAIM_LEASE_MS < 60_000);
+    } finally {
+      await hold.close();
+    }
+  });
+
+  it("ein Ergebnis für die alte Adresse wird verworfen, wenn das Ziel während der Prüfung umadressiert wurde (das Zurücksetzen bleibt)", async () => {
+    const t = await env.db.netMonitorTarget.create({ data: { name: "R", kind: "tcp", host: "10.0.0.7", port: 22, intervalSec: 300, state: "down", failStreak: 4, stateSince: at(-86_400), lastCheckAt: NOW } });
+    const snapshot = { id: t.id, kind: t.kind, host: t.host, port: t.port, path: t.path, method: t.method, ignoreTlsErrors: t.ignoreTlsErrors };
+    // wie in der Operation: Adresse ändern und neu anfangen
+    await env.db.netMonitorTarget.update({ where: { id: t.id }, data: { host: "10.0.0.8", state: "unknown", stateSince: null, failStreak: 0, lastCheckAt: null, lastClass: null, nextCheckAt: NOW } });
+    const result = await run.recordOutcome(snapshot, { ok: false, warn: false, latencyMs: null, statusClass: "timeout" }, at(5));
+    assert.deepEqual([result.discarded, result.event], [true, null]);
+    const row = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: t.id } });
+    assert.deepEqual([row.host, row.state, row.failStreak, row.stateSince, row.lastClass], ["10.0.0.8", "unknown", 0, null, null]);
+    assert.equal(await env.db.netMonitorSample.count({ where: { targetId: t.id } }), 0, "kein Messwert, kein Ereignis für die alte Adresse");
+    assert.equal(await env.db.netMonitorEvent.count({ where: { targetId: t.id } }), 0);
+    // passt die Konfiguration, wird gebucht – mit Zustand und Zähler aus der Zeile
+    const ok = await run.recordOutcome({ ...snapshot, host: "10.0.0.8" }, { ok: true, warn: false, latencyMs: 4, statusClass: "open" }, at(6));
+    assert.deepEqual([ok.discarded, ok.state], [false, "up"]);
+  });
+
+  it("das Ergebnis eines Laufs, dessen Ziel währenddessen umadressiert wurde, zählt nicht und ändert das neue Ziel nicht", async () => {
+    await enable();
+    const hold = await startTcp({ hold: true });
+    try {
+      const t = await env.db.netMonitorTarget.create({ data: { name: "umzug", kind: "http", host: "127.0.0.1", port: hold.port, path: "/", intervalSec: 300, nextCheckAt: at(-1) } });
+      const check = run.runDueChecks({ now: NOW, deps: { timeoutMs: 400 } });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await env.db.netMonitorTarget.update({ where: { id: t.id }, data: { port: hold.port + 1, state: "unknown", failStreak: 0, lastCheckAt: null, nextCheckAt: at(-1) } });
+      const summary = await check;
+      assert.deepEqual([summary.checked, summary.skipped, summary.errors], [0, 1, 0]);
+      const row = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: t.id } });
+      assert.deepEqual([row.state, row.failStreak, row.lastCheckAt, row.lastClass], ["unknown", 0, null, null]);
+    } finally {
+      await hold.close();
+    }
+  });
+
+  it("die Zusammenfassung zählt Zustandswechsel (Ausfall, Wiederkehr) – daran hängt die Meldung des Jobs", async () => {
+    await enable();
+    const port = await closedPort();
+    await make(port);
+    // erster Fehlschlag: noch kein Wechsel; zweiter: Ausfall
+    const first = await run.runDueChecks({ now: NOW });
+    assert.deepEqual([first.checked, first.wentDown, first.cameBack], [1, 0, 0]);
+    const second = await run.runDueChecks({ now: at(61) });
+    assert.deepEqual([second.wentDown, second.cameBack], [1, 0]);
+    const server = net.createServer((s) => s.end());
+    await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+    try {
+      const third = await run.runDueChecks({ now: at(700) });
+      assert.deepEqual([third.wentDown, third.cameBack], [0, 1]);
+    } finally {
+      server.close();
+    }
+  });
+
   it("ein während der Prüfung gelöschtes Ziel führt nicht zum Fehler", async () => {
     await enable();
     const gone = await env.db.netMonitorTarget.create({ data: { name: "weg", kind: "tcp", host: "127.0.0.1", port: 9, intervalSec: 300, nextCheckAt: at(-1) } });
     await env.db.netMonitorTarget.delete({ where: { id: gone.id } });
-    const state = await run.recordOutcome({ id: gone.id, state: "unknown", failStreak: 0, stateSince: null, intervalSec: 300 }, { ok: true, warn: false, latencyMs: 5, statusClass: "open" }, NOW);
-    assert.equal(state, "up");
+    const result = await run.recordOutcome({ id: gone.id, kind: "tcp", host: "127.0.0.1", port: 9, path: null, method: "HEAD", ignoreTlsErrors: false }, { ok: true, warn: false, latencyMs: 5, statusClass: "open" }, NOW);
+    assert.equal(result.discarded, true);
   });
 });
 
@@ -580,10 +697,12 @@ describe("Aufräumen und Verdichten", () => {
 
   it("Systemstatus: nicht erreichbare Ziele zählen nur bei eingeschalteter Überwachung und aktiver Funktion", async () => {
     await env.db.appSetting.deleteMany({ where: { key: run.MONITOR_ENABLED_SETTING } });
-    await env.db.netMonitorTarget.update({ where: { id: target.id }, data: { state: "down" } });
-    assert.deepEqual(await run.monitorHealth(true), { down: 0 });
+    await env.db.netMonitorTarget.update({ where: { id: target.id }, data: { state: "down", lastCheckAt: at(-10) } });
+    assert.deepEqual(await run.monitorHealth(true, NOW), { down: 0 });
     await env.db.appSetting.create({ data: { key: run.MONITOR_ENABLED_SETTING, value: "true" } });
-    assert.deepEqual(await run.monitorHealth(true), { down: 1 });
-    assert.deepEqual(await run.monitorHealth(false), { down: 0 });
+    assert.deepEqual(await run.monitorHealth(true, NOW), { down: 1 });
+    assert.deepEqual(await run.monitorHealth(false, NOW), { down: 0 });
+    // eine veraltete Messung (älter als drei Intervalle) ist kein Ausfall, sondern unbekannt – wie in Liste und Dashboard
+    assert.deepEqual(await run.monitorHealth(true, at(3_000)), { down: 0 });
   });
 });

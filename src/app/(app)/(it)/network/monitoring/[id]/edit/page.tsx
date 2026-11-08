@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import type { MonitorKind } from "@/lib/monitor/model";
@@ -13,7 +13,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function EditMonitorTargetPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePermission("network.monitor");
+  const session = await requirePermission("network.monitor");
+  if (!session.can("network.view")) redirect("/forbidden");
   const [{ t }, { id }, choices] = await Promise.all([getI18n(), params, monitorFormChoices()]);
   const target = await getMonitorTarget(id, { canManage: true });
   if (!target?.address) notFound();

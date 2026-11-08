@@ -80,7 +80,7 @@ describe("Rechte", () => {
 
 describe("Eingabeprüfung und Zielsperre beim Speichern", () => {
   it("gesperrte Ziele werden abgelehnt (Loopback, eigener Rechner, Link-Local/Metadaten, Multicast, IPv4-gemappt, Dezimal) – nichts wird gespeichert", async () => {
-    await login(["network.monitor"]);
+    await login(["network.view", "network.monitor"]);
     for (const host of ["127.0.0.1", "localhost", "169.254.169.254", "::1", "::ffff:127.0.0.1", "2130706433", "224.0.0.1", "0.0.0.0", "metadata.google.internal", "http://127.0.0.1:8080/"]) {
       const state = await save({ host });
       assert.ok(state.fieldErrors?.host, host);
@@ -89,7 +89,7 @@ describe("Eingabeprüfung und Zielsperre beim Speichern", () => {
   });
 
   it("Zugangsdaten in der Adresse, ungültiger Port/Pfad/Intervall/Art/Anfrage werden abgelehnt", async () => {
-    await login(["network.monitor"]);
+    await login(["network.view", "network.monitor"]);
     assert.ok((await save({ host: "https://user:pw@nas.example/" })).fieldErrors?.host);
     assert.ok((await save({ host: "user@nas.example" })).fieldErrors?.host);
     assert.ok((await save({ port: 0 })).fieldErrors?.port);
@@ -106,7 +106,7 @@ describe("Eingabeprüfung und Zielsperre beim Speichern", () => {
   });
 
   it("private Adressen sind erlaubt; eine eingefügte Adresse wird zerlegt; Standardport bei HTTP(S)", async () => {
-    await login(["network.monitor"]);
+    await login(["network.view", "network.monitor"]);
     await redirectOf(() => save({ host: "https://nas.firma.example:8443/status?x=1", name: "NAS" }));
     await redirectOf(() => save({ host: "10.1.2.3", kind: "https", name: "Web", path: "/", port: undefined }));
     const rows = await env.db.netMonitorTarget.findMany({ orderBy: { name: "asc" } });
@@ -117,7 +117,7 @@ describe("Eingabeprüfung und Zielsperre beim Speichern", () => {
   });
 
   it("doppelte Ziele und mehr als 100 Ziele werden abgelehnt", async () => {
-    await login(["network.monitor"]);
+    await login(["network.view", "network.monitor"]);
     await redirectOf(() => save());
     assert.ok((await save({ name: "Doppelt" })).fieldErrors?.host, "gleiche Art, Host, Port und Pfad");
     assert.equal(await redirectOf(() => save({ name: "Anderer Port", port: 2222 })) !== null, true);
@@ -129,7 +129,7 @@ describe("Eingabeprüfung und Zielsperre beim Speichern", () => {
   });
 
   it("Ändern prüft die Version; eine geänderte Adresse setzt den Zustand zurück, ein geänderter Name nicht; Gerät und HTTPS-Option werden übernommen", async () => {
-    await login(["network.monitor"]);
+    await login(["network.view", "network.monitor"]);
     const device = await env.db.netDevice.create({ data: { name: "sw-1", type: "switch" } });
     await redirectOf(() => save({ deviceId: device.id }));
     let row = await env.db.netMonitorTarget.findFirstOrThrow();
@@ -154,7 +154,7 @@ describe("Eingabeprüfung und Zielsperre beim Speichern", () => {
 
 describe("Schalter, Löschen, Audit", () => {
   it("die Überwachung ist standardmäßig aus; der Schalter schaltet ein und aus, macht alle Ziele fällig und wird protokolliert", async () => {
-    await login(["network.monitor"]);
+    await login(["network.view", "network.monitor"]);
     assert.equal(await queries.monitoringEnabled(), false);
     await redirectOf(() => save());
     await env.db.netMonitorTarget.updateMany({ data: { nextCheckAt: new Date("2099-01-01T00:00:00Z") } });
@@ -167,13 +167,168 @@ describe("Schalter, Löschen, Audit", () => {
   });
 
   it("Löschen nimmt den Verlauf mit und wird protokolliert; das Audit nennt das Ziel, nie mehr (keine Zugangsdaten, keine Antworten)", async () => {
-    await login(["network.monitor"]);
+    await login(["network.view", "network.monitor"]);
     await redirectOf(() => save());
     const row = await env.db.netMonitorTarget.findFirstOrThrow();
     await env.db.netMonitorSample.create({ data: { targetId: row.id, at: new Date("2026-03-10T10:00:00Z"), ok: true, latencyMs: 3, statusClass: "open" } });
     assert.equal(await redirectOf(() => actions.deleteMonitorTarget(form({ id: row.id }))), "/network/monitoring");
     assert.deepEqual([await env.db.netMonitorTarget.count(), await env.db.netMonitorSample.count()], [0, 0]);
     assert.deepEqual(await audits(), ["network.monitorCreate Switch SSH: tcp://192.168.10.10:22", "network.monitorDelete Switch SSH: tcp://192.168.10.10:22"]);
+  });
+});
+
+describe("Version, Termin und Zustand beim Ändern", () => {
+  const NOW = new Date("2026-03-10T10:00:00.000Z");
+  const at = (seconds: number) => new Date(NOW.getTime() + seconds * 1000);
+
+  it("eine Messung zwischen Öffnen und Speichern des Formulars macht das Speichern nicht zum Konflikt (updatedAt bleibt bei Messungen)", async () => {
+    await login(["network.view", "network.monitor"]);
+    await env.db.appSetting.create({ data: { key: run.MONITOR_ENABLED_SETTING, value: "true" } });
+    const { startTcp } = await import("@/test/fake-monitor");
+    const { allowLoopbackForTests } = await import("@/lib/offsite/host-policy");
+    const server = await startTcp();
+    try {
+      allowLoopbackForTests();
+      const target = await env.db.netMonitorTarget.create({ data: { name: "T", kind: "tcp", host: "127.0.0.1", port: server.port, intervalSec: 60, nextCheckAt: at(-1) } });
+      const version = versionOf(await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: target.id } })); // Formular geöffnet
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      assert.equal((await run.runDueChecks({ now: NOW })).checked, 1); // eine Messung läuft
+      offsiteNetwork.allowLoopback = false;
+      // gelingt (Weiterleitung), statt „von jemand anderem geändert“ zu melden
+      assert.ok(await redirectOf(() => save({ id: target.id, version, name: "Umbenannt", host: "192.168.10.20", port: 22, intervalSec: 60 })));
+      assert.equal((await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: target.id } })).name, "Umbenannt");
+    } finally {
+      offsiteNetwork.allowLoopback = false;
+      await server.close();
+    }
+  });
+
+  it("Intervalländerung setzt den nächsten Termin neu: verkürzt = sofort fällig, wenn überfällig; verlängert = letzte Messung + neues Intervall", async () => {
+    await login(["network.view", "network.monitor"]);
+    await redirectOf(() => save({ intervalSec: 3600 }));
+    const row = await env.db.netMonitorTarget.findFirstOrThrow();
+    const lastCheckAt = new Date(Date.now() - 30 * 60_000);
+    await env.db.netMonitorTarget.update({ where: { id: row.id }, data: { state: "up", lastCheckAt, nextCheckAt: new Date(lastCheckAt.getTime() + 3600_000) } });
+    let current = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: row.id } });
+    // 1 h → 1 min: die letzte Messung ist 30 min alt, also ist das Ziel überfällig – sofort dran, Zustand und Messung bleiben
+    await redirectOf(() => save({ id: row.id, version: versionOf(current), intervalSec: 60 }));
+    current = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: row.id } });
+    assert.ok(current.nextCheckAt.getTime() <= Date.now() + 1000, "fällig");
+    assert.deepEqual([current.state, current.intervalSec], ["up", 60]);
+    // 1 min → 10 min: nächster Termin = letzte Messung + 10 min (nicht schon nach einer Minute)
+    const recent = new Date(Date.now() - 2 * 60_000);
+    await env.db.netMonitorTarget.update({ where: { id: row.id }, data: { lastCheckAt: recent, nextCheckAt: new Date(recent.getTime() + 60_000) } });
+    current = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: row.id } });
+    await redirectOf(() => save({ id: row.id, version: versionOf(current), intervalSec: 600 }));
+    current = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: row.id } });
+    assert.equal(current.nextCheckAt.getTime(), recent.getTime() + 600_000);
+  });
+
+  it("Ausschalten (Ziel oder ganze Überwachung) setzt den Zustand auf „unbekannt“: nach dem Wiedereinschalten gibt es keine „Wieder erreichbar nach 3 Tagen“", async () => {
+    await login(["network.view", "network.monitor"]);
+    await redirectOf(() => save());
+    const row = await env.db.netMonitorTarget.findFirstOrThrow();
+    const down = { state: "down", failStreak: 5, stateSince: at(-3 * 86_400), lastCheckAt: at(-100), lastClass: "timeout" };
+    await env.db.netMonitorTarget.update({ where: { id: row.id }, data: down });
+    let current = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: row.id } });
+    await redirectOf(() => save({ id: row.id, version: versionOf(current), enabled: false }));
+    current = await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: row.id } });
+    assert.deepEqual([current.enabled, current.state, current.stateSince, current.failStreak, current.lastCheckAt], [false, "unknown", null, 0, null]);
+    // ganze Überwachung
+    await env.db.netMonitorTarget.update({ where: { id: row.id }, data: { ...down, enabled: true } });
+    await actions.setMonitoring(form({ enabled: "true" }));
+    await actions.setMonitoring(form({ enabled: "false" }));
+    assert.equal((await env.db.netMonitorTarget.findUniqueOrThrow({ where: { id: row.id } })).state, "unknown");
+  });
+});
+
+describe("Grenzen des Rechts: Docker-Host gesperrt, Änderungen gedrosselt, Überwachen setzt Ansehen voraus", () => {
+  it("network.monitor ohne network.view: alle Operationen verweigert (die Formulare lesen Geräte und IP-Adressen)", async () => {
+    await login(["network.monitor"]);
+    assert.ok((await save()).error, "Anlegen verweigert");
+    await actions.setMonitoring(form({ enabled: "true" })).catch(() => undefined);
+    assert.equal(await queries.monitoringEnabled(), false, "Schalter verweigert");
+    assert.equal(await env.db.netMonitorTarget.count(), 0);
+  });
+
+  it("das Host-Gateway des Containers und host.docker.internal gelten wie der eigene Rechner: beim Speichern abgelehnt", async () => {
+    const { setGatewayTestHooks } = await import("@/server/monitor/gateway");
+    setGatewayTestHooks({ gateways: ["172.17.0.1"] });
+    try {
+      await login(["network.view", "network.monitor"]);
+      for (const host of ["172.17.0.1", "::ffff:172.17.0.1", "::ffff:ac11:1", "host.docker.internal", "Host.Docker.Internal.", "gateway.docker.internal"]) {
+        assert.ok((await save({ host })).fieldErrors?.host, host);
+      }
+      assert.equal(await env.db.netMonitorTarget.count(), 0);
+      // andere private Adressen bleiben erlaubt
+      assert.ok(await redirectOf(() => save({ host: "172.17.0.2", name: "Nachbar" })));
+    } finally {
+      setGatewayTestHooks({});
+    }
+  });
+
+  it("Zieladressen anlegen/ändern ist je Konto gedrosselt (10 frei, dann wartet das Konto) – Umbenennen und Intervall zählen nicht, ein anderes Konto ist nicht betroffen", async () => {
+    const { resetLoginThrottle } = await import("@/server/auth/throttle");
+    resetLoginThrottle();
+    await login(["network.view", "network.monitor"]);
+    for (let i = 0; i < 10; i++) await redirectOf(() => save({ host: `10.20.0.${i + 1}`, name: `T${i}` }));
+    const blocked = await save({ host: "10.20.0.99", name: "Zu viel" });
+    assert.ok(blocked.error, "elfte Änderung wird gebremst");
+    assert.equal(await env.db.netMonitorTarget.count({ where: { name: "Zu viel" } }), 0);
+    // Umbenennen und Intervall ändern: keine Adressänderung
+    const row = await env.db.netMonitorTarget.findFirstOrThrow({ where: { name: "T0" } });
+    assert.ok(await redirectOf(() => save({ id: row.id, version: versionOf(row), host: row.host, name: "T0 neu", intervalSec: 600 })));
+    // ein anderes Konto hat sein eigenes Kontingent
+    await login(["network.view", "network.monitor"]);
+    assert.ok(await redirectOf(() => save({ host: "10.30.0.1", name: "Anderes Konto" })));
+    resetLoginThrottle();
+  });
+});
+
+describe("Job-Meldung", () => {
+  it("eine Routinerunde meldet nichts (kein Eintrag im Laufprotokoll); Ausfall und Wiederkehr schon", async () => {
+    const { featureJobs } = await import("@/modules/jobs");
+    const monitor = featureJobs.find((j) => j.id === "network.monitor")!;
+    const { allowLoopbackForTests } = await import("@/lib/offsite/host-policy");
+    const { startTcp } = await import("@/test/fake-monitor");
+    await env.db.appSetting.upsert({ where: { key: run.MONITOR_ENABLED_SETTING }, update: { value: "true" }, create: { key: run.MONITOR_ENABLED_SETTING, value: "true" } });
+    const server = await startTcp();
+    const ctx = () => ({ now: new Date(), signal: new AbortController().signal, attempt: 1, manual: false });
+    try {
+      allowLoopbackForTests();
+      const target = await env.db.netMonitorTarget.create({ data: { name: "J", kind: "tcp", host: "127.0.0.1", port: server.port, intervalSec: 300, nextCheckAt: new Date(0) } });
+      assert.equal(await monitor.run(ctx()), undefined, "Routine: erreichbar, nichts Auffälliges");
+      // ausfallen lassen: zwei Fehlschläge in Folge
+      await server.close();
+      await env.db.netMonitorTarget.update({ where: { id: target.id }, data: { nextCheckAt: new Date(0) } });
+      assert.equal(await monitor.run(ctx()), undefined, "erster Fehlschlag: noch kein Wechsel");
+      await env.db.netMonitorTarget.update({ where: { id: target.id }, data: { nextCheckAt: new Date(0) } });
+      assert.match(String(await monitor.run(ctx())), /1 ausgefallen/);
+    } finally {
+      offsiteNetwork.allowLoopback = false;
+      await server.close().catch(() => undefined);
+    }
+  });
+});
+
+describe("Verlauf: Rohwerte am Siebentagerand", () => {
+  it("noch nicht verdichtete Rohwerte älter als 7 Tage erscheinen (zwischen nächtlichem Aufräumen und jetzt − 7 Tage klafft keine Lücke); verdichtete werden nicht doppelt gezählt", async () => {
+    const NOW = new Date("2026-03-10T10:00:00.000Z");
+    const DAY = 86_400_000;
+    const target = await env.db.netMonitorTarget.create({ data: { name: "H", kind: "tcp", host: "10.0.0.9", port: 22 } });
+    await env.db.netMonitorSample.createMany({
+      data: [
+        { targetId: target.id, at: new Date(NOW.getTime() - 7 * DAY - 2 * 3600_000), ok: true, latencyMs: 12, statusClass: "open" },
+        { targetId: target.id, at: new Date(NOW.getTime() - 7 * DAY + 2 * 3600_000), ok: false, latencyMs: null, statusClass: "timeout" },
+      ],
+    });
+    const before = await queries.monitorHistory(target.id, NOW);
+    assert.equal(before.hours.reduce((n, h) => n + h.checks, 0), 2, "beide Messungen zählen");
+    assert.equal(before.availability30d, 50);
+    // nach dem Aufräumen: die ältere ist verdichtet (Stundenwert), die jüngere bleibt roh – die Summe ändert sich nicht
+    await run.pruneMonitor(NOW);
+    const after = await queries.monitorHistory(target.id, NOW);
+    assert.equal(after.hours.reduce((n, h) => n + h.checks, 0), 2, "keine Doppelzählung");
   });
 });
 

@@ -14,8 +14,10 @@ import { compareIPv4, nextFreeIp, warrantyState } from "@/modules/it/network/dom
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { deleteDevice } from "@/modules/it/network/actions";
-import { checkDevices, monitoringEnabled } from "@/modules/it/network/queries";
-import { DeviceStatusBadge, LinkStateBadge, MonitoringNotice } from "@/modules/it/network/ui";
+import { viewOf } from "@/lib/monitor/model";
+import { targetLabel } from "@/lib/monitor/target";
+import { checkDevices, deviceMonitorTargets, monitoringEnabled } from "@/modules/it/network/queries";
+import { DeviceStatusBadge, LinkStateBadge, MonitoringNotice, TargetStateBadge } from "@/modules/it/network/ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -44,7 +46,9 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   ]);
   if (!device) notFound();
 
-  const [checks, monitoring] = await Promise.all([checkDevices([device]), monitoringEnabled()]);
+  const canMonitor = session.can("network.monitor");
+  const [checks, monitoring, targets] = await Promise.all([checkDevices([device]), monitoringEnabled(), deviceMonitorTargets(device.id, { canManage: canMonitor })]);
+  const now = new Date();
   const check = checks.get(device.id);
   const canEdit = session.can("network.edit");
   const w = warrantyState(device.warrantyUntil);
@@ -184,6 +188,44 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                   },
                   { id: "otherPort", header: t("network.cols.otherPort"), cell: (l) => <span className="font-mono text-[13px]">{l.otherPort ?? "–"}</span> },
                   { id: "cable", header: t("network.cols.cable"), cell: (l) => l.cable ?? <span className="text-ink-muted">–</span> },
+                ]}
+              />
+            )}
+          </Card>
+
+          <Card
+            title={t("network.monitor.device.title")}
+            padded={false}
+            actions={
+              canMonitor ? (
+                <LinkButton href={`/network/monitoring/new?device=${device.id}`} variant="secondary" size="sm">
+                  <Plus className="size-3.5" aria-hidden /> {t("network.monitor.device.add")}
+                </LinkButton>
+              ) : null
+            }
+          >
+            {targets.length === 0 ? (
+              <EmptyState title={t("network.monitor.device.none")} />
+            ) : (
+              <DataTable
+                bare
+                caption={t("network.monitor.device.title")}
+                rows={targets}
+                rowKey={(row) => row.id}
+                rowHref={(row) => `/network/monitoring/${row.id}`}
+                minWidth="28rem"
+                columns={[
+                  { id: "name", header: t("network.monitor.cols.name"), priority: "primary", cell: (row) => row.name, sub: (row) => (row.address ? <span className="font-mono text-xs">{targetLabel({ kind: row.kind, ...row.address })}</span> : null) },
+                  {
+                    id: "status",
+                    header: t("network.monitor.cols.status"),
+                    // nur Gemessenes: ausgeschaltete Überwachung oder ausgeschaltetes Ziel = unbekannt
+                    cell: (row) => {
+                      const view = viewOf(row, now);
+                      const measured = monitoring && row.enabled;
+                      return <TargetStateBadge state={measured ? view.state : "unknown"} stale={measured && view.stale} t={t} />;
+                    },
+                  },
                 ]}
               />
             )}

@@ -86,7 +86,7 @@ function embeddedV4(g: number[]): [number, number, number, number] | null {
  * Kanonischer Schlüssel einer Adresse zum Vergleichen: IPv4 als `a.b.c.d`, IPv6 als acht Gruppen; **eine eingebettete IPv4-Adresse (`::ffff:a.b.c.d`, `::ffff:c0a8:b21d`) ist dieselbe Adresse wie die IPv4-Schreibweise**.
  * Der reine Textvergleich ließ die gemappte Schreibweise der eigenen Schnittstellenadresse durch.
  */
-function addressKey(ip: string): string | null {
+export function addressKey(ip: string): string | null {
   const bare = ip.split("%")[0];
   const family = isIP(bare);
   if (family === 4) return parseV4(bare)?.join(".") ?? null;

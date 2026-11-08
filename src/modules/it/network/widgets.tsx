@@ -4,12 +4,14 @@ import type { WidgetDef } from "@/modules/types";
 import { monitorSummary } from "./queries";
 
 /**
- * Baustein „Netzwerk-Status“: **nur Gemessenes**. Ist die Überwachung aus oder gibt es kein Ziel, steht dort „nicht eingerichtet“ bzw. „ausgeschaltet“ – kein erfundener Zustand. Er nennt die Namen
+ * Baustein „Netzwerk-Status“: **nur Gemessenes**. Ist die Überwachung aus, steht dort „ausgeschaltet“ (gibt es dazu noch gar kein Ziel, erscheint der Baustein nicht), ohne Ziel „nicht eingerichtet“ – kein erfundener Zustand. Er nennt die Namen
  * nicht erreichbarer Ziele (Bezeichnungen, nie Adressen) und verweist auf die Überwachung.
  */
 async function NetworkStatusWidget() {
   const { t } = await getI18n();
   const s = await monitorSummary(new Date());
+  // Ungenutzt (ausgeschaltet und keine Ziele): kein Dauerhinweis auf dem Dashboard
+  if (!s.enabled && s.targets === 0) return null;
   return (
     <Card
       headingLevel={3}

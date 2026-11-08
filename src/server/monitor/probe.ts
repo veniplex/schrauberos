@@ -10,7 +10,7 @@ import { MonitorBlocked, resolveMonitorTarget, type Lookup, type PinnedAddress }
  *  - Das Ziel wird zuerst **erneut gegen die Zielsperre** geprüft (`normalizeTarget`: die Datenbank könnte verändert sein), der Name einmal aufgelöst und **jede** Antwort geprüft (`resolve.ts`);
  *    verbunden wird mit der geprüften Adresse (bei mehreren der Reihe nach, jede mit einem Anteil der verbleibenden Zeit) – nie mit dem Namen.
  *  - **Zeitlimit** (5 s) für die ganze Prüfung. **Keine Weiterleitungen** (3xx ist eine Antwort: erreichbar, Klasse 3xx), keine wiederverwendeten Verbindungen (`Connection: close`).
- *  - HTTP: nur `HEAD` oder `GET`, die Anfrage wird von Hand mit genau drei Kopfzeilen (`Host`, fester `User-Agent`, `Connection: close`) gebaut – der Benutzer setzt keine; gelesen wird
+ *  - HTTP: nur `HEAD` oder `GET`, die Anfrage wird von Hand mit genau vier Kopfzeilen (`Host`, fester `User-Agent`, `Accept`, `Connection: close`) gebaut – der Benutzer setzt keine; gelesen wird
  *    **nur die Statuszeile** (höchstens 4 KiB), dann wird die Verbindung geschlossen. Kein Body, keine Kopfzeilen der Antwort verlassen diese Funktion; zurück kommen Klasse und Latenz.
  *  - TLS: mindestens 1.2; ein Zertifikatsfehler (abgelaufen, fremder Aussteller, falscher Name) ist **kein Ausfall**, sondern die Warnung `tlsWarning` – außer `ignoreTlsErrors` ist gesetzt.
  *    Die Anfrage enthält nie Zugangsdaten, ein ungeprüfter Kanal verrät also nichts.

@@ -40,6 +40,11 @@ function create() {
     vault: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
     /** Menge der Anzeigen je Konto (Schlüssel: Konto-Id): 30 freie in 10 Minuten, dann 10 s, 20 s … bis 90 s Wartezeit – auch mit richtigem Passwort lässt sich der Tresor nicht im Akkord abräumen (jede Anzeige steht im Audit-Log). */
     vaultReveal: new Gate({ free: 30, baseMs: 10_000, capMs: CAP_MS, decayMs: 10 * 60_000, maxEntries: 1_000, now }),
+    /**
+     * Neue oder umadressierte **Überwachungsziele** je Konto (Schlüssel: Konto-Id; Recht `network.monitor`): 10 freie Änderungen, danach 1, 2, 4 … bis 30 Minuten Wartezeit, 1 Stunde Ruhe setzt zurück. Das Recht lässt den Server
+     * interne Adressen und Ports abfragen; ohne diese Bremse ließe sich damit zügig ein Netz abtasten (jede Änderung macht das Ziel sofort fällig).
+     */
+    monitorChanges: new Gate({ free: 10, baseMs: 60_000, capMs: 30 * 60_000, decayMs: 60 * 60_000, maxEntries: 1_000, now }),
     /** Alle Fehlversuche zusammen: ab 30 pro Minute wird jede Anmeldung bis zu 3 s langsamer, aber nie abgewiesen. */
     budget: new FailureBudget({ limit: 30, windowMs: 60_000, stepMs: 50, maxDelayMs: 3_000, maxStamps: 5_000, now }),
     /**

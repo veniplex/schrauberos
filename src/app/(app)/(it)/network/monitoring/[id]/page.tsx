@@ -13,7 +13,7 @@ import { viewOf } from "@/lib/monitor/model";
 import { targetLabel } from "@/lib/monitor/target";
 import { deleteMonitorTarget } from "@/modules/it/network/monitor-actions";
 import { durationText, intervalText } from "@/modules/it/network/monitor-format";
-import { getMonitorTarget, monitorHistory } from "@/modules/it/network/queries";
+import { getMonitorTarget, monitoringEnabled, monitorHistory } from "@/modules/it/network/queries";
 import { TargetStateBadge } from "@/modules/it/network/ui";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -36,7 +36,9 @@ export default async function MonitorTargetPage({ params }: { params: Promise<{ 
   const target = await getMonitorTarget(id, { canManage });
   if (!target) notFound();
   const now = new Date();
-  const history = await monitorHistory(target.id, now);
+  const [history, monitoring] = await Promise.all([monitorHistory(target.id, now), monitoringEnabled()]);
+  // Bei ausgeschalteter Überwachung (insgesamt oder für dieses Ziel) ist jeder Zustand unbekannt – nie ein alter Wert
+  const measured = monitoring && target.enabled;
   const view = viewOf(target, now);
   const stamp = (d: Date) => date(d, { dateStyle: "medium", timeStyle: "short" });
 
@@ -51,7 +53,7 @@ export default async function MonitorTargetPage({ params }: { params: Promise<{ 
         title={target.name}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <TargetStateBadge state={target.enabled ? view.state : "unknown"} stale={target.enabled && view.stale} t={t} />
+            <TargetStateBadge state={measured ? view.state : "unknown"} stale={measured && view.stale} t={t} />
             {target.address ? <span className="font-mono text-xs">{targetLabel({ kind: target.kind, ...target.address })}</span> : null}
           </span>
         }
@@ -86,7 +88,7 @@ export default async function MonitorTargetPage({ params }: { params: Promise<{ 
               <p className="text-sm text-ink-muted">{t("network.monitor.detail.noHistory")}</p>
             ) : (
               <>
-                <div role="img" aria-label={`${history.recent.length} / ${failed}`} className="flex h-8 items-end gap-0.5">
+                <div role="img" aria-label={t("network.monitor.detail.recentLabel", { count: history.recent.length, failed })} className="flex h-8 items-end gap-0.5">
                   {history.recent.map((s) => (
                     <span
                       key={s.at.toISOString()}
@@ -125,7 +127,7 @@ export default async function MonitorTargetPage({ params }: { params: Promise<{ 
           <Card title={t("network.monitor.sections.state")}>
             <DefinitionList
               items={[
-                { label: t("network.monitor.cols.status"), value: <TargetStateBadge state={target.enabled ? view.state : "unknown"} stale={target.enabled && view.stale} t={t} /> },
+                { label: t("network.monitor.cols.status"), value: <TargetStateBadge state={measured ? view.state : "unknown"} stale={measured && view.stale} t={t} /> },
                 { label: t("network.monitor.cols.device"), value: target.device ? <Link href={`/network/devices/${target.device.id}`} className="font-medium hover:underline">{target.device.name}</Link> : null },
                 { label: t("network.monitor.cols.result"), value: target.lastClass ? t(`network.monitor.classes.${target.lastClass as "2xx"}`) : null },
                 { label: t("network.monitor.cols.latency"), value: target.lastLatencyMs !== null ? t("network.monitor.ms", { n: target.lastLatencyMs }) : null },

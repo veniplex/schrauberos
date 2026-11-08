@@ -1,6 +1,6 @@
 import "server-only";
 import { versionOf } from "@/lib/concurrency";
-import { HOURLY_KEEP_DAYS, RAW_KEEP_DAYS, availability, compactSamples, viewOf } from "@/lib/monitor/model";
+import { HOURLY_KEEP_DAYS, availability, compactSamples, viewOf } from "@/lib/monitor/model";
 import { db } from "@/server/db";
 import { isMonitoringEnabled } from "@/server/monitor/run";
 import { compareIPv4 } from "@/modules/it/network/domain";
@@ -85,6 +85,12 @@ export async function getMonitorTarget(id: string, viewer: MonitorViewer): Promi
   return { ...toRow(rest), version: versionOf({ updatedAt }) };
 }
 
+/** Die Überwachungsziele eines Geräts (Abschnitt „Überwachung“ der Geräteseite): wie die Liste – ohne Zieladresse, wenn die Person keine Ziele verwalten darf. */
+export async function deviceMonitorTargets(deviceId: string, viewer: MonitorViewer): Promise<MonitorTargetRow[]> {
+  const rows = await db.netMonitorTarget.findMany({ where: { deviceId }, select: targetSelect(viewer), orderBy: { name: "asc" } });
+  return rows.map((r) => toRow(r as RawTarget));
+}
+
 export type MonitorHistory = {
   /** Stundenwerte der letzten 30 Tage (Rohwerte der letzten 7 Tage, zu Stunden verdichtet, plus gespeicherte Stundenwerte), aufsteigend */
   hours: Array<{ hour: Date; checks: number; failures: number; latencyAvgMs: number | null }>;
@@ -94,10 +100,15 @@ export type MonitorHistory = {
   availability30d: number | null;
 };
 
+/** Obergrenze gelesener Rohwerte je Ziel (acht Tage bei 60 s Takt sind rund 11 500) */
+const RAW_HISTORY_ROWS = 20_000;
+
 export async function monitorHistory(targetId: string, now: Date): Promise<MonitorHistory> {
   const DAY = 86_400_000;
   const [raw, stored, recent, events] = await Promise.all([
-    db.netMonitorSample.findMany({ where: { targetId, at: { gte: new Date(now.getTime() - RAW_KEEP_DAYS * DAY) } }, orderBy: { at: "asc" }, select: { at: true, ok: true, latencyMs: true }, take: 12_000 }),
+    // Alle noch nicht verdichteten Rohwerte: nicht nur die der letzten 7 Tage – zwischen dem nächtlichen Aufräumen und `jetzt − 7 Tage` liegen bis zu 24 Stunden Rohwerte, die weder in den Stundenwerten noch
+    // sonst stünden (Lücke am Rand; ein gestoppter Job verlängert sie). Verdichtete sind gelöscht – keine Doppelzählung. Nach oben begrenzt auf die neuesten und auf 30 Tage.
+    db.netMonitorSample.findMany({ where: { targetId, at: { gte: new Date(now.getTime() - HOURLY_KEEP_DAYS * DAY) } }, orderBy: { at: "desc" }, select: { at: true, ok: true, latencyMs: true }, take: RAW_HISTORY_ROWS }),
     db.netMonitorHour.findMany({ where: { targetId, hour: { gte: new Date(now.getTime() - HOURLY_KEEP_DAYS * DAY) } }, orderBy: { hour: "asc" } }),
     db.netMonitorSample.findMany({ where: { targetId }, orderBy: { at: "desc" }, take: 48, select: { at: true, ok: true, statusClass: true, latencyMs: true } }),
     db.netMonitorEvent.findMany({ where: { targetId }, orderBy: { at: "desc" }, take: 20, select: { id: true, at: true, kind: true, downSeconds: true } }),

@@ -21,7 +21,10 @@ export const jobs: JobDef[] = [
       // Ohne `now` des Läufers: jede Prüfung nimmt die aktuelle Zeit
       const s = await runDueChecks({ signal });
       if (s.errors > 0) throw new Error("network_monitor_failed");
-      return s.checked > 0 ? `${s.checked} geprüft${s.down ? `, ${s.down} nicht erreichbar` : ""}` : undefined;
+      // Nur Auffälliges festhalten (wie alle Jobs): eine Routinerunde schreibt keinen Eintrag ins Laufprotokoll – es würde sonst alle 30 s einen füllen und die Fehler anderer Jobs aus „letzte Läufe“ drängen.
+      // Auffällig sind Zustandswechsel (Ausfall, Wiederkehr); den Dauerzustand zeigen Überwachung und Systemstatus.
+      if (s.wentDown === 0 && s.cameBack === 0) return undefined;
+      return [s.wentDown ? `${s.wentDown} ausgefallen` : null, s.cameBack ? `${s.cameBack} wieder erreichbar` : null].filter(Boolean).join(", ");
     },
   },
   {
