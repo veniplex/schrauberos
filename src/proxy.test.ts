@@ -21,6 +21,18 @@ const passes = (res: Response) => res.headers.get("x-middleware-next") === "1";
 const matcher = new RegExp(`^${config.matcher[0]}$`);
 const matched = (path: string) => matcher.test(path);
 
+describe("Proxy: IT-Tresor wird nie zwischengespeichert", () => {
+  it("jede Antwort unter /docs/vault trägt Cache-Control: no-store – auch die Weiterleitung auf die Anmeldung; andere Seiten bekommen den Kopf nicht", () => {
+    const session = "so_session=gueltig";
+    for (const path of ["/docs/vault", "/docs/vault/abc", "/docs/vault/abc/edit", "/docs/vault/new"]) {
+      assert.equal(proxy(request(path, session)).headers.get("cache-control"), "no-store", path);
+      assert.equal(proxy(request(path)).headers.get("cache-control"), "no-store", `${path} ohne Sitzung`);
+    }
+    assert.equal(proxy(request("/docs/it", session)).headers.get("cache-control"), null);
+    assert.equal(proxy(request("/network", session)).headers.get("cache-control"), null);
+  });
+});
+
 describe("Proxy: Anmeldeseite und Weiterleitungen", () => {
   it("leitet /login nie auf / um – auch nicht mit totem Cookie (Redirect-Schleife)", () => {
     for (const [cookie, headers] of [["so_session=abgelaufen", {}], ["__Host-so_session=abgelaufen", HTTPS]] as const) {

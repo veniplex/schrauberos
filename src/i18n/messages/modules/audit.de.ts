@@ -44,6 +44,7 @@ export const auditDe = {
     fleet: "Fuhrpark",
     network: "Netzwerk",
     docs: "Dokumentation",
+    vault: "IT-Tresor",
   },
   actions: {
     apiToken: {
@@ -304,6 +305,13 @@ export const auditDe = {
       monitorUpdate: "Überwachungsziel geändert",
       monitorDelete: "Überwachungsziel gelöscht",
       monitorSwitch: "Netzwerk-Überwachung ein-/ausgeschaltet",
+    },
+    vault: {
+      create: "Tresor-Eintrag angelegt",
+      update: "Tresor-Eintrag geändert",
+      delete: "Tresor-Eintrag gelöscht",
+      reveal: "Tresor-Zugangsdaten angezeigt",
+      revealFailed: "Tresor: Anzeige mit falschem Passwort versucht",
     },
     docs: {
       create: "Dokumentationsseite angelegt",

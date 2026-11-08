@@ -104,6 +104,12 @@ export const MARKED_PERMISSIONS: ReadonlyMap<string, PermissionMark> = new Map(
 );
 export const isAdminOnly = (permission: string): boolean => ADMIN_ONLY_PERMISSIONS.has(permission);
 
+/** Rechte, die auch Administratoren nur bekommen, wenn eine ihrer Rollen sie ausdrücklich enthält (`explicitOnly` in der `feature.ts`): die Rolle „Administrator“ bedeutet alle Rechte außer diesen. */
+export const EXPLICIT_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(FEATURES.flatMap((f) => (f.permissions as FeatureDef["permissions"]).explicitOnly ?? []));
+export const isExplicitOnly = (permission: string): boolean => EXPLICIT_ONLY_PERMISSIONS.has(permission);
+/** Alle Rechte, die eine Administrator-Rolle von sich aus bedeutet (alle außer den ausdrücklich zu vergebenden). */
+export const ADMIN_IMPLIED_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter((p) => !EXPLICIT_ONLY_PERMISSIONS.has(p));
+
 export const fullFeatureId = (f: { module: string; id: string }) => featureKey(f) as FeatureId;
 
 export const featuresOfModule = (moduleId: string) => FEATURES.filter((f) => f.module === moduleId);

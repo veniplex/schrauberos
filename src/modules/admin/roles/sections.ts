@@ -1,7 +1,7 @@
 import "server-only";
 import { getI18n } from "@/i18n/server";
 import type { MaskSection, PreviewData, PreviewEntry } from "@/lib/role-mask";
-import { FEATURES, MARKED_PERMISSIONS, MODULES, fullFeatureId, featuresOfModule, isAdminOnly } from "@/modules/catalog";
+import { FEATURES, MARKED_PERMISSIONS, MODULES, fullFeatureId, featuresOfModule, isAdminOnly, isExplicitOnly } from "@/modules/catalog";
 import { getActiveFeatureIds } from "@/modules/features";
 import { quickActionCatalog, widgetCatalog } from "@/modules/registry";
 import { ROLE_TEMPLATES, templatePermissions } from "@/modules/role-templates";
@@ -14,6 +14,7 @@ export async function permissionSections(): Promise<MaskSection[]> {
   const [{ t, td, has }, active] = await Promise.all([getI18n(), getActiveFeatureIds()]);
   const markOf = (key: string): string | undefined => {
     if (isAdminOnly(key)) return t("roles.marks.adminOnly");
+    if (isExplicitOnly(key)) return t("roles.marks.explicitOnly");
     const mark = MARKED_PERMISSIONS.get(key);
     return mark ? t(`roles.marks.${mark}`) : undefined;
   };

@@ -138,7 +138,7 @@ export const backupEn: typeof backupDe = {
     item_other: "{name}: {count} entries",
     backup: "Backup of the affected rows: {name} (folder secret-reset in the data directory).",
     keyDropped: "The previous recovery key belonged to another server and was removed – please create a new one under Backups → Recovery key.",
-    consumers: { auth: { totp: "Two-factor login (people set it up again)" }, updates: { token: "Update token (enter it again under Settings → Updates)" }, backup: { offsite: "Off-site backup (switched off; set up credentials and key again)" }, mail: { password: "Email sending (switched off; enter the password again under Settings → Email)" } },
+    consumers: { auth: { totp: "Two-factor login (people set it up again)" }, updates: { token: "Update token (enter it again under Settings → Updates)" }, backup: { offsite: "Off-site backup (switched off; set up credentials and key again)" }, mail: { password: "Email sending (switched off; enter the password again under Settings → Email)" }, it: { vault: "IT vault (the entries stay, the credentials must be entered again)" } },
     ack: "Understood",
   },
   keyIssue: {

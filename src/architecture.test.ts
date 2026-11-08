@@ -560,6 +560,24 @@ describe("Datenzugriff", () => {
     assert.deepEqual(offenders, []);
   });
 
+  it("IT-Tresor: die Tabelle VaultEntry berühren nur it/docs/vault*.ts (Anzeige, Operationen, Abfragen, Zurücksetzen) – Seiten, Bausteine, Suche, API, Export und andere Funktionen nie; Ausnahmen mit Grund", () => {
+    const ALLOWED = /^modules\/it\/docs\/vault[a-z-]*\.tsx?$/;
+    const EXCEPTIONS: Record<string, string> = {
+      "server/secret-key-issue.ts": "zählt Einträge mit umhülltem Schlüssel, um zu erkennen, dass ein fehlender secret.key nie still ersetzt werden darf (liest keinen Inhalt)",
+      "modules/it/docs/seed.ts": "Demo-Seed: ein Beispiel-Eintrag ohne Zugangsdaten",
+    };
+    const offenders = sources
+      .filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && !(file in EXCEPTIONS) && /\bvaultEntry\b/.test(code(text)))
+      .map(({ file }) => file);
+    assert.deepEqual(offenders, [], "Zugriff auf VaultEntry außerhalb von it/docs/vault*.ts");
+    for (const file of Object.keys(EXCEPTIONS)) assert.ok(sources.some((s) => s.file === file && /\bvaultEntry\b/.test(code(s.text))), `${file}: Ausnahme nicht mehr nötig – bitte streichen`);
+    // Wer entschlüsseln kann (vault-crypto), sind nur die Operationen und das Zurücksetzen – nie eine Seite, ein Baustein, die Suche oder eine andere Funktion
+    const crypto = sources.filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && /vault-crypto/.test(text)).map(({ file }) => file);
+    assert.deepEqual(crypto, [], "vault-crypto wird außerhalb von it/docs/vault*.ts importiert");
+    const pages = sources.filter(({ file, text }) => (isPage(file) || isWidget(file)) && /openVaultEntry|sealVaultEntry|encryptSecretBound|decryptSecretBound/.test(text)).map(({ file }) => file);
+    assert.deepEqual(pages, []);
+  });
+
   it("die API der Mitarbeiter liest nur die Spalten ohne besonders geschützte Daten (select) und nie Krankheit (scope)", () => {
     const api = readFileSync(path.join(SRC, "modules/office/employees/api.ts"), "utf8");
     assert.match(api, /select:\s*employeeBaseSelect/);

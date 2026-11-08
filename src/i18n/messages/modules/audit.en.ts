@@ -46,6 +46,7 @@ export const auditEn: typeof auditDe = {
     fleet: "Fleet",
     network: "Network",
     docs: "Documentation",
+    vault: "IT vault",
   },
   actions: {
     apiToken: {
@@ -306,6 +307,13 @@ export const auditEn: typeof auditDe = {
       monitorUpdate: "Monitoring target changed",
       monitorDelete: "Monitoring target deleted",
       monitorSwitch: "Network monitoring switched on/off",
+    },
+    vault: {
+      create: "Vault entry created",
+      update: "Vault entry changed",
+      delete: "Vault entry deleted",
+      reveal: "Vault credentials shown",
+      revealFailed: "Vault: display attempted with a wrong password",
     },
     docs: {
       create: "Documentation page created",

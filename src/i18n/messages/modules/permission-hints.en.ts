@@ -107,6 +107,8 @@ export const permissionHintsEn: typeof permissionHintsDe = {
   docsIt: {
     view: "Read the IT documentation.",
     edit: "Write and change the IT documentation.",
+    vault: "IT vault: view entries and show credentials after entering the password again. Explicit only – administrators do not get it automatically.",
+    vaultManage: "IT vault: create, change and delete entries (together with “view vault”). Explicit only – administrators do not get it automatically.",
   },
   users: {
     view: "View the user list.",

@@ -16,7 +16,7 @@ export const docsDe = {
   categoryNotEmpty: "Das Kapitel enthält noch Seiten und kann nicht gelöscht werden. Verschiebe oder lösche die Seiten zuerst.",
   categoryNotEmptyHint: "Enthält Seiten – erst verschieben oder löschen",
   restricted: "Nur für bestimmte Rollen",
-  noPasswordsHint: "Keine Passwörter oder Zugangsdaten in die Dokumentation schreiben – sie ist für alle lesbar, die das Recht dazu haben, und jede alte Fassung bleibt im Verlauf erhalten.",
+  noPasswordsHint: "Keine Passwörter oder Zugangsdaten in die Dokumentation schreiben – sie ist für alle lesbar, die das Recht dazu haben, und jede alte Fassung bleibt im Verlauf erhalten. Zugangsdaten gehören in den IT-Tresor.",
   searchPlaceholder: "Titel und Inhalt durchsuchen …",
   empty: "Noch keine Seiten.",
   emptyHint: "Die erste Seite anlegen – Markdown mit Überschriften, Listen, Tabellen und Bildern wird unterstützt.",

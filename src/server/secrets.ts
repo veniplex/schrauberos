@@ -72,6 +72,12 @@ export function databaseHoldsSecrets(file: string | null = currentDatabaseFile()
     return false;
   }
   try {
+    // Ein Eintrag des IT-Tresors mit umhülltem Schlüssel gehört zu einem `secret.key`: auch dann darf nie still ein neuer entstehen (die Tabelle fehlt in alten Datenbanken: dann gibt es nichts zu schützen)
+    try {
+      if (db.prepare(`SELECT 1 FROM VaultEntry WHERE wrappedKey IS NOT NULL LIMIT 1`).get()) return true;
+    } catch {
+      /* keine Tresor-Tabelle */
+    }
     if (db.prepare(`SELECT 1 FROM TwoFactor WHERE secret IS NOT NULL LIMIT 1`).get()) return true;
     for (const row of db.prepare(`SELECT key, value FROM AppSetting`).all() as Array<{ key: string; value: string }>) {
       if (MARKER_KEYS.has(row.key) || SECRET_BLOB.test(row.value)) return true;
@@ -152,6 +158,40 @@ export function encryptSecret(plain: string): string {
  */
 export function decryptSecret(blob: string): string | null {
   return decryptSecretWith(blob, key());
+}
+
+/**
+ * Umhüllung mit **gebundenem Kontext** (für Schlüssel, die zu genau einer Zeile gehören, z. B. der Eintragsschlüssel des IT-Tresors): dieselbe AES-256-GCM-Verschlüsselung mit dem Schlüssel aus `secret.key` und
+ * zufälliger 12-Byte-Nonce, aber `aad` (z. B. `schrauberos:vault:dek:v1:<Eintrags-ID>`) ist zusätzlich authentifiziert – in eine andere Zeile verschoben lässt sich der Block nicht mehr öffnen.
+ * Format `b1:<Nonce>:<Tag>:<Daten>` (Base64); es ist **kein** `v1`-Geheimnis der Einstellungen (`isSecretBlob` erkennt es nicht, der Einstellungs-Reset fasst es nie an).
+ * Wirft `SecretKeyUnavailableError`, wenn der Schlüssel fehlt oder nicht lesbar ist (nie still ein anderer Weg).
+ */
+export function encryptSecretBound(plain: Buffer, aad: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  cipher.setAAD(Buffer.from(aad, "utf8"));
+  const data = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return ["b1", iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
+}
+
+/** Gegenstück zu `encryptSecretBound`: `null`, wenn der Schlüssel dieses Datenträgers den Block nicht öffnet (fremder Schlüssel, falscher Kontext, beschädigt); wirft `SecretKeyUnavailableError`, wenn er nicht lesbar ist. */
+export function decryptSecretBound(blob: string, aad: string): Buffer | null {
+  return decryptSecretBoundWith(blob, aad, key());
+}
+
+/** Wie `decryptSecretBound` mit einem gegebenen Schlüssel (Hex oder Bytes). */
+export function decryptSecretBoundWith(blob: string, aad: string, secretKey: Buffer | string): Buffer | null {
+  try {
+    const parts = blob.split(":");
+    if (parts.length !== 4 || parts[0] !== "b1") return null;
+    const [, iv, tag, data] = parts;
+    const decipher = createDecipheriv("aes-256-gcm", typeof secretKey === "string" ? Buffer.from(secretKey, "hex") : secretKey, Buffer.from(iv, "base64"));
+    decipher.setAAD(Buffer.from(aad, "utf8"));
+    decipher.setAuthTag(Buffer.from(tag, "base64"));
+    return Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]);
+  } catch {
+    return null;
+  }
 }
 
 /** Wie `decryptSecret`, aber mit einem gegebenen Schlüssel (Hex) statt der Datei – z. B. um zu prüfen, ob ein aufgehobener Schlüssel zu einer Datenbank passt. `null`: passt nicht oder beschädigt. */

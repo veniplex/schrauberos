@@ -1,4 +1,4 @@
-import { ALL_PERMISSIONS, isAdminOnly } from "@/modules/catalog";
+import { ADMIN_IMPLIED_PERMISSIONS, isAdminOnly } from "@/modules/catalog";
 
 /**
  * Rechte-Hierarchie (reine Logik, getestet): Wer Benutzer oder Rollen verwaltet, darf damit nie mehr Rechte erzeugen, als er selbst
@@ -21,9 +21,12 @@ export const DENIALS = ["adminRole", "adminOnly", "notSubset", "ownRole"] as con
 export type Denial = (typeof DENIALS)[number];
 export const isDenial = (value: unknown): value is Denial => (DENIALS as readonly unknown[]).includes(value);
 
-/** Rohrechte einer Rollenmenge: eine Administrator-Rolle bedeutet alle Rechte des Katalogs. */
+/**
+ * Rohrechte einer Rollenmenge: eine Administrator-Rolle bedeutet alle Rechte des Katalogs **außer den ausdrücklich zu vergebenden** (`explicitOnly`, z. B. IT-Tresor); die Rechte, die eine Rolle ausdrücklich
+ * enthält, kommen immer dazu.
+ */
 export function rawRights(roles: readonly RoleRights[]): Set<string> {
-  return new Set(roles.some((r) => r.isAdmin) ? ALL_PERMISSIONS : roles.flatMap((r) => r.permissions));
+  return new Set([...(roles.some((r) => r.isAdmin) ? ADMIN_IMPLIED_PERMISSIONS : []), ...roles.flatMap((r) => r.permissions)]);
 }
 
 export function actorOf(userId: string, roles: readonly (RoleRights & { id: string })[]): Actor {

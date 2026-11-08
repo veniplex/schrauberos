@@ -7,7 +7,8 @@ import { MAIL_STATUS_TONE } from "@/modules/admin/mail/status-tone";
 import { FEATURE_STATE_TONE } from "@/modules/admin/modules/status-tone";
 import { JOB_STATUS_TONE, JOB_STATUSES } from "@/modules/admin/system/status-tone";
 import { DEVICE_STATUSES, IP_KINDS } from "@/modules/it/network/constants";
-import { DEVICE_STATUS_TONE, IP_KIND_TONE, LINK_STATE_TONE } from "@/modules/it/network/status-tone";
+import { DEVICE_STATUS_TONE, IP_KIND_TONE, LINK_STATE_TONE, TARGET_STATE_TONE } from "@/modules/it/network/status-tone";
+import { VAULT_STATE_TONE } from "@/modules/it/docs/status-tone";
 import { ABSENCE_TYPES } from "@/modules/office/employees/domain";
 import { ABSENCE_TONE } from "@/modules/office/employees/status-tone";
 import { FLEET_STATUSES } from "@/modules/office/fleet/domain";
@@ -42,6 +43,8 @@ const MAPS: Array<[string, Record<string, string>, readonly string[]]> = [
   ["Gerätestatus", DEVICE_STATUS_TONE, DEVICE_STATUSES],
   ["IP-Art", IP_KIND_TONE, IP_KINDS],
   ["Erreichbarkeit", LINK_STATE_TONE, ["online", "degraded", "offline", "unknown"]],
+  ["Überwachungsziel", TARGET_STATE_TONE, ["up", "warn", "down", "unknown"]],
+  ["Tresor-Eintrag", VAULT_STATE_TONE, ["sealed", "empty", "unreadable"]],
   ["Fälligkeit", DUE_TONE, ["expired", "soon", "ok"]],
   ["Backup-Art", BACKUP_KIND_TONE, BACKUP_KINDS],
   ["Job-Lauf", JOB_STATUS_TONE, JOB_STATUSES],

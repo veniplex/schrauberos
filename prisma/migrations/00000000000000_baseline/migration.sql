@@ -453,6 +453,23 @@ CREATE TABLE "NetConnection" (
 );
 
 -- CreateTable
+CREATE TABLE "VaultEntry" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "title" TEXT NOT NULL,
+    "kind" TEXT NOT NULL DEFAULT 'other',
+    "system" TEXT,
+    "format" INTEGER NOT NULL DEFAULT 1,
+    "revision" INTEGER NOT NULL DEFAULT 1,
+    "wrappedKey" TEXT,
+    "payload" TEXT,
+    "unreadableAt" DATETIME,
+    "createdByName" TEXT,
+    "updatedByName" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
 CREATE TABLE "NetMonitorTarget" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
@@ -1447,6 +1464,9 @@ CREATE INDEX "NetConnection_fromDeviceId_idx" ON "NetConnection"("fromDeviceId")
 
 -- CreateIndex
 CREATE INDEX "NetConnection_toDeviceId_idx" ON "NetConnection"("toDeviceId");
+
+-- CreateIndex
+CREATE INDEX "VaultEntry_kind_idx" ON "VaultEntry"("kind");
 
 -- CreateIndex
 CREATE INDEX "NetMonitorTarget_deviceId_idx" ON "NetMonitorTarget"("deviceId");

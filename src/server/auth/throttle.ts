@@ -33,6 +33,13 @@ function create() {
     totpSetup: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
     /** Passwortwechsel im Konto: eigenes Limit (die Prüfung des aktuellen Passworts darf kein Rate-Orakel für gestohlene Sitzungen sein). */
     passwordChange: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
+    /**
+     * Passwortabfrage vor dem **Anzeigen von Tresor-Zugangsdaten** (Schlüssel: Konto-Id): eigenes Limit, nicht das des Passwortwechsels und nicht die scrypt-Semaphore der Anmeldung (die Prüfung läuft auf dem
+     * Eigentümer-Pfad `ownerLane`). 5 freie Fehlversuche, dann 5 s, 10 s … bis 90 s; ein richtiges Passwort setzt die Zählung zurück.
+     */
+    vault: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
+    /** Menge der Anzeigen je Konto (Schlüssel: Konto-Id): 30 freie in 10 Minuten, dann 10 s, 20 s … bis 90 s Wartezeit – auch mit richtigem Passwort lässt sich der Tresor nicht im Akkord abräumen (jede Anzeige steht im Audit-Log). */
+    vaultReveal: new Gate({ free: 30, baseMs: 10_000, capMs: CAP_MS, decayMs: 10 * 60_000, maxEntries: 1_000, now }),
     /** Alle Fehlversuche zusammen: ab 30 pro Minute wird jede Anmeldung bis zu 3 s langsamer, aber nie abgewiesen. */
     budget: new FailureBudget({ limit: 30, windowMs: 60_000, stepMs: 50, maxDelayMs: 3_000, maxStamps: 5_000, now }),
     /**

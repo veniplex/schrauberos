@@ -14,7 +14,7 @@ import { readSecretKey } from "@/server/secrets";
  */
 export type SecretKeyIssue = { kind: "missing" | "unreadable" | "mismatch"; recoverable: boolean };
 
-type Reader = Pick<PrismaClient | Prisma.TransactionClient, "appSetting" | "twoFactor">;
+type Reader = Pick<PrismaClient | Prisma.TransactionClient, "appSetting" | "twoFactor" | "vaultEntry">;
 
 export const KEY_CHECK_SETTING = "secrets.keyCheck";
 
@@ -27,7 +27,11 @@ export async function secretKeyIssue(client: Reader = db): Promise<SecretKeyIssu
   if (key.state === "readable") return hasWrap && check !== secretKeyCheck(key.hex) ? { kind: "mismatch", recoverable: true } : null;
   if (key.state === "missing") {
     // Fehlt die Datei und enthält die Datenbank gar nichts Verschlüsseltes, ist das keine Störung (der Schlüssel entsteht bei Bedarf)
-    const holds = hasWrap || (await client.appSetting.count({ where: { value: { startsWith: "v1:" } } })) > 0 || (await client.twoFactor.count({ where: { secret: { not: null } } })) > 0;
+    const holds =
+      hasWrap ||
+      (await client.appSetting.count({ where: { value: { startsWith: "v1:" } } })) > 0 ||
+      (await client.twoFactor.count({ where: { secret: { not: null } } })) > 0 ||
+      (await client.vaultEntry.count({ where: { wrappedKey: { not: null } } })) > 0;
     return holds ? { kind: "missing", recoverable: hasWrap } : null;
   }
   return { kind: "unreadable", recoverable: hasWrap && key.reason === "content" };

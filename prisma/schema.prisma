@@ -660,6 +660,36 @@ model NetConnection {
   @@index([toDeviceId])
 }
 
+// ───────────── IT-Tresor (F13) ─────────────
+
+// Zugangsdaten zu IT-Systemen. Titel, Art und Systembezeichnung stehen im Klartext (Liste, Suche in der Liste); URL, Benutzername, Geheimnis und Notiz nur verschlüsselt (Envelope-Verschlüsselung, README „IT-Tresor“):
+// ein zufälliger 256-Bit-Eintragsschlüssel (DEK) verschlüsselt den Nutzdatenblock mit AES-256-GCM (AAD = Eintrags-ID, Format und Revision), der DEK ist mit dem Schlüssel aus secret.key umhüllt (AAD = Eintrags-ID).
+// Ohne secret.key (Backup ohne Schlüssel) sind beide nicht lesbar – die Zeile bleibt, bis die Administration sie zurücksetzt (Sicherung der Zeilen nach secret-reset/), dann steht dort „Neu eingeben nötig“.
+model VaultEntry {
+  id            String    @id @default(cuid())
+  title         String
+  // server | network | account | other
+  kind          String    @default("other")
+  // Bezeichnung des Systems (Freitext, z. B. "fw-01"), kein Geheimnis
+  system        String?
+  // Format der verschlüsselten Teile (Version der Konstruktion, Teil der AAD)
+  format        Int       @default(1)
+  // Zähler: steigt mit jeder neuen Verschlüsselung (Teil der AAD des Blocks)
+  revision      Int       @default(1)
+  // umhüllter Eintragsschlüssel; null = keine Zugangsdaten hinterlegt oder nicht lesbar (dann ist unreadableAt gesetzt)
+  wrappedKey    String?
+  // verschlüsselter Block aus URL, Benutzername, Geheimnis und Notiz
+  payload       String?
+  // gesetzt, wenn die Geheimnisse nach einer Wiederherstellung ohne passenden Schlüssel zurückgesetzt wurden („Neu eingeben nötig“)
+  unreadableAt  DateTime?
+  createdByName String?
+  updatedByName String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([kind])
+}
+
 // ───────────── Netzwerk-Überwachung (F12) ─────────────
 
 // Ein Ziel der Erreichbarkeitsprüfung: TCP-Verbindung oder HTTP(S)-Anfrage, nie ICMP. Gespeichert wird nur, was die Anwendung gemessen hat (Zustand, Latenz, Statusklasse) – nie ein Antworttext.

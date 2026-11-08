@@ -111,7 +111,18 @@ export type FeatureDef = {
    * `adminOnly`: Rechte der Verwaltung (Benutzer, Rollen, Einstellungen, Backups …), die nur Administratoren vergeben dürfen –
    * ein Nicht-Admin kann sie weder Rollen hinzufügen noch Konten zuweisen (siehe `src/lib/rbac.ts`).
    */
-  permissions: { group: string; keys: readonly string[]; adminOnly?: readonly string[]; marked?: Readonly<Partial<Record<PermissionMark, readonly string[]>>> };
+  permissions: {
+    group: string;
+    keys: readonly string[];
+    adminOnly?: readonly string[];
+    marked?: Readonly<Partial<Record<PermissionMark, readonly string[]>>>;
+    /**
+     * Rechte, die auch ein **Administrator nicht automatisch hat**: Sie gelten nur, wenn eine Rolle des Kontos sie ausdrücklich enthält (z. B. der IT-Tresor: wer das System verwaltet, soll nicht schon deshalb
+     * Zugangsdaten sehen). Die Rolle „Administrator“ bedeutet alle Rechte **außer diesen**; vergeben wird über eine zusätzliche Rolle in der Rollenmaske (Administratoren dürfen sie vergeben, jede Vergabe steht im Audit-Log).
+     * Gesperrt sind sie wie andere gekennzeichnete Rechte für Standardrollen und API-Token (`marked`, `API_NEVER`).
+     */
+    explicitOnly?: readonly string[];
+  };
   nav: readonly NavDef[];
   /** Anlegen-Aktionen für das globale „Neu“-Menü (optional). Die Schnellsuche kommt von `search.ts` der Funktion (`searchProviders`, siehe `registry.ts`). */
   quickActions?: readonly QuickActionDef[];

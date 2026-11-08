@@ -13,7 +13,7 @@ export const rolesEn: typeof rolesDe = {
   delete: "Delete role",
   confirmDelete: "Really delete this role? Users lose these permissions.",
   adminBadge: "Full access",
-  adminNotice: "Administrator roles always have every permission – including those of future features. They cannot be restricted here.",
+  adminNotice: "Administrator roles always have every permission – including those of future features. They cannot be restricted here. The exception are permissions that are only granted explicitly (marked “Explicit only” in the permission list, e.g. the IT vault): they apply to administrators only through an additional role that contains them.",
   allPermissions: "all permissions",
   permissionCount: "{count} of {total} permissions",
   userCount_one: "{count} user",
@@ -42,6 +42,7 @@ export const rolesEn: typeof rolesDe = {
   marks: {
     adminOnly: "Administrators only",
     sensitive: "Sensitive",
+    explicitOnly: "Explicit only – also for administrators",
     export: "Export",
     import: "Import",
     send: "Sending",

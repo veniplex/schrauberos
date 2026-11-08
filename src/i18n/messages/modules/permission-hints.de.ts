@@ -106,6 +106,8 @@ export const permissionHintsDe = {
   docsIt: {
     view: "Die IT-Dokumentation lesen.",
     edit: "IT-Dokumentation schreiben und ändern.",
+    vault: "IT-Tresor: Einträge ansehen und Zugangsdaten nach erneuter Passwortabfrage anzeigen. Gilt nur ausdrücklich – auch Administratoren bekommen es nicht von selbst.",
+    vaultManage: "IT-Tresor: Einträge anlegen, ändern und löschen (zusammen mit „Tresor ansehen“). Gilt nur ausdrücklich – auch Administratoren bekommen es nicht von selbst.",
   },
   users: {
     view: "Die Benutzerliste ansehen.",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ALL_PERMISSIONS } from "@/modules/catalog";
+import { ADMIN_IMPLIED_PERMISSIONS, ALL_PERMISSIONS, EXPLICIT_ONLY_PERMISSIONS } from "@/modules/catalog";
 import { actorOf, checkGrantRole, checkManageUser, checkRoleChange, checkRoleDelete, hasAdminOnlyRights, lockedPermissions, rawRights } from "./rbac";
 
 const role = (id: string, permissions: string[], isAdmin = false) => ({ id, isAdmin, permissions });
@@ -8,8 +8,14 @@ const admin = actorOf("a", [role("admin", [], true)]);
 const helper = actorOf("h", [role("helper", ["appointments.view", "appointments.edit", "roles.manage"])]);
 
 describe("Rechte-Hierarchie (reine Logik)", () => {
-  it("Rohrechte: Administrator-Rolle = alle Rechte, sonst die Vereinigung", () => {
-    assert.equal(rawRights([role("x", [], true)]).size, ALL_PERMISSIONS.length);
+  it("Rohrechte: Administrator-Rolle = alle Rechte außer den ausdrücklich zu vergebenden (IT-Tresor), sonst die Vereinigung", () => {
+    assert.ok(EXPLICIT_ONLY_PERMISSIONS.size >= 2, "es gibt ausdrücklich zu vergebende Rechte");
+    assert.equal(rawRights([role("x", [], true)]).size, ALL_PERMISSIONS.length - EXPLICIT_ONLY_PERMISSIONS.size);
+    assert.equal(rawRights([role("x", [], true)]).size, ADMIN_IMPLIED_PERMISSIONS.length);
+    for (const p of EXPLICIT_ONLY_PERMISSIONS) assert.ok(!rawRights([role("x", [], true)]).has(p), p);
+    // eine zusätzliche Rolle, die das Recht ausdrücklich enthält, gilt auch für Administratoren
+    const withVault = rawRights([role("x", [], true), role("tresor", ["docsIt.vault"])]);
+    assert.ok(withVault.has("docsIt.vault") && !withVault.has("docsIt.vaultManage"));
     assert.deepEqual([...rawRights([role("a", ["x.1"]), role("b", ["x.2", "x.1"])])].sort(), ["x.1", "x.2"]);
   });
 

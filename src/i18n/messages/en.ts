@@ -1,5 +1,6 @@
 import type { Messages } from "./de";
 import { docsEn } from "./modules/docs.en";
+import { vaultEn } from "./modules/vault.en";
 import { invoicesEn } from "./modules/invoices.en";
 import { fleetEn } from "./modules/fleet.en";
 import { employeesEn } from "./modules/employees.en";
@@ -40,6 +41,7 @@ export const en: Messages = {
   archive: archiveEn,
   privacy: privacyEn,
   docs: docsEn,
+  vault: vaultEn,
   invoices: invoicesEn,
   fleet: fleetEn,
   employees: employeesEn,
@@ -188,6 +190,7 @@ export const en: Messages = {
     time: "Time tracking",
     fleet: "Fleet",
     docsIt: "IT documentation",
+    vault: "IT vault",
     handbook: "Handbook",
     it: "IT & network",
     network: "Network",
@@ -473,6 +476,8 @@ export const en: Messages = {
     docsIt: {
       view: "Read IT documentation",
       edit: "Edit IT documentation",
+      vault: "IT vault: view entries and show credentials (explicit only)",
+      vaultManage: "IT vault: create, change and delete entries (explicit only)",
     },
     users: {
       view: "View user list",

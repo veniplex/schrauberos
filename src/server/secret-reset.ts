@@ -38,22 +38,34 @@ const WRAP_KEYS = [WRAPPED_SETTING_KEY, KEY_CHECK_SETTING, "secrets.keyCreatedAt
 
 export const secretResetDir = (data = dataDir()) => path.join(data, "secret-reset");
 
-type Rows = { settings: Array<{ key: string; value: string }>; twoFactor: Array<Record<string, unknown>>; backupCodes: Array<Record<string, unknown>> };
+type Rows = { settings: Array<{ key: string; value: string }>; twoFactor: Array<Record<string, unknown>>; backupCodes: Array<Record<string, unknown>>; consumers?: Record<string, Array<Record<string, unknown>>> };
 
 /**
  * Welche Zeilen würde ein Zurücksetzen anfassen? Nicht lesbare Geheimnisse in den Einstellungen und zweite Faktoren, deren Geheimnis bei lesbarem Schlüssel nicht
  * entschlüsselt werden kann (samt Sicherungscode-Hashes dieser Konten); bei `withWrap` auch die Hülle des Wiederherstellungsschlüssels (sie wird entfernt). `null`: nichts zu tun.
  * Nur Blobs, die ohnehin verschlüsselt in der Datenbank liegen – kein Klartext.
  */
-async function collectAffected(withWrap: boolean): Promise<Rows | null> {
+async function collectAffected(withWrap: boolean, consumers: readonly SecretConsumerDef[]): Promise<Rows | null> {
   const settings = (await db.appSetting.findMany()).filter((row) => (isSecretBlob(row.value) && decryptSecret(row.value) === null) || (withWrap && WRAP_KEYS.includes(row.key)));
   const twoFactor = (await db.twoFactor.findMany()).filter((row) => (row.enabledAt || row.secret) && (!row.secret || decryptSecret(row.secret) === null));
-  if (settings.length === 0 && twoFactor.length === 0) return null;
+  // Zeilen von Verbrauchern mit eigenen Tabellen (IT-Tresor): ihre verschlüsselten Blöcke gehören in dieselbe Sicherung
+  const own: Record<string, Array<Record<string, unknown>>> = {};
+  for (const consumer of consumers) {
+    if (!consumer.affectedRows) continue;
+    try {
+      const rows = await consumer.affectedRows();
+      if (rows.length > 0) own[consumer.id] = rows;
+    } catch (error) {
+      logError(`secrets:affected:${consumer.id}`, error);
+    }
+  }
+  if (settings.length === 0 && twoFactor.length === 0 && Object.keys(own).length === 0) return null;
   const backupCodes = twoFactor.length ? await db.twoFactorBackupCode.findMany({ where: { userId: { in: twoFactor.map((row) => row.userId) } } }) : [];
   return {
     settings: settings.map(({ key, value }) => ({ key, value })),
     twoFactor: twoFactor.map((row) => ({ ...row })),
     backupCodes: backupCodes.map((row) => ({ ...row })),
+    ...(Object.keys(own).length > 0 ? { consumers: own } : {}),
   };
 }
 
@@ -102,7 +114,7 @@ export async function resetUnreadableSecrets(consumers: readonly SecretConsumerD
     console.error("[secrets] secret.key passt nicht zur Datenbank, eine Wiederherstellung mit dem Wiederherstellungsschlüssel ist möglich: es wird nichts zurückgesetzt (Seite „Schlüssel wiederherstellen“ bzw. Verwaltung → Backups → Schlüssel).");
     return [];
   }
-  const affected = await collectAffected(stale);
+  const affected = await collectAffected(stale, consumers);
   if (!affected) return [];
   const backup = writeResetBackup(affected, options.force ? "forced" : stale ? "restore" : "unreadable", options.dataRoot);
 

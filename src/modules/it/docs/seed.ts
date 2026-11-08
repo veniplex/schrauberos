@@ -24,4 +24,17 @@ async function demo(db: PrismaClient) {
   ].join("\n"));
 }
 
-export const seeds: SeedDef[] = [{ id: "docs", feature: "it.docs", order: 140, demo }];
+/**
+ * Beispiel für die Oberfläche: ein Tresor-Eintrag **ohne Zugangsdaten** (Titel, Art, System) – Geheimnisse gehören nie in Beispieldaten, und der Seed berührt `secret.key` nicht. Zugangsdaten entstehen nur in der
+ * Oberfläche, über die echte Verschlüsselung.
+ */
+async function demoVault(db: PrismaClient) {
+  if ((await db.vaultEntry.count()) > 0) return;
+  console.log("Demo-Eintrag (IT-Tresor) wird angelegt …");
+  await db.vaultEntry.create({ data: { title: "Beispiel: Firewall fw-01 – Weboberfläche", kind: "network", system: "fw-01", createdByName: "Demo", updatedByName: "Demo" } });
+}
+
+export const seeds: SeedDef[] = [
+  { id: "docs", feature: "it.docs", order: 140, demo },
+  { id: "vault", feature: "it.docs", order: 141, demo: demoVault },
+];

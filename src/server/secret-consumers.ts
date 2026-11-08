@@ -19,6 +19,11 @@ export type SecretConsumerDef = {
   feature?: FeatureId;
   /** Setzt alle nicht mehr lesbaren Geheimnisse dieses Verbrauchers zurück und liefert ihre Anzahl. Idempotent; darf nur Unlesbares anfassen. */
   resetUnreadable: () => Promise<number>;
+  /**
+   * Die Zeilen, die `resetUnreadable` anfassen würde (nur bereits verschlüsselte Werte, nie Klartext): Sie werden **vor** dem Zurücksetzen als Teil der Sicherung `secret-reset/<Zeit>.json` abgelegt.
+   * Verbraucher, deren Geheimnisse nicht in `AppSetting`/`TwoFactor` liegen (z. B. der IT-Tresor), liefern sie hier – ohne diese Angabe gäbe es für ihre Zeilen keine Sicherung.
+   */
+  affectedRows?: () => Promise<Array<Record<string, unknown>>>;
 };
 
 /**

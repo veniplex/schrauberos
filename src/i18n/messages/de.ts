@@ -1,4 +1,5 @@
 import { docsDe } from "./modules/docs.de";
+import { vaultDe } from "./modules/vault.de";
 import { invoicesDe } from "./modules/invoices.de";
 import { fleetDe } from "./modules/fleet.de";
 import { employeesDe } from "./modules/employees.de";
@@ -41,6 +42,7 @@ export const de = {
   archive: archiveDe,
   privacy: privacyDe,
   docs: docsDe,
+  vault: vaultDe,
   invoices: invoicesDe,
   fleet: fleetDe,
   employees: employeesDe,
@@ -189,6 +191,7 @@ export const de = {
     time: "Zeiterfassung",
     fleet: "Fuhrpark",
     docsIt: "IT-Dokumentation",
+    vault: "IT-Tresor",
     handbook: "Handbuch",
     it: "IT & Netzwerk",
     network: "Netzwerk",
@@ -473,6 +476,8 @@ export const de = {
     docsIt: {
       view: "IT-Dokumentation lesen",
       edit: "IT-Dokumentation bearbeiten",
+      vault: "IT-Tresor: Einträge ansehen und Zugangsdaten anzeigen (nur ausdrücklich)",
+      vaultManage: "IT-Tresor: Einträge anlegen, ändern und löschen (nur ausdrücklich)",
     },
     users: {
       view: "Benutzerliste ansehen",

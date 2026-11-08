@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { CSP_HEADER, CSP_REPORT_ONLY_HEADER, HSTS_VALUE, requestPolicy, type RequestPolicy } from "@/lib/csp";
 import { cspMode } from "@/lib/csp-mode";
+import { isNoStorePath } from "@/lib/no-store";
 import { reinstallHtml } from "@/lib/reinstall-text";
 import { startingHtml, STARTING_RETRY_SECONDS } from "@/lib/starting-text";
 import { isSecureRequest, sessionCookieName } from "@/lib/session-cookie";
@@ -67,6 +68,13 @@ function passThrough(request: NextRequest, policy: RequestPolicy, secure: boolea
 }
 
 export function proxy(request: NextRequest) {
+  const response = route(request);
+  // Seiten und Aktionen des IT-Tresors nie zwischenspeichern (lib/no-store.ts)
+  if (isNoStorePath(request.nextUrl.pathname)) response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+function route(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   const secure = isSecureRequest(request.headers.get("x-forwarded-proto"));
   const policy = requestPolicy(pathname, { dev: process.env.NODE_ENV !== "production", mode: cspMode() });
