@@ -33,7 +33,6 @@
     "@prisma/client": "^7.10.1",
     "better-sqlite3": "12.11.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
     "dotenv": "^18.0.9",
     "geist": "^1.9.1",
     "lucide-react": "^1.69.0",
