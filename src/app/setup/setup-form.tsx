@@ -35,24 +35,22 @@ export function SetupForm({ timezones, presets = [], done = false }: { timezones
   const [presetId, setPresetId] = useState(presets[0]?.id ?? "");
   const preset = presets.find((p) => p.id === presetId);
 
-  // Die Einrichtung ist abgeschlossen (Seite neu geladen): der Code wird nur einmal angezeigt
-  if (done) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Alert tone="info">{t("recovery.setupDoneReload")}</Alert>
-        <LinkButton href="/" variant="primary">
-          {t("recovery.continue")}
-        </LinkButton>
-      </div>
-    );
-  }
-
   return (
     <Form<RecoveryActionState> action={completeSetup} className="flex flex-col gap-4">
       {(state) =>
-        // Nach der Einrichtung: eigene Seite für den Wiederherstellungs-Code mit Pflicht-Bestätigung (der Code steht nur in dieser Antwort)
+        // Nach der Einrichtung: eigene Seite für den Wiederherstellungs-Code mit Pflicht-Bestätigung (der Code steht nur in dieser Antwort).
+        // Das Formular bleibt dafür immer eingehängt: Direkt nach dem Anlegen rendert Next die Seite mit der neuen Sitzung noch einmal (`done`), und ein
+        // früher Rückgabewert vor dem Formular würde den Antwortzustand mit dem Code verwerfen – der Code wäre nie zu sehen.
         state.recoveryCode ? (
           <RecoveryCodeView code={state.recoveryCode} issuedOn={state.issuedOn} onConfirm={() => confirmRecoveryCode(new FormData())} onContinue={() => router.push("/")} />
+        ) : done ? (
+          // Die Einrichtung ist abgeschlossen (Seite neu geladen): der Code wird nur einmal angezeigt
+          <div className="flex flex-col gap-4">
+            <Alert tone="info">{t("recovery.setupDoneReload")}</Alert>
+            <LinkButton href="/" variant="primary">
+              {t("recovery.continue")}
+            </LinkButton>
+          </div>
         ) : (
           <>
       <Field label={t("setup.token")} htmlFor="token" name="token" hint={t("setup.tokenHint")} required>
