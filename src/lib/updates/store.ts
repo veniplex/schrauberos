@@ -8,7 +8,7 @@ import { emptyState, parseState, type UpdateState, type VersionMeta } from "./st
 
 /** Datenverzeichnis: im Container `/data` (DATA_DIR), in der Entwicklung `.data` im Projektordner. */
 export const dataDir = () => process.env.DATA_DIR ?? path.resolve(/*turbopackIgnore: true*/ ".data");
-export const updatesDir = (data = dataDir()) => path.join(data, "app");
+export const updatesDir = (data = dataDir()) => path.join(/*turbopackIgnore: true*/ data, "app");
 export const versionsDir = (data = dataDir()) => path.join(updatesDir(data), "versions");
 export const versionDir = (version: string, data = dataDir()) => path.join(versionsDir(data), version);
 const stateFile = (data = dataDir()) => path.join(updatesDir(data), "state.json");

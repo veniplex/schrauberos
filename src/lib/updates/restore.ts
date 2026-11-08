@@ -48,7 +48,7 @@ export const pendingDbFile = (data = dataDir()) => path.join(restoreDir(data), "
 const pendingInfoFile = (data = dataDir()) => path.join(restoreDir(data), "pending.json");
 export const pendingFilesDir = (data = dataDir()) => path.join(restoreDir(data), "pending-files");
 const replacedFilesDir = (data = dataDir()) => path.join(restoreDir(data), "replaced-files");
-const liveFilesDir = (data = dataDir()) => path.join(data, "files");
+const liveFilesDir = (data = dataDir()) => path.join(/*turbopackIgnore: true*/ data, "files");
 export const pendingSecretKeyFile = (data = dataDir()) => path.join(restoreDir(data), "pending-secret.key");
 const replacedSecretKeyFile = (data = dataDir()) => path.join(restoreDir(data), "replaced-secret.key");
 const liveSecretKeyFile = (data = dataDir()) => path.join(data, "secret.key");

@@ -16,7 +16,7 @@ export { safeName };
  * Backups per Hardlink möglich. Pfade bestehen nur aus ASCII-Zeichen `A–Z a–z 0–9 . _ -` und stammen nie direkt aus Eingaben.
  */
 
-export const filesDir = () => path.join(dataDir(), "files");
+export const filesDir = () => path.join(/*turbopackIgnore: true*/ dataDir(), "files");
 const tmpDir = () => path.join(filesDir(), ".tmp");
 
 const REL = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$/;

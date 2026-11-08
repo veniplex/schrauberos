@@ -115,7 +115,7 @@ export async function stageRestore(name: string, options: { recoveryKey?: string
   mkdirSync(restoreDir(), { recursive: true });
   cancelPending();
   await unpackAndValidate(path.join(dir, DB_ARCHIVE), pendingDbFile(), "keep");
-  const hasFiles = existsSync(path.join(dir, "files"));
+  const hasFiles = existsSync(path.join(/*turbopackIgnore: true*/ dir, "files"));
   let secretKeyRestored = false;
   try {
     // Mit Wiederherstellungsschlüssel: die im Backup mitgelieferte Hülle öffnen – vor allem anderen, damit ein falscher Schlüssel nichts anlegt (kein Sicherungsstand vor der Wiederherstellung)
@@ -142,7 +142,7 @@ export async function stageRestore(name: string, options: { recoveryKey?: string
         secretKeyRestored = true;
       }
     }
-    if (hasFiles) await linkTree(path.join(dir, "files"), pendingFilesDir());
+    if (hasFiles) await linkTree(path.join(/*turbopackIgnore: true*/ dir, "files"), pendingFilesDir());
     await createBackup("pre-restore");
   } catch (error) {
     cancelPending();
@@ -294,7 +294,7 @@ export async function importBackupFile(uploaded: string, limits: ArchiveLimits =
     // Die Datenbank im Archiv muss gültig sein
     const probe = path.join(work, "probe.db");
     await unpackAndValidate(path.join(work, DB_ARCHIVE), probe, "check");
-    const files = await countTree(path.join(work, "files"));
+    const files = await countTree(path.join(/*turbopackIgnore: true*/ work, "files"));
     writeInfo(work, { files: files.count, bytes: files.bytes });
     const name = uniqueBackupName("upload");
     renameSync(work, path.join(root, name));

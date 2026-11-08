@@ -213,7 +213,7 @@ export async function createBackup(kind: BackupKind, dbFile = databaseFile(), at
     await gzipFile(rawDb, path.join(tmp, DB_ARCHIVE));
     for (const f of [rawDb, `${rawDb}-wal`, `${rawDb}-shm`]) rmSync(f, { force: true });
 
-    const linked = await linkTree(filesDir(), path.join(tmp, "files"));
+    const linked = await linkTree(filesDir(), path.join(/*turbopackIgnore: true*/ tmp, "files"));
     writeInfo(tmp, { files: linked.count, bytes: linked.bytes });
     renameSync(tmp, path.join(root, name));
   } catch (error) {

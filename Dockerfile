@@ -56,16 +56,23 @@ RUN set -eux; \
 
 # Das Paket zusammenstellen und seine Dateiliste (SOS-TREE) erzeugen – im selben Stage, kein weiterer 250-MB-Kopierschritt. Der Generator bricht laut ab bei Sonderdateien,
 # Setuid/Setgid/Sticky, unzulässigen Namen und Symlinks, die den Baum verlassen: Ein Paket, das der Starter später ablehnen würde, soll gar nicht erst entstehen.
+# `next build` (output: standalone) kopiert je nach Ablaufverfolgung auch Quelldateien (`src/`: Seiten, Routen, Tests), `.env`, `assets/` und `prisma/migrations` mit: Quelltext und Umgebungsdateien
+# kommen nicht ins Paket (rm), Schrift, Migrationen und Hilfe werden aus dem Quellbaum **in** die Zielordner kopiert (`dir/.`: ein `cp -a dir ziel` legte sie bei vorhandenem Ziel in `ziel/dir` ab), und
+# Next schreibt `.next/server` und Teile von `.next/static` mit Modus 664: `chmod -R go-w` (der Starter prüft nur das Ausführbit, der Smoke-Test verlangt kein g+w/o+w unter /app).
+# `scripts/check-bundle.mjs` bricht ab, wenn etwas Unzulässiges im Paket liegt oder etwas fehlt, das die App zur Laufzeit liest (Hilfe-Markdown, Schrift, Migrationen, Laufzeit, Launcher).
 RUN set -eux; \
-    mkdir -p /bundle/.next /bundle/prisma; \
+    mkdir -p /bundle/.next /bundle/prisma/migrations /bundle/assets /bundle/docs /bundle/public; \
     cp -a .next/standalone/. /bundle/; \
+    rm -rf /bundle/src /bundle/.env /bundle/.env.*; \
     cp -a .next/static /bundle/.next/static; \
-    cp -a public /bundle/public; \
-    cp -a docs /bundle/docs; \
-    cp -a assets /bundle/assets; \
-    cp -a prisma/migrations /bundle/prisma/migrations; \
+    cp -a public/. /bundle/public/; \
+    cp -a docs/. /bundle/docs/; \
+    cp -a assets/. /bundle/assets/; \
+    cp -a prisma/migrations/. /bundle/prisma/migrations/; \
     cp -a version.json launcher.mjs /bundle/; \
     cp -a /runtime /bundle/runtime; \
+    chmod -R go-w /bundle; \
+    node scripts/check-bundle.mjs /bundle; \
     node scripts/gen-tree.mjs /bundle
 
 # ───────── Vertrauensanker des Starters: Schlüssel und Untergrenze aus dem Code (nur aus release-key.ts, keine Umgebungsvariable) ─────────
