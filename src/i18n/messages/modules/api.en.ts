@@ -187,7 +187,7 @@ export const apiEn: typeof apiDe = {
         accepted: "Quote accepted",
         paid: "Document paid",
         sent: "Document sent",
-        cancelled: "Invoice cancelled",
+        cancelled: "Invoice cancelled (the id is the cancelled original; its field cancelledByInvoiceId names the cancellation document)",
       },
       checklist: { started: "Checklist started", completed: "Checklist completed" },
       file: { uploaded: "File uploaded" },

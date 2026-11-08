@@ -185,7 +185,7 @@ export const apiDe = {
         accepted: "Angebot angenommen",
         paid: "Beleg bezahlt",
         sent: "Beleg versendet",
-        cancelled: "Rechnung storniert",
+        cancelled: "Rechnung storniert (die ID nennt das stornierte Original, den Gegenbeleg nennt dessen Feld cancelledByInvoiceId)",
       },
       checklist: { started: "Checkliste begonnen", completed: "Checkliste abgeschlossen" },
       file: { uploaded: "Datei hochgeladen" },
