@@ -11,6 +11,8 @@ type Options = {
   entityId?: string | null;
   /** Nur nötig, wenn (noch) keine Sitzung besteht, z. B. bei der Anmeldung */
   actor?: { id: string | null; name: string };
+  /** Höchstlänge des Ziels (Standard 200 Zeichen); nur für Einträge mit einer Differenz (Rechte einer Rolle), die mehr braucht */
+  targetMax?: number;
 };
 
 type Client = Pick<PrismaClient | Prisma.TransactionClient, "auditLog">;
@@ -27,7 +29,7 @@ export async function writeAudit(client: Client, action: AuditAction, options: O
       action,
       actorId: options.actor.id,
       actorName: clean(options.actor.name, 120) ?? "–",
-      target: clean(options.target, 200),
+      target: clean(options.target, options.targetMax ?? 200),
       entityId: clean(options.entityId, 60),
     },
   });

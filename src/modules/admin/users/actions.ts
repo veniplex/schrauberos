@@ -12,6 +12,7 @@ import { resetSecondFactor } from "@/server/auth/second-factor";
 import { loginThrottle, normalizeUsername } from "@/server/auth/throttle";
 import { defineAction, defineOperation, fail, failField } from "@/server/operations";
 import { auditUserExplicitChange } from "@/server/rbac/explicit-audit";
+import { auditUserRolesChange } from "@/server/rbac/change-audit";
 import { loadActor, loadRoles, toRights } from "@/server/rbac/hierarchy";
 import { secretHoldings } from "@/server/secret-holdings";
 import type { Prisma } from "@/generated/prisma/client";
@@ -108,6 +109,8 @@ const saveUserOperation = defineOperation({
     const roleNames = new Map((await tx.role.findMany({ where: { id: { in: [...new Set([...before, ...roles].map((r) => r.id))] } }, select: { id: true, name: true } })).map((r) => [r.id, r.name]));
     const named = (list: typeof roles) => list.map((r) => ({ id: r.id, name: roleNames.get(r.id) ?? r.id, permissions: r.permissions }));
     await auditUserExplicitChange(tx, principal, { id: userId, username: d.username }, named(before), named(roles), prepared.holdings);
+    // Welche Rollen hat das Konto bekommen oder verloren (z. B. „Administrator“)? – sonst von einer Umbenennung nicht zu unterscheiden
+    await auditUserRolesChange(tx, principal, { id: userId, username: d.username }, before.map((r) => roleNames.get(r.id) ?? r.id), roles.map((r) => roleNames.get(r.id) ?? r.id));
 
     // Passwort geändert oder deaktiviert -> Sitzungen, bekannte Geräte und API-Tokens beenden – in derselben Transaktion (kein Zustand dazwischen,
     // kein verschlucktes Fehlschlagen nach dem Commit)

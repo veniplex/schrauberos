@@ -8,6 +8,7 @@ import { checkRoleChange, checkRoleDelete, type Denial } from "@/lib/rbac";
 import { isPermission } from "@/modules/catalog";
 import { defineAction, defineOperation, fail } from "@/server/operations";
 import { auditRoleExplicitChange } from "@/server/rbac/explicit-audit";
+import { auditRolePermissionsChange } from "@/server/rbac/change-audit";
 import { loadActor, toRights } from "@/server/rbac/hierarchy";
 import { secretHoldings } from "@/server/secret-holdings";
 
@@ -72,6 +73,8 @@ const saveRoleOperation = defineOperation({
     }
     // Ausdrücklich zu vergebende Rechte (Tresor) hinzugefügt oder entzogen: eigener Audit-Eintrag je Recht (Rolle und Recht), nicht nur der Rollenname
     await auditRoleExplicitChange(tx, principal, { id: roleId, name: d.name }, beforePermissions, afterPermissions, prepared.holdings);
+    // Alle hinzugefügten/entzogenen Rechte (nur Schlüssel, gekürzt) – damit z. B. `users.manage` für eine Rolle nicht hinter dem Namen verschwindet
+    await auditRolePermissionsChange(tx, principal, { id: roleId, name: d.name }, beforePermissions, afterPermissions);
     audit({ target: d.name, entityId: roleId });
     return { roleId };
   },

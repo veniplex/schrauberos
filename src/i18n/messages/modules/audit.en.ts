@@ -143,6 +143,7 @@ export const auditEn: typeof auditDe = {
       unlock: "Sign-in delay lifted",
       explicitGrant: "Role with an explicit-only permission (e.g. IT vault) given to an account",
       explicitRevoke: "Role with an explicit-only permission (e.g. IT vault) taken from an account",
+      rolesChanged: "Roles of an account changed (+ added, − removed)",
     },
     role: {
       create: "Role created",
@@ -150,6 +151,7 @@ export const auditEn: typeof auditDe = {
       delete: "Role deleted",
       explicitGrant: "Explicit-only permission (e.g. IT vault) added to a role",
       explicitRevoke: "Explicit-only permission (e.g. IT vault) removed from a role",
+      permissionsChanged: "Permissions of a role changed (+ added, − removed)",
     },
     module: {
       enable: "Module/feature switched on",

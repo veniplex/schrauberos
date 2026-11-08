@@ -12,5 +12,5 @@ export const rolesFeature = defineFeature({
     { id: "roles", href: "/admin/roles", labelKey: "nav.roles", icon: "roles", permission: "roles.manage", order: 110 },
   ],
   routes: ["admin/roles"],
-  auditActions: ["role.create", "role.update", "role.delete", "role.explicitGrant", "role.explicitRevoke"],
+  auditActions: ["role.create", "role.update", "role.delete", "role.explicitGrant", "role.explicitRevoke", "role.permissionsChanged"],
 });

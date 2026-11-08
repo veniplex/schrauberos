@@ -197,3 +197,34 @@ describe("saveRole – gleichzeitiges Bearbeiten", () => {
     assert.match((await env.db.role.findUniqueOrThrow({ where: { id: target.id } })).name, /^Name [ABC]$/);
   });
 });
+
+describe("saveRole – Audit der Rechte-Differenz (Z6-1 M3)", () => {
+  const permissionEntries = () => env.db.auditLog.findMany({ where: { action: "role.permissionsChanged" }, orderBy: { createdAt: "asc" } });
+
+  it("nennt hinzugefügte und entzogene Rechte (nur Schlüssel); eine reine Umbenennung schreibt keinen Rechte-Eintrag", async () => {
+    await env.db.auditLog.deleteMany();
+    await env.signIn(admin2);
+    const target = await env.role({ name: "Büro", permissions: ["appointments.view", "tires.view"] });
+    // Administrator darf auch adminOnly-Rechte vergeben: genau diese Vergabe soll im Audit-Log zu sehen sein
+    await redirectOf(() => save(target, { permissions: ["appointments.view", "users.manage", "api.manage"] }));
+    const [entry] = await permissionEntries();
+    assert.equal(entry?.target, "Büro: +api.manage +users.manage −tires.view");
+    assert.equal(entry?.entityId, target.id);
+    assert.equal(entry?.actorName, "admin2");
+    assert.equal(await env.db.auditLog.count({ where: { action: "role.update" } }), 1, "role.update bleibt");
+
+    await redirectOf(() => save(target, { name: "Büro neu", permissions: ["appointments.view", "users.manage", "api.manage"] }));
+    assert.equal((await permissionEntries()).length, 1, "Umbenennung ohne Rechteänderung: kein weiterer Rechte-Eintrag");
+    assert.equal(await env.db.auditLog.count({ where: { action: "role.update" } }), 2);
+  });
+
+  it("neue Rolle: alle Rechte gelten als hinzugefügt; lange Listen werden auf 20 gekürzt (…und n weitere)", async () => {
+    await env.db.auditLog.deleteMany();
+    await env.signIn(admin2);
+    const many = ["appointments.view", "appointments.edit", "appointments.delete", "tires.view", "tires.edit", "tires.delete", "customers.view", "customers.edit", "customers.delete", "vehicles.view", "vehicles.edit", "vehicles.delete", "invoices.view", "invoices.edit", "invoices.delete", "orders.view", "orders.edit", "parts.view", "parts.edit", "files.view", "files.upload", "files.delete"];
+    await redirectOf(() => save(null, { name: "Viele", permissions: many }));
+    const [entry] = await permissionEntries();
+    assert.match(entry?.target ?? "", /^Viele: (\+[a-z]+\.[a-zA-Z]+ ){19}\+[a-z]+\.[a-zA-Z]+ …und 2 weitere$/);
+    assert.equal((entry?.target ?? "").split(" +").length - 1, 20, "genau 20 Schlüssel stehen im Eintrag");
+  });
+});

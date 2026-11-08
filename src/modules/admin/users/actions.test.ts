@@ -287,3 +287,25 @@ describe("saveUser – gleichzeitiges Bearbeiten", () => {
     assert.match(target ?? "", /^\/admin\/users$/);
   });
 });
+
+describe("saveUser – Audit der Rollen-Differenz (Z6-1 M3)", () => {
+  const rolesEntries = () => env.db.auditLog.findMany({ where: { action: "user.rolesChanged" }, orderBy: { createdAt: "asc" } });
+
+  it("Anlegen mit Rollen und Ändern der Rollen: der Eintrag nennt hinzugefügte und entzogene Rollen (Namen), eine Umbenennung nicht", async () => {
+    await env.db.auditLog.deleteMany();
+    await env.signIn(admin2);
+    await redirectOf(() => actions.saveUser({}, form({ username: "neu", name: "Neu", password: "neues-pass-123", roleId: [lowRole.id] })));
+    const created = await env.db.user.findUniqueOrThrow({ where: { username: "neu" } });
+    assert.equal((await rolesEntries())[0]?.target, `neu: +${lowRole.name}`, "neues Konto: alle Rollen sind hinzugefügt");
+
+    await redirectOf(() => edit(created, { roleId: [adminRole.id] }));
+    const [, second] = await rolesEntries();
+    assert.equal(second?.target, `neu: +${adminRole.name} −${lowRole.name}`);
+    assert.equal(second?.actorName, "admin2");
+    assert.equal(second?.entityId, created.id);
+
+    await redirectOf(() => edit(created, { name: "Umbenannt" }));
+    assert.equal((await rolesEntries()).length, 2, "Umbenennung: kein Rollen-Eintrag");
+    assert.equal(await env.db.auditLog.count({ where: { action: "user.update" } }), 2, "user.update bleibt");
+  });
+});

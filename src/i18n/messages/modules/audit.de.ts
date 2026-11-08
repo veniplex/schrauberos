@@ -141,6 +141,7 @@ export const auditDe = {
       unlock: "Anmeldesperre aufgehoben",
       explicitGrant: "Rolle mit ausdrücklich zu vergebendem Recht (z. B. IT-Tresor) einem Konto gegeben",
       explicitRevoke: "Rolle mit ausdrücklich zu vergebendem Recht (z. B. IT-Tresor) einem Konto entzogen",
+      rolesChanged: "Rollen eines Kontos geändert (+ hinzugefügt, − entzogen)",
     },
     role: {
       create: "Rolle angelegt",
@@ -148,6 +149,7 @@ export const auditDe = {
       delete: "Rolle gelöscht",
       explicitGrant: "Ausdrücklich zu vergebendes Recht (z. B. IT-Tresor) einer Rolle hinzugefügt",
       explicitRevoke: "Ausdrücklich zu vergebendes Recht (z. B. IT-Tresor) einer Rolle entzogen",
+      permissionsChanged: "Rechte einer Rolle geändert (+ hinzugefügt, − entzogen)",
     },
     module: {
       enable: "Modul/Funktion eingeschaltet",
