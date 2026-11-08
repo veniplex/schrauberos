@@ -13,7 +13,7 @@ Eingerichtet wird er unter **Einstellungen → E-Mail** (nur Administratoren).
   ein gespeichertes Passwort geht nie an ein anderes Ziel.
 * **Absender:** Absenderadresse (Pflicht), Absendername (erscheint vor der Adresse) und optional eine Antwortadresse.
 * **Eigenes Netz:** Verbindungen zu Adressen im eigenen Netz (zum Beispiel ein interner Mail-Relay unter 192.168.x.x) sind aus Sicherheitsgründen gesperrt, solange Sie sie nicht ausdrücklich mit **„Server im eigenen Netz erlauben“** freigeben. Der eigene
-  Server selbst (bei einem Betrieb im Container auch der Docker-Host) und Adressen für Cloud-Dienste sind nie erlaubt.
+  Server selbst (bei einem Betrieb im Container auch der Docker-Host und die Gateways der Container-Netze) und Adressen für Cloud-Dienste sind nie erlaubt. Mit der Freigabe sind andere Rechner im LAN erreichbar, auch die LAN-Adresse des Servers selbst (sie kann ein Container nicht erkennen).
 * **Unverschlüsselt** senden Sie nur, wenn Sie „Keine Verschlüsselung“ wählen, das Eigene-Netz-Häkchen setzen **und** die Warnung bestätigen – und nur zu einem Server im eigenen Netz. Zugangsdaten und Inhalte laufen dann im Klartext durchs Netz; das ist nur für
   einen vertrauenswürdigen internen Relay gedacht.
 
