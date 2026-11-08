@@ -216,3 +216,59 @@ describe("Passwortregeln", () => {
     assert.equal(passwordProblem("x".repeat(100_000)), "long");
   });
 });
+
+describe("Grenzwerte der Drosselung (Z6-4 L-1: jeweils genau auf, direkt davor und direkt dahinter)", () => {
+  it("Zerfall: genau nach der Ruhezeit zählt der Versuch noch weiter, eine Millisekunde später beginnt die Zählung von vorn", () => {
+    clock = 1_000_000;
+    const g = gate();
+    for (let i = 0; i < 4; i++) g.take("anna");
+    clock += 15 * 60_000;
+    assert.equal(g.take("anna").attempts, 5, "genau decayMs: kein Zerfall");
+    clock += 15 * 60_000 + 1;
+    assert.equal(g.take("anna").attempts, 1, "decayMs + 1 ms: von vorn");
+  });
+
+  it("verzeihen: genau n Versuche weniger, nie unter null; nur unter den freien Versuchen entfällt die Wartezeit", () => {
+    clock = 1_000_000;
+    const g = gate();
+    for (let i = 0; i < 4; i++) g.take("anna"); // 4 Versuche, Wartezeit nach dem vierten
+    assert.ok(g.check("anna") > 0);
+    g.forgive("anna", 1);
+    assert.equal(g.attemptsOf("anna"), 3, "genau einer weniger");
+    assert.ok(g.check("anna") > 0, "mit 3 von 3 freien ist die Wartezeit noch da");
+    g.forgive("anna", 1);
+    assert.equal(g.attemptsOf("anna"), 2);
+    assert.equal(g.check("anna"), 0, "unter den freien Versuchen entfällt die Wartezeit");
+    assert.equal(g.take("anna").delayMs, 2_000, "der dritte Versuch löst die erste Wartezeit aus (2 s), nicht eine längere");
+    g.forgive("anna", 50);
+    assert.equal(g.attemptsOf("anna"), 0, "nie unter null");
+    assert.equal(g.take("anna").attempts, 1);
+  });
+
+  it("globales Budget: das 30. Ereignis kostet noch nichts, das 31. genau einen Schritt, die Obergrenze gilt ab dem Schritt davor nicht und danach", () => {
+    clock = 1_000_000;
+    const b = new FailureBudget({ limit: 30, windowMs: 60_000, stepMs: 50, maxDelayMs: 3_000, maxStamps: 5_000, now });
+    for (let i = 0; i < 30; i++) b.record();
+    assert.equal(b.delayMs(), 0, "genau auf dem Budget");
+    b.record();
+    assert.equal(b.delayMs(), 50, "ein Ereignis darüber: genau ein Schritt");
+    for (let i = 0; i < 58; i++) b.record(); // 89 → 59 über dem Budget
+    assert.equal(b.delayMs(), 2_950);
+    b.record();
+    assert.equal(b.delayMs(), 3_000, "60 über dem Budget: genau die Obergrenze");
+    b.record();
+    assert.equal(b.delayMs(), 3_000, "darüber bleibt es dabei");
+    // ein Ereignis, das genau windowMs alt ist, zählt noch; eine Millisekunde älter nicht mehr
+    clock += 60_000;
+    assert.ok(b.delayMs() > 0);
+    clock += 1;
+    assert.equal(b.delayMs(), 0);
+  });
+
+  it("Passwortlänge: 7/8 und 128/129 Zeichen", () => {
+    assert.equal(passwordProblem("a".repeat(7)), "short");
+    assert.equal(passwordProblem("a".repeat(8)), null);
+    assert.equal(passwordProblem("a".repeat(128)), null);
+    assert.equal(passwordProblem("a".repeat(129)), "long");
+  });
+});

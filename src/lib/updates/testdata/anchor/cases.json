@@ -2419,6 +2419,13 @@
 {"path":"app/versions/0.3.0/SOS-SEAL","type":"f","mode":420,"b64":"c2NocmF1YmVyb3Mtc2VhbCAxCnZlcnNpb24gMC4zLjAKYmFzZSA0CmFyY2ggeDY0CnRyZWUtc2hhNTEyIDk0YzM3ZGFjYmUzYzEwN2ZhMjE5YmU2ZDVjZmVkNWM1Y2Y4ZjdmYTUxMDg2NzgyOTA0ZWM3MDM0MTA4MjAxMDcyNDIzYzcwOGZjZTA2ZmI1OTNmMDdhZjlmOWYwM2M5YjJlNjc5ZGZlYWM4NDZlYTczNmExNjkwNWRjNDU3YTRmCnRyZWUtc2l6ZSAxNjgKdHJlZS1lbnRyaWVzIDEKdHJlZS1ieXRlcyAwCnNpZ25pbmcta2V5IDViNjhhM2I4ZWVkNmQ3YmE5ZGNkN2EwOTM4YWU2ZWQxYzIxNThkYTA5Y2U4ZWE1N2RjMmVlNDhhNmE0MWUxMWQKc2lnbmF0dXJlIGY0ZmFiNjAwZjIxOTYyYzJiNTg1NzA0ZTJmNjk2NGZhOTYzMDA4NTE2OWM0YWQzMDA0Njk1OWExMGZhMGExMDdkOGRkMGNmZDg3NjM1Y2FmMzNkYmM3Mzk1MTcyYmQxMDIyMjMxYmZkYzBkMzg4MTdjNzE1ZTFhNzgwZjMwNDA1Cg=="},
 {"path":"app/versions/0.3.0/SOS-TREE","type":"f","mode":420,"b64":"c2NocmF1YmVyb3MtdHJlZSAyCmhhc2ggc2hhNTEyCmYJLQkzCWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhCWEK"}
 ]},
+{"name":"tree-size-14-digits","description":"Größenfeld mit 14 Ziffern (Obergrenze sind 13). (gültig signiert, die Liste selbst ist fehlerhaft)","args":{"version":"0.3.0","image":{"base":4,"arch":"x64"},"floor":"0.2.0-dev.abc1234"},"expect":{"code":13,"class":"negative","reason":"tree-format"},"entries":[
+{"path":"app","type":"d","mode":493},
+{"path":"app/versions","type":"d","mode":493},
+{"path":"app/versions/0.3.0","type":"d","mode":493},
+{"path":"app/versions/0.3.0/SOS-SEAL","type":"f","mode":420,"b64":"c2NocmF1YmVyb3Mtc2VhbCAxCnZlcnNpb24gMC4zLjAKYmFzZSA0CmFyY2ggeDY0CnRyZWUtc2hhNTEyIDg5OTJjY2FkZGUyNmY1ZWI2NTNmNjE5NGQyNmMzOGFkMjIyZjIxNDc4MDMyMjQ0MTdlYTg1ZDhiZDY0NmI0MTk1ZDBkNzAxYTBjODk1ZGQyYWRkODUzYjhiOTcyMmNhZWQ2MmIxZTQ3OWQ0ODE1NjBhMzhhNmMwMTliYmNmZDlkCnRyZWUtc2l6ZSAxODEKdHJlZS1lbnRyaWVzIDEKdHJlZS1ieXRlcyAwCnNpZ25pbmcta2V5IDViNjhhM2I4ZWVkNmQ3YmE5ZGNkN2EwOTM4YWU2ZWQxYzIxNThkYTA5Y2U4ZWE1N2RjMmVlNDhhNmE0MWUxMWQKc2lnbmF0dXJlIDgzMWI5MDA4MTE0YTEzYjFiZjEyYjQ0OGY5MWMyNjI2OTc3ZTg4MjRjNDE0NTVmZDljY2U2M2ZiYzU3MjExYTZmOWUxMzc3YjIwM2NiNmVmNTdmYjRlOThkMWM2N2UzNzIyN2E1MjU0MWM5YzI4MDRjOWY4ZTdkZDEwZGYyNTBmCg=="},
+{"path":"app/versions/0.3.0/SOS-TREE","type":"f","mode":420,"b64":"c2NocmF1YmVyb3MtdHJlZSAxCmhhc2ggc2hhNTEyCmYJLQkxMDAwMDAwMDAwMDAwMAlhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQlhCg=="}
+]},
 {"name":"tree-crlf","description":"Windows-Zeilenenden. (gültig signiert, die Liste selbst ist fehlerhaft)","args":{"version":"0.3.0","image":{"base":4,"arch":"x64"},"floor":"0.2.0-dev.abc1234"},"expect":{"code":13,"class":"negative","reason":"tree-format"},"entries":[
 {"path":"app","type":"d","mode":493},
 {"path":"app/versions","type":"d","mode":493},

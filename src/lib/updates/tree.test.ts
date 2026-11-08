@@ -264,3 +264,16 @@ describe("SOS-TREE: echtes Dateisystem (nodeFs)", () => {
     assert.equal(await fs.readlink("link"), "a");
   });
 });
+
+describe("SOS-TREE: Größenfeld (Z6-4 L-1)", () => {
+  const line = (size: string) => Buffer.from(`${TREE_HEADER}f\t-\t${size}\t${HASH}\ta\n`);
+
+  it("13 Ziffern sind lesbar (bis 2^40), 14 Ziffern nicht (der C-Prüfer liest ebenfalls höchstens 13; Goldkorpus-Fall tree-size-14-digits)", () => {
+    assert.equal(parseTree(line("1099511627776"))[0]?.size, 2 ** 40, "13 Ziffern: die größte erlaubte Datei (2^40 Bytes)");
+    assert.equal(codeOf(() => parseTree(line("1099511627777"))), "limit", "13 Ziffern, aber über der Dateigrenze: Grenze, nicht Format");
+    assert.equal(codeOf(() => parseTree(line("10000000000000"))), "format");
+    assert.equal(codeOf(() => parseTree(line("00000000000000"))), "format", "auch 14 Nullen sind zu lang");
+    assert.equal(codeOf(() => parseTree(line("-1"))), "format");
+    assert.equal(codeOf(() => parseTree(line("1e3"))), "format");
+  });
+});

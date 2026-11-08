@@ -39,6 +39,14 @@ describe("amountsConsistent", () => {
     assert.equal(amountsConsistent(10000, 1900, 12000), false);
     assert.equal(amountsConsistent(null, 1900, 12000), true);
   });
+
+  test("Grenze der Toleranz: Abweichung 0 und 1 Cent (nach oben und unten) gelten, 2 Cent nicht (Z6-4 M-2)", () => {
+    for (const gross of [11899, 11900, 11901]) assert.equal(amountsConsistent(10000, 1900, gross), true, String(gross));
+    for (const gross of [11897, 11898, 11902, 11903]) assert.equal(amountsConsistent(10000, 1900, gross), false, String(gross));
+    assert.equal(amountsConsistent(10000, null, 99999), true, "ohne MwSt keine Prüfung");
+    assert.equal(amountsConsistent(-10000, -1900, -11901), true, "Gegenbelege");
+    assert.equal(amountsConsistent(-10000, -1900, -11902), false);
+  });
 });
 
 describe("Beleg-Ablage", () => {

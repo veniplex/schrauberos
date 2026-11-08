@@ -414,6 +414,7 @@ export async function buildCorpus(): Promise<Corpus> {
     ["tree-uppercase-hash", "Hash in Großbuchstaben.", TREE_HEADER + f("a", "A".repeat(128))],
     ["tree-exec-on-dir", "Ausführbit an einem Ordner.", TREE_HEADER + "d\tx\t0\t-\ta\n"],
     ["tree-wrong-header", "Falsche Kopfzeile.", TREE_HEADER.replace("tree 1", "tree 2") + f("a")],
+    ["tree-size-14-digits", "Größenfeld mit 14 Ziffern (Obergrenze sind 13).", TREE_HEADER + `f\t-\t10000000000000\t${hash}\ta\n`],
     ["tree-crlf", "Windows-Zeilenenden.", (TREE_HEADER + f("a")).replace(/\n/g, "\r\n")],
     ["tree-absolute-link", "Symlink mit absolutem Ziel.", TREE_HEADER + "l\t-\t0\t/etc/passwd\tlink\n"],
     ["tree-link-escapes", "Symlink-Ziel verlässt den Baum.", TREE_HEADER + "l\t-\t0\t../../x\tlink\n"],

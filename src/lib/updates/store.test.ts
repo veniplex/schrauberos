@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { afterFailure, afterInstall, emptyState } from "./state";
-import { BLOCKED_KEEP, activeFile, pruneBlockedRemnants, pruneVersions, readActive, readMeta, readState, versionDir, versionsDir, writeState } from "./store";
+import { BLOCKED_KEEP, BLOCKED_MAX_AGE_MS, activeFile, pruneBlockedRemnants, pruneVersions, readActive, readMeta, readState, versionDir, versionsDir, writeState } from "./store";
 
 const data = mkdtempSync(path.join(tmpdir(), "so-store-"));
 after(() => rmSync(data, { recursive: true, force: true }));
@@ -94,6 +94,36 @@ describe("Beiseitegeschobene Marker-Reste (`<Marker>.blocked-<ms>`)", () => {
       assert.equal(existsSync(old[0]), false);
       assert.equal(existsSync(old[1]), false);
       assert.equal(pruneBlockedRemnants(path.join(root, "gibtsnicht"), now), 0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Grenzwert: Alter beiseitegeschobener Reste (Z6-4 L-1)", () => {
+  it("genau 7 Tage alt bleibt, eine Millisekunde länger wird gelöscht (die drei neuesten bleiben unabhängig vom Alter)", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "so-blocked-edge-"));
+    try {
+      const app = path.join(root, "app");
+      mkdirSync(app, { recursive: true });
+      const now = Date.now();
+      const make = (name: string, ageMs: number) => {
+        const full = path.join(app, name);
+        mkdirSync(full);
+        const when = new Date(now - ageMs);
+        utimesSync(full, when, when);
+        return full;
+      };
+      const day = 24 * 3600_000;
+      for (const [i, name] of ["verify-failed.blocked-1", "verify-failed.blocked-2", "verify-failed.blocked-3"].entries()) make(name, i * 1000); // die drei neuesten
+      const exactly = make("inconclusive.blocked-10", BLOCKED_MAX_AGE_MS);
+      const older = make("inconclusive.blocked-11", BLOCKED_MAX_AGE_MS + 1);
+      const younger = make("inconclusive.blocked-12", BLOCKED_MAX_AGE_MS - 1);
+      assert.equal(BLOCKED_MAX_AGE_MS, 7 * day);
+      assert.equal(pruneBlockedRemnants(root, now), 1);
+      assert.equal(existsSync(exactly), true, "genau 7 Tage: bleibt");
+      assert.equal(existsSync(younger), true);
+      assert.equal(existsSync(older), false, "7 Tage + 1 ms: weg");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
