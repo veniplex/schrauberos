@@ -438,6 +438,8 @@ describe("Läufe: Entprellung, Ereignisse, Belegen, Fairness, Grenzen", () => {
       const [a, b] = await Promise.all([run.runDueChecks({ now: NOW }), run.runDueChecks({ now: NOW })]);
       assert.equal(a.checked + b.checked, 6);
       assert.equal(a.skipped + b.skipped >= 0, true);
+      // Der Zähler des Testservers steigt erst, wenn dessen Ereignisschleife die Verbindungen annimmt (unter Linux nach der Prüfung, nicht davor): kurz abwarten
+      for (let i = 0; i < 100 && server.connections < 6; i++) await new Promise((resolve) => setTimeout(resolve, 20));
       assert.equal(server.connections, 6);
       assert.equal(await env.db.netMonitorSample.count(), 6);
     } finally {
