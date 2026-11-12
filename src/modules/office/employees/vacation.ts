@@ -8,8 +8,9 @@ import { FULL_WEEK, type WorkPattern } from "./work-pattern";
  * **Anspruch im Ein-/Austrittsjahr (monatsgenau, konservativ):** 1/12 des Jahresanspruchs je **vollem** Kalendermonat der Beschäftigung. Ein Monat zählt nur, wenn die Person ihn vom
  * ersten bis zum letzten Tag beschäftigt war (Eintritt am 1. zählt, Eintritt am 2. nicht; Austritt am letzten Tag zählt, am Vortag nicht). Gerundet wird wie in § 5 Abs. 2 BUrlG:
  * ein Bruchteil von mindestens einem halben Tag wird auf einen vollen Tag **aufgerundet**; ein kleinerer Bruchteil bleibt (auf zwei Nachkommastellen) bestehen. Vertragliche und
- * tarifliche Regelungen können abweichen, und die gesetzliche Sonderregel zum Austritt in der zweiten Jahreshälfte ist hier nicht abgebildet – die Anwendung liefert eine Übersicht,
- * keine Rechtsberatung.
+ * tarifliche Regelungen können abweichen. **Nicht abgebildet** sind die Wartezeit (voller Anspruch nach sechs Monaten) und die gesetzliche Sonderregel zum Austritt nach dem 30.6. (voller Anspruch): Hier
+ * wird immer 1/12 je vollem Monat gerechnet. Ebenso nicht abgebildet ist die Mitwirkungs- und Hinweispflicht des Arbeitgebers (§ 7 BUrlG): Der Übertrag verfällt am Stichtag automatisch. Die Anwendung
+ * liefert eine Übersicht, keine Rechtsberatung (die Hilfe sagt das ebenso).
  *
  * **Teilzeit:** Der Jahresanspruch ist der Anspruch in Arbeitstagen *dieser Person* (bei einer Dreitagewoche z. B. 18, nicht 30). Abgezogen werden nur Arbeitstage nach ihrem Muster
  * (`work-pattern.ts`), ohne Feiertage.
