@@ -132,3 +132,31 @@ test("Termin → Auftrag → Positionen → Abschluss → Rechnung → Festschre
   expect(await cspViolations(page)).toEqual([]);
   expect(browserErrors()).toEqual([]);
 });
+
+test("Mail-Verwaltung: Einstellungen bleiben gespeichert, „Verbindung testen“ klappt, das Sendeprotokoll nennt die versendete Rechnung ohne Inhalt", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "globale Mail-Einstellung: ein Durchlauf");
+  test.skip(!smtp, "braucht den Empfänger und die Einstellung des Durchlaufs davor");
+  const browserErrors = collectBrowserErrors(page);
+  await watchCsp(page);
+  await page.goto("/settings?tab=mail");
+  await expect(page.getByText("Der Versand ist eingerichtet und eingeschaltet.")).toBeVisible();
+  // die Einstellungen aus dem ersten Durchlauf stehen noch (Server, Port, Absender); das Passwort-Feld ist leer
+  await expect(page.locator("#host")).toHaveValue("127.0.0.1");
+  await expect(page.locator("#port")).toHaveValue(String(smtp!.port));
+  await expect(page.locator("#fromAddress")).toHaveValue("werkstatt@example.org");
+
+  // Verbindung testen: meldet Erfolg, sendet nichts
+  const before = smtp!.mails.length;
+  await page.getByRole("button", { name: "Verbindung testen" }).click();
+  await expect(page.locator("[data-flash]").first()).toContainText("Verbindung und Anmeldung beim Server haben geklappt");
+  expect(smtp!.mails.length, "der Verbindungstest sendet nichts").toBe(before);
+
+  // Sendeprotokoll: Empfänger und Status, nie der Inhalt
+  const log = page.getByRole("table", { name: "Sendeprotokoll" });
+  await expect(log).toBeVisible();
+  const row = log.getByRole("row").filter({ hasText: "erika@example.org" }).first();
+  await expect(row).toContainText("Gesendet");
+  await expect(log).not.toContainText("Content-Type");
+  expect(await cspViolations(page)).toEqual([]);
+  expect(browserErrors()).toEqual([]);
+});

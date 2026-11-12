@@ -51,7 +51,13 @@ test("Checkliste Annahmeprotokoll: Punkte abhaken, Name und gezeichnete Untersch
   await page.getByRole("textbox", { name: "Kilometerstand abgelesen: Wert" }).fill("45123");
   await page.getByRole("combobox", { name: "Tankfüllung" }).selectOption({ label: "1/2" });
   await page.getByRole("combobox", { name: "Warnleuchten im Kombiinstrument" }).selectOption({ label: "keine" });
-  for (const name of [/Äußere Schäden dokumentiert/, /Wertgegenstände im Fahrzeug/, /Kundenwunsch besprochen/, /Kostenrahmen und Rückruf/]) await page.getByRole("checkbox", { name }).check();
+  // Per Tastatur abhaken: Der Fokus bleibt auf dem Punkt, auch während und nach dem Speichern (nie auf <body>, Z6-5 M1)
+  const first = page.getByRole("checkbox", { name: /Äußere Schäden dokumentiert/ });
+  await first.focus();
+  await page.keyboard.press("Space");
+  await expect(first).toBeChecked();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("type") ?? document.activeElement?.tagName)).toBe("checkbox");
+  for (const name of [/Wertgegenstände im Fahrzeug/, /Kundenwunsch besprochen/, /Kostenrahmen und Rückruf/]) await page.getByRole("checkbox", { name }).check();
   await expect(page.getByText(/von 9 erledigt/)).toContainText(/[6-9] von 9 erledigt/);
 
   // Abschluss: Name des Kunden, gezeichnete Unterschrift
