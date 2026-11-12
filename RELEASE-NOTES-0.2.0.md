@@ -8,6 +8,10 @@ Entwurf der Release-Notiz (Stand Block 13d). Vor dem Veröffentlichen: Abschnitt
 
 Beim ersten Start: Einrichtungs-Token aus dem Container-Log, Einrichtung im Browser (Werkstattname, Zeitzone, erster Administrator, Preset), danach den **Wiederherstellungs-Code** (Notzugang) ausdrucken und – unter Verwaltung → Backups → Schlüssel – den **Wiederherstellungsschlüssel** erzeugen und sicher verwahren.
 
+## Rechnungserstellung: vor dem produktiven Einsatz vom Steuerberater freigeben lassen
+
+**Die Rechnungserstellung (Angebote & Rechnungen) ist fachlich nicht freigegeben.** Bevor echte Rechnungen versendet werden, muss die Steuerberatung Pflichtangaben und Prüfliste, den Kleinunternehmer-Text (Kategorie „steuerfrei“), 0 %-Positionen, die Darstellung der Abschläge in der Schlussrechnung und beim Storno sowie den Kassenhinweis (Barzahlungen, § 146a AO) freigeben. Der **Wortlaut** der Schlussrechnung (Abschläge getrennt nach Entgelt und Umsatzsteuer, danach Restbetrag), des Stornos einer Schlussrechnung (Erstattungsbetrag) und der Anmerkungen in der XRechnung ist eine **Annahme des Entwicklungsteams**. Die Funktion ist standardmäßig ausgeschaltet. Offen und vor dem **ersten echten Versand** zu entscheiden: Die **Originalrechnung** (PDF und XRechnung) wird bei jedem Abruf neu aus den gespeicherten Daten erzeugt und nicht als Datei abgelegt – bei E-Rechnungen gilt der strukturierte Teil als Original, dessen unveränderte Aufbewahrung die Steuerberatung bewerten muss (Ablage beim Festschreiben wäre die Alternative). Nur Inland (Land DE; Steuerkategorien „normal“ und „steuerfrei“, kein Reverse-Charge, keine innergemeinschaftliche Lieferung, keine Ausfuhr). Die **E-Rechnungspflicht im B2B** (Empfang seit 2025, Versand gestaffelt bis 2028) klärt die Steuerberatung.
+
 ## Neu
 
 **Alle neuen Funktionen sind standardmäßig aus.** Ein Administrator schaltet sie in „Module & Funktionen“ ein oder wählt bei der Einrichtung ein Preset (`basic`, `orders`, `invoicing`, `daily`). Ausgeschaltete Funktionen haben weder Menü noch Rechte; Daten bleiben beim Ausschalten erhalten.
@@ -21,6 +25,9 @@ Beim ersten Start: Einrichtungs-Token aus dem Container-Log, Einrichtung im Brow
 
 ## Geändertes Verhalten (bitte lesen)
 
+* **Wiederherstellung beendet Sitzungen:** Nach **jeder** Wiederherstellung eines Backups sind alle Sitzungen und gemerkten Geräte beendet (einmalige erneute Anmeldung); Webhooks sind aus, API-Tokens widerrufen.
+* **Datenbank:** Die Datenbank wird mit `auto_vacuum = INCREMENTAL` angelegt; ein täglicher Job gibt freien Platz zurück (die Datei schrumpft nach Aufräumläufen). Das gilt nur für **neu angelegte** Datenbanken – ein Grund mehr für die Neuinstallation.
+* **Neu in Standardrollen:** `employees.sensitive` (Krankheit, Notfallkontakt – Gesundheitsdaten) steckt **nicht mehr** in der Rolle „Geschäftsführung“, ist als „sensibel“ gekennzeichnet und gehört in keine Rolle und keine Vorlage, solange die Leitung es nicht ausdrücklich vergibt (Administratoren haben es). Rollenliste und Sperrseite nennen für Administratoren, dass „alle Rechte“ die ausdrücklich zu vergebenden (Tresor) nicht einschließen.
 * **Rechte:** Diese Rechte stehen in **keiner Standardrolle** und werden bewusst vergeben: `invoices.finalize` (Festschreiben), `billing.send` und `mail.send` (Versand), `orders.reopen`, `checklists.reopen`, `time.viewAll`, `time.correctAll`, `reports.export`, alle Export-/Import-Rechte, `customers.disclose`, `customers.privacy`, `network.monitor`. Die **Tresor-Rechte** gelten nur, wenn eine Rolle sie ausdrücklich enthält – **auch Administratoren haben sie nicht automatisch**. Kein API-Token kann diese Rechte tragen. `reports.view` haben Geschäftsführung und Büro.
 * **Kundendaten:** Telefon des Halters und Ort des Kunden sehen nur Personen mit `customers.view`; Kennzeichen suchen in der Kundenliste nur mit `vehicles.view`. Eingeschränkte Kunden (Art. 18) erscheinen nirgends mehr in Auswahl, Suche, Export, API und Kalender-Abo.
 * **Zeit:** Die **Werkstatt-Zone** (Einstellungen) bestimmt „heute“ und alle Uhrzeiten; die Zeitzone des Servers ist ohne Bedeutung. Kalendertage werden als Mittag der Werkstatt-Zone gespeichert; ein Zonenwechsel kann bei weit entfernten Zonen gespeicherte Tage um einen Tag verschieben.
@@ -35,6 +42,12 @@ Beim ersten Start: Einrichtungs-Token aus dem Container-Log, Einrichtung im Brow
 * **Anmeldung:** „Dieses Gerät merken“ nur auf Wunsch (nie vom Passwort oder zweiten Faktor befreit); Leerlauf-Frist und Pflicht-2FA für Administratoren sind Standard aus.
 * **Technisch:** SVG-Logos werden nicht mehr angenommen (Standardmarke), das Logo ist ohne Anmeldung abrufbar; Doku-Bild-Upload verlangt `Content-Length`; hinter einem Reverse-Proxy mit umgeschriebenem Host die Einstellung „Hinter Reverse-Proxy“ (`X-Forwarded-Host`); Off-Site-Dateien `.sobk` Version 2; Webhooks, Off-Site und E-Mail erreichen den **Docker-Host nicht mehr** (wie schon die Überwachung).
 
+## Änderungen seit dem Entwurf (Fix-Runde 13e, bitte beachten)
+
+* **Neuinstallation nötig** bleibt: Schema und Baseline haben sich geändert (`updatedAt`/Version an sechs Konfigurationstabellen, `Restrict` statt `Cascade` auf Historie, `auto_vacuum`, Versionsangabe der Suchspalten); es gibt weiterhin keine Migration von 0.1.0.
+* Bedienung: „Auftrag aus Termin“ und „Terminzettel“ stehen auch im Bearbeiten-Dialog eines Termins; die Prüfliste einer Rechnung verlinkt fehlende Punkte und kann die Anschrift aus dem Kunden neu übernehmen; Diagramme bleiben am Handy lesbar; Meldungen nennen Auftrag, Beleg oder Funktion; Stempeln wird angesagt; der Fokus bleibt nach Aktionen auf der Seite.
+* Datenschutz: Die **Anonymisierung** ersetzt den Namen in den Audit-Einträgen des Kunden (Aktion, Zeit, Handelnde und Kennung bleiben). Die **Urlaubsberechnung** ist eine Vereinfachung (kein Ersatz für Rechtsprüfung; Wartezeit und Austritt nach dem 30.6. nicht automatisch; der Verfall des Übertrags ohne Hinweis des Arbeitgebers nach § 7 BUrlG wird nicht abgebildet).
+
 ## Für Betreiber
 
 * Image: `ghcr.io/veniplex/schrauberos:0.2.0` (auch `0.2`, `latest`). Gehärteter Betrieb: `docker-compose.hardened.yml`. HTTPS (Reverse-Proxy) ist für die installierbare App nötig.
@@ -45,9 +58,9 @@ Beim ersten Start: Einrichtungs-Token aus dem Container-Log, Einrichtung im Brow
 
 Die vollständige Liste mit Empfehlung steht im Übergabebericht von Block 13d; hier die Kurzform nach Thema.
 
-* **Fachliche Freigabe durch den Steuerberater:** Rechnungserstellung (Pflichtangaben, Kleinunternehmer-Text, 0 %-Positionen, Anrechnung von Abschlägen, Storno ohne Fälligkeit), XRechnung (nie gegen den KoSIT-Prüfer gelaufen; der Pipeline-Job tut es), Aufbewahrungsfristen (Platzhalter; die Anonymisierung bleibt gesperrt, bis ein Administrator sie bestätigt), Umsatz-Definition der Berichte, Kassenhinweis.
+* **Fachliche Freigabe durch den Steuerberater:** Rechnungserstellung (Pflichtangaben, Kleinunternehmer-Text, 0 %-Positionen, Anrechnung von Abschlägen – Darstellung in Schlussrechnung und Storno –, Storno ohne Fälligkeit, Originalrechnung PDF/XML), XRechnung (nie gegen den KoSIT-Prüfer gelaufen; der Pipeline-Job tut es), Aufbewahrungsfristen (Platzhalter; die Anonymisierung bleibt gesperrt, bis ein Administrator sie bestätigt), Umsatz-Definition der Berichte, Kassenhinweis.
 * **Daten ohne Primärquelle:** Feiertage der Schweizer Kantone und österreichischen Landesfeiertage, Arbeitszeit-Schwellen, Drehmomentwerte der Checklisten-Vorlagen.
-* **Rechte:** `employees.sensitive` steckt in der Standardrolle „Geschäftsführung“ (Empfehlung: entfernen und kennzeichnen), Notausschalter für die Pflicht-2FA, eigene Tresor-Hülle statt „ein Schlüssel für alles“.
+* **Rechte:** Notausschalter für die Pflicht-2FA, eigene Tresor-Hülle statt „ein Schlüssel für alles“.
 * **Webhooks, Off-Site und E-Mail** erreichen den Docker-Host nicht (Entscheid des Entwicklungsteams, zu bestätigen).
 
 ## Realgeräte-Ergebnis
