@@ -33,10 +33,12 @@ describe("Rollenvorlagen", () => {
     }
   });
 
-  it("die Leitung hat gegenüber der Standardrolle „Geschäftsführung“ nur die sensiblen Mitarbeiterdaten weniger", () => {
+  it("die Leitung entspricht der Standardrolle „Geschäftsführung“: Die sensiblen Mitarbeiterdaten (Art. 9 DSGVO) stecken in keiner von beiden und sind als „sensibel“ gekennzeichnet", () => {
     const management = DEFAULT_ROLES.find((r) => r.key === "management")!;
     const leitung = templatePermissions(ROLE_TEMPLATES.find((t) => t.id === "management")!);
-    assert.deepEqual(management.permissions.filter((p) => !leitung.includes(p)), ["employees.sensitive"]);
+    assert.deepEqual(management.permissions.filter((p) => !leitung.includes(p)), []);
+    assert.ok(!management.permissions.includes("employees.sensitive" as never), "nicht in der Standardrolle");
+    assert.equal(MARKED_PERMISSIONS.get("employees.sensitive"), "sensitive");
     assert.ok(isRuleNinePermission("employees.sensitive") && isRuleNinePermission("customers.export") && isRuleNinePermission("users.manage") && !isRuleNinePermission("customers.view"));
   });
 });

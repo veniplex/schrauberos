@@ -28,7 +28,8 @@ export const DEFAULT_ROLES: Array<{
       "billing.view", "billing.edit", "billing.accept",
       // Berichte ansehen (jeder Bericht zeigt nur, was die Rolle auch an der Quelle sehen darf); der CSV-Export (reports.export) ist gekennzeichnet (Regel 9) und in keiner Standardrolle
       "reports.view",
-      "employees.view", "employees.edit", "employees.delete", "employees.sensitive",
+      // employees.sensitive (Krankheit, Notfallkontakt: Gesundheitsdaten, Art. 9 DSGVO) ist gekennzeichnet (Regel 9) und in keiner Standardrolle: Die Leitung vergibt es ausdrücklich (Administratoren haben es)
+      "employees.view", "employees.edit", "employees.delete",
       "fleet.view", "fleet.edit", "fleet.delete",
       "handbook.view", "handbook.edit",
       "appointments.view", "tires.view", "customers.view", "vehicles.view",

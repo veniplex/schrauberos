@@ -6,7 +6,7 @@ export const employeesFeature = defineFeature({
   nameKey: "employees.feature.name",
   descriptionKey: "employees.feature.description",
   order: 40,
-  permissions: { group: "employees", keys: ["employees.view", "employees.edit", "employees.delete", "employees.sensitive"] },
+  permissions: { group: "employees", keys: ["employees.view", "employees.edit", "employees.delete", "employees.sensitive"], marked: { sensitive: ["employees.sensitive"] } },
   nav: [
     { id: "employees", href: "/employees", labelKey: "nav.employees", icon: "employees", permission: "employees.view", order: 40 },
     { id: "absences", href: "/employees/absences", labelKey: "nav.absences", icon: "absences", permission: "employees.view", order: 41 },

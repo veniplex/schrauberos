@@ -136,7 +136,7 @@ describe("Katalog", () => {
       for (const [mark, keys] of Object.entries(marked)) for (const p of keys) assert.ok((f.permissions.keys as readonly string[]).includes(p), `${p} (${mark}) nicht in der Gruppe`);
     }
     assert.ok(MARKED_PERMISSIONS.size >= 8, "mindestens die Rechte für Export und Import je Datenart");
-    for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(!MARKED_PERMISSIONS.has(p) || p === "employees.sensitive", `${role.key}: ${p} ist gekennzeichnet (${MARKED_PERMISSIONS.get(p)}) und gehört in keine Standardrolle`);
+    for (const role of DEFAULT_ROLES) for (const p of role.permissions) assert.ok(!MARKED_PERMISSIONS.has(p), `${role.key}: ${p} ist gekennzeichnet (${MARKED_PERMISSIONS.get(p)}) und gehört in keine Standardrolle`);
     // Gegenprobe zum Namensmuster: die Kennzeichnung steht im Katalog, ein vergessenes Recht fällt trotzdem auf
     for (const p of ALL_PERMISSIONS) if (/\.(export|import)$/.test(p)) assert.ok(MARKED_PERMISSIONS.has(p), `${p} fehlt unter permissions.marked`);
   });

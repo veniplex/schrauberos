@@ -15,11 +15,8 @@ export const ROLE_TEMPLATES: readonly RoleTemplateDef[] = [
   { id: "management", from: "management", nameKey: "roles.templates.management.name", descriptionKey: "roles.templates.management.description" },
 ];
 
-/** Sensible Mitarbeiterdaten stehen (noch) nicht unter `permissions.marked` im Katalog (siehe Produktentscheid in den offenen Punkten); Vorlagen lassen sie trotzdem immer weg. */
-const SENSITIVE_WITHOUT_MARK: ReadonlySet<string> = new Set(["employees.sensitive"]);
-
 /** Rechte, die nie in einer Vorlage stehen (Regel 9). */
-export const isRuleNinePermission = (permission: string): boolean => ADMIN_ONLY_PERMISSIONS.has(permission) || MARKED_PERMISSIONS.has(permission) || SENSITIVE_WITHOUT_MARK.has(permission);
+export const isRuleNinePermission = (permission: string): boolean => ADMIN_ONLY_PERMISSIONS.has(permission) || MARKED_PERMISSIONS.has(permission);
 
 /** Rechte einer Vorlage: die der Standardrolle ohne Rechte nach Regel 9. */
 export function templatePermissions(template: RoleTemplateDef): Permission[] {
