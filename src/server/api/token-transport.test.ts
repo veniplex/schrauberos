@@ -92,7 +92,7 @@ describe("Token-Übergabe", () => {
     const responses = [
       await send(`/customers?token=${token}`),
       await send("/customers", { authorization: `Basic ${b64(`${token}:`)}` }),
-      await send("/customers", { authorization: `Bearer ${token.slice(0, -1)}A` }),
+      await send("/customers", { authorization: `Bearer ${token.slice(0, -1)}${token.endsWith("A") ? "B" : "A"}` }),
       await send("/customers", { cookie: `access_token=${token}` }),
     ];
     for (const r of responses) {
