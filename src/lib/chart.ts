@@ -52,6 +52,8 @@ export type ChartLayoutInput = {
   series: readonly ChartSeries[];
   width?: number;
   height?: number;
+  /** Breite eines Zeichens der Achsenbeschriftung in Einheiten des viewBox (Standard 6,4 für 11 px Schrift; bei 12 px etwa 7) */
+  charWidth?: number;
   /** Beschriftung der Teilstriche – bestimmt den Platz links */
   formatTick?: (value: number) => string;
   /** Anzahlen: Teilstriche nur bei ganzen Zahlen */
@@ -78,7 +80,8 @@ export function layoutChart(input: ChartLayoutInput): ChartLayout {
   const values = input.series.flatMap((s) => s.values.filter((v): v is number => v !== null && Number.isFinite(v)));
   const scale = niceScale(values.length ? Math.min(...values) : 0, values.length ? Math.max(...values) : 0, 5, input.type === "bar", input.integer);
   const format = input.formatTick ?? ((v: number) => String(v));
-  const tickWidth = Math.max(...scale.ticks.map((t) => format(t).length), 1) * CHAR_WIDTH;
+  const charWidth = input.charWidth ?? CHAR_WIDTH;
+  const tickWidth = Math.max(...scale.ticks.map((t) => format(t).length), 1) * charWidth;
   const plot = { left: Math.ceil(tickWidth) + 14, top: 14, right: width - 10, bottom: height - 28 };
   const plotWidth = plot.right - plot.left;
   const plotHeight = plot.bottom - plot.top;
@@ -86,7 +89,7 @@ export function layoutChart(input: ChartLayoutInput): ChartLayout {
   const count = Math.max(1, input.categories.length);
   const slot = plotWidth / count;
 
-  const labelWidth = Math.max(...input.categories.map((c) => c.length), 1) * CHAR_WIDTH + 8;
+  const labelWidth = Math.max(...input.categories.map((c) => c.length), 1) * charWidth + 8;
   const every = Math.max(1, Math.ceil(labelWidth / slot));
   const categories = input.categories.map((label, i) => ({ label, x: plot.left + slot * (i + 0.5), show: i % every === 0 }));
 

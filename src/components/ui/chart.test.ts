@@ -96,6 +96,40 @@ describe("Chart", () => {
     assert.ok(byText(root, "button", /As table/));
   });
 
+  it("Schrift in Bildschirmpixeln konstant: der viewBox folgt der gemessenen Breite (Handy 316 px: 1 Einheit = 1 px, Schrift 12), nicht der festen Breite 640", async () => {
+    const original = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    class FakeObserver {
+      constructor(private callback: (entries: Array<{ contentRect: { width: number } }>) => void) {}
+      observe() {
+        this.callback([{ contentRect: { width: (globalThis as { __chartWidth?: number }).__chartWidth ?? 640 } }]);
+      }
+      disconnect() {}
+    }
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = FakeObserver;
+    try {
+      (globalThis as { __chartWidth?: number }).__chartWidth = 316;
+      const categories = Array.from({ length: 12 }, (_, i) => `Monat ${i + 1}`);
+      const root = await mountChart({ type: "bar", categories, series: [{ id: "a", label: "Umsatz", values: categories.map((_, i) => (i + 1) * 100000) }] });
+      const svg = root.querySelector("svg[role='img']") as SVGElement;
+      assert.equal(svg.getAttribute("viewBox")?.split(" ")[2], "316", "viewBox = Containerbreite (Pixel)");
+      const sizes = new Set(Array.from(svg.querySelectorAll("text")).map((t) => Number(t.getAttribute("font-size") ?? t.getAttribute("fontSize"))));
+      assert.deepEqual([...sizes], [12], "Beschriftung überall 12 px, bei Maßstab 1");
+      assert.ok(Math.min(...sizes) >= 11, "mindestens 11 px");
+      const shown = Array.from(svg.querySelectorAll("text")).filter((t) => /^Monat/.test(t.textContent ?? ""));
+      assert.ok(shown.length > 0 && shown.length < 12, "auf schmaler Anzeige wird die Kategorie-Beschriftung ausgedünnt, nicht verkleinert");
+      assert.ok(byText(root, "button", /Als Tabelle/), "die Tabellen-Alternative bleibt erreichbar");
+      assert.equal(Array.from(svg.querySelectorAll("text")).filter((t) => /d.*€$/.test(t.textContent ?? "") && t.getAttribute("text-anchor") === "middle").length, 0, "zu eng für Werte am Balken: sie stehen in der Tabelle");
+      await view?.unmount();
+      view = null;
+      (globalThis as { __chartWidth?: number }).__chartWidth = 900;
+      const wide = await mountChart({ type: "bar", categories: MONTHS, series: [{ id: "a", label: "Umsatz", values: [120000, 150000, 90000, 180000] }] });
+      assert.equal(wide.querySelector("svg[role='img']")?.getAttribute("viewBox")?.split(" ")[2], "900");
+    } finally {
+      delete (globalThis as { __chartWidth?: number }).__chartWidth;
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original;
+    }
+  });
+
   it("Farben sind die Tokens (Hell und Dunkel stecken in den Tokens), keine Rohwerte im Baustein", async () => {
     const source = readFileSync(path.resolve(process.cwd(), "src/components/ui/chart.tsx"), "utf8");
     assert.doesNotMatch(source, /#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(/);

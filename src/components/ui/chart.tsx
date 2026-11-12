@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "@/i18n/client";
 import { layoutChart, seriesColorIndex, type ChartSeries, type ChartType } from "@/lib/chart";
@@ -19,8 +19,15 @@ import { Table } from "./layout";
  *    weiteren die neutrale sechste Farbe (dann tragen nur die Marken und die Legende die Unterscheidung).
  *  - Zahlen formatiert `formatValue` (Cent als Euro, Prozent …); Standard ist die Zahl der Sprache.
  *
- * Geometrie und Teilung: `lib/chart.ts`. Das SVG skaliert mit der Breite (`viewBox`), die Schrift bleibt dabei lesbar, weil die Breite 640 nur etwa das 1,7-fache einer Handybreite ist.
+ * Geometrie und Teilung: `lib/chart.ts`. **Die Schrift ist in Bildschirmpixeln konstant (12 px):** Das SVG wird mit der tatsächlichen Breite des Containers berechnet (`viewBox` = Pixel, gemessen mit
+ * `ResizeObserver`), statt eine feste Breite von 640 auf ein Handy zu verkleinern (dort wären 11 Einheiten nur noch 5 px). Auf schmalen Anzeigen dünnt `layoutChart` die Beschriftung aus. Bis zur ersten
+ * Messung (Server, Hydration) gilt die Breite 640.
  */
+
+/** Schriftgröße der Beschriftung in Bildschirmpixeln (Mindestmaß lesbarer Diagrammschrift) */
+export const CHART_FONT_PX = 12;
+const MIN_WIDTH = 260;
+const MAX_WIDTH = 960;
 
 const FILL: Record<number, string> = { 1: "fill-chart-1", 2: "fill-chart-2", 3: "fill-chart-3", 4: "fill-chart-4", 5: "fill-chart-5", 6: "fill-chart-6" };
 const STROKE: Record<number, string> = { 1: "stroke-chart-1", 2: "stroke-chart-2", 3: "stroke-chart-3", 4: "stroke-chart-4", 5: "stroke-chart-5", 6: "stroke-chart-6" };
@@ -84,16 +91,32 @@ export function Chart({
   const { t, number } = useI18n();
   const id = useId();
   const [asTable, setAsTable] = useState(false);
+  const frame = useRef<HTMLElement>(null);
+  const [measured, setMeasured] = useState<number | null>(null);
+  useEffect(() => {
+    const element = frame.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const width = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (width > 0) setMeasured((previous) => (previous === width ? previous : width));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const format = formatValue ?? ((value: number) => number(value));
   const empty = categories.length === 0 || series.length === 0 || series.every((s) => s.values.every((v) => v === null));
-  const layout = layoutChart({ type, categories, series, height, formatTick: format, integer });
-  const showValues = type === "bar" && layout.bars.length <= 12;
+  const width = measured === null ? 640 : Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, measured));
+  const layout = layoutChart({ type, categories, series, width, height, formatTick: format, integer, charWidth: CHART_FONT_PX * 0.58 });
+  // Werte am Balken nur, wenn sie nebeneinander Platz haben (schmale Anzeige: die Tabelle ist der Weg zu den Zahlen)
+  const slotWidth = (layout.plot.right - layout.plot.left) / Math.max(1, categories.length) / Math.max(1, series.length);
+  const longestValue = Math.max(1, ...layout.bars.map((bar) => format(bar.value).length));
+  const showValues = type === "bar" && layout.bars.length <= 12 && slotWidth >= longestValue * CHART_FONT_PX * 0.58 + 4;
   const description = t("ui.chart.summary", { type: t(type === "bar" ? "ui.chart.bar" : "ui.chart.line"), series: series.length, categories: categories.length });
 
   if (empty) return <p className={clsx("rounded-md border border-dashed border-line p-6 text-center text-sm text-ink-muted", className)}>{t("ui.chart.noData")}</p>;
 
   return (
-    <figure className={clsx("flex flex-col gap-3", className)}>
+    <figure ref={frame} className={clsx("flex min-w-0 flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <figcaption className="text-sm font-medium">{title}</figcaption>
         <Button size="sm" aria-pressed={asTable} onClick={() => setAsTable((v) => !v)}>
@@ -135,14 +158,14 @@ export function Chart({
           {layout.ticks.map((tick) => (
             <g key={tick.value}>
               <line x1={layout.plot.left} x2={layout.plot.right} y1={tick.y} y2={tick.y} className={tick.value === 0 ? "stroke-line-strong" : "stroke-line"} strokeWidth={1} />
-              <text x={layout.plot.left - 6} y={tick.y} textAnchor="end" dominantBaseline="middle" fontSize={11} className="fill-ink-muted tabular">
+              <text x={layout.plot.left - 6} y={tick.y} textAnchor="end" dominantBaseline="middle" fontSize={CHART_FONT_PX} className="fill-ink-muted tabular">
                 {format(tick.value)}
               </text>
             </g>
           ))}
           {layout.categories.map((c, i) =>
             c.show ? (
-              <text key={`${c.label}-${i}`} x={c.x} y={layout.plot.bottom + 16} textAnchor="middle" fontSize={11} className="fill-ink-muted">
+              <text key={`${c.label}-${i}`} x={c.x} y={layout.plot.bottom + 17} textAnchor="middle" fontSize={CHART_FONT_PX} className="fill-ink-muted">
                 {c.label}
               </text>
             ) : null,
@@ -158,7 +181,7 @@ export function Chart({
                       <title>{label}</title>
                     </rect>
                     {showValues ? (
-                      <text x={bar.x + bar.width / 2} y={bar.value >= 0 ? bar.y - 4 : bar.y + bar.height + 12} textAnchor="middle" fontSize={11} className="fill-ink tabular">
+                      <text x={bar.x + bar.width / 2} y={bar.value >= 0 ? bar.y - 4 : bar.y + bar.height + CHART_FONT_PX} textAnchor="middle" fontSize={CHART_FONT_PX} className="fill-ink tabular">
                         {format(bar.value)}
                       </text>
                     ) : null}
