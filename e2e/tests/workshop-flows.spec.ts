@@ -87,6 +87,8 @@ test("Fotos am Auftrag: Mehrfach-Upload, Auslieferung ohne Exif, API-Upload wird
   await watchCsp(page);
   const { orderId } = await newOrder(page, info);
   await page.goto(`/orders/${orderId}`);
+  // erst nach der Hydration: eine Auswahl vor dem Anhängen des Handlers geht verloren (zeigte sich einmal in einem Lauf: keine Vorschaubilder)
+  await page.waitForLoadState("networkidle");
   const photoInput = page.locator("input[type='file']").first();
 
   // Mehrfachauswahl am Handy/Desktop: zwei Fotos in einem Zug
