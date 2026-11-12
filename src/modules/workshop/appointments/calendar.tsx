@@ -13,7 +13,7 @@ import { customerDisplayName } from "@/modules/workshop/customers/public";
 import { weekdayKey, type OpeningHours } from "@/lib/opening-hours";
 import { addDays, dayKey, getDate, getISOWeek, instantOf, isSameDay, minutesOfDay, startOfDay, startOfWeek, wallOf } from "@/lib/zone";
 import type { AppointmentRow } from "./queries";
-import { assignLanes, eventSpanOnDay, eventSurface, initialSlot, overlapsDay } from "./calendar-layout";
+import { MAX_LANES, assignLanes, eventSpanOnDay, eventSurface, initialSlot, overlapsDay } from "./calendar-layout";
 import { quickStatusOptions } from "./domain";
 import { AppointmentQuickStatus } from "./appointment-quick-status";
 import { SlotGrid } from "./slot-grid";
@@ -251,10 +251,15 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
   const endMin = endHour * 60;
   const totalMin = endMin - startMin;
   const slots = Math.floor(totalMin / ctx.slotMinutes);
-  const positioned = assignLanes(column.events, (a) => {
-    const [s, e] = eventSpanOnDay(a.startsAt, a.endsAt, column.day, ctx.slotMinutes);
-    return [Math.max(s, startMin), e];
-  });
+  // Die Wochenansicht hat sieben schmale Spalten (Tablet hoch: rund 110 px): Dort passen für Touch (44 px) nur zwei Spuren nebeneinander
+  const positioned = assignLanes(
+    column.events,
+    (a) => {
+      const [s, e] = eventSpanOnDay(a.startsAt, a.endsAt, column.day, ctx.slotMinutes);
+      return [Math.max(s, startMin), e];
+    },
+    ctx.view === "week" ? 2 : MAX_LANES,
+  );
   const nowMin = minutesOfDay(ctx.now);
   const today = isSameDay(column.day, ctx.now);
 

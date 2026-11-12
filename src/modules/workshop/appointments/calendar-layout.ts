@@ -3,7 +3,7 @@ import { addDaysToKey, dayKey, isSameDay, minutesOfDay, startOfDay } from "@/lib
 /** `more`: Sammelblock „+n weitere“ (er ersetzt die Termine der hinteren Spuren einer sehr vollen Überlappungsgruppe; `item` ist der erste davon) */
 export type Positioned<T> = { item: T; lane: number; lanes: number; more?: T[] };
 
-/** Mehr nebeneinanderliegende Spuren als hier würden die Blöcke unter Touch-Größe (24 px) quetschen: Der Rest wird zu einem Sammelblock (siehe `assignLanes`) */
+/** Mehr nebeneinanderliegende Spuren als hier würden die Blöcke unter Touch-Größe (44 px) quetschen: Der Rest wird zu einem Sammelblock (siehe `assignLanes`; die Wochenansicht nutzt wegen ihrer sieben schmalen Spalten nur 2) */
 export const MAX_LANES = 3;
 
 /**
