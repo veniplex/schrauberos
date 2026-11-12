@@ -56,7 +56,7 @@ export function LinkButton({
   );
 }
 
-/** Submit-Button, der während des Absendens (useFormStatus) gesperrt ist und einen Spinner zeigt. */
+/** Submit-Button, der während des Absendens (useFormStatus) nicht noch einmal absendet (`aria-disabled`, der Fokus bleibt) und einen Spinner zeigt. */
 export function SubmitButton({
   children,
   variant = "primary",
@@ -69,8 +69,14 @@ export function SubmitButton({
     <button
       {...props}
       type="submit"
-      disabled={pending || props.disabled}
+      disabled={props.disabled}
+      // Beim Absenden `aria-disabled` statt `disabled`: ein gesperrter Knopf verliert den Fokus (Tastatur und Bildschirmleser landen auf <body>); ein zweiter Klick wird abgefangen
+      aria-disabled={pending || props.disabled || undefined}
       aria-busy={pending || undefined}
+      onClick={(event) => {
+        if (pending) event.preventDefault();
+        else props.onClick?.(event);
+      }}
       className={clsx(buttonClass(variant, size), className)}
     >
       {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}

@@ -66,6 +66,7 @@ export const appointmentsEn: typeof appointmentsDe = {
     tireSet: "Tyre set",
     noNotes: "No notes.",
     editHint: "Editing needs the permission “Edit appointments”.",
+    actions: "Appointment actions",
   },
   feed: {
     calendarName: "Appointments and deadlines",

@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
+import { LinkButton } from "@/components/ui/buttons";
 import { UrlModal } from "@/components/ui/modal";
 import { getI18n } from "@/i18n/server";
 import { db } from "@/server/db";
@@ -20,10 +22,13 @@ export async function AppointmentModal({
   params,
   closeHref,
   canDelete,
+  sections,
 }: {
   params: ModalParams;
   closeHref: string;
   canDelete: boolean;
+  /** Beiträge anderer Funktionen (Erweiterungspunkt `appointments/detail`, z. B. „Auftrag aus Termin“): im Bearbeiten-Dialog dieselben Aktionen wie in der Leseansicht */
+  sections?: ReactNode;
 }) {
   const session = await getSession();
   const current = params.edit ? await db.appointment.findUnique({ where: { id: params.edit }, select: { assigneeId: true, typeId: true, bayId: true } }) : null;
@@ -92,6 +97,15 @@ export async function AppointmentModal({
 
   return (
     <UrlModal title={params.edit ? t("appointments.edit") : t("appointments.new")} closeHref={closeHref}>
+      {params.edit ? (
+        // Ein Tipp auf den Termin öffnet für Bearbeiter das Formular: Auftrag aus Termin und Terminzettel müssen auch hier erreichbar sein
+        <div role="group" aria-label={t("appointments.detail.actions")} className="mb-4 flex flex-wrap items-center gap-2 border-b border-line pb-4">
+          {sections}
+          <LinkButton href={`/appointments/${params.edit}/slip`} variant="secondary">
+            {t("appointments.slip.button")}
+          </LinkButton>
+        </div>
+      ) : null}
       <AppointmentForm
         initial={initial}
         options={{

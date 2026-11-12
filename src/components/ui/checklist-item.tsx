@@ -64,10 +64,14 @@ export function ChecklistItem({
           <input
             type="checkbox"
             checked={shown}
-            disabled={disabled || status === "saving"}
+            disabled={disabled}
+            // Beim Speichern nicht `disabled`: ein gesperrtes Feld verliert den Fokus (Tastatur und Bildschirmleser landen auf <body>); stattdessen `aria-busy`, und Eingaben ignoriert die Zeile
+            aria-busy={status === "saving" || undefined}
             aria-describedby={statusId}
             aria-invalid={failed || undefined}
-            onChange={(event) => void save(event.target.checked)}
+            onChange={(event) => {
+              if (status !== "saving") void save(event.target.checked);
+            }}
             className="size-6 shrink-0 accent-[var(--accent)]"
           />
           <span className="min-w-0">

@@ -37,7 +37,10 @@ export function QuickStatus({ id, version, status, title, prompt }: { id: string
               value={next}
               size="sm"
               variant={next === "done" ? "secondary" : "primary"}
-              disabled={pending}
+              aria-disabled={pending || undefined}
+              onClick={(event) => {
+                if (pending) event.preventDefault();
+              }}
               aria-label={t(next === "done" ? "appointments.quickStatus.finishFor" : "appointments.quickStatus.startFor", { title })}
             >
               {t(next === "done" ? "appointments.quickStatus.finish" : "appointments.quickStatus.start")}

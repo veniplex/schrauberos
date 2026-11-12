@@ -159,12 +159,13 @@ export function ConfirmSubmitButton({
         type="submit"
         title={named ?? label}
         aria-label={named ?? props["aria-label"]}
-        disabled={pending || props.disabled}
+        disabled={props.disabled}
+        aria-disabled={pending || props.disabled || undefined}
         aria-busy={pending || undefined}
         className={clsx(buttonClass(variant, size), className)}
         onClick={(event) => {
           event.preventDefault();
-          setOpen(true);
+          if (!pending) setOpen(true);
         }}
       >
         {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}

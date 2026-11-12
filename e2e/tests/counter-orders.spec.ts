@@ -29,7 +29,8 @@ test("Termin → Auftrag → Positionen → Abschluss → Rechnung → Festschre
   const appointment = await createAppointment(page, vehicleId, `Inspektion ${lastName}`);
 
   // 2. Auftrag aus dem Termin (Fahrzeug und Kundenwunsch kommen aus dem Termin)
-  await page.goto(`/appointments?view=list&show=${appointment.id}`);
+  // Ein Tipp auf den Termin öffnet für Bearbeiter das Formular (`edit`): „Auftrag aus Termin“ steht dort wie in der Leseansicht
+  await page.goto(`/appointments?view=list&edit=${appointment.id}`);
   await page.getByRole("link", { name: "Auftrag aus Termin" }).click();
   await page.waitForURL(/\/orders\/new\?appointment=/);
   await expect(page.getByText(plate).first()).toBeVisible();

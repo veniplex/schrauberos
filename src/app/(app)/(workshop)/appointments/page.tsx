@@ -108,6 +108,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
           params={{ edit: sp.edit, at: sp.at, bay: sp.bay, tireSet: sp.tireSet, vehicle: sp.vehicle, date: toDateInput(date) }}
           closeHref={closeHref}
           canDelete={session.can("appointments.delete")}
+          sections={sp.edit ? <PageSections session={session} host="appointments/detail" entityId={sp.edit} /> : undefined}
         />
       ) : null}
       {showDetail ? <AppointmentDetail key={sp.show} id={sp.show!} view={view} date={date} canEdit={canEdit} sections={<PageSections session={session} host="appointments/detail" entityId={sp.show!} />} /> : null}

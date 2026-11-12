@@ -111,6 +111,35 @@ describe("UrlModal", () => {
     m.opener.remove();
   });
 
+  it("ist der Auslöser nach dem Schließen ein neuer Knoten (Seite neu aufgebaut), findet der Fokus ihn über das Ziel; ohne Auslöser landet er auf der Hauptüberschrift, nie auf body", async () => {
+    const { UrlModal } = await import("./modal");
+    const main = document.createElement("main");
+    main.innerHTML = '<h1>Termine</h1><a id="old" href="/appointments?edit=7">Inspektion</a>';
+    document.body.append(main);
+    (main.querySelector("a") as HTMLElement).focus();
+    view = await mount(await withRouter(await withProviders(createElement(UrlModal as never, { title: "Termin", closeHref: "/appointments" }, createElement("p", null, "Inhalt"))), { pushed: [] }));
+    // die Seite baut sich neu auf: gleicher Link, neuer Knoten
+    main.querySelector("a")!.remove();
+    const again = document.createElement("a");
+    again.setAttribute("href", "/appointments?edit=7");
+    again.textContent = "Inspektion";
+    main.append(again);
+    (document.activeElement as HTMLElement | null)?.blur();
+    await view.unmount();
+    view = null;
+    assert.ok(document.activeElement === again, "Fokus beim neuen Link mit gleichem Ziel");
+
+    // zweiter Durchgang: der Auslöser ist verschwunden und nichts Gleiches da
+    main.querySelector("a")!.focus();
+    view = await mount(await withRouter(await withProviders(createElement(UrlModal as never, { title: "Termin", closeHref: "/appointments" }, createElement("p", null, "Inhalt"))), { pushed: [] }));
+    main.querySelector("a")!.remove();
+    (document.activeElement as HTMLElement | null)?.blur();
+    await view.unmount();
+    view = null;
+    assert.ok(document.activeElement === main.querySelector("h1"), "Hauptüberschrift statt body");
+    main.remove();
+  });
+
   it("beim Entfernen des Fensters geht der Fokus an den Auslöser zurück", async () => {
     const m = await mountModal();
     (document.activeElement as HTMLElement | null)?.blur();

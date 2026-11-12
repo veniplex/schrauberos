@@ -26,7 +26,7 @@ Der Werkstattkalender zeigt die Termine als **Woche**, **Tag** (mit einer Spalte
 
 ## Terminzettel drucken
 
-Im geöffneten Termin erzeugt **Terminzettel** einen Zettel zum Mitgeben: **Datum und Uhrzeit** (in der Zeitzone der Werkstatt), Anliegen, Terminart, Fahrzeug, Kunde (Name; die Telefonnummer nur, wenn Sie Kunden sehen dürfen) und – bei einem Reifenwechsel – der Reifensatz, dazu Platz für eigene Notizen. Arbeitsplatz und zuständige Person stehen bewusst nicht darauf.
+Im geöffneten Termin (Leseansicht oder Bearbeiten-Dialog, jeweils im Aktionsbereich) erzeugt **Terminzettel** einen Zettel zum Mitgeben: **Datum und Uhrzeit** (in der Zeitzone der Werkstatt), Anliegen, Terminart, Fahrzeug, Kunde (Name; die Telefonnummer nur, wenn Sie Kunden sehen dürfen) und – bei einem Reifenwechsel – der Reifensatz, dazu Platz für eigene Notizen. Arbeitsplatz und zuständige Person stehen bewusst nicht darauf.
 
 * **Papier:** A5 oder A6, als **PDF** (Öffnen, Teilen, Herunterladen) und als Druckansicht.
 * **Notizen:** Die Notizen des Termins sind für die Werkstatt geschrieben. Sie kommen **nur auf den Zettel, wenn Sie es ausdrücklich ankreuzen** („Notizen des Termins mit aufs Papier drucken“).

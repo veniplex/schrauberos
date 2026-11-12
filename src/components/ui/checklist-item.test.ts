@@ -36,20 +36,26 @@ async function mountItem(props: Record<string, unknown>) {
 }
 
 describe("ChecklistItem", () => {
-  it("Abhaken speichert sofort diesen einen Punkt; während des Speicherns gesperrt, danach bestätigt", async () => {
+  it("Abhaken speichert sofort diesen einen Punkt; während des Speicherns `aria-busy` (nicht `disabled`: der Fokus bleibt), danach bestätigt", async () => {
     const saves: boolean[] = [];
     const gate = deferred();
     const { box, status } = await mountItem({ onSave: (value: boolean) => (saves.push(value), gate.promise) });
     await click(box);
     assert.deepEqual(saves, [true]);
     assert.equal(box.checked, true, "der Haken steht sofort");
-    assert.equal(box.disabled, true, "während des Speicherns gesperrt (kein Doppeltippen)");
+    box.focus();
+    assert.equal(box.disabled, false, "nicht `disabled`: ein gesperrtes Feld verliert den Fokus (Tastatur, Bildschirmleser)");
+    assert.equal(box.getAttribute("aria-busy"), "true");
+    assert.equal(document.activeElement, box, "der Fokus bleibt auf dem Punkt");
+    await click(box);
+    assert.deepEqual(saves, [true], "während des Speicherns kein Doppeltippen: der zweite Klick speichert nichts");
     assert.match(status(), /Wird gespeichert/);
     await act(async () => {
       gate.resolve();
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
     });
-    assert.equal(box.disabled, false);
+    assert.equal(box.getAttribute("aria-busy"), null);
+    assert.equal(document.activeElement, box, "auch nach dem Speichern steht der Fokus noch auf dem Punkt");
     assert.equal(box.checked, true);
     assert.equal(view!.container.querySelector("[role='status'] :not(.sr-only)"), null, "nach Erfolg keine sichtbare Meldung");
     assert.match(view!.container.querySelector("[role='status'] .sr-only")?.textContent ?? "", /Gespeichert/, "für Hilfstechnik steht „Gespeichert“ da");

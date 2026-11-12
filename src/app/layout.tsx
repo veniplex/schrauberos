@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
+import { FocusRescue } from "@/components/ui/focus-rescue";
 import { NavProgress } from "@/components/ui/nav-progress";
 import { ToastProvider } from "@/components/ui/toast";
 import { I18nProvider } from "@/i18n/client";
@@ -70,6 +71,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         <I18nProvider locale={locale} messages={messages}>
           <NavProgress />
+          <FocusRescue />
           <ToastProvider>
             {children}
             <ServiceWorkerRegistrar version={appVersion()} />

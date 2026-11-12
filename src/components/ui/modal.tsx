@@ -28,11 +28,29 @@ export function UrlModal({ title, closeHref, children }: { title: string; closeH
 
   useEffect(() => {
     const dialog = ref.current;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    // Nach dem Schließen ist der Auslöser oft ein neuer Knoten (die Seite hat sich neu aufgebaut): dann über Kennung oder Ziel wiederfinden
+    const openerId = opener?.id ?? "";
+    const openerHref = opener?.getAttribute("href") ?? "";
     if (dialog && !dialog.open) dialog.showModal();
     return () => {
-      // beim Schließen (die Seite hängt das Fenster aus) zurück zum Auslöser, sofern es ihn noch gibt
-      if (opener?.isConnected && opener !== document.body) opener.focus();
+      // beim Schließen (die Seite hängt das Fenster aus) zurück zum Auslöser; gibt es ihn nicht mehr, zur Hauptüberschrift (nie auf <body>)
+      if (opener?.isConnected) {
+        opener.focus();
+        return;
+      }
+      const again = (openerId ? document.getElementById(openerId) : null) ?? (openerHref ? Array.from(document.querySelectorAll<HTMLElement>("a[href]")).find((a) => a.getAttribute("href") === openerHref && !a.closest("dialog")) : null);
+      if (again) {
+        again.focus();
+        return;
+      }
+      if (opener) {
+        const heading = document.querySelector<HTMLElement>("main h1");
+        if (heading) {
+          if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+          heading.focus({ preventScroll: true });
+        }
+      }
     };
   }, []);
 

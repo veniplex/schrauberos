@@ -65,6 +65,7 @@ export const appointmentsDe = {
     tireSet: "Reifensatz",
     noNotes: "Keine Notizen.",
     editHint: "Zum Bearbeiten fehlt das Recht „Termine bearbeiten“.",
+    actions: "Aktionen zum Termin",
   },
   /** Terminzettel (F8) */
   /** Kalender-Abo (F10): Texte im Feed (.ics) und auf der Seite zum Einrichten */

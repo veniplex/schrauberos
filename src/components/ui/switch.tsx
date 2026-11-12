@@ -35,15 +35,20 @@ export function SubmitSwitch({
         aria-checked={checked}
         aria-label={label}
         aria-busy={pending || undefined}
-        disabled={pending || props.disabled}
+        disabled={props.disabled}
+        aria-disabled={pending || props.disabled || undefined}
         onClick={(event) => {
+          if (pending) {
+            event.preventDefault();
+            return;
+          }
           if (checked && confirm) {
             event.preventDefault();
             setAsking(true);
           }
         }}
         className={clsx(
-          "group relative inline-flex h-(--tap) min-w-(--tap) shrink-0 cursor-pointer items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-60",
+          "group relative inline-flex h-(--tap) min-w-(--tap) shrink-0 cursor-pointer items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-progress aria-disabled:opacity-60",
           className,
         )}
       >

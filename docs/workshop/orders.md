@@ -8,7 +8,7 @@ Ein Auftrag (Arbeitskarte) begleitet ein Fahrzeug von der Annahme bis zur Abholu
 **Angenommen → In Arbeit → Fertig (abholbereit) → Abgeholt.** Dazu gibt es **Storniert**. Der Stand steht oben auf der Auftragsseite, jeder Wechsel mit Zeit und Person im **Verlauf**.
 
 * **Auftrag annehmen:** Unter **Aufträge → Neuer Auftrag** das Fahrzeug wählen, Kundenwunsch und **Kilometerstand bei Annahme** eintragen. Schneller geht es aus einem Termin:
-  Im Termin (Kalender, Termin anklicken) erscheint **Auftrag aus Termin**; Fahrzeug und Anliegen werden übernommen. Zu einem Termin kann es einen (nicht stornierten) Auftrag geben; einen Termin verknüpfen kann nur, wer Termine sehen darf.
+  Im Termin (Kalender, Termin anklicken) erscheint **Auftrag aus Termin** – in der Leseansicht ebenso wie im Bearbeiten-Dialog, bei Bearbeitern also direkt über dem Formular; Fahrzeug und Anliegen werden übernommen. Zu einem Termin kann es einen (nicht stornierten) Auftrag geben; einen Termin verknüpfen kann nur, wer Termine sehen darf.
   Jeder Auftrag bekommt eine fortlaufende Nummer der Form `A-2026-0001` ohne Lücken.
 * **Kunde:** Er ergibt sich aus dem Halter des Fahrzeugs. Ein Fahrzeug ohne Halter ergibt einen Auftrag ohne Kunden. Archivierte Fahrzeuge lassen sich nicht annehmen; bei Kunden mit
   eingeschränkter Verarbeitung (Datenschutz) ist kein neuer Auftrag möglich.
