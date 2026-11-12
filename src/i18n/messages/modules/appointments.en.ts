@@ -41,6 +41,7 @@ export const appointmentsEn: typeof appointmentsDe = {
       confirmDelete: "Delete appointment type? Existing appointments are kept without a type.",
     },
   },
+  more: "+{count} more",
   title: "Scheduling",
   description: "Workshop appointments by week, day or as a list.",
   new: "New appointment",

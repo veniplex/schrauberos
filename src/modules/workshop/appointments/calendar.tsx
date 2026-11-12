@@ -118,6 +118,30 @@ export function CalendarToolbar({ i18n, view, date, canCreate }: Pick<Ctx, "i18n
 
 /* ───────────── Termin-Block im Raster ───────────── */
 
+/** Sammelblock „+n weitere“: ersetzt die Termine der hinteren Spuren einer sehr vollen Zeit (sonst würden die Blöcke zu schmal zum Antippen) und führt zur Liste dieses Tages. */
+function MoreBlock({ ctx, day, items, startMin, spanStart, spanEnd, lane, lanes }: { ctx: Ctx; day: Date; items: AppointmentRow[]; startMin: number; spanStart: number; spanEnd: number; lane: number; lanes: number }) {
+  const { i18n } = ctx;
+  const label = i18n.t("appointments.more", { count: items.length });
+  const style = {
+    top: px(spanStart - startMin),
+    height: `max(${px(spanEnd - spanStart)}, 22px)`,
+    left: `calc(${(lane / lanes) * 100}% + 2px)`,
+    width: `calc(${100 / lanes}% - 4px)`,
+  } as CSSProperties;
+  return (
+    <div style={style} className="absolute z-10 rounded-md border border-dashed border-line-strong bg-surface-2 text-xs leading-tight text-ink hover:z-20 hover:shadow-pop focus-within:z-20">
+      <Link
+        href={calendarHref("list", day)}
+        title={items.map((m) => `${timeRange(i18n, m)} ${m.title}`).join("\n")}
+        className="-my-px flex h-[calc(100%+2px)] min-h-0 items-start justify-center overflow-hidden rounded-[inherit] px-1 py-1 text-center font-medium after:absolute after:inset-0 after:rounded-[inherit]"
+      >
+        <span className="truncate">{label}</span>
+        <span className="sr-only">: {items.map((m) => `${timeRange(i18n, m)} ${m.title}`).join("; ")}</span>
+      </Link>
+    </div>
+  );
+}
+
 function AppointmentBlock({ a, ctx, startMin, spanStart, spanEnd, lane, lanes }: { a: AppointmentRow; ctx: Ctx; startMin: number; spanStart: number; spanEnd: number; lane: number; lanes: number }) {
   const { i18n } = ctx;
   const color = eventColor(a);
@@ -246,7 +270,13 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
         backgroundSize: `100% ${px(60)}`,
       }}
     >
-      {positioned.map(({ item: a, lane, lanes }) => {
+      {positioned.map(({ item: a, lane, lanes, more }) => {
+        if (more) {
+          const spans = more.map((m) => eventSpanOnDay(m.startsAt, m.endsAt, column.day, ctx.slotMinutes));
+          const from = Math.max(Math.min(...spans.map(([s]) => s)), startMin);
+          const to = Math.min(Math.max(...spans.map(([, e]) => e)), endMin);
+          return <MoreBlock key={`more-${a.id}`} ctx={ctx} day={column.day} items={more} startMin={startMin} spanStart={from} spanEnd={to} lane={lane} lanes={lanes} />;
+        }
         const [s, e] = eventSpanOnDay(a.startsAt, a.endsAt, column.day, ctx.slotMinutes);
         const spanStart = Math.max(s, startMin);
         return <AppointmentBlock key={a.id} a={a} ctx={ctx} startMin={startMin} spanStart={spanStart} spanEnd={Math.min(e, endMin)} lane={lane} lanes={lanes} />;

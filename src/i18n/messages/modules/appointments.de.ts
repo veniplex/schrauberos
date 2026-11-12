@@ -40,6 +40,7 @@ export const appointmentsDe = {
       confirmDelete: "Terminart löschen? Bestehende Termine bleiben ohne Art erhalten.",
     },
   },
+  more: "+{count} weitere",
   title: "Terminplanung",
   description: "Werkstatttermine nach Woche, Tag oder als Liste.",
   new: "Neuer Termin",

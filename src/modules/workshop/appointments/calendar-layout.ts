@@ -1,12 +1,17 @@
 import { addDaysToKey, dayKey, isSameDay, minutesOfDay, startOfDay } from "@/lib/zone";
 
-export type Positioned<T> = { item: T; lane: number; lanes: number };
+/** `more`: Sammelblock „+n weitere“ (er ersetzt die Termine der hinteren Spuren einer sehr vollen Überlappungsgruppe; `item` ist der erste davon) */
+export type Positioned<T> = { item: T; lane: number; lanes: number; more?: T[] };
+
+/** Mehr nebeneinanderliegende Spuren als hier würden die Blöcke unter Touch-Größe (24 px) quetschen: Der Rest wird zu einem Sammelblock (siehe `assignLanes`) */
+export const MAX_LANES = 3;
 
 /**
  * Verteilt zeitlich überlappende Termine auf nebeneinanderliegende Spuren (wie Outlook/Google).
- * Gibt je Termin die Spur und die Spurenzahl seiner Überlappungsgruppe zurück.
+ * Gibt je Termin die Spur und die Spurenzahl seiner Überlappungsgruppe zurück. Hat eine Gruppe mehr als `maxLanes` Spuren, bleiben die ersten `maxLanes - 1` Spuren einzeln, und alle Termine der übrigen Spuren
+ * werden zu **einem** Eintrag mit `more` (Sammelblock): so bleibt jeder Block breit genug zum Antippen, und kein Termin geht verloren (der Sammelblock führt zur Liste des Tages).
  */
-export function assignLanes<T>(items: T[], range: (item: T) => [number, number]): Positioned<T>[] {
+export function assignLanes<T>(items: T[], range: (item: T) => [number, number], maxLanes = MAX_LANES): Positioned<T>[] {
   const sorted = [...items].sort((a, b) => range(a)[0] - range(b)[0] || range(a)[1] - range(b)[1]);
   const result: Positioned<T>[] = [];
   let cluster: Positioned<T>[] = [];
@@ -15,8 +20,16 @@ export function assignLanes<T>(items: T[], range: (item: T) => [number, number])
 
   const flush = () => {
     const lanes = Math.max(1, laneEnds.length);
-    cluster.forEach((p) => (p.lanes = lanes));
-    result.push(...cluster);
+    if (lanes > maxLanes) {
+      const keep = cluster.filter((p) => p.lane < maxLanes - 1);
+      const rest = cluster.filter((p) => p.lane >= maxLanes - 1);
+      keep.forEach((p) => (p.lanes = maxLanes));
+      keep.push({ item: rest[0].item, lane: maxLanes - 1, lanes: maxLanes, more: rest.map((p) => p.item) });
+      result.push(...keep);
+    } else {
+      cluster.forEach((p) => (p.lanes = lanes));
+      result.push(...cluster);
+    }
     cluster = [];
     laneEnds = [];
     clusterEnd = -Infinity;

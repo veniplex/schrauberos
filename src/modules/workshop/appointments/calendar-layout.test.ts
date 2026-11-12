@@ -26,6 +26,20 @@ describe("assignLanes", () => {
   test("leere Liste", () => {
     assert.deepEqual(assignLanes([], range), []);
   });
+  test("mehr als drei Spuren: die ersten beiden bleiben einzeln, alle übrigen werden ein Sammelblock (kein Termin geht verloren, kein Block wird schmaler als ein Drittel)", () => {
+    const events: Ev[] = Array.from({ length: 6 }, (_, i) => ({ id: `t${i}`, s: 0, e: 60 }));
+    const placed = assignLanes(events, range);
+    assert.equal(placed.length, 3, "zwei einzelne Termine und ein Sammelblock");
+    assert.ok(placed.every((p) => p.lanes === 3));
+    assert.deepEqual(placed.filter((p) => !p.more).map((p) => p.lane).sort(), [0, 1]);
+    const more = placed.find((p) => p.more)!;
+    assert.equal(more.lane, 2);
+    assert.equal(more.more!.length, 4, "die vier übrigen Termine");
+    const shown = new Set([...placed.filter((p) => !p.more).map((p) => p.item.id), ...more.more!.map((m) => m.id)]);
+    assert.equal(shown.size, 6, "jeder Termin ist entweder sichtbar oder im Sammelblock");
+    // genau drei Spuren bleiben unverändert; eine andere Gruppe am Tag ist unabhängig
+    assert.deepEqual(run([{ id: "a", s: 0, e: 60 }, { id: "b", s: 0, e: 60 }, { id: "c", s: 0, e: 60 }, { id: "d", s: 300, e: 360 }]), { a: [0, 3], b: [1, 3], c: [2, 3], d: [0, 1] });
+  });
 });
 
 describe("eventSpan", () => {
