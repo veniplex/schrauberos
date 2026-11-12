@@ -22,6 +22,8 @@ export const timeEn: typeof timeDe = {
     startOrder: "Start order",
     stop: "Clock out",
     stopOrder: "Stop order",
+    stampedIn: "Clocked in at {time}.",
+    stampedOut: "Clocked out at {time}.",
     running: "Running since {since}.",
     runningOrder: "Running since {since} on {order}.",
     orderHint: "Without an order the time counts in general (workshop, office, driving).",

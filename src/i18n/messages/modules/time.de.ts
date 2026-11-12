@@ -21,6 +21,8 @@ export const timeDe = {
     startOrder: "Auftrag starten",
     stop: "Gehen",
     stopOrder: "Auftrag beenden",
+    stampedIn: "Eingestempelt um {time} Uhr.",
+    stampedOut: "Ausgestempelt um {time} Uhr.",
     running: "Läuft seit {since}.",
     runningOrder: "Läuft seit {since} auf {order}.",
     orderHint: "Ohne Auftrag zählt die Zeit allgemein (Werkstatt, Büro, Fahrt).",

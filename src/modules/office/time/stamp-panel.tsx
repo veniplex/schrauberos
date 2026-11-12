@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Field, Input, Select } from "@/components/ui/form";
 import { StampButton } from "@/components/ui/stamp-button";
+import { useToast } from "@/components/ui/toast";
 import { useI18n } from "@/i18n/client";
 import { startTime, stopTime } from "./actions";
 
@@ -23,8 +24,11 @@ async function book(action: typeof startTime | typeof stopTime, values: Record<s
  * Der Server entscheidet (Rechte, „läuft schon“, Schlüssel): die Oberfläche glaubt sich nichts.
  */
 export function StampPanel({ running, orders, since }: { running: { id: string; orderLabel: string | null } | null; orders: StampOrder[]; since: string | null }) {
-  const { t } = useI18n();
+  const { t, date } = useI18n();
+  const toast = useToast();
   const router = useRouter();
+  // Der Wechsel von „Kommen“ zu „Gehen“ tauscht den Knopf samt seiner Statuszeile aus: Angesagt wird deshalb mit einer Meldung (Live-Region des Toasts), nicht am Knopf
+  const announce = (key: "time.stamp.stampedIn" | "time.stamp.stampedOut") => toast.show({ tone: "success", text: t(key, { time: date(new Date(), { timeStyle: "short" }) }) });
   const [orderId, setOrderId] = useState("");
   const [activity, setActivity] = useState("");
   const [pause, setPause] = useState("0");
@@ -43,6 +47,7 @@ export function StampPanel({ running, orders, since }: { running: { id: string; 
           tone="neutral"
           onStamp={async (key) => {
             await book(stopTime, { key, breakMinutes: pause });
+            announce("time.stamp.stampedOut");
             setPause("0");
             router.refresh();
           }}
@@ -74,6 +79,7 @@ export function StampPanel({ running, orders, since }: { running: { id: string; 
         actionId={`start:${orderId || "general"}`}
         onStamp={async (key) => {
           await book(startTime, { key, orderId, activity });
+          announce("time.stamp.stampedIn");
           setActivity("");
           router.refresh();
         }}

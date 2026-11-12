@@ -203,8 +203,11 @@ test("Zeit: stempeln und als Positionen in den Auftrag übernehmen (Büro stempe
     await staff.locator("#stamp-activity").fill("Bremsen prüfen");
     await staff.getByRole("button", { name: "Auftrag starten" }).click();
     await expect(staff.getByRole("button", { name: "Auftrag beenden" })).toBeVisible();
+    // Der Wechsel tauscht den Knopf aus: Angesagt wird mit einer Meldung (Z6-5 M6)
+    await expect(staff.getByText(/Eingestempelt um .+ Uhr./)).toBeVisible();
     await staff.getByRole("button", { name: "Auftrag beenden" }).click();
     await expect(staff.getByRole("button", { name: "Auftrag starten" })).toBeVisible();
+    await expect(staff.getByText(/Ausgestempelt um .+ Uhr./)).toBeVisible();
 
     // Nachtrag einer Stunde auf den Auftrag (Büro darf Zeiten erfassen): eine Zeit, die sich übernehmen lässt
     await staff.goto("/time/entries/new");

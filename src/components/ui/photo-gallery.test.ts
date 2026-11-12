@@ -197,7 +197,9 @@ describe("PhotoGallery: Dateien (PDF) und nur ansehen", () => {
     view = await mountI18n(createElement(PhotoGallery, { uploader: upload.uploader, variant: "file", accept: "application/pdf", acceptFile: (f: File) => f.type === "application/pdf", addLabel: "PDF-Dokument hinzufügen", hideEmpty: true } as never));
     const input = view.container.querySelector("input[type='file']") as HTMLInputElement;
     assert.equal(input.getAttribute("accept"), "application/pdf");
-    assert.equal(input.getAttribute("aria-label"), "PDF-Dokument hinzufügen");
+    const label = view.container.querySelector(`label[for='${input.id}']`);
+    assert.equal(plain(label?.textContent), "PDF-Dokument hinzufügen", "sichtbare Beschriftung, die zugleich der Name des Feldes ist");
+    assert.ok(label && !label.classList.contains("sr-only"), "nicht nur für Bildschirmleser");
     assert.equal(input.hasAttribute("capture"), false, "keine Kamera für Dokumente");
     assert.doesNotMatch(plain(view.container.textContent), /Noch keine Fotos/);
   });

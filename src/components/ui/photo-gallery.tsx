@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { Ban, Check, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
 import { useI18n } from "@/i18n/client";
@@ -85,6 +85,7 @@ export function PhotoGallery({
   const [queue] = useState(() => createUploadQueue({ uploader, maxBytes, concurrency: 2, accept: acceptFile ?? ((file) => file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) }));
   const items = useSyncExternalStore(queue.subscribe, queue.items, queue.items);
   const [notice, setNotice] = useState<string | null>(null);
+  const inputId = useId();
 
   const reported = useRef(new Set<string>());
   const callback = useRef(onUploaded);
@@ -127,7 +128,11 @@ export function PhotoGallery({
     <div className={clsx("flex flex-col gap-4", className)}>
       {readOnly ? null : (
         <div>
-          <FileInput variant={variant} multiple accept={accept} maxBytes={maxBytes} imageEngine={imageEngine} aria-label={addLabel ?? t("ui.gallery.add")} onChange={onFiles} />
+          {/* sichtbare Beschriftung (auch Name des Feldes): zwei gleich aussehende native Dateifelder (Fotos, PDF) lassen sich sonst nicht unterscheiden; der Knopftext kommt vom Browser */}
+          <label htmlFor={inputId} className="mb-1 block text-sm font-medium">
+            {addLabel ?? t("ui.gallery.add")}
+          </label>
+          <FileInput id={inputId} variant={variant} multiple accept={accept} maxBytes={maxBytes} imageEngine={imageEngine} onChange={onFiles} />
           {notice ? (
             <p role="alert" className="field-error">
               {notice}
