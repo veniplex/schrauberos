@@ -154,6 +154,32 @@ describe("Entwurf", () => {
     const row = await fresh(await draft(session));
     assert.deepEqual([row.partyName, row.partyStreet, row.partyZip, row.partyCity, row.buyerEmail], ["Max Mustermann", "Nebenweg 2", "50667", "Köln", "max@kunde.example"]);
   });
+
+  it("„Anschrift aus Kunde übernehmen“: liest den Empfänger neu aus dem Kunden – nur im Entwurf, mit aktueller Version und Recht, ohne eingeschränkten Kunden", async () => {
+    const session = await sessionFor(EDIT);
+    const id = await draft(session);
+    // Anschrift des Kunden wird nach dem Anlegen des Entwurfs geändert: der Entwurf behält den Stand vom Anlegen
+    await env.db.customer.update({ where: { id: customerId }, data: { street: "Neue Straße 9", zip: "80331", city: "München", email: "neu@kunde.example" } });
+    assert.equal((await fresh(id)).partyStreet, "Nebenweg 2");
+    const stale = versionOf(await fresh(id));
+    const done = await ops.refreshRecipientOperation.execute(session, { id, version: stale });
+    assert.ok(done.ok, JSON.stringify(!done.ok && done.failure));
+    const row = await fresh(id);
+    assert.deepEqual([row.partyName, row.partyStreet, row.partyZip, row.partyCity, row.buyerEmail], ["Max Mustermann", "Neue Straße 9", "80331", "München", "neu@kunde.example"]);
+    assert.equal(failureOf(await ops.refreshRecipientOperation.execute(session, { id, version: stale })).code, "conflict", "veraltete Version: Konflikt");
+    const audit = await env.db.auditLog.findFirstOrThrow({ where: { action: "billing.update", entityId: id }, orderBy: { createdAt: "desc" } });
+    assert.ok(!audit.target?.includes("Mustermann"), "das Audit nennt nie den Namen");
+
+    const viewer = await sessionFor(["billing.view", "customers.view"]);
+    assert.equal((await ops.refreshRecipientOperation.execute(viewer, { id, version: versionOf(row) })).ok, false, "ohne billing.edit nicht");
+
+    await env.db.customer.update({ where: { id: customerId }, data: { processingRestrictedAt: new Date() } });
+    assert.equal(failureOf(await ops.refreshRecipientOperation.execute(session, { id, version: versionOf(await fresh(id)) })).code, "invalid", "eingeschränkter Kunde (Art. 18)");
+    await env.db.customer.update({ where: { id: customerId }, data: { processingRestrictedAt: null } });
+
+    const fixed = await finalized(await sessionFor(FINALIZE));
+    assert.equal(failureOf(await ops.refreshRecipientOperation.execute(session, { id: fixed, version: versionOf(await fresh(fixed)) })).code, "inUse", "festgeschrieben: nie");
+  });
 });
 
 describe("Festschreiben", () => {

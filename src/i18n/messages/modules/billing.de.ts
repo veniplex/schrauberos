@@ -127,6 +127,7 @@ export const billingDe = {
   totals: { net: "Nettosumme", tax: "Umsatzsteuer", gross: "Gesamtbetrag", payable: "Zu zahlender Betrag", deducted: "abzgl. Abschläge", exempt: "Kein Ausweis von Umsatzsteuer (Kleinunternehmer, § 19 UStG)." },
   actions: {
     save: "Entwurf speichern",
+    refreshRecipient: "Anschrift aus Kunde übernehmen",
     finalize: "Festschreiben",
     issue: "Ausstellen",
     accept: "Als angenommen vermerken",
@@ -147,7 +148,8 @@ export const billingDe = {
     cancel: "Stornorechnung zu {number} anlegen? Beide Belege gelten danach als storniert; die Nummer der Stornorechnung wird vergeben. Das lässt sich nicht rückgängig machen.",
     createOrder: "Aus dem Angebot einen Werkstattauftrag anlegen? Positionen und Fahrzeug werden übernommen.",
   },
-  problemsIntro: "Zum Festschreiben fehlt noch:",
+  problemsIntro: "Zum Festschreiben fehlt noch (die Punkte führen zur passenden Stelle):",
+  refreshRecipientHint: "Liest Name, Anschrift und E-Mail des Empfängers neu aus dem Kunden – nützlich, wenn die Anschrift erst nach dem Anlegen des Entwurfs ergänzt wurde.",
   problems: {
     senderName: "Name der Werkstatt im Werkstattprofil",
     senderAddress: "Anschrift der Werkstatt im Werkstattprofil (Straße, PLZ, Ort)",
@@ -260,6 +262,7 @@ export const billingDe = {
   },
   flash: {
     saved: "Gespeichert.",
+    recipientRefreshed: "Anschrift aus dem Kunden übernommen.",
     finalized: "Festgeschrieben.",
     issued: "Ausgestellt.",
     accepted: "Angebot als angenommen vermerkt.",
@@ -275,6 +278,7 @@ export const billingDe = {
     amount: "Ungültiger Betrag, z. B. 1.234,56.",
     taxRate: "Erlaubt sind nur 19 %, 7 % und 0 %.",
     notDraft: "Dieser Beleg ist kein Entwurf mehr und lässt sich nicht ändern.",
+    noCustomer: "Zu diesem Entwurf gehört kein Kunde, aus dem sich die Anschrift übernehmen ließe.",
     wrongKind: "Diese Belegart wird an anderer Stelle festgeschrieben bzw. ausgestellt.",
     incomplete: "Der Beleg ist noch nicht vollständig – siehe Prüfliste.",
     finalCustomer: "Für eine Schlussrechnung ist ein Kunde nötig.",

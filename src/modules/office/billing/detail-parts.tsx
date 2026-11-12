@@ -2,14 +2,14 @@ import { DataTable } from "@/components/ui/data-table";
 import { SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { Checkbox, Field, Input, Select } from "@/components/ui/form";
-import { Alert, Card, DefinitionList } from "@/components/ui/layout";
+import { Alert, Card, DefinitionList, TextLink } from "@/components/ui/layout";
 import { Timeline, type TimelineItem } from "@/components/ui/timeline";
 import { INTL_LOCALE, type Locale } from "@/i18n/config";
 import type { getI18n } from "@/i18n/server";
 import { noon } from "@/lib/dates";
 import { QUANTITY_DECIMALS, lineResult, scaledToInput } from "@/lib/line-items";
 import { formatCents } from "@/lib/money";
-import { addPayment, removePayment, sendDocument } from "./actions";
+import { addPayment, refreshRecipient, removePayment, sendDocument } from "./actions";
 import { PAYMENT_METHODS } from "./constants";
 import { SMALL_BUSINESS_NOTE } from "@/lib/einvoice/ubl";
 import { viewPayable, type DocView } from "./view";
@@ -155,7 +155,36 @@ export function FactsCard({ view, i18n, extra }: { view: DocView; i18n: I18n; ex
   );
 }
 
-export function ChecklistCard({ problems, i18n, smallAmount = false }: { problems: readonly string[]; i18n: I18n; smallAmount?: boolean }) {
+/**
+ * Wohin ein Punkt der Prüfliste führt, damit er sich beheben lässt (statt toter Text): Angaben der Werkstatt → Werkstattprofil in den Einstellungen; Empfänger → der Kunde (mit „Anschrift aus Kunde
+ * übernehmen“ am Entwurf) bzw. der Entwurf; alles andere → der Entwurf. Ohne das nötige Recht bleibt der Punkt Text.
+ */
+export type ProblemLinkContext = { docId: string; customerId: string | null; canEditDraft: boolean; canEditCustomer: boolean; canEditProfile: boolean };
+
+const PROFILE_PROBLEMS = new Set(["senderName", "senderAddress", "senderTaxId", "iban"]);
+const RECIPIENT_PROBLEMS = new Set(["recipientName", "recipientAddress"]);
+
+export function problemLink(code: string, ctx: ProblemLinkContext): string | null {
+  if (PROFILE_PROBLEMS.has(code)) return ctx.canEditProfile ? "/settings?tab=workshop" : null;
+  if (RECIPIENT_PROBLEMS.has(code)) return ctx.customerId && ctx.canEditCustomer ? `/customers/${ctx.customerId}/edit` : ctx.canEditDraft ? `/billing/${ctx.docId}/edit` : null;
+  if (code === "restricted" || code === "exemptChanged") return null;
+  return ctx.canEditDraft ? `/billing/${ctx.docId}/edit` : null;
+}
+
+export function ChecklistCard({
+  problems,
+  i18n,
+  smallAmount = false,
+  links,
+  refresh,
+}: {
+  problems: readonly string[];
+  i18n: I18n;
+  smallAmount?: boolean;
+  links?: ProblemLinkContext;
+  /** „Anschrift aus Kunde übernehmen“ (nur Entwurf mit Kunde, Recht zum Bearbeiten) */
+  refresh?: { docId: string; version: string };
+}) {
   const { t, td } = i18n;
   return (
     <Card title={t("billing.sections.checklist")}>
@@ -163,14 +192,28 @@ export function ChecklistCard({ problems, i18n, smallAmount = false }: { problem
         <p className="text-sm text-success-ink">{t("billing.checklistOk")}</p>
       ) : (
         <>
-          <p className="mb-2 text-sm">{t("billing.problemsIntro")}</p>
+          <p id="billing-checklist-intro" className="mb-2 text-sm">
+            {t("billing.problemsIntro")}
+          </p>
           <ul className="list-disc pl-5 text-sm">
-            {problems.map((code) => (
-              <li key={code}>{td(`billing.problems.${code}`, code)}</li>
-            ))}
+            {problems.map((code) => {
+              const text = td(`billing.problems.${code}`, code);
+              const href = links ? problemLink(code, links) : null;
+              return <li key={code}>{href ? <TextLink href={href}>{text}</TextLink> : text}</li>;
+            })}
           </ul>
         </>
       )}
+      {refresh ? (
+        <form action={refreshRecipient} className="mt-3">
+          <input type="hidden" name="id" value={refresh.docId} />
+          <input type="hidden" name="version" value={refresh.version} />
+          <SubmitButton variant="secondary" size="sm">
+            {t("billing.actions.refreshRecipient")}
+          </SubmitButton>
+          <p className="mt-1 text-xs text-ink-muted">{t("billing.refreshRecipientHint")}</p>
+        </form>
+      ) : null}
       {smallAmount ? <p className="mt-3 text-xs text-ink-muted">{t("billing.smallAmountHint")}</p> : null}
     </Card>
   );

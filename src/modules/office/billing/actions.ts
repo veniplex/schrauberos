@@ -11,6 +11,7 @@ import {
   invoiceFromOrderOperation,
   issueDocumentOperation,
   orderFromOfferOperation,
+  refreshRecipientOperation,
   rejectOfferOperation,
   removePaymentOperation,
   saveDraftOperation,
@@ -26,6 +27,8 @@ export const saveDraft = defineAction(saveDraftOperation, {
   redirect: ({ id }) => `/billing/${id}`,
   message: "billing.flash.saved",
 });
+
+export const refreshRecipient = defineAction(refreshRecipientOperation, { revalidate: ({ id }) => paths(id), message: "billing.flash.recipientRefreshed" });
 
 export const deleteDraft = defineAction(deleteDraftOperation, { revalidate: ["/billing", "/"], redirect: "/billing", message: "common.deleted" });
 

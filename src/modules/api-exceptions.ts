@@ -7,6 +7,7 @@
  * Anzeigeeinstellungen). Beides sind nie API-Ressourcen.
  */
 export const API_EXCEPTIONS: Readonly<Record<string, string>> = {
+  "billing.refreshRecipient": "Komfortknopf der Oberfläche („Anschrift aus Kunde übernehmen“ am Entwurf): Die API setzt Name, Anschrift und E-Mail des Entwurfs unmittelbar über PATCH /billing-documents/{id} (partyName, partyStreet, partyZip, partyCity, buyerEmail) – ein eigener Endpunkt wäre doppelt.",
   "checklists.saveTemplate": "Vorlagen pflegt die Leitung in der Oberfläche (Einrichtung der Werkstatt; jede Änderung ist eine neue Version): Die API liest die Vorlagen (GET /checklist-templates) und beginnt Checklisten daraus.",
   "checklists.archiveTemplate": "Vorlagen archivieren oder wieder aktivieren gehört zur Einrichtung der Werkstatt durch die Leitung: nur in der Oberfläche.",
   "checklists.installDefaults": "Die mitgelieferten Vorlagen einzurichten ist ein einmaliger Einrichtungsschritt der Leitung: nur in der Oberfläche.",

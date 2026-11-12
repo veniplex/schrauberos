@@ -129,6 +129,7 @@ export const billingEn: typeof billingDe = {
   totals: { net: "Net total", tax: "VAT", gross: "Total", payable: "Amount due", deducted: "less partial invoices", exempt: "No VAT shown (small business, § 19 UStG)." },
   actions: {
     save: "Save draft",
+    refreshRecipient: "Take over address from customer",
     finalize: "Finalize",
     issue: "Issue",
     accept: "Mark as accepted",
@@ -149,7 +150,8 @@ export const billingEn: typeof billingDe = {
     cancel: "Create a cancellation invoice for {number}? Both documents are then cancelled; the number of the cancellation invoice is assigned. This cannot be undone.",
     createOrder: "Create a workshop order from the quote? Items and vehicle are carried over.",
   },
-  problemsIntro: "Still missing before finalizing:",
+  problemsIntro: "Still missing before finalizing (each item leads to the right place):",
+  refreshRecipientHint: "Reads the recipient's name, address and e-mail from the customer again – useful when the address was added after the draft was created.",
   problems: {
     senderName: "Workshop name in the workshop profile",
     senderAddress: "Workshop address in the workshop profile (street, postcode, city)",
@@ -262,6 +264,7 @@ export const billingEn: typeof billingDe = {
   },
   flash: {
     saved: "Saved.",
+    recipientRefreshed: "Address taken over from the customer.",
     finalized: "Finalized.",
     issued: "Issued.",
     accepted: "Quote marked as accepted.",
@@ -277,6 +280,7 @@ export const billingEn: typeof billingDe = {
     amount: "Invalid amount, e.g. 1,234.56.",
     taxRate: "Only 19 %, 7 % and 0 % are allowed.",
     notDraft: "This document is no longer a draft and cannot be changed.",
+    noCustomer: "This draft has no customer to take the address from.",
     wrongKind: "This type of document is finalized or issued elsewhere.",
     incomplete: "The document is not complete yet – see the checklist.",
     finalCustomer: "A final invoice needs a customer.",

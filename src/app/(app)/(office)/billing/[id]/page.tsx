@@ -113,7 +113,13 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
         <div className="flex min-w-0 flex-col gap-5">
           {draft ? (
             <>
-              <ChecklistCard problems={problems} i18n={i18n} smallAmount={invoiceLike && view.docType !== "credit" && isSmallAmount(view.totals.grossCents)} />
+              <ChecklistCard
+                problems={problems}
+                i18n={i18n}
+                smallAmount={invoiceLike && view.docType !== "credit" && isSmallAmount(view.totals.grossCents)}
+                links={{ docId: row.id, customerId: row.customerId, canEditDraft: canEdit, canEditCustomer: session.can("customers.edit") && session.features.has("workshop.customers"), canEditProfile: session.can("settings.manage") }}
+                refresh={canEdit && row.customerId && !restricted ? { docId: row.id, version } : undefined}
+              />
               {canFinalize || canEdit ? (
                 <Card title={t("billing.sections.actions")}>
                   <div className="flex flex-col gap-3">
@@ -121,7 +127,7 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
                       <form action={quote ? issueDocument : finalizeDocument}>
                         <input type="hidden" name="id" value={row.id} />
                         <input type="hidden" name="version" value={version} />
-                        <ConfirmSubmitButton variant="primary" size="md" disabled={problems.length > 0} message={t(quote ? "billing.confirm.issue" : "billing.confirm.finalize", { type: typeName })} confirmLabel={t(quote ? "billing.actions.issue" : "billing.actions.finalize")}>
+                        <ConfirmSubmitButton variant="primary" size="md" disabled={problems.length > 0} aria-describedby={problems.length > 0 ? "billing-checklist-intro" : undefined} message={t(quote ? "billing.confirm.issue" : "billing.confirm.finalize", { type: typeName })} confirmLabel={t(quote ? "billing.actions.issue" : "billing.actions.finalize")}>
                           {t(quote ? "billing.actions.issue" : "billing.actions.finalize")}
                         </ConfirmSubmitButton>
                       </form>

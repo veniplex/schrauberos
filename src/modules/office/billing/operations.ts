@@ -221,6 +221,32 @@ export const deleteDraftOperation = defineOperation({
   },
 });
 
+/**
+ * „Anschrift aus Kunde übernehmen“ (`billing.edit`, nur Entwurf mit Kunde): Name, Anschrift und E-Mail des Empfängers werden neu aus dem verknüpften Kunden gelesen. Der Empfänger ist am Entwurf ein
+ * Stand vom Anlegen; wer die Anschrift des Kunden danach ergänzt, braucht den Weg, sie zu übernehmen, ohne sie abzutippen. Prüfen und Schreiben in einer Transaktion (`claimRow`); der Kunde darf nicht
+ * eingeschränkt oder anonymisiert sein. Die Audit-Zeile nennt nie den Namen.
+ */
+export const refreshRecipientOperation = defineOperation({
+  name: "billing.refreshRecipient",
+  permission: "billing.edit",
+  input: idInput.extend({ version: z.string().min(1) }),
+  audit: "billing.update",
+  run: async ({ input, tx, audit }) => {
+    const doc = await billingDoc(tx, input.id);
+    if (!isDraft(doc)) fail("inUse", "billing.errors.notDraft");
+    if (!doc.customerId) fail("invalid", "billing.errors.noCustomer");
+    const customer = await findLinkableCustomer(tx, doc.customerId, doc.customerId);
+    if (!customer) fail("invalid", "billing.errors.restricted");
+    if (!(await claimRow(tx.invoice, doc.id, input.version))) fail("conflict");
+    await tx.invoice.update({
+      where: { id: doc.id },
+      data: { partyName: customer.displayName, partyKey: searchKey(customer.displayName), partyStreet: customer.street, partyZip: customer.zip, partyCity: customer.city, buyerEmail: customer.email },
+    });
+    audit({ target: labelOf(doc.docType, ""), entityId: doc.id });
+    return { id: doc.id };
+  },
+});
+
 /* ───────────── Festschreiben und Ausstellen ───────────── */
 
 const commitInput = idInput.extend({ version: z.string().min(1) });

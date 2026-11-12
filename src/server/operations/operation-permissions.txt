@@ -79,6 +79,7 @@ billing.delete billing.edit
 billing.finalize invoices.finalize
 billing.fromOrder billing.edit
 billing.issue billing.edit
+billing.refreshRecipient billing.edit
 billing.reject billing.accept
 billing.removePayment invoices.edit
 billing.save billing.edit
