@@ -12,7 +12,7 @@ export const rolesDe = {
   confirmDelete: "Rolle wirklich löschen? Benutzer verlieren damit diese Berechtigungen.",
   adminBadge: "Voller Zugriff",
   adminNotice: "Administrator-Rollen haben immer alle Berechtigungen – auch für künftige Funktionen. Einzelrechte lassen sich hier nicht einschränken. Ausgenommen sind Rechte, die nur ausdrücklich vergeben werden (in der Rechte-Auswahl als „Nur ausdrücklich“ gekennzeichnet, z. B. der IT-Tresor): sie gelten auch Administratoren nur über eine zusätzliche Rolle, die sie enthält.",
-  allPermissions: "alle Rechte",
+  allPermissions: "alle Rechte, außer den ausdrücklich zu vergebenden (IT-Tresor)",
   permissionCount: "{count} von {total} Rechten",
   userCount_one: "{count} Benutzer",
   userCount_other: "{count} Benutzer",

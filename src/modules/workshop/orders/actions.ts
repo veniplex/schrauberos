@@ -20,16 +20,28 @@ export const updateOrder = defineAction(updateOrderOperation, {
 });
 
 /** Ein Schritt der Statuskette (Formular mit `id`, `version`, `status`). */
-export const setOrderStatus = defineAction(setStatusOperation, { revalidate: (data) => pages(data.id), message: "common.saved" });
+const STATUS_NOTICE = {
+  accepted: "orders.notices.toAccepted",
+  in_progress: "orders.notices.toInProgress",
+  ready: "orders.notices.toReady",
+  picked_up: "orders.notices.closed",
+  cancelled: "orders.notices.toCancelled",
+} as const;
 
-export const closeOrder = defineAction(closeOrderOperation, { revalidate: (data) => pages(data.id), message: "orders.notices.closed" });
+// Die Meldung nennt den Auftrag und was geschah (Z6-5 M7): „Auftrag A-2026-0007: Arbeit begonnen.“ statt „Gespeichert.“
+export const setOrderStatus = defineAction(setStatusOperation, {
+  revalidate: (data) => pages(data.id),
+  message: (data) => ({ key: STATUS_NOTICE[data.status as keyof typeof STATUS_NOTICE] ?? "orders.notices.closed", params: { number: data.number } }),
+});
 
-export const reopenOrder = defineAction(reopenOrderOperation, { revalidate: (data) => pages(data.id), message: "orders.notices.reopened" });
+export const closeOrder = defineAction(closeOrderOperation, { revalidate: (data) => pages(data.id), message: (data) => ({ key: "orders.notices.closed", params: { number: data.number } }) });
 
-export const saveOrderItems = defineAction(saveItemsOperation, { revalidate: (data) => pages(data.id), message: "common.saved" });
+export const reopenOrder = defineAction(reopenOrderOperation, { revalidate: (data) => pages(data.id), message: (data) => ({ key: "orders.notices.reopened", params: { number: data.number } }) });
 
-export const addOrderFinding = defineAction(addFindingOperation, { revalidate: (data) => pages(data.id), message: "common.saved" });
+export const saveOrderItems = defineAction(saveItemsOperation, { revalidate: (data) => pages(data.id), message: (data) => ({ key: "orders.notices.itemsSaved", params: { number: data.number } }) });
 
-export const removeOrderFinding = defineAction(removeFindingOperation, { revalidate: (data) => pages(data.id), message: "common.deleted" });
+export const addOrderFinding = defineAction(addFindingOperation, { revalidate: (data) => pages(data.id), message: (data) => ({ key: "orders.notices.findingAdded", params: { number: data.number } }) });
+
+export const removeOrderFinding = defineAction(removeFindingOperation, { revalidate: (data) => pages(data.id), message: "orders.notices.findingRemoved" });
 
 export const approveOrder = defineAction(approveOperation, { form: formObject, revalidate: (data) => pages(data.orderId), message: "orders.notices.approved" });

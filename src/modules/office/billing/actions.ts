@@ -32,8 +32,8 @@ export const refreshRecipient = defineAction(refreshRecipientOperation, { revali
 
 export const deleteDraft = defineAction(deleteDraftOperation, { revalidate: ["/billing", "/"], redirect: "/billing", message: "common.deleted" });
 
-export const finalizeDocument = defineAction(finalizeDocumentOperation, { revalidate: ({ id }) => paths(id), message: "billing.flash.finalized" });
-export const issueDocument = defineAction(issueDocumentOperation, { revalidate: ({ id }) => paths(id), message: "billing.flash.issued" });
+export const finalizeDocument = defineAction(finalizeDocumentOperation, { revalidate: ({ id }) => paths(id), message: ({ number }) => ({ key: "billing.flash.finalized", params: { number } }) });
+export const issueDocument = defineAction(issueDocumentOperation, { revalidate: ({ id }) => paths(id), message: ({ number }) => ({ key: "billing.flash.issued", params: { number } }) });
 
 export const acceptOffer = defineAction(acceptOfferOperation, { revalidate: ({ id }) => paths(id), message: "billing.flash.accepted" });
 export const rejectOffer = defineAction(rejectOfferOperation, { revalidate: ({ id }) => paths(id), message: "billing.flash.rejected" });

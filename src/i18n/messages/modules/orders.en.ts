@@ -104,8 +104,15 @@ export const ordersEn: typeof ordersDe = {
   notices: {
     created: "Order created.",
     mileageKept: "Order created or saved. The mileage on the vehicle was left unchanged because it is higher.",
-    closed: "Order closed.",
-    reopened: "Order reopened.",
+    closed: "Order {number} closed.",
+    reopened: "Order {number} reopened.",
+    toAccepted: "Order {number}: back to “Accepted”.",
+    toInProgress: "Order {number}: work started.",
+    toReady: "Order {number}: marked ready for pickup.",
+    toCancelled: "Order {number} cancelled.",
+    itemsSaved: "Items of order {number} saved.",
+    findingAdded: "Finding added to order {number}.",
+    findingRemoved: "Finding removed.",
     approved: "Approval recorded.",
   },
   errors: {

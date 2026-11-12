@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import type { ActionState } from "@/components/ui/form";
 import { getI18n } from "@/i18n/server";
-import type { MessageKey, Translator } from "@/i18n/translate";
+import type { MessageKey, Translator, Vars } from "@/i18n/translate";
 import { formObject } from "@/lib/forms";
 import { logError } from "@/lib/log-safe";
 import { requirePermission, requireSession } from "@/server/auth/session";
@@ -29,6 +29,10 @@ export type ActionFunction = {
 
 /** Wert oder Funktion aus Ergebnis und Eingabe der Operation – und der angemeldeten Person (z. B. Weiterleitung nur dorthin, wo sie hinein darf) */
 type Of<T, I, R> = T | ((data: R, input: I, principal: Principal) => T);
+type I18nBag = Awaited<ReturnType<typeof getI18n>>;
+
+/** Erfolgsmeldung: ein Schlüssel oder ein Schlüssel mit Platzhaltern (`{ key, params }`), damit die Meldung nennt, **was** geschah („Auftrag A-2026-0007: In Arbeit“) – nie nur „Gespeichert.“ */
+export type SuccessMessage = MessageKey | { key: MessageKey; params: Vars };
 
 export type ActionOptions<I, R> = {
   /** FormData → rohe Eingabe der Operation (Standard: `formObject`, leere Felder entfallen). Hier kommen Mehrfachfelder, Häkchen und Dateien dazu. */
@@ -43,7 +47,7 @@ export type ActionOptions<I, R> = {
    */
   redirectNext?: Of<string | undefined, I, R>;
   /** Erfolgsmeldung (Schlüssel): im Formularzustand `message`, sonst Flash. Weglassen, wenn die Zielseite selbst meldet (z. B. `?saved=`). */
-  message?: Of<MessageKey, I, R>;
+  message?: SuccessMessage | ((data: R, input: I, principal: Principal, i18n: I18nBag) => SuccessMessage);
   /**
    * Zusätzliche Felder im Formularzustand nach Erfolg (nur bei `(prev, formData)`), z. B. der einmalig angezeigte Klartext eines neuen
    * Wiederherstellungs-Codes. Steht nur in der Antwort der Aktion, nie in URL, Log oder Audit.
@@ -116,13 +120,15 @@ export function defineAction<I, R>(operation: Operation<I, R>, options: ActionOp
       else revalidatePath(entry[0], entry[1]);
     }
     if (options.onSuccess) await options.onSuccess(data, input);
-    const message = resolve(options.message, data, input, principal);
+    const spec = typeof options.message === "function" ? options.message(data, input, principal, i18n) : options.message;
+    const message = typeof spec === "string" ? spec : spec?.key;
+    const messageParams = typeof spec === "string" ? undefined : spec?.params;
     const target = (wantsNext ? resolve(options.redirectNext, data, input, principal) : undefined) ?? resolve(options.redirect, data, input, principal);
-    if (message && (formMode || target)) await setFlash({ tone: "success", key: message });
+    if (message && (formMode || target)) await setFlash({ tone: "success", key: message, params: messageParams });
     if (target) redirect(target);
     if (formMode) return undefined;
     const extra = options.state ? options.state(data, input, i18n) : {};
-    return { ok: true, ...(message ? { message: t(message) } : {}), ...extra };
+    return { ok: true, ...(message ? { message: t(message, messageParams) } : {}), ...extra };
   };
   return Object.assign(action as ActionFunction, { operation });
 }

@@ -276,6 +276,8 @@ export const de = {
     forgotPassword: "Passwort vergessen – bitte die Administration fragen.",
     forbiddenTitle: "Kein Zugriff",
     forbiddenText: "Für diese Seite fehlt die Berechtigung. Bitte an die Administration wenden.",
+    forbiddenAdminText: "Auch Administrator-Rollen enthalten die ausdrücklich zu vergebenden Rechte (zum Beispiel für den IT-Tresor) nicht von selbst: Sie stecken nur in einer Rolle, die sie ausdrücklich enthält. Unter „Rollen“ lässt sich eine solche Rolle anlegen und zuweisen; die Hilfe zu den Rollen erklärt es.",
+    forbiddenAdminRoles: "Rollen öffnen",
   },
   preferences: {
     language: "Sprache",

@@ -263,8 +263,8 @@ export const billingDe = {
   flash: {
     saved: "Gespeichert.",
     recipientRefreshed: "Anschrift aus dem Kunden übernommen.",
-    finalized: "Festgeschrieben.",
-    issued: "Ausgestellt.",
+    finalized: "{number} festgeschrieben.",
+    issued: "{number} ausgestellt.",
     accepted: "Angebot als angenommen vermerkt.",
     rejected: "Angebot als abgelehnt vermerkt.",
     confirmationCreated: "Entwurf der Auftragsbestätigung angelegt.",

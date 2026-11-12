@@ -6,7 +6,7 @@ den Fuhrpark nicht nutzt.
 
 * Beim Ausschalten **bleiben alle Daten erhalten**; nur der Zugriff wird gesperrt (Seiten, Navigation, Übersicht, Rechte).
 * Jede Funktion hat einen **Schalter**. Das **Ausschalten** fragt vorher nach (mit den Folgen für abhängige Funktionen), das Einschalten geht sofort; danach meldet
-  eine Meldung unten im Bild „Eingeschaltet.“ bzw. „Ausgeschaltet.“.
+  eine Meldung unten im Bild, die die Funktion nennt („Aufträge“ eingeschaltet bzw. ausgeschaltet).
 * Jedes Modul ist eine **einklappbare Karte** mit seinem Schalter in der Kopfzeile; ausgeschaltete Module starten zugeklappt.
 * Manche Funktionen brauchen andere (Reifenlager und Termine brauchen die Fahrzeuge). Die Seite zeigt die Abhängigkeiten kompakt unter der Funktion: **Benötigt** (ohne sie ist die Funktion nicht nutzbar),
   **Nutzt optional** (läuft auch ohne) und **Gebraucht von** (diese Funktionen hängen von ihr ab); abhängige Funktionen werden automatisch unbenutzbar.

@@ -297,7 +297,7 @@ export const saveItemsOperation = defineOperation({
       })),
     });
     audit({ target: `${order.number}: ${d.items.length}`, entityId: d.id });
-    return { id: d.id, count: d.items.length };
+    return { id: d.id, number: order.number, count: d.items.length };
   },
 });
 
@@ -314,7 +314,7 @@ export const addFindingOperation = defineOperation({
     if (!isOpen(order.status)) fail("invalid", "orders.errors.closed");
     const row = await tx.orderFinding.create({ data: { orderId: d.id, text: d.text, authorName: byName(principal) }, select: { id: true } });
     audit({ target: order.number, entityId: d.id });
-    return { id: d.id, findingId: row.id };
+    return { id: d.id, number: order.number, findingId: row.id };
   },
 });
 

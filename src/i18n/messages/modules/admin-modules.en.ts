@@ -34,8 +34,8 @@ export const modulesEn: typeof modulesDe = {
   confirmOffModule: "Switch off module “{name}”? All its features become unreachable; the data is kept.",
   confirmOffFeature: "Switch off feature “{name}”? Dependent features become unusable as well; the data is kept.",
   saved: "Saved.",
-  switchedOn: "Switched on.",
-  switchedOff: "Switched off.",
+  switchedOn: "“{name}” switched on.",
+  switchedOff: "“{name}” switched off.",
   rightsInactive: "Feature switched off – its permissions have no effect until it is switched on again (the roles keep their permissions).",
   errors: { unknown: "Unknown module or feature.", required: "This module or feature is a required part of the platform." },
 };

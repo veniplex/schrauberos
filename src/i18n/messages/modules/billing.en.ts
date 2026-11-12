@@ -265,8 +265,8 @@ export const billingEn: typeof billingDe = {
   flash: {
     saved: "Saved.",
     recipientRefreshed: "Address taken over from the customer.",
-    finalized: "Finalized.",
-    issued: "Issued.",
+    finalized: "{number} finalized.",
+    issued: "{number} issued.",
     accepted: "Quote marked as accepted.",
     rejected: "Quote marked as rejected.",
     confirmationCreated: "Draft of the order confirmation created.",

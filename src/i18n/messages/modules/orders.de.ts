@@ -103,8 +103,15 @@ export const ordersDe = {
   notices: {
     created: "Auftrag angelegt.",
     mileageKept: "Auftrag angelegt bzw. gespeichert. Der Kilometerstand im Fahrzeug blieb unverändert, weil er höher ist.",
-    closed: "Auftrag abgeschlossen.",
-    reopened: "Auftrag wieder geöffnet.",
+    closed: "Auftrag {number} abgeschlossen.",
+    reopened: "Auftrag {number} wieder geöffnet.",
+    toAccepted: "Auftrag {number}: zurück auf „Angenommen“.",
+    toInProgress: "Auftrag {number}: Arbeit begonnen.",
+    toReady: "Auftrag {number}: fertig gemeldet, abholbereit.",
+    toCancelled: "Auftrag {number} storniert.",
+    itemsSaved: "Positionen von Auftrag {number} gespeichert.",
+    findingAdded: "Befund zu Auftrag {number} gespeichert.",
+    findingRemoved: "Befund entfernt.",
     approved: "Freigabe protokolliert.",
   },
   errors: {

@@ -275,6 +275,8 @@ export const en: Messages = {
     forgotPassword: "Forgot your password? Please ask your administrator.",
     forbiddenTitle: "No access",
     forbiddenText: "You don't have permission for this page. Please contact your administrator.",
+    forbiddenAdminText: "Administrator roles do not include permissions that are granted explicitly (for example for the IT vault) by themselves: they only live in a role that contains them explicitly. You can create and assign such a role under “Roles”; the help on roles explains it.",
+    forbiddenAdminRoles: "Open roles",
   },
   preferences: {
     language: "Language",
