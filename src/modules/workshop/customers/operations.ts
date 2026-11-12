@@ -221,7 +221,10 @@ export const anonymizeCustomerOperation = defineOperation({
         archivedAt: customer.archivedAt ?? now,
       },
     });
-    // Der Name steht danach nirgends mehr: das Audit-Log nennt nur die Kennung
+    // Die Einträge dieses Kunden im Audit-Log (angelegt, geändert, archiviert …) tragen als Bezeichnung seinen Namen: Sie bekommen dieselbe Kennung wie die Anonymisierung, die Kennung der
+    // Sache (`entityId`) und Zeit, Handelnde und Aktion bleiben – die Nachvollziehbarkeit bleibt, der Name verschwindet. (Einträge anderer Funktionen nennen nie den Namen, siehe `labelOf` der Rechnungserstellung;
+    // Namen in Mail-Vermerken und in Backups bleiben bis zu deren Fristen, siehe Hilfe „Datenschutz bei Kunden“.)
+    await tx.auditLog.updateMany({ where: { entityId: input.id, action: { startsWith: "customer.", not: "customer.anonymize" } }, data: { target: "Kunde anonymisiert" } });
     audit({ target: "Kunde anonymisiert", entityId: input.id });
     return { id: input.id };
   },

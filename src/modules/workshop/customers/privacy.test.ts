@@ -197,6 +197,14 @@ describe("Aufbewahrungsfristen und Anonymisierung", () => {
     const { customer, vehicle, set, appointment } = await customerWithData();
     await login(ALL_PRIVACY, false);
     const anonymize = () => actions.anonymizeCustomer(form({ id: customer.id }));
+    // frühere Einträge im Audit-Log nennen den Namen des Kunden (Bezeichnung = Anzeigename) – und ein fremder Eintrag mit anderer Kennung bleibt unberührt
+    await env.db.auditLog.createMany({
+      data: [
+        { actorName: "Test", action: "customer.create", target: "Erika Beispiel", entityId: customer.id },
+        { actorName: "Test", action: "customer.update", target: "Erika Beispiel", entityId: customer.id },
+        { actorName: "Test", action: "customer.update", target: "Anderer Kunde", entityId: "fremd" },
+      ],
+    });
 
     // unbestätigt
     await anonymize();
@@ -237,7 +245,12 @@ describe("Aufbewahrungsfristen und Anonymisierung", () => {
     // Rechnung: Empfänger und Verknüpfung bleiben
     const invoice = await env.db.invoice.findFirstOrThrow();
     assert.deepEqual([invoice.partyName, invoice.customerId, invoice.grossCents], ["Erika Beispiel", customer.id, 11900]);
-    // Audit ohne Namen; zweites Mal gesperrt
+    // Audit ohne Namen; zweites Mal gesperrt. Frühere Einträge zu diesem Kunden verlieren den Namen, behalten aber Aktion, Zeit, Handelnde und Kennung
+    const earlier = await env.db.auditLog.findMany({ where: { entityId: customer.id, action: { not: "customer.anonymize" } } });
+    assert.equal(earlier.length, 2);
+    for (const row of earlier) assert.deepEqual([row.target, row.actorName], ["Kunde anonymisiert", "Test"]);
+    assert.equal(await env.db.auditLog.count({ where: { target: { contains: "Beispiel" } } }), 0, "der Name steht in keinem Eintrag mehr");
+    assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { entityId: "fremd" } })).target, "Anderer Kunde", "Einträge zu anderen Sachen bleiben");
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.anonymize" } });
     assert.equal(JSON.stringify(entry).includes("Beispiel"), false);
     assert.equal(entry.entityId, customer.id);
