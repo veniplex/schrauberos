@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { cspViolations, watchCsp } from "../support/checks";
-import { createAppointment, createCustomerWithVehicle, save, uniqueName } from "../support/flow";
+import { createAppointment, createCustomerWithVehicle, fillStable, save, uniqueName } from "../support/flow";
 import { collectBrowserErrors } from "../support/page-checks";
 
 /**
@@ -159,8 +159,10 @@ test("Benutzer und Rollen: Rolle anlegen, Benutzer anlegen, Anzeigename ändern,
   for (const name of [roleName, spareRole]) {
     await page.goto("/admin/roles/new");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("textbox", { name: "Name", exact: true }).fill(name);
+    // gesteuertes Feld: erst wenn der Wert nach der Hydration hält (sonst überschreibt die Vorlage den leeren Namen)
+    await fillStable(page.getByRole("textbox", { name: "Name", exact: true }), name);
     await page.getByRole("button", { name: "Mechaniker – Vorlage übernehmen" }).click();
+    await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(name);
     await save(page);
     await page.waitForURL((url) => url.pathname === "/admin/roles");
     await expect(page.getByText(name).first()).toBeVisible();
