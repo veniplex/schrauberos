@@ -143,7 +143,7 @@ describe("XRechnung aus Belegen der Rechnungserstellung", () => {
     const credit = await check("billing-credit-note", cancelled.data.counterId);
     assert.ok(credit.xml.includes("<CreditNote "));
     // BR-CO-25: positiver Zahlbetrag ohne Fälligkeit braucht Zahlungsbedingungen
-    assert.ok(credit.xml.includes("<cac:PaymentTerms><cbc:Note>Stornorechnung (Gutschrift): kein Zahlungsziel"));
+    assert.ok(credit.xml.includes("<cac:PaymentTerms><cbc:Note>Stornorechnung: kein Zahlungsziel"));
     assert.ok(!credit.xml.includes("PaymentDueDate"));
     assert.equal(credit.p.creditNote, true);
     assert.equal(credit.p.grossCents, -final.view.totals.grossCents);

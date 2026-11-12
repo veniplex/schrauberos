@@ -141,15 +141,38 @@ export async function buildDocumentPdf(view: DocView, options: { logo?: Buffer |
 
   /* ── Summen ── */
   const t = view.totals;
-  const totalRows = view.exempt
-    ? [{ label: "Gesamtbetrag", value: eur(t.grossCents), strong: view.deductions.length === 0 }]
+  // Mit angerechneten Abschlägen (Schlussrechnung) oder – beim Gegenbeleg einer Schlussrechnung – deren Spiegelung folgt eine Restbetragszeile
+  const credit = view.docType === "credit";
+  const hasDeductions = view.deductions.length > 0 || (credit && view.deductedCents !== 0);
+  const totalRows: Array<{ label: string; value: string; strong?: boolean }> = view.exempt
+    ? [{ label: "Gesamtbetrag", value: eur(t.grossCents), strong: !hasDeductions }]
     : [
         { label: "Nettosumme", value: eur(t.netCents) },
         ...t.taxGroups.map((group) => ({ label: `zzgl. ${percentText(group.taxBp)} MwSt. auf ${eur(group.netCents)}`, value: eur(group.taxCents) })),
-        { label: "Gesamtbetrag brutto", value: eur(t.grossCents), strong: view.deductions.length === 0 },
+        { label: "Gesamtbetrag brutto", value: eur(t.grossCents), strong: !hasDeductions },
       ];
-  for (const d of view.deductions) totalRows.push({ label: `abzgl. Abschlag ${d.number}`, value: eur(0 - d.grossCents) });
-  if (view.deductions.length > 0) totalRows.push({ label: "Zu zahlender Betrag", value: eur(viewPayable(view)), strong: true });
+  // § 14 Abs. 5 Satz 2 UStG: Die Endrechnung setzt die vereinnahmten Teilentgelte **und die darauf entfallenden Steuerbeträge** ab – je Abschlag das Entgelt, dann die Steuer je Satz (Wortlaut: Annahme, vom Steuerberater freizugeben)
+  for (const d of view.deductions) {
+    const from = `Abschlag ${d.number} vom ${dateDe(d.issueDay)}`;
+    if (view.exempt) {
+      totalRows.push({ label: `abzgl. ${from}`, value: eur(0 - d.grossCents) });
+      continue;
+    }
+    totalRows.push({ label: `abzgl. ${from}: Entgelt`, value: eur(0 - d.netCents) });
+    for (const group of d.taxGroups) {
+      if (group.taxCents !== 0) totalRows.push({ label: `abzgl. darauf entfallende ${percentText(group.taxBp)} MwSt. auf ${eur(group.netCents)}`, value: eur(0 - group.taxCents) });
+    }
+  }
+  // Gegenbeleg einer Schlussrechnung: die Abschläge bleiben gültig (sie wurden gezahlt) – gespiegelt wie auf der Originalrechnung, damit PDF und XRechnung (PrepaidAmount/PayableAmount) dasselbe sagen
+  if (credit && view.deductedCents !== 0) {
+    const label = "abzgl. Abschläge der stornierten Schlussrechnung (bleiben bestehen)";
+    if (view.exempt) totalRows.push({ label, value: eur(0 - view.deductedCents) });
+    else {
+      totalRows.push({ label: `${label}: Entgelt`, value: eur(0 - view.deductedNetCents) });
+      if (view.deductedVatCents !== 0) totalRows.push({ label: "abzgl. darauf entfallende Umsatzsteuer", value: eur(0 - view.deductedVatCents) });
+    }
+  }
+  if (hasDeductions) totalRows.push({ label: credit ? "Erstattungsbetrag" : "Restbetrag (zu zahlen)", value: eur(viewPayable(view)), strong: true });
   pdf.space(2);
   pdf.totals(totalRows, { width: mm(95) });
 

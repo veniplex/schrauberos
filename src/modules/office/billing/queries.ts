@@ -17,7 +17,7 @@ import { isUnusable, usabilitySelect } from "@/modules/workshop/customers/public
 export const viewInclude = {
   items: { orderBy: { position: "asc" } },
   snapshot: true,
-  deductions: { include: { partial: { select: { number: true, issueDate: true, grossCents: true } } } },
+  deductions: { include: { partial: { select: { number: true, issueDate: true, grossCents: true, exempt: true, items: { select: { quantityMilli: true, unitCents: true, taxBp: true, discountBp: true }, orderBy: { position: "asc" } } } } } },
   cancels: { select: { number: true, issueDate: true } },
   order: { select: { number: true } },
   sourceDoc: { select: { number: true } },

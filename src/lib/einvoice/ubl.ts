@@ -65,7 +65,12 @@ export type EinvoiceInput = {
   /** Text der Zahlungsbedingungen (BT-20) */
   paymentTerms: string | null;
   /** angerechnete Abschläge (Schlussrechnung): Summe brutto und die Rechnungen, auf die verwiesen wird */
-  prepaid: { cents: number; refs: ReadonlyArray<{ number: string; issueDate: string }> };
+  prepaid: {
+    cents: number;
+    refs: ReadonlyArray<{ number: string; issueDate: string }>;
+    /** Anmerkungen (BT-22) zur Anrechnung: Entgelt und darauf entfallende Steuer je Abschlag (§ 14 Abs. 5 UStG) */
+    notes?: readonly string[];
+  };
   /** Gegenbeleg: die stornierte Rechnung (BT-25) */
   creditOf?: { number: string; issueDate: string } | null;
 };
@@ -230,6 +235,7 @@ export function buildUblXml(input: EinvoiceInput): string {
     el("cbc:IssueDate", input.issueDate),
     ...(!credit && input.dueDate ? [el("cbc:DueDate", input.dueDate)] : []),
     el(credit ? "cbc:CreditNoteTypeCode" : "cbc:InvoiceTypeCode", typeCode),
+    ...(input.prepaid.notes ?? []).map((note) => el("cbc:Note", oneLine(note, 1000))),
     el("cbc:DocumentCurrencyCode", "EUR"),
     el("cbc:BuyerReference", oneLine(input.buyerReference)),
   ];

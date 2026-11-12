@@ -56,8 +56,15 @@ export type DocView = {
   items: LineView[];
   totals: Totals;
   exempt: boolean;
-  deductions: Array<{ number: string; issueDay: string; grossCents: number }>;
+  /**
+   * Angerechnete Abschläge (Schlussrechnung): je Abschlag Brutto sowie **Entgelt (netto) und darauf entfallende Umsatzsteuer je Steuersatz** – § 14 Abs. 5 Satz 2 UStG verlangt, in der Endrechnung die
+   * vereinnahmten Teilentgelte **und** die darauf entfallenden Steuerbeträge abzusetzen. Die Zahlen rechnen aus den Positionen des (festgeschriebenen, unveränderlichen) Abschlags – genau wie sie dort stehen.
+   */
+  deductions: Array<{ number: string; issueDay: string; grossCents: number; netCents: number; vatCents: number; taxGroups: Totals["taxGroups"] }>;
   deductedCents: number;
+  /** Entgelt und Umsatzsteuer aller angerechneten Abschläge (am Beleg festgeschrieben; beim Gegenbeleg einer Schlussrechnung negativ wie `deductedCents`) */
+  deductedNetCents: number;
+  deductedVatCents: number;
   paidCents: number;
   cancels: { number: string; issueDay: string } | null;
   finalizedAt: Date | null;
@@ -68,7 +75,7 @@ export type DocView = {
 export type ViewRow = Invoice & {
   items: InvoiceItem[];
   snapshot: InvoiceSnapshot | null;
-  deductions: Array<InvoiceDeduction & { partial: { number: string; issueDate: Date; grossCents: number } }>;
+  deductions: Array<InvoiceDeduction & { partial: { number: string; issueDate: Date; grossCents: number; exempt: boolean; items: Array<Pick<InvoiceItem, "quantityMilli" | "unitCents" | "taxBp" | "discountBp">> } }>;
   cancels: { number: string; issueDate: Date } | null;
   order: { number: string } | null;
   sourceDoc: { number: string } | null;
@@ -149,8 +156,13 @@ export function viewOf(row: ViewRow, workshop: Omit<Workshop, "logoDataUrl">): D
     items,
     totals: computeTotals(items, { exempt }),
     exempt,
-    deductions: row.deductions.map((d) => ({ number: d.partial.number, issueDay: dayKey(d.partial.issueDate), grossCents: d.partial.grossCents })),
+    deductions: row.deductions.map((d) => {
+      const parts = computeTotals(d.partial.items, { exempt: d.partial.exempt });
+      return { number: d.partial.number, issueDay: dayKey(d.partial.issueDate), grossCents: d.partial.grossCents, netCents: parts.netCents, vatCents: parts.taxCents, taxGroups: parts.taxGroups };
+    }),
     deductedCents: row.deductedCents,
+    deductedNetCents: row.deductedNetCents,
+    deductedVatCents: row.deductedVatCents,
     paidCents: row.paidCents,
     cancels: row.cancels ? { number: row.cancels.number, issueDay: dayKey(row.cancels.issueDate) } : null,
     finalizedAt: row.finalizedAt,

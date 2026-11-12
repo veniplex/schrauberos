@@ -11,7 +11,27 @@ import type { DocView } from "./view";
 
 
 /** Zahlungsbedingung (BT-20) einer Stornorechnung. */
-export const CREDIT_TERMS = "Stornorechnung (Gutschrift): kein Zahlungsziel, der Betrag wird verrechnet bzw. erstattet.";
+export const CREDIT_TERMS = "Stornorechnung: kein Zahlungsziel, der Betrag wird verrechnet bzw. erstattet.";
+
+/** Betrag als Text für die Anmerkungen der XRechnung (Euro, Komma) */
+const eurText = (cents: number): string => `${cents < 0 ? "-" : ""}${Math.floor(Math.abs(cents) / 100)},${String(Math.abs(cents) % 100).padStart(2, "0")} EUR`;
+
+/**
+ * Anmerkungen (BT-22) zur Anrechnung: Entgelt und darauf entfallende Umsatzsteuer je Abschlag – dieselben Zahlen wie auf dem PDF (§ 14 Abs. 5 Satz 2 UStG; die strukturierten Beträge tragen nur die Summe
+ * (PrepaidAmount, brutto), wie EN 16931 es vorsieht). Beim Gegenbeleg einer Schlussrechnung: die Abschläge bleiben bestehen, der Zahlbetrag ist der Erstattungsbetrag. Wortlaut: Annahme, vom Steuerberater freizugeben.
+ */
+function prepaidNotes(view: DocView): string[] {
+  if (view.docType === "credit") {
+    if (view.deductedCents === 0) return [];
+    const vat = view.exempt ? "" : `, darauf entfallende Umsatzsteuer ${eurText(Math.abs(view.deductedVatCents))}`;
+    return [`Die bei der stornierten Schlussrechnung angerechneten Abschläge bleiben bestehen (Entgelt ${eurText(Math.abs(view.deductedNetCents))}${vat}). Der Zahlbetrag ist der Erstattungsbetrag.`];
+  }
+  return view.deductions.map((d) => {
+    if (view.exempt) return `Anrechnung Abschlag ${d.number} vom ${dateDe(d.issueDay)}: ${eurText(d.grossCents)}`;
+    const groups = d.taxGroups.filter((g) => g.taxCents !== 0).map((g) => `${g.taxBp / 100} %: ${eurText(g.taxCents)} auf ${eurText(g.netCents)}`);
+    return `Anrechnung Abschlag ${d.number} vom ${dateDe(d.issueDay)}: Entgelt ${eurText(d.netCents)}, darauf entfallende Umsatzsteuer ${eurText(d.vatCents)}${groups.length > 0 ? ` (${groups.join("; ")})` : ""}`;
+  });
+}
 
 const XML_TYPE: Record<string, EinvoiceInput["type"]> = { invoice: "invoice", final: "invoice", partial: "partial", credit: "credit" };
 
@@ -46,7 +66,7 @@ export function einvoiceInputOf(view: DocView): EinvoiceInput {
     payment: { method: (["transfer", "cash", "card", "other"] as const).find((m) => m === view.paymentMethod) ?? "transfer", iban: view.sender.iban, bic: view.sender.bic, accountHolder: view.sender.name, reference: paymentReference(view.docType, view.number) },
     // BR-CO-25: Rechnungen tragen die Fälligkeit (BT-9) und den Text dazu; Stornorechnungen nur einen Text – es gibt keine Zahlungsaufforderung, also auch keine erfundene Fälligkeit
     paymentTerms: credit ? CREDIT_TERMS : !view.dueDay ? null : `Zahlbar bis ${dateDe(view.dueDay)} ohne Abzug.`,
-    prepaid: { cents: Math.abs(view.deductedCents), refs: credit ? [] : view.deductions.map((d) => ({ number: d.number, issueDate: d.issueDay })) },
+    prepaid: { cents: Math.abs(view.deductedCents), refs: credit ? [] : view.deductions.map((d) => ({ number: d.number, issueDate: d.issueDay })), notes: prepaidNotes(view) },
     creditOf: view.cancels ? { number: view.cancels.number, issueDate: view.cancels.issueDay } : null,
   };
 }

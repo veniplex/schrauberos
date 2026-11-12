@@ -611,6 +611,49 @@ describe("PDF und XRechnung", () => {
     assert.ok(payload?.includes("EUR71.40"));
   });
 
+  it("Schlussrechnung: Entgelt und darauf entfallende Steuer der Abschläge getrennt abgesetzt (§ 14 Abs. 5 UStG), je Steuersatz; PDF und XRechnung nennen dieselben Zahlen", async () => {
+    const session = await sessionFor(FINALIZE);
+    const finalizeDraft = async (extra: Record<string, unknown>, list: Array<Record<string, unknown>>) => {
+      const created = await ops.saveDraftOperation.execute(session, { docType: "invoice", customerId, serviceFrom: todayInput(), buyerReference: "KD-1", items: items(list), ...extra });
+      assert.ok(created.ok, JSON.stringify(!created.ok && created.failure));
+      assert.ok((await finalize(session, created.data.id)).ok);
+      return created.data.id;
+    };
+    const pdfText = async (id: string) => inspectPdf(await docs.buildDocumentPdf((await queries.loadDocView(id))!.view)).pages.join("\n");
+    const flat = (text: string) => text.replace(/[\s\u00a0\u202f]+/g, " ");
+    // Abschlag 500,00 netto mit 19 % (95,00) und 100,00 netto mit 7 % (7,00): zwei Steuersätze im Abschlag
+    const partialId = await finalizeDraft({ docType: "partial" }, [{ description: "Abschlag A", unitCents: 50000 }, { description: "Abschlag B", unitCents: 10000, taxBp: 700 }]);
+    const finalId = await finalizeDraft({ docType: "final", deductPartialIds: [partialId] }, [{ description: "Gesamt", unitCents: 180000 }]);
+    const row = await fresh(finalId);
+    assert.deepEqual([row.grossCents, row.deductedCents, row.deductedNetCents, row.deductedVatCents], [214200, 70200, 60000, 10200]);
+    const text = flat(await pdfText(finalId));
+    assert.match(text, /Nettosumme 1\.800,00/);
+    assert.match(text, /abzgl\. Abschlag \S+ vom \d\d\.\d\d\.\d{4}: Entgelt [-−] ?600,00/, "Entgelt (netto) des Abschlags");
+    assert.match(text, /abzgl\. darauf entfallende 19 % MwSt\. auf 500,00 € [-−] ?95,00/, "Steuer je Satz: 19 %");
+    assert.match(text, /abzgl\. darauf entfallende 7 % MwSt\. auf 100,00 € [-−] ?7,00/, "Steuer je Satz: 7 %");
+    assert.match(text, /Restbetrag \(zu zahlen\) 1\.440,00/, "2.142,00 − 702,00");
+    // XRechnung: PrepaidAmount brutto (EN 16931), Anmerkung mit Entgelt und Steuer, Zahlbetrag wie im PDF
+    const xml = xr.buildDocumentXml((await queries.loadDocView(finalId))!.view);
+    assert.match(xml, /<cbc:PrepaidAmount[^>]*>702\.00</);
+    assert.match(xml, /<cbc:PayableAmount[^>]*>1440\.00</);
+    assert.match(xml, /<cbc:Note>Anrechnung Abschlag \S+ vom [^<]*Entgelt 600,00 EUR, darauf entfallende Umsatzsteuer 102,00 EUR \(19 %: 95,00 EUR auf 500,00 EUR; 7 %: 7,00 EUR auf 100,00 EUR\)</);
+
+    // Storno der Schlussrechnung: PDF und XML widerspruchsfrei (Anrechnung gespiegelt, Erstattungsbetrag benannt, kein „Gutschrift“ im Zahlungstext)
+    const cancelled = await invoiceOps.cancelInvoiceOperation.execute(session, { id: finalId, version: versionOf(await fresh(finalId)) });
+    assert.ok(cancelled.ok);
+    const credit = flat(await pdfText(cancelled.data.counterId));
+    assert.match(credit, /Gesamtbetrag brutto [-−] ?2.142,00/);
+    assert.match(credit, /abzgl\. Abschläge der stornierten Schlussrechnung \(bleiben bestehen\): Entgelt 600,00/);
+    assert.match(credit, /abzgl\. darauf entfallende Umsatzsteuer 102,00/);
+    assert.match(credit, /Erstattungsbetrag [-−] ?1.440,00/);
+    const creditXml = xr.buildDocumentXml((await queries.loadDocView(cancelled.data.counterId))!.view);
+    assert.match(creditXml, /<cbc:TaxInclusiveAmount[^>]*>2142\.00</);
+    assert.match(creditXml, /<cbc:PrepaidAmount[^>]*>702\.00</);
+    assert.match(creditXml, /<cbc:PayableAmount[^>]*>1440\.00</, "dieselbe Zahl wie der Erstattungsbetrag im PDF");
+    assert.doesNotMatch(creditXml, /Gutschrift/);
+    assert.match(creditXml, /<cbc:Note>Die bei der stornierten Schlussrechnung angerechneten Abschläge bleiben bestehen/);
+  });
+
   it("ein Entwurf trägt den Hinweis und keine Nummer", async () => {
     const session = await sessionFor(EDIT);
     const id = await draft(session);
