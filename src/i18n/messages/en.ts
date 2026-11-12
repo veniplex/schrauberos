@@ -323,6 +323,7 @@ export const en: Messages = {
       open: "open",
       allDone: "All done. The checklist can be hidden now.",
       hide: "Hide checklist",
+      more: "More items and completed ones ({count})",
       finish: "Done – hide checklist",
       show: "Show setup checklist again",
     },
@@ -663,6 +664,7 @@ export const en: Messages = {
     errors: {
       externalPassword: "This account's password is managed in an external directory and cannot be changed here.",
       currentWrong: "The current password is incorrect.",
+      currentRequired: "Please enter your own password.",
       passwordShort: "At least {min} characters.",
       passwordLong: "At most {max} characters.",
       tooManyAttempts: "Too many attempts. Please try again in about {seconds} seconds.",

@@ -64,7 +64,7 @@ export function CustomerForm({ initial, cancelHref, canAddVehicle = false }: { i
           <Input id="street" name="street" defaultValue={initial.street} autoComplete="off" />
         </Field>
         <Field label={t("customers.fields.zip")} htmlFor="zip">
-          <Input id="zip" name="zip" defaultValue={initial.zip} autoComplete="off" />
+          <Input id="zip" name="zip" defaultValue={initial.zip} inputMode="numeric" autoComplete="off" />
         </Field>
         <Field label={t("customers.fields.city")} htmlFor="city">
           <Input id="city" name="city" defaultValue={initial.city} autoComplete="off" />

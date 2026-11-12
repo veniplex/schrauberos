@@ -71,6 +71,7 @@ export const systemDe = {
     everyMinutes: "alle {n} Minuten",
     everyHours: "alle {n} Stunden",
     cron: "Zeitplan {cron} (Ortszeit der Werkstatt)",
+    dailyAt: "täglich um {time} Uhr (Ortszeit der Werkstatt)",
   },
   names: {
     backup: { auto: "Automatisches Backup", offsite: "Off-Site-Backup übertragen", retention: "Backups aufräumen (Aufbewahrung)" },

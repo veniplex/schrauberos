@@ -76,7 +76,7 @@ export function WorkshopForm({
           </Field>
           <div className="grid grid-cols-[7rem_1fr] gap-3">
             <Field label={t("customers.fields.zip")} htmlFor="zip">
-              <Input id="zip" name="zip" defaultValue={initial.zip} />
+              <Input id="zip" name="zip" defaultValue={initial.zip} inputMode="numeric" autoComplete="off" />
             </Field>
             <Field label={t("customers.fields.city")} htmlFor="city">
               <Input id="city" name="city" defaultValue={initial.city} />
@@ -196,6 +196,7 @@ export function WorkshopForm({
                 checked={closed[day]}
                 onChange={(e) => setClosed((c) => ({ ...c, [day]: e.target.checked }))}
                 label={t("settings.workshop.closed")}
+                aria-label={`${t(`enums.weekday.${day}`)} ${t("settings.workshop.closed").toLowerCase()}`}
                 className="sm:order-4"
               />
               <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:contents">

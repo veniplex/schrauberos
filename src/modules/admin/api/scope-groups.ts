@@ -23,7 +23,8 @@ export function scopeGroups(grantable: readonly string[], can: (permission: stri
         id,
         label: td(`permissionGroups.${group}`, group),
         items: [...keys]
-          .sort((a, b) => Number(b.endsWith(".view")) - Number(a.endsWith(".view")) || a.localeCompare(b))
+          // Reihenfolge des Katalogs (wie in der Rollenmaske: ansehen, anlegen, bearbeiten, löschen), „ansehen“ immer zuerst
+          .sort((a, b) => Number(b.endsWith(".view")) - Number(a.endsWith(".view")) || (f.permissions.keys as readonly string[]).indexOf(a) - (f.permissions.keys as readonly string[]).indexOf(b) || a.localeCompare(b))
           .map((key) => {
             const action = key.slice(group.length + 1);
             return {

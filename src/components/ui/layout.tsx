@@ -250,6 +250,8 @@ export function NavLink({
   return (
     <Link
       {...props}
+      // Die Seitenleiste kürzt lange Namen mit „…“: der Tooltip nennt sie ganz
+      title={props.title ?? (typeof children === "string" ? children : undefined)}
       aria-current={active ? "page" : undefined}
       className={clsx(
         "relative flex min-h-(--tap) items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",

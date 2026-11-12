@@ -324,6 +324,7 @@ export const de = {
       open: "offen",
       allDone: "Alles erledigt. Die Checkliste lässt sich jetzt ausblenden.",
       hide: "Checkliste ausblenden",
+      more: "Weitere Punkte und Erledigtes ({count})",
       finish: "Fertig – Checkliste ausblenden",
       show: "Einrichtungs-Checkliste wieder einblenden",
     },
@@ -663,6 +664,7 @@ export const de = {
     errors: {
       externalPassword: "Das Passwort dieses Kontos wird in einem externen Verzeichnis verwaltet und kann hier nicht geändert werden.",
       currentWrong: "Das aktuelle Passwort ist falsch.",
+      currentRequired: "Bitte das eigene Passwort eingeben.",
       passwordShort: "Mindestens {min} Zeichen.",
       passwordLong: "Höchstens {max} Zeichen.",
       tooManyAttempts: "Zu viele Versuche. Bitte in etwa {seconds} Sekunden erneut versuchen.",

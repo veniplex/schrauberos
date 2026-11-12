@@ -92,7 +92,7 @@ function ItemRow({ item, editable, onDone }: { item: RunnerItem; editable: boole
   const outside = isNumeric(item.type) && number.trim() !== "" && Number.isFinite(numeric) && ((item.minValue !== null && numeric < item.minValue) || (item.maxValue !== null && numeric > item.maxValue));
   const fmt = (value: number) => formatNumber(value, locale);
   const rangeText =
-    item.minValue !== null && item.maxValue !== null ? t("checklists.detail.range", { min: fmt(item.minValue), max: fmt(item.maxValue) }) : item.minValue !== null ? t("checklists.detail.rangeMin", { min: fmt(item.minValue) }) : item.maxValue !== null ? t("checklists.detail.rangeMax", { max: fmt(item.maxValue) }) : null;
+    item.minValue !== null && item.maxValue !== null ? t("checklists.detail.range", { min: fmt(item.minValue), max: fmt(item.maxValue) }) : item.minValue !== null && item.minValue !== 0 ? t("checklists.detail.rangeMin", { min: fmt(item.minValue) }) : item.maxValue !== null ? t("checklists.detail.rangeMax", { max: fmt(item.maxValue) }) : null;
   const hint = [item.hint, item.type === "photo" ? t("checklists.detail.photoHint") : null, item.targetValue !== null ? t("checklists.detail.target", { value: `${fmt(item.targetValue)}${item.unit ? ` ${item.unit}` : ""}` }) : null, rangeText, item.doneLabel && done ? item.doneLabel : null].filter(Boolean).join(" · ");
 
   return (

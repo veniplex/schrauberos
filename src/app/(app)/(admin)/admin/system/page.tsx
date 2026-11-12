@@ -104,7 +104,12 @@ export default async function SystemPage() {
   const noticeText = (n: SystemNotice) => t(`system.notice.${n.code}`);
 
   const scheduleText = (schedule: Schedule) => {
-    if ("cron" in schedule) return t("system.schedule.cron", { cron: schedule.cron });
+    if ("cron" in schedule) {
+      // „20 3 * * *“ als Klartext („täglich um 03:20 Uhr“); andere Muster bleiben als Cron-Ausdruck
+      const daily = /^(d{1,2}) (d{1,2}) * * *$/.exec(schedule.cron.trim());
+      if (daily) return t("system.schedule.dailyAt", { time: `${daily[2].padStart(2, "0")}:${daily[1].padStart(2, "0")}` });
+      return t("system.schedule.cron", { cron: schedule.cron });
+    }
     const seconds = Math.round(schedule.every / 1000);
     if (seconds < 120) return t("system.schedule.everySeconds", { n: seconds });
     if (seconds < 2 * 3600) return t("system.schedule.everyMinutes", { n: Math.round(seconds / 60) });

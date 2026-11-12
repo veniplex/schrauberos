@@ -73,6 +73,7 @@ export const systemEn: typeof systemDe = {
     everyMinutes: "every {n} minutes",
     everyHours: "every {n} hours",
     cron: "{cron} (workshop local time)",
+    dailyAt: "daily at {time} (workshop local time)",
   },
   names: {
     backup: { auto: "Automatic backup", offsite: "Transfer off-site backup", retention: "Clean up backups (retention)" },

@@ -23,7 +23,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   return (
     <>
       {/* ohne `help`: Die Reiter haben verschiedene Rechte, das Hilfekapitel „Einstellungen“ aber nur settings.manage */}
-      <PageHeader title={t("settings.title")} description={t("settings.description")} />
+      <PageHeader title={t("settings.title")} description={t("settings.description")} help="admin.settings" />
       <TabNav label={t("settings.title")} items={tabs.map((tab) => ({ href: `/settings?tab=${tab.id}`, label: t(tab.labelKey), active: active?.id === tab.id }))} />
       {active ? <active.Component /> : null}
     </>

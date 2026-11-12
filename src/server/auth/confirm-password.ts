@@ -13,6 +13,8 @@ export type ConfirmGate = typeof loginThrottle.passwordChange;
  * Sitzung darf damit nicht raten. Die Berechnung läuft auf dem Eigentümer-Pfad (`ownerLane`), nie hinter einer Flut von Anmeldungen.
  */
 export async function confirmOwnPassword(userId: string, password: string, field = "password", gate: ConfirmGate = loginThrottle.passwordChange): Promise<{ username: string }> {
+  // Ein leeres Feld ist nicht „falsch“, sondern fehlt (kein Versuch, kein Hash)
+  if (!password) failField(field, "account.errors.currentRequired");
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   if (user.authSource !== "local") fail("forbidden", "recovery.account.errors.external");
   const wait = gate.check(user.id);
