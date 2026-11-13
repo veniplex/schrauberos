@@ -5,7 +5,7 @@ import { getSession } from "@/server/auth/session";
 import { buildDocumentXml, xrechnungProblems } from "@/modules/office/billing/xrechnung";
 import { documentFileName } from "@/modules/office/billing/domain";
 import { readOriginal } from "@/modules/office/billing/original-files";
-import { loadDocView } from "@/modules/office/billing/queries";
+import { billingReadAllowed, loadDocView } from "@/modules/office/billing/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const { id } = await params;
   const loaded = await loadDocView(id);
-  if (!loaded) return errorResponse(404, "Not found");
+  if (!loaded || !(await billingReadAllowed(session, loaded.row.customerId))) return errorResponse(404, "Not found"); // Art. 18: Belege eingeschränkter Kunden nur mit invoices.view
   const original = loaded.view.draft ? null : await readOriginal(id, "xml");
   if (original === "damaged") return errorResponse(500, "Original damaged");
   if (original) return new Response(new Uint8Array(original.bytes), { headers: { ...deliveryHeaders({ mime: "application/xml", name: documentFileName(loaded.view.docType, loaded.view.number, "xml"), download: true, size: original.bytes.byteLength }), "X-Document-Version": "original" } });

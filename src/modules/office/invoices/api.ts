@@ -11,7 +11,7 @@ import type { ApiEndpoint } from "@/server/api/types";
 import { db } from "@/server/db";
 import { fileExists, fileSize, openFile } from "@/server/files";
 import { apiProblem, runApiOperation } from "@/server/operations";
-import { invoiceTextWhere, ledgerWhere } from "./queries";
+import { archiveListedWhere, invoiceTextWhere, ledgerWhere } from "./queries";
 import { DOC_TYPES_LEDGER, INVOICE_DIRECTIONS, INVOICE_FILE_MAX_BYTES, INVOICE_FILE_TYPES, INVOICE_STATUSES } from "./domain";
 import { cancelInvoiceOperation, deleteInvoiceOperation, finalizeInvoiceOperation, markInvoicePaidOperation, reopenInvoiceOperation, saveInvoiceOperation } from "./operations";
 
@@ -145,7 +145,7 @@ const resourceEndpoints = defineResource({
   model: db.invoice as unknown as Delegate<Row>,
   include: { file: true, cancelledBy: { select: { id: true } } },
   // nur die Ausgangsliste: keine Angebote, Auftragsbestätigungen und Entwürfe der Rechnungserstellung
-  scope: ledgerWhere,
+  scope: { AND: [ledgerWhere, archiveListedWhere] }, // eingeschränkte Kunden (Art. 18) gibt es in der Schnittstelle nicht
   item,
   version: versionOf,
   toItem: toItemOf,
@@ -218,7 +218,7 @@ const common = { feature: "office.invoices" as const, tag: "Invoices" };
 const withFile = { file: true, cancelledBy: { select: { id: true } } } as const;
 
 /** Die Rechnung des Archivs mit Beleg (nur, was die Ressource zeigt: `ledgerWhere`). */
-const findInvoice = (id: string) => (ID_SHAPE.test(id) ? db.invoice.findFirst({ where: { id, ...ledgerWhere }, include: withFile }) : Promise.resolve(null));
+const findInvoice = (id: string) => (ID_SHAPE.test(id) ? db.invoice.findFirst({ where: { AND: [{ id }, ledgerWhere, archiveListedWhere] }, include: withFile }) : Promise.resolve(null));
 
 /** `If-Match` lesen: ohne Kopf 428, unbrauchbar 400. */
 function versionOfRequest(header: string | null): string {

@@ -25,6 +25,7 @@ async function session(permissions: readonly string[]) {
 
 /** Alle Rechnungen entfernen, in der Reihenfolge der Verknüpfungen (Anrechnungen und Gegenbelege hängen mit Restrict an den anderen). */
 async function clearInvoices() {
+  await env.db.invoiceOriginal.deleteMany();
   await env.db.invoiceDeduction.deleteMany();
   await env.db.invoice.deleteMany({ where: { cancelsInvoiceId: { not: null } } });
   await env.db.invoice.deleteMany();

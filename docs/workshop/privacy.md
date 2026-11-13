@@ -24,6 +24,8 @@ Die Auskunft enthält nur, was in der Anwendung steht – bei Aufträgen, Checkl
 * lässt er sich nicht mehr neu verknüpfen (neuer Termin mit diesem Kunden, Halterwechsel auf ihn, neue Rechnung an ihn); bestehende Verknüpfungen bleiben,
 * bleibt er auf seiner **Kundenseite** sichtbar – mit einem Hinweis, seit wann die Verarbeitung eingeschränkt ist, und der Notiz zum Anlass.
 
+**Rechnungen eines eingeschränkten Kunden:** Festgeschriebene Rechnungen bleiben wegen der Aufbewahrungspflicht im **Rechnungsarchiv lesbar** – nur für Personen mit dem Recht *Rechnungen ansehen* (bei Belegen aus *Angebote & Rechnungen* zusätzlich zu *Angebote und Rechnungen ansehen*), mit dem sichtbaren Hinweis „Verarbeitung eingeschränkt (Aufbewahrungspflicht)“. Der **Name** steht dort nur mit dem Recht *Kunden ansehen*, sonst „Kunde eingeschränkt“; die Suche nach dem Namen findet sie ebenfalls nur damit (Nummer und Referenz immer). Nicht festgeschriebene Rechnungen (Entwürfe) eines eingeschränkten Kunden sind nicht mehr lesbar. In der Schnellsuche, in Auswahlfeldern, in CSV-Exporten, in der Programmierschnittstelle und im Kalender-Abo erscheinen eingeschränkte Kunden nicht. Die Summen in Berichten zählen die Rechnungen mit (die Zahl der nicht aufgeführten steht dabei).
+
 Auffindbar ist er über den Listenfilter **Eingeschränkt** (und „Alle“). Nutzen dürfen Sie die Daten nur mit Einwilligung, zur Geltendmachung von Rechtsansprüchen oder aus anderen gesetzlich erlaubten Gründen. **Einschränkung aufheben** macht den Kunden wieder normal verwendbar. Hinweis: Bereits angelegte Termine und Fahrzeuge des Kunden bleiben in ihren Listen und im Kalender stehen.
 
 ## Aufbewahrungsfristen und Anonymisierung (Art. 17 DSGVO)

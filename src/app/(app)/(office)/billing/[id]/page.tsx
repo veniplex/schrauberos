@@ -15,7 +15,7 @@ import { ChecklistCard, FactsCard, HistoryCard, ItemsCard, PartiesCard, Payments
 import { originalStates } from "@/modules/office/billing/original-files";
 import { docTitle, isDraft, isSmallAmount, offerState, todayKey } from "@/modules/office/billing/domain";
 import { xrechnungProblems } from "@/modules/office/billing/xrechnung";
-import { documentDetail } from "@/modules/office/billing/queries";
+import { billingReadAllowed, documentDetail } from "@/modules/office/billing/queries";
 import { DocBadges } from "@/modules/office/billing/ui";
 import { draftProblems } from "@/modules/office/billing/view";
 import { cancelBlock, cancelInvoice } from "@/modules/office/invoices/public";
@@ -26,8 +26,11 @@ import { db } from "@/server/db";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  if (!(await sessionIfAllowed("billing.view"))) return {};
-  const doc = await db.invoice.findFirst({ where: { id, source: "billing" }, select: { number: true, docType: true, partyName: true } });
+  const sessionAllowed = await sessionIfAllowed("billing.view");
+  if (!sessionAllowed) return {};
+  const doc = await db.invoice.findFirst({ where: { id, source: "billing" }, select: { number: true, docType: true, partyName: true, customerId: true } });
+  // Art. 18: Belege eingeschränkter Kunden liefern ohne `invoices.view` keinen Titel (auch keinen Namen)
+  if (doc && !(await billingReadAllowed({ can: (p) => Boolean(sessionAllowed?.can(p)) }, doc.customerId))) return {};
   return { title: doc ? `${doc.number || docTitle(doc.docType)} · ${doc.partyName}` : undefined };
 }
 
@@ -36,7 +39,7 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
   const [{ id }, i18n] = await Promise.all([params, getI18n()]);
   const { t, td } = i18n;
   const detail = await documentDetail(id);
-  if (!detail) notFound();
+  if (!detail || !(await billingReadAllowed(session, detail.row.customerId))) notFound(); // Art. 18: Belege eingeschränkter Kunden nur mit invoices.view
   const { view, row, payments, derived, counter, restricted, sendTo, originalId, deductedInFinal, invalidDeductions } = detail;
 
   const draft = isDraft(row);

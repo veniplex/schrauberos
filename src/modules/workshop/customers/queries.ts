@@ -68,6 +68,8 @@ export const isUnusable = (customer: { processingRestrictedAt: Date | null; anon
  *  - `unrestrictedOrder` (Kunde und Fahrzeug, Fahrzeug Pflicht) und `unrestrictedDocument` (Kunde und optionales Fahrzeug): beides zusammen.
  */
 export const unrestrictedByCustomer = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
+/** Das Gegenteil von `unrestrictedByCustomer`: die Sache hat einen Kunden, und dessen Verarbeitung ist eingeschränkt (Zählungen „nicht aufgeführt“, Hinweise im Archiv). */
+export const restrictedByCustomer = { AND: [{ customerId: { not: null } }, { customer: { is: restrictedCustomerWhere } }] };
 export const unrestrictedByVehicle = { vehicle: { is: unrestrictedByCustomer } };
 export const unrestrictedByOptionalVehicle = { OR: [{ vehicleId: null }, { vehicle: { is: unrestrictedByCustomer } }] };
 export const unrestrictedOrder = { AND: [unrestrictedByCustomer, unrestrictedByVehicle] };

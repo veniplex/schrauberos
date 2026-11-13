@@ -11,6 +11,7 @@ import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { formatCents } from "@/lib/money";
+import { unrestrictedByCustomer } from "@/modules/workshop/customers/public";
 import { BILLING_STATUS_FILTERS, BILLING_TYPE_FILTERS, billingListWhere, billingStats, parseStatusFilter, parseTypeFilter } from "@/modules/office/billing/queries";
 import { DocBadges } from "@/modules/office/billing/ui";
 import { payableCents } from "@/modules/office/billing/domain";
@@ -34,7 +35,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const type = parseTypeFilter(sp.type);
   const status = parseStatusFilter(sp.status);
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT });
-  const where = billingListWhere({ q, type, status });
+  // Belege eingeschränkter Kunden (Art. 18) stehen nur mit `invoices.view` in der Liste (wie das Archiv, `billingReadAllowed`)
+  const where = { AND: [billingListWhere({ q, type, status }), session.can("invoices.view") ? {} : unrestrictedByCustomer] };
   const orderBy =
     list.sort === "number"
       ? [{ number: list.dir }]

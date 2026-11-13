@@ -14,7 +14,8 @@ import { INTL_LOCALE } from "@/i18n/config";
 import { currentYear, startOfDayIn, todayInput } from "@/lib/dates";
 import { clampPage, listHref, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { INVOICE_DIRECTIONS, paymentState, type InvoiceDirection } from "@/modules/office/invoices/domain";
-import { invoiceSums, invoiceTextWhere, invoiceYears, ledgerWhere } from "@/modules/office/invoices/queries";
+import { archiveReadableWhere, invoiceSums, invoiceTextWhere, invoiceYears, ledgerWhere } from "@/modules/office/invoices/queries";
+import { restrictionSelect } from "@/modules/workshop/customers/public";
 import { formatCents } from "@/lib/money";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -49,7 +50,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT, dirParam: ORDER_PARAM });
 
   const yearRange = year ? { issueDate: { gte: startOfDayIn(`${year}-01-01`), lt: startOfDayIn(`${year + 1}-01-01`) } } : {};
-  const text = searchWhere<Prisma.InvoiceWhereInput>(q, session.can, [{ where: (term) => ({ OR: invoiceTextWhere(term) }) }]);
+  // Namen eingeschränkter Kunden (Art. 18) findet die Suche nur mit `customers.view`
+  const restrictedNames = session.can("customers.view");
+  const text = searchWhere<Prisma.InvoiceWhereInput>(q, session.can, [{ where: (term) => ({ OR: invoiceTextWhere(term, { category: true, restrictedNames }) }) }]);
   // nur die Ausgangsliste: keine Angebote, Auftragsbestätigungen und Entwürfe der Rechnungserstellung
   const filters: Prisma.InvoiceWhereInput = {
     direction,
@@ -59,7 +62,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     ...(state === "overdue" ? { status: "open", dueDate: { lt: today } } : {}),
     ...(state === "open" ? { status: "open", AND: [{ OR: [{ dueDate: null }, { dueDate: { gte: today } }] }] } : {}),
   };
-  const where: Prisma.InvoiceWhereInput = { AND: [ledgerWhere, filters] };
+  // Festgeschriebene Rechnungen eingeschränkter Kunden bleiben lesbar (Aufbewahrungspflicht), nicht festgeschriebene nicht (`archiveReadableWhere`)
+  const where: Prisma.InvoiceWhereInput = { AND: [ledgerWhere, archiveReadableWhere, filters] };
 
   const orderBy =
     list.sort === "number"
@@ -75,7 +79,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   // Summen immer über alle Rechnungen der Richtung im gewählten Jahr (ohne Status-/Suchfilter), von der Datenbank gerechnet
   const [total, totals, years] = await Promise.all([db.invoice.count({ where }), invoiceSums({ direction, ...yearRange }), invoiceYears(thisYear)]);
   const page = clampPage(list.page, total, list.pageSize);
-  const invoices = await db.invoice.findMany({ where, include: { file: { select: { id: true } } }, orderBy, ...pageWindow(page, list.pageSize) });
+  const invoices = await db.invoice.findMany({ where, include: { file: { select: { id: true } }, customer: { select: restrictionSelect } }, orderBy, ...pageWindow(page, list.pageSize) });
   const canEdit = session.can("invoices.edit");
 
   const links = listLinks("/invoices", { dir: direction, q: q || undefined, status: state || undefined, year: sp.year }, list, DEFAULT, ORDER_PARAM);
@@ -166,7 +170,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             sort: "party",
             cell: (inv) => (
               <div className="text-sm">
-                {inv.partyName}
+                {inv.customer?.processingRestrictedAt && !restrictedNames ? <span className="text-ink-muted">{t("invoices.restricted.hiddenName")}</span> : inv.partyName}
+                {inv.customer?.processingRestrictedAt ? <div className="text-xs text-warning-ink">{t("invoices.restricted.notice")}</div> : null}
                 {inv.category ? <div className="text-xs text-ink-muted">{inv.category}</div> : null}
               </div>
             ),

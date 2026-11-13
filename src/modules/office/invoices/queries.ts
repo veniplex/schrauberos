@@ -2,7 +2,7 @@ import "server-only";
 import { addMonths as addMonthsTo } from "@/lib/month";
 import { addDaysToKey as addDaysTo, daysBetweenKeys, dayKey, startOfDay, wallOf } from "@/lib/zone";
 import type { Viewer } from "@/modules/types";
-import { restrictedCustomerWhere, unrestrictedCustomerWhere } from "@/modules/workshop/customers/public";
+import { restrictedByCustomer, unrestrictedByCustomer } from "@/modules/workshop/customers/public";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { contains, keyContains } from "@/server/search";
@@ -12,11 +12,22 @@ import { AGE_BUCKETS, ageBucketOf, ageBucketRange, ledgerWhere, outstandingCents
  * Suchbedingungen für Rechnungen (Liste, Schnellsuche, API): der Geschäftspartner über die normalisierte Spalte `partyKey` (Umlaute, Groß-/Kleinschreibung, Trenner), Nummer, Referenz
  * und Kategorie als Teilstring. Jedes Element ist eine ODER-Alternative; `category: false` lässt die Kategorie weg (Schnellsuche).
  */
-export function invoiceTextWhere(term: string, options: { category?: boolean } = { category: true }): Prisma.InvoiceWhereInput[] {
-  return [{ number: contains(term) }, keyContains("partyKey", term), { reference: contains(term) }, ...(options.category === false ? [] : [{ category: contains(term) }])];
+export function invoiceTextWhere(term: string, options: { category?: boolean; /** Der Betrachter darf Namen von Kunden mit eingeschränkter Verarbeitung sehen (`customers.view`); sonst findet die Suche sie nicht über den Namen (Art. 18) */ restrictedNames?: boolean } = { category: true }): Prisma.InvoiceWhereInput[] {
+  const party = options.restrictedNames === false ? { AND: [keyContains("partyKey", term), unrestrictedByCustomer] } : keyContains("partyKey", term);
+  return [{ number: contains(term) }, party, { reference: contains(term) }, ...(options.category === false ? [] : [{ category: contains(term) }])];
 }
 
 export { ledgerWhere };
+
+/**
+ * **Archiv-Lesen und Art. 18** (Entscheid des Besitzers): Festgeschriebene Rechnungen eingeschränkter Kunden bleiben im Archiv lesbar (Aufbewahrungspflicht) – nur mit `invoices.view`, mit dem Hinweis „Verarbeitung
+ * eingeschränkt (Aufbewahrungspflicht)", ihr Name nur mit `customers.view`. Nicht festgeschriebene Rechnungen eingeschränkter Kunden sind dort nicht lesbar. Liste, Detail, Datei und Schnellsuche nehmen diese Bedingung
+ * (aus `unrestrictedByCustomer` der Kundenfunktion, nie handgeschrieben); **API, Exporte und Feeds** nehmen dagegen `unrestrictedByCustomer` allein: eingeschränkte Kunden fehlen dort ganz.
+ */
+export const archiveReadableWhere: Prisma.InvoiceWhereInput = { OR: [unrestrictedByCustomer, { finalizedAt: { not: null } }] };
+
+/** Schnellsuche und Auswahl: eingeschränkte Kunden fehlen ganz (Art. 18). */
+export const archiveListedWhere: Prisma.InvoiceWhereInput = unrestrictedByCustomer;
 
 /**
  * Summen über alle Rechnungen, die `where` trifft – von der Datenbank gerechnet (`aggregate`), nicht über eine geladene Seite: Die Kacheln über der Liste
@@ -162,8 +173,8 @@ export async function revenueByMonth(viewer: Viewer, months: readonly string[]):
  */
 const openWhere = (direction: "outgoing" | "incoming"): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, { direction, status: "open", docType: { in: ["invoice", "partial", "final"] }, grossCents: { gt: 0 } }] });
 const creditsWhere = (direction: "outgoing" | "incoming"): Prisma.InvoiceWhereInput => ({ AND: [ledgerWhere, { direction, status: "open", docType: { in: ["invoice", "partial", "final"] }, grossCents: { lt: 0 } }] });
-const UNRESTRICTED_PARTY: Prisma.InvoiceWhereInput = { OR: [{ customerId: null }, { customer: { is: unrestrictedCustomerWhere } }] };
-const RESTRICTED_PARTY: Prisma.InvoiceWhereInput = { customerId: { not: null }, customer: { is: restrictedCustomerWhere } };
+const UNRESTRICTED_PARTY: Prisma.InvoiceWhereInput = unrestrictedByCustomer;
+const RESTRICTED_PARTY: Prisma.InvoiceWhereInput = restrictedByCustomer;
 
 const OPEN_SUMS = { grossCents: true, deductedCents: true, paidCents: true } as const;
 type OpenSums = { grossCents: number | null; deductedCents: number | null; paidCents: number | null };

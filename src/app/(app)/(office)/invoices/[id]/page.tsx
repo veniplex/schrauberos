@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Download, ExternalLink, Lock, Pencil } from "lucide-react";
-import { Badge, Card, DefinitionList, TextLink, DangerZone } from "@/components/ui/layout";
+import { Alert, Badge, Card, DefinitionList, TextLink, DangerZone } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton, SubmitButton } from "@/components/ui/buttons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
@@ -11,8 +11,9 @@ import { INTL_LOCALE } from "@/i18n/config";
 import { todayInput } from "@/lib/dates";
 import { versionOf } from "@/lib/concurrency";
 import { cancelBlock, finalizeBlock, isFinalized, ledgerWhere, outstandingCents, paymentState } from "@/modules/office/invoices/domain";
+import { archiveReadableWhere } from "@/modules/office/invoices/queries";
 import { PageSections } from "@/modules/page-sections";
-import { customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
+import { customerDisplayName, customerNameSelect, restrictionSelect } from "@/modules/workshop/customers/public";
 import { formatCents } from "@/lib/money";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -24,8 +25,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   if (!(await sessionIfAllowed("invoices.view"))) return {};
   // wie die Seite: nur Belege der Ausgangsliste (kein Entwurf, kein Angebot) liefern einen Titel
-  const inv = await db.invoice.findFirst({ where: { id, ...ledgerWhere }, select: { number: true, partyName: true } });
-  return { title: inv ? `${inv.number} · ${inv.partyName}` : undefined };
+  const session = await sessionIfAllowed("invoices.view");
+  const inv = await db.invoice.findFirst({ where: { AND: [{ id }, ledgerWhere, archiveReadableWhere] }, select: { number: true, partyName: true, customer: { select: restrictionSelect } } });
+  // Name eines eingeschränkten Kunden (Art. 18) nur mit `customers.view`
+  const named = !inv?.customer?.processingRestrictedAt || session?.can("customers.view");
+  return { title: inv ? (named ? `${inv.number} · ${inv.partyName}` : inv.number) : undefined };
 }
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,9 +40,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   // Entwürfe, Angebote und Auftragsbestätigungen der Rechnungserstellung gehören nicht in die Ausgangsliste (`ledgerWhere`)
   const inv = await db.invoice.findFirst({
-    where: { id, ...ledgerWhere },
+    // nicht festgeschriebene Rechnungen eingeschränkter Kunden (Art. 18) sind im Archiv nicht lesbar (`archiveReadableWhere`)
+    where: { AND: [{ id }, ledgerWhere, archiveReadableWhere] },
     include: {
-      customer: { select: customerNameSelect },
+      customer: { select: { ...customerNameSelect, ...restrictionSelect } },
       file: { select: { name: true, mime: true, size: true, uploadedAt: true } },
       cancels: { select: { id: true, number: true } },
       cancelledBy: { select: { id: true, number: true } },
@@ -58,6 +63,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const canCancel = session.can("invoices.edit") && cancelBlock({ ...inv, hasCounterDocument: inv.cancelledBy !== null, deductedInFinal }) === null;
   const outgoing = inv.direction === "outgoing";
   const isImage = inv.file?.mime.startsWith("image/");
+  // Kunde mit eingeschränkter Verarbeitung (Art. 18): lesbar wegen der Aufbewahrungspflicht, mit Hinweis; der Name nur mit `customers.view`
+  const restricted = Boolean(inv.customer?.processingRestrictedAt);
+  const partyName = restricted && !session.can("customers.view") ? t("invoices.restricted.hiddenName") : inv.partyName;
 
   return (
     <>
@@ -79,7 +87,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         description={
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={outgoing ? "accent" : "neutral"}>{t(`invoices.tabs.${outgoing ? "outgoing" : "incoming"}`)}</Badge>
-            <span>{inv.partyName}</span>
+            <span>{partyName}</span>
             {inv.cancels ? <TextLink href={`/invoices/${inv.cancels.id}`}>{t("invoices.cancel.counterOf", { number: inv.cancels.number })}</TextLink> : null}
             {inv.cancelledBy ? <TextLink href={`/invoices/${inv.cancelledBy.id}`}>{t("invoices.cancel.cancelledBy", { number: inv.cancelledBy.number })}</TextLink> : null}
           </span>
@@ -108,6 +116,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           ) : null
         }
       />
+
+      {restricted ? (
+        <Alert tone="warning" className="mb-5">
+          <strong>{t("invoices.restricted.notice")}.</strong> {t("invoices.restricted.detail")}
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <div className="min-w-0 md:col-span-2">
@@ -168,7 +182,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                       {customerDisplayName(inv.customer)}
                     </TextLink>
                   ) : (
-                    inv.partyName
+                    partyName
                   ),
                 },
                 { label: t("invoices.fields.issueDate"), value: date(inv.issueDate) },

@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { getSession } from "@/server/auth/session";
 import { deliveryHeaders } from "@/lib/file-delivery";
 import { fileExists, fileSize, openFile } from "@/server/files";
+import { archiveReadableWhere } from "@/modules/office/invoices/queries";
 
 /**
  * Liefert die Datei einer Rechnung aus – nur mit Recht `invoices.view`. ?download=1 erzwingt den Download. Kopfzeilen (nosniff, PDF inline,
@@ -17,6 +18,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const file = await db.invoiceFile.findUnique({ where: { invoiceId: id } });
   if (!file || !fileExists(file.path)) return new Response("Not found", { status: 404 });
+  // Nicht festgeschriebene Rechnungen eingeschränkter Kunden (Art. 18) sind im Archiv nicht lesbar; festgeschriebene bleiben es (Aufbewahrungspflicht)
+  if ((await db.invoice.count({ where: { AND: [{ id }, archiveReadableWhere] } })) === 0) return new Response("Not found", { status: 404 });
 
   const download = request.nextUrl.searchParams.get("download") === "1";
   return new Response(Readable.toWeb(openFile(file.path)) as ReadableStream, {

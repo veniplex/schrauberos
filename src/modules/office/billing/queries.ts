@@ -6,7 +6,7 @@ import { contains, keyContains } from "@/server/search";
 import { getWorkshopBilling } from "@/server/workshop";
 import { INVOICE_TYPES, QUOTE_TYPES } from "./constants";
 import { viewOf, type DocView, type ViewRow } from "./view";
-import { isUnusable, usabilitySelect } from "@/modules/workshop/customers/public";
+import { isRestricted, isUnusable, restrictionSelect, usabilitySelect } from "@/modules/workshop/customers/public";
 
 /**
  * Lesezugriffe der Rechnungserstellung (README, „Datenzugriff“): Abfragen mit ausdrücklichem `select`/`include`, Betrachter nur dort, wo Daten vom Recht abhängen. Kunden erscheinen nur als Name
@@ -28,6 +28,16 @@ export const viewInclude = {
 export async function loadDocView(id: string): Promise<{ view: DocView; row: ViewRow } | null> {
   const [row, workshop] = await Promise.all([db.invoice.findFirst({ where: { id, source: "billing" }, include: viewInclude }), getWorkshopBilling()]);
   return row ? { view: viewOf(row as ViewRow, workshop), row: row as ViewRow } : null;
+}
+
+/**
+ * **Lesen eines Beleges und Art. 18** (Entscheid des Besitzers): Gehört der Beleg einem Kunden mit eingeschränkter Verarbeitung, liest ihn nur, wer auch das Archiv lesen darf (`invoices.view`, Aufbewahrungspflicht) –
+ * sonst gilt er als nicht vorhanden (404). Seite, PDF, XRechnung und Original rufen diese Prüfung vor jeder Ausgabe. Belege ohne Kunden oder mit nicht eingeschränktem Kunden: unverändert (`billing.view`).
+ */
+export async function billingReadAllowed(session: { can: (permission: "invoices.view") => boolean }, customerId: string | null): Promise<boolean> {
+  if (!customerId) return true;
+  const customer = await db.customer.findUnique({ where: { id: customerId }, select: restrictionSelect });
+  return !isRestricted(customer) || session.can("invoices.view");
 }
 
 /** Suchbedingung: Nummer, Empfänger (normalisiert), Fahrzeug, Referenz. */

@@ -7,7 +7,7 @@ import { isInvoiceType } from "@/modules/office/billing/constants";
 import { buildDocumentPdf, logoForPdf } from "@/modules/office/billing/documents";
 import { documentFileName } from "@/modules/office/billing/domain";
 import { readOriginal } from "@/modules/office/billing/original-files";
-import { loadDocView } from "@/modules/office/billing/queries";
+import { billingReadAllowed, loadDocView } from "@/modules/office/billing/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params;
   const loaded = await loadDocView(id);
-  if (!loaded) return errorResponse(404, "Not found");
+  if (!loaded || !(await billingReadAllowed(session, loaded.row.customerId))) return errorResponse(404, "Not found"); // Art. 18: Belege eingeschränkter Kunden nur mit invoices.view
   const download = request.nextUrl.searchParams.get("download") === "1";
   const fresh = request.nextUrl.searchParams.get("fresh") === "1";
   const { view } = loaded;
