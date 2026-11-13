@@ -86,6 +86,16 @@ test("Termin → Auftrag → Positionen → Abschluss → Rechnung → Festschre
   await expect(page.getByRole("link", { name: "Bearbeiten" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Entwurf löschen" })).toHaveCount(0);
 
+  // 5b. Originalrechnung: das beim Festschreiben abgelegte PDF ist gekennzeichnet und wird als Original geliefert; die „neu erzeugte Ansicht“ ist davon getrennt
+  await expect(page.getByText("Gezeigt wird das Original")).toBeVisible();
+  const billingId = new URL(invoiceUrl).pathname.split("/").pop()!;
+  const original = await request.get(`/api/billing/${billingId}/pdf`);
+  expect(original.status()).toBe(200);
+  expect(original.headers()["x-document-version"]).toBe("original");
+  const regenerated = await request.get(`/api/billing/${billingId}/pdf?fresh=1`);
+  expect(regenerated.headers()["x-document-version"]).toBe("regenerated");
+  expect(regenerated.headers()["content-disposition"] ?? "").toContain("neu-erzeugt");
+
   // 6. PDF: die Datei selbst (Magic Bytes, Kopfzeilen, Seitenzahl) und die Vorschau im Rahmen ohne Verstoß gegen die CSP
   const pdfLink = page.getByRole("group", { name: "PDF-Datei" }).getByRole("link", { name: "Öffnen" });
   const pdfHref = (await pdfLink.getAttribute("href"))!;

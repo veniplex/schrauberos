@@ -20,6 +20,29 @@ test.beforeEach(({}, info) => {
 
 const confirm = (page: Page, label: string | RegExp, password = TEST_PASSWORD) => page.getByRole("textbox", { name: label }).fill(password);
 
+const VAULT_PASSPHRASE = "E2E-Tresor-Passphrase für den Browsertest 2026";
+
+/** Der Tresor ist nach dem Start gesperrt und beim ersten Lauf noch nicht eingerichtet: einrichten bzw. entsperren (so wie eine Person es klickt). */
+async function ensureVaultUnlocked(page: Page) {
+  await page.goto("/docs/vault");
+  const setup = page.getByRole("button", { name: "Tresor einrichten" });
+  const unlock = page.getByRole("button", { name: "Tresor entsperren", exact: true });
+  const lock = page.getByRole("button", { name: "Tresor sperren" });
+  await expect(setup.or(unlock).or(lock)).toBeVisible();
+  if (await lock.isVisible()) return;
+  if (await setup.isVisible()) {
+    await page.getByLabel("Tresor-Passphrase").fill(VAULT_PASSPHRASE);
+    await page.getByLabel("Passphrase wiederholen").fill(VAULT_PASSPHRASE);
+    await page.getByLabel("Eigenes Passwort (zur Bestätigung)").fill(TEST_PASSWORD);
+    await setup.click();
+  } else {
+    await page.getByLabel("Tresor-Passphrase").fill(VAULT_PASSPHRASE);
+    await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
+    await unlock.click();
+  }
+  await expect(page.getByRole("button", { name: "Tresor sperren" })).toBeVisible();
+}
+
 test("API-Token: anlegen mit Passwortabfrage, der Klartext erscheint nur einmal, der Aufruf mit dem Token klappt und das Token lässt sich widerrufen", async ({ page, playwright, baseURL }, info) => {
   const browserErrors = collectBrowserErrors(page);
   await watchCsp(page);
@@ -123,6 +146,7 @@ test("IT-Tresor: Eintrag anlegen, Zugangsdaten nie in Liste und Seite, Anzeige n
   const title = uniqueName(info, "Firewall");
   const secretText = `Geheim-${Date.now().toString(36)}-xyz`;
 
+  await ensureVaultUnlocked(page);
   await page.goto("/docs/vault/new");
   await expect(page.getByRole("textbox", { name: "Titel" })).toBeVisible(); // die Seite streamt: erst messen, wenn das Formular da ist
   // Struktur gegen Passwortmanager: keine Felder namens username/password für die Zugangsdaten, kein type="password" für das Geheimnis, autocomplete aus
@@ -175,6 +199,104 @@ test("IT-Tresor: Eintrag anlegen, Zugangsdaten nie in Liste und Seite, Anzeige n
   await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
   await expect(page.getByText("Das aktuelle Passwort ist falsch.").first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText("admin-e2e");
+  expect(await cspViolations(page)).toEqual([]);
+  expect(browserErrors()).toEqual([]);
+});
+
+test("IT-Tresor: nach dem Sperren (Neustart) nichts lesbar, falsche Passphrase abgewiesen, richtige entsperrt wieder", async ({ page }, info) => {
+  test.setTimeout(120_000);
+  const browserErrors = collectBrowserErrors(page);
+  await watchCsp(page);
+  await ensureVaultUnlocked(page);
+  const title = uniqueName(info, "Router");
+  await page.goto("/docs/vault/new");
+  await page.getByRole("textbox", { name: "Titel" }).fill(title);
+  await page.getByRole("textbox", { name: "Passwort / Geheimnis" }).fill("Router-Pw-e2e-1");
+  await save(page);
+  await page.waitForURL((url) => /^\/docs\/vault\/(?!new$)[^/]+$/.test(url.pathname));
+  const detailUrl = page.url();
+
+  // sperren: der Eintrag lässt sich nicht mehr anzeigen, die Seite verweist auf das Entsperren
+  await page.goto("/docs/vault");
+  await page.getByRole("button", { name: "Tresor sperren" }).click();
+  await expect(page.getByRole("button", { name: "Tresor entsperren", exact: true })).toBeVisible();
+  await page.goto(detailUrl);
+  await expect(page.getByText("Der Tresor ist gesperrt").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Zugangsdaten anzeigen" })).toHaveCount(0);
+
+  // falsche Passphrase: abgewiesen, der Tresor bleibt gesperrt
+  await page.goto("/docs/vault");
+  await page.getByLabel("Tresor-Passphrase").fill("das-ist-die-falsche-Passphrase-1");
+  await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
+  await expect(page.getByText("Die Passphrase ist falsch.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tresor sperren" })).toHaveCount(0);
+
+  // richtige Passphrase: entsperrt, Anzeige geht wieder
+  await page.getByLabel("Tresor-Passphrase").fill(VAULT_PASSPHRASE);
+  await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Tresor sperren" })).toBeVisible();
+  await page.goto(detailUrl);
+  await page.getByRole("textbox", { name: "Passwort" }).first().fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
+  await expect(page.getByRole("button", { name: "Ausblenden" })).toBeVisible();
+  expect(await cspViolations(page)).toEqual([]);
+  expect(browserErrors()).toEqual([]);
+});
+
+test("Dienstkonto: Schlüssel mit begrenzter und mit unbegrenzter Laufzeit, jeder Schlüssel einzeln widerrufbar, „unbegrenzt“ nur für Dienstkonten", async ({ page, playwright, baseURL }, info) => {
+  test.setTimeout(120_000);
+  const browserErrors = collectBrowserErrors(page);
+  await watchCsp(page);
+  const account = uniqueName(info, "Dienstkonto");
+  await page.goto("/admin/api/accounts/new");
+  await page.getByRole("textbox", { name: "Name", exact: true }).fill(account);
+  for (const box of await page.locator('input[name="roleId"]').all()) await box.check({ force: true });
+  await confirm(page, "Passwort (zur Bestätigung)");
+  await page.getByRole("button", { name: "Dienstkonto anlegen" }).click();
+  await page.waitForURL((url) => url.pathname === "/admin/api/accounts");
+
+  const issue = async (name: string, expiry: string) => {
+    await page.goto("/admin/api/tokens/new");
+    await page.getByLabel("Besitzer").selectOption({ label: `${account} (Dienstkonto)` });
+    await page.getByRole("textbox", { name: "Name", exact: true }).fill(name);
+    await page.getByLabel("Gültigkeit").selectOption(expiry);
+    await page.getByRole("checkbox", { name: /^Termine ansehen/ }).check();
+    await confirm(page, "Eigenes Passwort");
+    await page.getByRole("button", { name: "Token anlegen" }).click();
+    await expect(page.getByRole("heading", { name: "Token angelegt" })).toBeVisible();
+    await page.getByRole("button", { name: "Anzeigen", exact: true }).click();
+    return page.getByRole("textbox", { name: "API-Token (Klartext)" }).inputValue();
+  };
+  const timedName = uniqueName(info, "befristet");
+  const foreverName = uniqueName(info, "unbegrenzt");
+  const timed = await issue(timedName, "30");
+  await expect(page.getByText(/gilt bis/)).toBeVisible();
+  const forever = await issue(foreverName, "unlimited");
+  await expect(page.getByText("keinen Ablauf")).toBeVisible();
+
+  // Ohne Dienstkonto als Besitzer gibt es „Unbegrenzt“ nicht
+  await page.goto("/admin/api/tokens/new");
+  await expect(page.getByLabel("Gültigkeit").locator('option[value="unlimited"]')).toHaveCount(0);
+
+  const call = async (token: string) => {
+    const api = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] }, extraHTTPHeaders: { authorization: `Bearer ${token}` } });
+    const status = (await api.get("/api/v1/appointments")).status();
+    await api.dispose();
+    return status;
+  };
+  expect(await call(timed)).toBe(200);
+  expect(await call(forever)).toBe(200);
+
+  // Liste: der unbegrenzte Schlüssel steht als „ohne Ablauf“; einzeln widerrufen, der andere bleibt gültig
+  await page.goto("/admin/api");
+  const row = page.getByRole("row").filter({ hasText: foreverName });
+  await expect(row).toContainText("ohne Ablauf");
+  await row.getByRole("button").first().click();
+  await page.getByRole("dialog").getByRole("button").last().click();
+  await expect.poll(() => call(forever), { timeout: 15_000 }).toBe(401);
+  expect(await call(timed), "die anderen Schlüssel des Kontos bleiben").toBe(200);
   expect(await cspViolations(page)).toEqual([]);
   expect(browserErrors()).toEqual([]);
 });
