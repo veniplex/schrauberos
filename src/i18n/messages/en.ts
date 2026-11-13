@@ -191,7 +191,7 @@ export const en: Messages = {
     absences: "Absences",
     time: "Time tracking",
     fleet: "Fleet",
-    docsIt: "IT documentation",
+    docs: "IT documentation",
     vault: "IT vault",
     handbook: "Handbook",
     it: "IT & network",
@@ -364,8 +364,8 @@ export const en: Messages = {
     employees: "Employees",
     time: "Time tracking",
     fleet: "Fleet",
-    handbook: "Handbook",
-    docsIt: "IT documentation",
+    manual: "Handbook",
+    docs: "IT documentation",
     backup: "Backups",
     updates: "Updates",
     audit: "Audit log",
@@ -475,11 +475,11 @@ export const en: Messages = {
       edit: "Edit fleet",
       delete: "Delete fleet entries",
     },
-    handbook: {
+    manual: {
       view: "Read the handbook",
       edit: "Edit the handbook",
     },
-    docsIt: {
+    docs: {
       view: "Read IT documentation",
       edit: "Edit IT documentation",
       vault: "IT vault: view entries and show credentials (explicit only)",

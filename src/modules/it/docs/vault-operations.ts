@@ -11,7 +11,7 @@ import { EMPTY_SECRET, hasContent, openVaultEntry, sealVaultEntry, type VaultLab
 
 /**
  * Operationen des IT-Tresors (F13). Festgelegt (Tests in `vault.test.ts`):
- *  - **Rechte:** Anzeigen braucht `docsIt.vault`, Anlegen/Ändern/Löschen zusätzlich `docsIt.vaultManage` (beide nur ausdrücklich, auch für Administratoren; `explicitOnly`), nie über die API.
+ *  - **Rechte:** Anzeigen braucht `docs.vault`, Anlegen/Ändern/Löschen zusätzlich `docs.vaultManage` (beide nur ausdrücklich, auch für Administratoren; `explicitOnly`), nie über die API.
  *  - **Anzeigen nur mit erneuter Passwortabfrage** der handelnden Person (`confirmOwnPassword` mit dem eigenen Limit `loginThrottle.vault`, Eigentümer-Pfad – nicht die scrypt-Semaphore der Anmeldung) und
  *    dem Mengenlimit `loginThrottle.vaultReveal`; Audit `vault.reveal` mit Eintrag-ID und Titel, **nie Inhalt**; ein falsches Passwort zählt, steht (gedrosselt) als `vault.revealFailed` im Audit-Log.
  *  - **Löschen und Ändern der hinterlegten Zugangsdaten eines bestehenden Eintrags** (ersetzen, ergänzen, entfernen) verlangen dieselbe Passwortabfrage mit demselben Limit: eine unbeaufsichtigte Sitzung darf den
@@ -56,7 +56,7 @@ const touchesCredentials = (input: SaveInput): boolean => {
 
 export const saveVaultEntryOperation = defineOperation({
   name: "vault.save",
-  permission: "docsIt.vaultManage",
+  permission: "docs.vaultManage",
   input: saveInput,
   audit: (input) => (input.id ? "vault.update" : "vault.create"),
   // Zugangsdaten eines bestehenden Eintrags **mit hinterlegten Zugangsdaten** ändern, ersetzen oder entfernen: erneute Passwortabfrage (außerhalb der Transaktion; aufwendig, eigener Pfad `ownerLane`, eigenes
@@ -70,7 +70,7 @@ export const saveVaultEntryOperation = defineOperation({
   },
   run: async ({ input, principal, tx, audit }) => {
     // Verwalten setzt das Ansehen voraus: wer nicht einmal die Liste sehen darf, ändert auch nichts „blind“
-    if (!principal.can("docsIt.vault")) fail("forbidden");
+    if (!principal.can("docs.vault")) fail("forbidden");
     const typed = typedOf(input);
     const clear = clearOf(input);
     const credentialsChanged = touchesCredentials(input);
@@ -139,7 +139,7 @@ export const saveVaultEntryOperation = defineOperation({
 
 export const deleteVaultEntryOperation = defineOperation({
   name: "vault.delete",
-  permission: "docsIt.vaultManage",
+  permission: "docs.vaultManage",
   input: z.object({ id: z.string().min(1), password: z.string().max(1024).optional() }),
   audit: "vault.delete",
   // Löschen ist endgültig: wie das Anzeigen nur mit erneuter Passwortabfrage und demselben Limit
@@ -148,7 +148,7 @@ export const deleteVaultEntryOperation = defineOperation({
     await confirmOwnPassword(principal.user.id, input.password, "password", loginThrottle.vault);
   },
   run: async ({ input, principal, tx, audit }) => {
-    if (!principal.can("docsIt.vault")) fail("forbidden");
+    if (!principal.can("docs.vault")) fail("forbidden");
     const entry = await tx.vaultEntry.findUnique({ where: { id: input.id }, select: { title: true } });
     if (!entry) fail("notFound");
     await tx.vaultEntry.delete({ where: { id: input.id } });
@@ -163,7 +163,7 @@ const REVEAL_ERRORS = { empty: "vault.errors.empty", unsupported: "vault.errors.
 
 export const revealVaultEntryOperation = defineOperation({
   name: "vault.reveal",
-  permission: "docsIt.vault",
+  permission: "docs.vault",
   input: z.object({ id: z.string().min(1), password: z.string().max(1024) }),
   audit: "vault.reveal",
   // Passwortprüfung außerhalb der Transaktion (aufwendig, eigener Pfad `ownerLane`); danach das Mengenlimit der Anzeigen

@@ -14,8 +14,8 @@ describe("Rechte-Hierarchie (reine Logik)", () => {
     assert.equal(rawRights([role("x", [], true)]).size, ADMIN_IMPLIED_PERMISSIONS.length);
     for (const p of EXPLICIT_ONLY_PERMISSIONS) assert.ok(!rawRights([role("x", [], true)]).has(p), p);
     // eine zusätzliche Rolle, die das Recht ausdrücklich enthält, gilt auch für Administratoren
-    const withVault = rawRights([role("x", [], true), role("tresor", ["docsIt.vault"])]);
-    assert.ok(withVault.has("docsIt.vault") && !withVault.has("docsIt.vaultManage"));
+    const withVault = rawRights([role("x", [], true), role("tresor", ["docs.vault"])]);
+    assert.ok(withVault.has("docs.vault") && !withVault.has("docs.vaultManage"));
     assert.deepEqual([...rawRights([role("a", ["x.1"]), role("b", ["x.2", "x.1"])])].sort(), ["x.1", "x.2"]);
   });
 

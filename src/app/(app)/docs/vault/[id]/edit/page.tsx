@@ -14,8 +14,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function EditVaultEntryPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requirePermission("docsIt.vaultManage");
-  if (!session.can("docsIt.vault")) redirect("/forbidden");
+  const session = await requirePermission("docs.vaultManage");
+  if (!session.can("docs.vault")) redirect("/forbidden");
   const [{ t }, { id }] = await Promise.all([getI18n(), params]);
   const entry = await getVaultEntry(id);
   if (!entry) notFound();

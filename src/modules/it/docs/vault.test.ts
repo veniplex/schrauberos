@@ -97,7 +97,7 @@ async function login(permissions: string[], options: { admin?: boolean; extra?: 
   await env.signIn(user);
   return user;
 }
-const BOTH = ["docsIt.vault", "docsIt.vaultManage"];
+const BOTH = ["docs.vault", "docs.vaultManage"];
 
 /** Eintrag direkt anlegen (wie die Operation: Zeile, dann verschlüsseln) */
 async function makeEntry(title = "Firewall", secret: Partial<ReturnType<typeof markSecret>> = markSecret()) {
@@ -291,32 +291,32 @@ describe("Rechte: auch Administratoren nur ausdrücklich", () => {
     await login([], { admin: true });
     let session = (await getSession())!;
     assert.equal(session.user.isAdmin, true);
-    assert.ok(session.can("users.manage") && session.can("docsIt.edit"), "alle übrigen Rechte hat er");
-    assert.equal(session.can("docsIt.vault"), false);
-    assert.equal(session.can("docsIt.vaultManage"), false);
+    assert.ok(session.can("users.manage") && session.can("docs.edit"), "alle übrigen Rechte hat er");
+    assert.equal(session.can("docs.vault"), false);
+    assert.equal(session.can("docs.vaultManage"), false);
     assert.equal(await redirectOf(() => reveal(entry.id)), "/forbidden");
     assert.equal(await redirectOf(() => save()), "/forbidden");
     assert.equal(await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id }))), "/forbidden");
     assert.equal(await env.db.vaultEntry.count(), 1);
 
     env.signOut();
-    await login([], { admin: true, extra: ["docsIt.vault"] });
+    await login([], { admin: true, extra: ["docs.vault"] });
     session = (await getSession())!;
-    assert.deepEqual([session.can("docsIt.vault"), session.can("docsIt.vaultManage")], [true, false]);
+    assert.deepEqual([session.can("docs.vault"), session.can("docs.vaultManage")], [true, false]);
     assert.equal((await reveal(entry.id)).ok, true);
     assert.equal(await redirectOf(() => save({ title: "Neu" })), "/forbidden", "ansehen genügt nicht zum Verwalten");
   });
 
   it("Ansehen und Verwalten sind getrennt – und Verwalten setzt Ansehen voraus", async () => {
     const entry = await makeEntry();
-    await login(["docsIt.vaultManage"]);
+    await login(["docs.vaultManage"]);
     const state = await save({ title: "Blind" });
     assert.ok(state.error, "wer nur verwalten darf, ändert nichts blind");
     assert.equal(await env.db.vaultEntry.count(), 1);
     await redirectOf(() => actions.deleteVaultEntry(form({ id: entry.id, password: PASSWORD })));
     assert.equal(await env.db.vaultEntry.count(), 1, "wer nur verwalten darf, löscht nichts blind");
     env.signOut();
-    await login(["docsIt.vault", "docsIt.edit", "docsIt.view"]);
+    await login(["docs.vault", "docs.edit", "docs.view"]);
     assert.equal(await redirectOf(() => save({ title: "Zu wenig" })), "/forbidden");
   });
 
@@ -331,8 +331,8 @@ describe("Rechte: auch Administratoren nur ausdrücklich", () => {
     const { MARKED_PERMISSIONS, isExplicitOnly } = await import("@/modules/catalog");
     const { DEFAULT_ROLES } = await import("@/modules/default-roles");
     const { isApiForbidden } = await import("@/lib/api/scope");
-    assert.equal(MARKED_PERMISSIONS.get("docsIt.vault"), "reveal");
-    assert.equal(MARKED_PERMISSIONS.get("docsIt.vaultManage"), "sensitive");
+    assert.equal(MARKED_PERMISSIONS.get("docs.vault"), "reveal");
+    assert.equal(MARKED_PERMISSIONS.get("docs.vaultManage"), "sensitive");
     for (const p of BOTH) {
       assert.ok(isExplicitOnly(p) && isApiForbidden(p), p);
       for (const role of DEFAULT_ROLES) assert.ok(!(role.permissions as readonly string[]).includes(p), `${role.key}: ${p}`);
@@ -538,7 +538,7 @@ describe("Ändern überschreibt nie einen unbekannten oder beschädigten Block; 
 
 describe("Anzeigen nur mit erneuter Passwortabfrage", () => {
   it("richtiges Passwort: der Klartext steht nur in der Antwort; das Audit nennt Eintrag-ID und Titel, nie Inhalt; kein Ereignis, kein Protokolltext", async () => {
-    await login(["docsIt.vault"]);
+    await login(["docs.vault"]);
     const entry = await makeEntry("Router");
     const state = (await reveal(entry.id)) as { ok?: boolean; vault?: Record<string, string> };
     assert.equal(state.ok, true);
@@ -552,7 +552,7 @@ describe("Anzeigen nur mit erneuter Passwortabfrage", () => {
   });
 
   it("falsches Passwort: Fehler am Feld, kein Klartext, es zählt (eigenes Limit) – nach fünf Fehlversuchen bleibt auch das richtige Passwort eine Weile zu", async () => {
-    const user = await login(["docsIt.vault"]);
+    const user = await login(["docs.vault"]);
     const entry = await makeEntry();
     for (let i = 0; i < 5; i++) {
       const state = (await reveal(entry.id, `falsch-${i}`)) as { fieldErrors?: Record<string, string>; vault?: unknown };
@@ -570,7 +570,7 @@ describe("Anzeigen nur mit erneuter Passwortabfrage", () => {
   });
 
   it("falsche Passwörter stehen im Audit-Log (gedrosselt: je Konto höchstens einmal pro Minute), ohne das Eingegebene", async () => {
-    await login(["docsIt.vault"]);
+    await login(["docs.vault"]);
     const entry = await makeEntry();
     for (const wrong of ["Geheim-Versuch-1", "Geheim-Versuch-2", "Geheim-Versuch-3"]) await reveal(entry.id, wrong);
     const failed = await env.db.auditLog.findMany({ where: { action: "vault.revealFailed" } });
@@ -579,7 +579,7 @@ describe("Anzeigen nur mit erneuter Passwortabfrage", () => {
   });
 
   it("Mengenlimit: nach 30 Anzeigen in kurzer Zeit wartet auch das richtige Passwort", async () => {
-    const user = await login(["docsIt.vault"]);
+    const user = await login(["docs.vault"]);
     const entry = await makeEntry();
     for (let i = 0; i < 30; i++) throttle.loginThrottle.vaultReveal.take(user.id);
     assert.ok(throttle.loginThrottle.vaultReveal.check(user.id) > 0, "Wartezeit läuft");
@@ -603,7 +603,7 @@ describe("Anzeigen nur mit erneuter Passwortabfrage", () => {
   });
 
   it("nicht vorhandener, leerer, nicht lesbarer und beschädigter Eintrag: jeweils eine eigene Meldung, nie Klartext", async () => {
-    await login(["docsIt.vault"]);
+    await login(["docs.vault"]);
     assert.ok(((await reveal("gibt-es-nicht")) as { error?: string }).error);
     const empty = await env.db.vaultEntry.create({ data: { title: "Leer" } });
     assert.ok(((await reveal(empty.id)) as { error?: string }).error);
@@ -624,15 +624,15 @@ describe("Klartext nirgends sonst", () => {
     const { WEBHOOK_EVENTS } = await import("@/modules/catalog");
     const { EXPORTS, IMPORTS } = await import("@/modules/exchange");
     const { checkTokenScope } = await import("@/lib/api/scope");
-    await login([...BOTH, "docsIt.view", "docsIt.edit"], { admin: true });
+    await login([...BOTH, "docs.view", "docs.edit"], { admin: true });
     await makeEntry("Marker-Tresor-Titel");
     const session = (await getSession())!;
     const groups = await searchFor(session, "Marker");
     assert.ok(!JSON.stringify(groups).includes("Marker-Tresor-Titel"), "Schnellsuche");
     assert.ok(!JSON.stringify(await searchFor(session, MARK.secret)).includes("Tresor"));
     assert.deepEqual(apiEndpoints.filter((e) => /vault/i.test(`${e.path} ${e.operations.join(" ")} ${e.permission}`)).map((e) => e.operationId), []);
-    assert.equal(checkTokenScope({ rights: new Set(BOTH) }, ["docsIt.vault"]), "forbidden");
-    assert.equal(checkTokenScope({ rights: new Set(BOTH) }, ["docsIt.vaultManage"]), "forbidden");
+    assert.equal(checkTokenScope({ rights: new Set(BOTH) }, ["docs.vault"]), "forbidden");
+    assert.equal(checkTokenScope({ rights: new Set(BOTH) }, ["docs.vaultManage"]), "forbidden");
     assert.deepEqual(WEBHOOK_EVENTS.filter((e) => /vault/i.test(`${e.type} ${e.resource}`)), []);
     assert.deepEqual([...EXPORTS, ...IMPORTS].filter((d) => /vault/i.test(JSON.stringify([d.id, d.feature, d.permission]))), []);
     // der Versionsverlauf der Dokumentation bleibt unberührt
@@ -682,19 +682,19 @@ describe("Ehrlichkeit statt Schein: Schlüsselvorgänge und Rechtevergabe stehen
     await makeEntry("Router");
     await makeEntry("Switch");
     // neue Rolle mit ausdrücklichen Rechten (und einem gewöhnlichen)
-    assert.ok(await redirectOf(() => roleActions.saveRole({}, form({ name: "Reporting", permission: ["docsIt.view", "docsIt.vault", "docsIt.vaultManage"] }))));
+    assert.ok(await redirectOf(() => roleActions.saveRole({}, form({ name: "Reporting", permission: ["docs.view", "docs.vault", "docs.vaultManage"] }))));
     const role = await env.db.role.findFirstOrThrow({ where: { name: "Reporting" } });
     assert.deepEqual(await explicit(), [
-      "role.explicitGrant Reporting: docsIt.vault · Tresor betroffen (2 Einträge)",
-      "role.explicitGrant Reporting: docsIt.vaultManage · Tresor betroffen (2 Einträge)",
+      "role.explicitGrant Reporting: docs.vault · Tresor betroffen (2 Einträge)",
+      "role.explicitGrant Reporting: docs.vaultManage · Tresor betroffen (2 Einträge)",
     ]);
     // dem eigenen Konto geben
     const fresh = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
     assert.ok(await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(fresh), username: user.username, name: user.name, active: "on", roleId: [...fresh.roles.map((r) => r.roleId), role.id] }))));
     const logs = await explicit();
     assert.deepEqual(logs.slice(2), [
-      "user.explicitGrant admin-1 ← Reporting: docsIt.vault · Tresor betroffen (2 Einträge)",
-      "user.explicitGrant admin-1 ← Reporting: docsIt.vaultManage · Tresor betroffen (2 Einträge)",
+      "user.explicitGrant admin-1 ← Reporting: docs.vault · Tresor betroffen (2 Einträge)",
+      "user.explicitGrant admin-1 ← Reporting: docs.vaultManage · Tresor betroffen (2 Einträge)",
     ]);
     // nur Rechtenamen und Beschriftungen – nie Inhalte
     assertNoPlaintext(JSON.stringify(await env.db.auditLog.findMany()), "Audit");
@@ -702,26 +702,26 @@ describe("Ehrlichkeit statt Schein: Schlüsselvorgänge und Rechtevergabe stehen
 
   it("Entzug ebenfalls: Recht aus der Rolle genommen, Rolle dem Konto entzogen; unveränderte Rechte und gewöhnliche Rechte erzeugen keinen Eintrag", async () => {
     const { user } = await adminLogin();
-    const role = await env.role({ key: "tresor", name: "Tresor", permissions: ["docsIt.view", "docsIt.vault"] });
+    const role = await env.role({ key: "tresor", name: "Tresor", permissions: ["docs.view", "docs.vault"] });
     const fresh = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
     await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(fresh), username: user.username, name: user.name, active: "on", roleId: [...fresh.roles.map((r) => r.roleId), role.id] })));
-    assert.deepEqual(await explicit(), ["user.explicitGrant admin-1 ← Tresor: docsIt.vault"], "ohne Tresor-Einträge kein Vermerk");
+    assert.deepEqual(await explicit(), ["user.explicitGrant admin-1 ← Tresor: docs.vault"], "ohne Tresor-Einträge kein Vermerk");
     // Rolle ändern: vault bleibt, ein gewöhnliches Recht kommt dazu → kein Eintrag
     let current = await env.db.role.findUniqueOrThrow({ where: { id: role.id } });
-    await redirectOf(() => roleActions.saveRole({}, form({ id: role.id, version: versionOf(current), name: "Tresor", permission: ["docsIt.view", "docsIt.vault", "docsIt.edit"] })));
+    await redirectOf(() => roleActions.saveRole({}, form({ id: role.id, version: versionOf(current), name: "Tresor", permission: ["docs.view", "docs.vault", "docs.edit"] })));
     assert.equal((await explicit()).length, 1);
     // vault entziehen
     current = await env.db.role.findUniqueOrThrow({ where: { id: role.id } });
-    await redirectOf(() => roleActions.saveRole({}, form({ id: role.id, version: versionOf(current), name: "Tresor", permission: ["docsIt.view"] })));
+    await redirectOf(() => roleActions.saveRole({}, form({ id: role.id, version: versionOf(current), name: "Tresor", permission: ["docs.view"] })));
     // Rolle dem Konto entziehen (nach dem Entzug des Rechts enthält sie keins mehr: kein weiterer Eintrag), danach die Rechte nicht mehr vorhanden
-    assert.deepEqual(await explicit(), ["user.explicitGrant admin-1 ← Tresor: docsIt.vault", "role.explicitRevoke Tresor: docsIt.vault"]);
+    assert.deepEqual(await explicit(), ["user.explicitGrant admin-1 ← Tresor: docs.vault", "role.explicitRevoke Tresor: docs.vault"]);
     // Rolle mit Tresor-Recht neu anlegen, Konto zuweisen und wieder entziehen
-    const again = await env.role({ key: "tresor2", name: "Tresor zwei", permissions: ["docsIt.vault"] });
+    const again = await env.role({ key: "tresor2", name: "Tresor zwei", permissions: ["docs.vault"] });
     let u = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
     await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(u), username: user.username, name: user.name, active: "on", roleId: [...u.roles.map((r) => r.roleId), again.id] })));
     u = await env.db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roles: true } });
     await redirectOf(() => userActions.saveUser({}, form({ id: user.id, version: versionOf(u), username: user.username, name: user.name, active: "on", roleId: u.roles.map((r) => r.roleId).filter((id) => id !== again.id) })));
-    assert.deepEqual((await explicit()).slice(2), ["user.explicitGrant admin-1 ← Tresor zwei: docsIt.vault", "user.explicitRevoke admin-1 ← Tresor zwei: docsIt.vault"]);
+    assert.deepEqual((await explicit()).slice(2), ["user.explicitGrant admin-1 ← Tresor zwei: docs.vault", "user.explicitRevoke admin-1 ← Tresor zwei: docs.vault"]);
   });
 
   it("Wiederherstellungsschlüssel erzeugen: der Eintrag secrets.keyCreated sagt, dass der Tresor betroffen ist (Anzahl, nie Inhalt); ohne Tresor-Einträge bleibt er wie vorher", async () => {

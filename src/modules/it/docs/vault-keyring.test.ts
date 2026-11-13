@@ -34,7 +34,7 @@ async function sessionFor(permissions: string[]) {
   await env.signIn(user);
   return (await getSession())!;
 }
-const BOTH = ["docsIt.vault", "docsIt.vaultManage"];
+const BOTH = ["docs.vault", "docs.vaultManage"];
 const failure = (outcome: { ok: boolean }) => (outcome as unknown as { failure: { code: string; key?: string; fields?: Record<string, { key: string }> } }).failure;
 const audits = async () => (await env.db.auditLog.findMany({ orderBy: { createdAt: "asc" } })).map((e) => `${e.action} ${e.target}`);
 
@@ -131,7 +131,7 @@ describe("Einrichten", () => {
     assert.equal(failure(await setup("kurz")).fields?.passphrase?.key, "vault.keyring.errors.tooShort");
     assert.equal(failure(await ops.setupVaultOperation.execute(session, { passphrase: PASSPHRASE, confirm: PASSPHRASE + "x", password: PASSWORD })).fields?.confirm?.key, "vault.keyring.errors.mismatch");
     assert.ok(failure(await ops.setupVaultOperation.execute(session, { passphrase: PASSPHRASE, confirm: PASSPHRASE, password: "falsch" })).fields?.password);
-    const viewer = await sessionFor(["docsIt.vault"]);
+    const viewer = await sessionFor(["docs.vault"]);
     assert.equal(failure(await ops.setupVaultOperation.execute(viewer, { passphrase: PASSPHRASE, confirm: PASSPHRASE, password: PASSWORD })).code, "forbidden");
     assert.equal(await env.db.vaultKeyring.count(), 0);
     assert.ok((await setup()).ok);

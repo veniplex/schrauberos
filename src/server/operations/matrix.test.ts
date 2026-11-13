@@ -285,7 +285,7 @@ describe("Berechtigungs-Matrix: Route Handler", () => {
     "app/api/files/[id]/route.ts": { all: ["files.view"] },
     "app/api/files/route.ts": { all: ["files.upload"] },
     "app/api/backups/upload/route.ts": { all: ["backup.manage"] },
-    "app/api/docs/images/route.ts": { any: ["handbook.edit", "docsIt.edit"], feature: "" }, // zwei Funktionen: das Abschalten nur einer sperrt die Route nicht
+    "app/api/docs/images/route.ts": { any: ["manual.edit", "docs.edit"], feature: "" }, // zwei Funktionen: das Abschalten nur einer sperrt die Route nicht
     "app/api/invoices/[id]/file/route.ts": { all: ["invoices.view"] },
     "app/api/invoices/e-invoice/route.ts": { all: ["invoices.edit"] },
     "app/api/orders/[id]/card/route.ts": { all: ["orders.view"] },

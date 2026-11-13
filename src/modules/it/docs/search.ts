@@ -7,7 +7,7 @@ export const searchProviders: SearchProviderDef[] = [
   {
     id: "it-docs",
     feature: "it.docs",
-    permission: "docsIt.view",
+    permission: "docs.view",
     groupKey: "docs.areas.it.title",
     order: 81,
     search: (q, { session, limit }) => searchDocPages(session, "it", q, limit),

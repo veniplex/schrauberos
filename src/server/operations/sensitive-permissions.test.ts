@@ -11,12 +11,12 @@ import { createTestEnv, type TestEnv } from "@/test/harness";
  *  - ein Benutzer mit **allen anderen Rechten derselben Gruppe** (etwa `invoices.view`, `invoices.edit` … ohne `invoices.delete`) wird abgewiesen – das fängt die Verwechslung mit einem Nachbarrecht,
  *    die die generierte Matrix (alle Rechte außer dem verlangten) nicht erkennt,
  *  - ein Benutzer mit genau diesem einen Recht wird nicht am Recht abgewiesen.
- * Mutationsprobe (13e, auf einer Kopie im Scratchpad): `invoices.delete` → `invoices.view`, `vault.delete` → `docsIt.vault`, `customers.delete` → `customers.view` usw. werden von diesem Test erkannt.
+ * Mutationsprobe (13e, auf einer Kopie im Scratchpad): `invoices.delete` → `invoices.view`, `vault.delete` → `docs.vault`, `customers.delete` → `customers.view` usw. werden von diesem Test erkannt.
  */
 const SENSITIVE: Record<string, string> = {
-  "vault.delete": "docsIt.vaultManage",
-  "vault.reveal": "docsIt.vault",
-  "vault.save": "docsIt.vaultManage",
+  "vault.delete": "docs.vaultManage",
+  "vault.reveal": "docs.vault",
+  "vault.save": "docs.vaultManage",
   "customers.delete": "customers.delete",
   "invoices.cancel": "invoices.edit",
   "invoices.delete": "invoices.delete",

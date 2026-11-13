@@ -42,9 +42,9 @@ beforeEach(async () => {
   await env.db.role.deleteMany();
   env.signOut();
   adminRole = await env.role({ key: "admin", isAdmin: true });
-  staffRole = await env.role({ key: "staff", permissions: ["handbook.view"] });
-  bossRole = await env.role({ key: "boss", permissions: ["handbook.view"] });
-  editorRole = await env.role({ key: "editor", permissions: ["handbook.view", "handbook.edit"] });
+  staffRole = await env.role({ key: "staff", permissions: ["manual.view"] });
+  bossRole = await env.role({ key: "boss", permissions: ["manual.view"] });
+  editorRole = await env.role({ key: "editor", permissions: ["manual.view", "manual.edit"] });
   staff = await env.user({ username: "staff", roles: [staffRole] });
   boss = await env.user({ username: "boss", roles: [bossRole] });
   editor = await env.user({ username: "editor", roles: [editorRole] });

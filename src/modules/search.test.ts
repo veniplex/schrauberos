@@ -139,12 +139,12 @@ describe("Verhalten", () => {
     await env.db.docPage.create({ data: { area: "handbook", slug: "offen", title: "Offene Suchtest-Seite", content: "x" } });
     await env.db.docPage.create({ data: { area: "handbook", slug: "geheim", title: "Geheime Suchtest-Seite", content: "x", categoryId: chapter.id } });
 
-    await as(["handbook.view"]);
+    await as(["manual.view"]);
     let hits = (await get("Suchtest")).body.groups.find((g) => g.id === "handbook")?.hits.map((h) => h.title) ?? [];
     assert.deepEqual(hits, ["Offene Suchtest-Seite"]);
 
     // mit der Rolle des Kapitels ist die Seite sichtbar
-    await as(["handbook.view"], { roleIds: [secretRole.id] });
+    await as(["manual.view"], { roleIds: [secretRole.id] });
     hits = (await get("Suchtest")).body.groups.find((g) => g.id === "handbook")?.hits.map((h) => h.title).sort() ?? [];
     assert.deepEqual(hits, ["Geheime Suchtest-Seite", "Offene Suchtest-Seite"]);
   });
@@ -159,7 +159,7 @@ describe("Verhalten", () => {
     await env.db.docPage.create({ data: { area: "handbook", slug: "inhalt", title: "Seite ohne Fund", content: "Ein Satz mit Zebrastreifen darin." } });
     const customer = await env.db.customer.findFirstOrThrow();
     await env.db.appointment.create({ data: { title: "Reifenwechsel", notes: "Kunde wartet im Cafe", startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), customerId: customer.id } });
-    await as(["handbook.view", "appointments.view"]);
+    await as(["manual.view", "appointments.view"]);
     const ids = async (q: string) => (await get(q)).body.groups.map((g) => g.id).sort();
     assert.deepEqual(await ids("Ze"), [], "zwei Zeichen: kein Volltext");
     assert.deepEqual(await ids("Zeb"), ["handbook"]);

@@ -13,9 +13,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function NewVaultEntryPage() {
-  const session = await requirePermission("docsIt.vaultManage");
+  const session = await requirePermission("docs.vaultManage");
   // Verwalten setzt das Ansehen voraus (wie in der Operation)
-  if (!session.can("docsIt.vault")) redirect("/forbidden");
+  if (!session.can("docs.vault")) redirect("/forbidden");
   const { t } = await getI18n();
   const keyring = await vaultStatus();
   return (

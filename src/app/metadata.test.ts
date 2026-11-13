@@ -67,7 +67,7 @@ const cases: Case[] = [
   },
   {
     name: "Dokumentationsseite (IT)",
-    permission: "docsIt.view",
+    permission: "docs.view",
     seed: async (env) => {
       await env.db.docPage.create({ data: { area: "it", slug: "geheim-seite", title: SECRET, content: "x" } });
       return { area: "it", slug: "geheim-seite" };

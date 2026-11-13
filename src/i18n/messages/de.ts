@@ -192,7 +192,7 @@ export const de = {
     absences: "Abwesenheiten",
     time: "Zeiterfassung",
     fleet: "Fuhrpark",
-    docsIt: "IT-Dokumentation",
+    docs: "IT-Dokumentation",
     vault: "IT-Tresor",
     handbook: "Handbuch",
     it: "IT & Netzwerk",
@@ -364,8 +364,8 @@ export const de = {
     employees: "Mitarbeiter",
     time: "Zeiterfassung",
     fleet: "Fuhrpark",
-    handbook: "Handbuch",
-    docsIt: "Dokumentation IT",
+    manual: "Handbuch",
+    docs: "Dokumentation IT",
     backup: "Backups",
     updates: "Updates",
     audit: "Audit-Log",
@@ -475,11 +475,11 @@ export const de = {
       edit: "Fuhrpark bearbeiten",
       delete: "Fuhrpark-Einträge löschen",
     },
-    handbook: {
+    manual: {
       view: "Handbuch lesen",
       edit: "Handbuch bearbeiten",
     },
-    docsIt: {
+    docs: {
       view: "IT-Dokumentation lesen",
       edit: "IT-Dokumentation bearbeiten",
       vault: "IT-Tresor: Einträge ansehen und Zugangsdaten anzeigen (nur ausdrücklich)",

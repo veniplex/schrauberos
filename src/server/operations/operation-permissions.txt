@@ -103,12 +103,12 @@ customers.savePrivacySettings settings.manage
 customers.unarchive customers.edit
 customers.unrestrict customers.privacy
 dashboard.setSetupChecklist settings.manage
-docs.deleteCategory docsIt.edit (nach Eingabe)
-docs.deletePage docsIt.edit (nach Eingabe)
-docs.restoreVersion docsIt.edit (nach Eingabe)
-docs.saveCategory docsIt.edit (nach Eingabe)
-docs.savePage docsIt.edit (nach Eingabe)
-docs.togglePin docsIt.edit (nach Eingabe)
+docs.deleteCategory docs.edit (nach Eingabe)
+docs.deletePage docs.edit (nach Eingabe)
+docs.restoreVersion docs.edit (nach Eingabe)
+docs.saveCategory docs.edit (nach Eingabe)
+docs.savePage docs.edit (nach Eingabe)
+docs.togglePin docs.edit (nach Eingabe)
 employees.delete employees.delete
 employees.deleteAbsence employees.edit
 employees.deleteQualification employees.edit
@@ -176,15 +176,15 @@ tires.dispose tires.edit
 tires.saveSettings settings.manage
 tires.setStatus tires.stock
 tires.update tires.edit
-vault.delete docsIt.vaultManage
-vault.lock docsIt.vault
-vault.passphrase docsIt.vaultManage
-vault.reset docsIt.vaultManage
-vault.reveal docsIt.vault
-vault.save docsIt.vaultManage
-vault.setup docsIt.vaultManage
-vault.unlock docsIt.vault
-vault.unlockRecovery docsIt.vault
+vault.delete docs.vaultManage
+vault.lock docs.vault
+vault.passphrase docs.vaultManage
+vault.reset docs.vaultManage
+vault.reveal docs.vault
+vault.save docs.vaultManage
+vault.setup docs.vaultManage
+vault.unlock docs.vault
+vault.unlockRecovery docs.vault
 vehicles.archive vehicles.edit
 vehicles.delete vehicles.delete
 vehicles.save vehicles.edit

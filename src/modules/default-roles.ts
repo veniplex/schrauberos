@@ -31,7 +31,7 @@ export const DEFAULT_ROLES: Array<{
       // employees.sensitive (Krankheit, Notfallkontakt: Gesundheitsdaten, Art. 9 DSGVO) ist gekennzeichnet (Regel 9) und in keiner Standardrolle: Die Leitung vergibt es ausdrücklich (Administratoren haben es)
       "employees.view", "employees.edit", "employees.delete",
       "fleet.view", "fleet.edit", "fleet.delete",
-      "handbook.view", "handbook.edit",
+      "manual.view", "manual.edit",
       "appointments.view", "tires.view", "customers.view", "vehicles.view",
       "orders.view", "orders.prices",
       "parts.view", "parts.prices",
@@ -52,7 +52,7 @@ export const DEFAULT_ROLES: Array<{
       "reports.view",
       "employees.view",
       "fleet.view", "fleet.edit",
-      "handbook.view", "handbook.edit",
+      "manual.view", "manual.edit",
       "customers.view", "appointments.view",
       "orders.view", "orders.prices",
       "time.view", "time.stamp", "time.correct",
@@ -76,7 +76,7 @@ export const DEFAULT_ROLES: Array<{
       // Dokumente & Fotos: hochladen und – als Leitung der Annahme – auch fremde Dateien entfernen
       "files.view", "files.upload", "files.delete",
       "checklists.view", "checklists.fill",
-      "handbook.view",
+      "manual.view",
     ],
   },
   {
@@ -86,19 +86,19 @@ export const DEFAULT_ROLES: Array<{
     // `tires.stock` (Ein-/Ausbuchen) gehört ausdrücklich dazu: Wer den Wechsel am Fahrzeug macht, bucht den Satz um (Vorschlag nach dem erledigten Termin). Das ist kein
     // sensibles/Export-/Verwaltungsrecht (Regel 9) und gibt nicht das Bearbeiten (`tires.edit`) oder Löschen von Sätzen frei.
     // Aufträge: ansehen und bearbeiten (Status, Befunde) – bewusst ohne `orders.prices`: Preise und Summen bekommen Mechaniker nicht zu sehen und werden für sie nicht gelesen
-    permissions: ["appointments.view", "appointments.edit", "tires.view", "tires.stock", "customers.view", "vehicles.view", "orders.view", "orders.edit", "parts.view", "time.view", "time.stamp", "time.correct", "files.view", "files.upload", "checklists.view", "checklists.fill", "handbook.view"],
+    permissions: ["appointments.view", "appointments.edit", "tires.view", "tires.stock", "customers.view", "vehicles.view", "orders.view", "orders.edit", "parts.view", "time.view", "time.stamp", "time.correct", "files.view", "files.upload", "checklists.view", "checklists.fill", "manual.view"],
   },
   {
     key: "warehouse",
     name: "Lager",
     description: "Reifenlager pflegen.",
     // Teile & Lager: das Lager pflegt Artikel, bucht Wareneingang und Inventur und sieht die Preise (Mechaniker nicht)
-    permissions: ["tires.view", "tires.create", "tires.edit", "tires.stock", "tires.delete", "customers.view", "vehicles.view", "appointments.view", "parts.view", "parts.edit", "parts.stock", "parts.prices", "time.view", "time.stamp", "time.correct", "files.view", "files.upload", "handbook.view"],
+    permissions: ["tires.view", "tires.create", "tires.edit", "tires.stock", "tires.delete", "customers.view", "vehicles.view", "appointments.view", "parts.view", "parts.edit", "parts.stock", "parts.prices", "time.view", "time.stamp", "time.correct", "files.view", "files.upload", "manual.view"],
   },
   {
     key: "it_admin",
     name: "IT-Administrator",
     description: "Netzwerk dokumentieren und die IT-Dokumentation pflegen.",
-    permissions: ["network.view", "network.edit", "network.delete", "docsIt.view", "docsIt.edit", "handbook.view"],
+    permissions: ["network.view", "network.edit", "network.delete", "docs.view", "docs.edit", "manual.view"],
   },
 ];

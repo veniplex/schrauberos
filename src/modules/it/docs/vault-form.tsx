@@ -18,7 +18,7 @@ export type VaultFormInitial = {
 };
 
 /**
- * Eintrag anlegen oder ändern (Rechte `docsIt.vaultManage` und `docsIt.vault`). Das Formular zeigt **nie** vorhandene Zugangsdaten (dafür gibt es die Anzeige mit Passwortabfrage): Beim Bearbeiten bleiben die
+ * Eintrag anlegen oder ändern (Rechte `docs.vaultManage` und `docs.vault`). Das Formular zeigt **nie** vorhandene Zugangsdaten (dafür gibt es die Anzeige mit Passwortabfrage): Beim Bearbeiten bleiben die
  * Felder leer, und ein leeres Feld lässt den bisherigen Wert stehen; „Entfernen“ leert ihn. Die Felder tragen `data-no-draft` – Zugangsdaten gehen nie in einen Formularentwurf im Browser. Wer die Zugangsdaten eines
  * bestehenden Eintrags ändert, bestätigt mit dem eigenen Passwort (Feld `password`).
  *

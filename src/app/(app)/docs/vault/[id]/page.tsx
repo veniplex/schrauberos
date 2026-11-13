@@ -16,19 +16,19 @@ import { vaultStatus } from "@/server/vault-keyring";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  if (!(await sessionIfAllowed("docsIt.vault"))) return {};
+  if (!(await sessionIfAllowed("docs.vault"))) return {};
   return { title: (await vaultTitle(id)) ?? undefined };
 }
 
 /** Eintrag des IT-Tresors: Titel, Art, System, Zustand. Die Zugangsdaten erscheinen nur nach „Anzeigen“ mit erneuter Passwortabfrage (`VaultReveal`) – diese Seite liest sie nie. */
 export default async function VaultEntryPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requirePermission("docsIt.vault");
+  const session = await requirePermission("docs.vault");
   const { id } = await params;
   const { t, date } = await getI18n();
   const entry = await getVaultEntry(id);
   if (!entry) notFound();
   const keyring = await vaultStatus();
-  const canManage = session.can("docsIt.vaultManage");
+  const canManage = session.can("docs.vaultManage");
   const when = (d: Date) => date(d, { dateStyle: "medium", timeStyle: "short" });
 
   return (

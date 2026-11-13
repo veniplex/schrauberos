@@ -20,7 +20,7 @@ before(async () => {
   env = await createTestEnv();
   for (const key of ["handbook.manual", "it.docs"]) await env.db.featureSetting.upsert({ where: { key }, update: { enabled: true }, create: { key, enabled: true, updatedByName: "Test" } });
   router = await import("@/server/api/router");
-  token = (await makeToken(env, { admin: true, scope: ["handbook.view", "handbook.edit", "docsIt.view"] })).token;
+  token = (await makeToken(env, { admin: true, scope: ["manual.view", "manual.edit", "docs.view"] })).token;
   const open = await env.db.docCategory.create({ data: { area: "handbook", name: "Allgemein" } });
   const role = await env.role({ key: "leitung-doc" });
   const closed = await env.db.docCategory.create({ data: { area: "handbook", name: "Nur Leitung", roles: { create: [{ roleId: role.id }] } } });
@@ -48,7 +48,7 @@ describe("Handbuch (nur lesend)", () => {
     assert.deepEqual((found.json.data as Array<{ slug: string }>).map((p) => p.slug), ["offen"]);
   });
 
-  it("Schreiben gibt es nicht (405), und ohne handbook.view im Scope 403", async () => {
+  it("Schreiben gibt es nicht (405), und ohne manual.view im Scope 403", async () => {
     for (const method of ["POST", "PATCH", "DELETE"]) {
       const path = method === "POST" ? "/manual-pages" : `/manual-pages/${ids.frei}`;
       assert.ok([404, 405].includes((await call(method, path, { title: "x" })).status), method);

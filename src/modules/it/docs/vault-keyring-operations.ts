@@ -12,7 +12,7 @@ import { resetVaultEntries } from "./vault-reset";
 /**
  * Operationen der **Tresor-Hülle** (Schlüsselkonzept, README „IT-Tresor“): einrichten, entsperren (Passphrase oder Wiederherstellungsschlüssel), sperren, Passphrase ändern, zurücksetzen. Festgelegt (Tests in
  * `vault-keyring.test.ts`):
- *  - **Rechte:** Einrichten, Passphrase ändern und Zurücksetzen verlangen `docsIt.vaultManage` (und `docsIt.vault`), Entsperren und Sperren `docsIt.vault` – beide nur ausdrücklich (`explicitOnly`, auch Administratoren), nie über die API.
+ *  - **Rechte:** Einrichten, Passphrase ändern und Zurücksetzen verlangen `docs.vaultManage` (und `docs.vault`), Entsperren und Sperren `docs.vault` – beide nur ausdrücklich (`explicitOnly`, auch Administratoren), nie über die API.
  *  - **Passwortabfrage der handelnden Person** (\`confirmOwnPassword\`, Eigentümer-Pfad, Limit \`loginThrottle.vault\`) bei jedem Vorgang außer dem Sperren – wer eine entsperrte Sitzung stiehlt, schaltet den Tresor nicht um.
  *  - **Passphrase falsch:** global gedrosselt (\`loginThrottle.vaultKey\`: 5 freie Versuche, dann 5 s … 90 s – für alle Konten gemeinsam), jeder Fehlversuch steht (höchstens einmal pro Minute) als \`vault.unlockFailed\` im Audit-Log, nie das Eingegebene.
  *    Die scrypt-Ableitung läuft im Eigentümer-Pfad (\`ownerLane\`), vor der Transaktion (\`prepare\`).
@@ -48,11 +48,11 @@ const keyringOf = async () => db.vaultKeyring.findUnique({ where: { id: "default
 /** Tresor einrichten: Passphrase festlegen (Mindestqualität), Hauptschlüssel erzeugen, Tresor ist danach entsperrt. */
 export const setupVaultOperation = defineOperation({
   name: "vault.setup",
-  permission: "docsIt.vaultManage",
+  permission: "docs.vaultManage",
   input: z.object({ passphrase: passphraseField, confirm: passphraseField, password: passwordField }),
   audit: "vault.setup",
   prepare: async ({ input, principal }) => {
-    if (!principal.can("docsIt.vault")) fail("forbidden");
+    if (!principal.can("docs.vault")) fail("forbidden");
     await confirmOwnPassword(principal.user.id, input.password, "password", loginThrottle.vault);
     checkNewPassphrase(input.passphrase, input.confirm, principal.user.username);
     if (await keyringOf()) fail("conflict", "vault.keyring.errors.exists");
@@ -75,7 +75,7 @@ export const setupVaultOperation = defineOperation({
 /** Entsperren mit der Passphrase (nach jedem Neustart nötig): Hauptschlüssel in den Speicher. */
 export const unlockVaultOperation = defineOperation({
   name: "vault.unlock",
-  permission: "docsIt.vault",
+  permission: "docs.vault",
   input: z.object({ passphrase: passphraseField, password: passwordField }),
   audit: "vault.unlock",
   prepare: async ({ input, principal }) => {
@@ -113,7 +113,7 @@ export const unlockVaultOperation = defineOperation({
 /** Entsperren mit dem Wiederherstellungsschlüssel (Passphrase vergessen oder Server neu aufgesetzt); danach lässt sich die Passphrase neu setzen. */
 export const unlockVaultWithRecoveryKeyOperation = defineOperation({
   name: "vault.unlockRecovery",
-  permission: "docsIt.vault",
+  permission: "docs.vault",
   input: z.object({ recoveryKey: z.string().max(200), password: passwordField }),
   audit: "vault.unlockRecovery",
   prepare: async ({ input, principal }) => {
@@ -149,7 +149,7 @@ export const unlockVaultWithRecoveryKeyOperation = defineOperation({
 /** Sperren: der Hauptschlüssel verschwindet aus dem Speicher (jeder Berechtigte darf, ohne Passwortabfrage – sperren verengt nur). */
 export const lockVaultOperation = defineOperation({
   name: "vault.lock",
-  permission: "docsIt.vault",
+  permission: "docs.vault",
   input: z.object({}),
   audit: "vault.lock",
   run: async ({ audit, afterCommit }) => {
@@ -162,11 +162,11 @@ export const lockVaultOperation = defineOperation({
 /** Passphrase ändern: nur bei entsperrtem Tresor; tauscht Hülle und Salz, die Einträge bleiben unberührt (kein Neuverschlüsseln). */
 export const changeVaultPassphraseOperation = defineOperation({
   name: "vault.passphrase",
-  permission: "docsIt.vaultManage",
+  permission: "docs.vaultManage",
   input: z.object({ passphrase: passphraseField, confirm: passphraseField, password: passwordField }),
   audit: "vault.passphrase",
   prepare: async ({ input, principal }) => {
-    if (!principal.can("docsIt.vault")) fail("forbidden");
+    if (!principal.can("docs.vault")) fail("forbidden");
     await confirmOwnPassword(principal.user.id, input.password, "password", loginThrottle.vault);
     checkNewPassphrase(input.passphrase, input.confirm, principal.user.username);
     if (!(await keyringOf())) fail("conflict", "vault.errors.notSetUp");
@@ -193,11 +193,11 @@ export const changeVaultPassphraseOperation = defineOperation({
  */
 export const resetVaultOperation = defineOperation({
   name: "vault.reset",
-  permission: "docsIt.vaultManage",
+  permission: "docs.vaultManage",
   input: z.object({ password: passwordField, confirm: z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean()) }),
   audit: "vault.reset",
   prepare: async ({ input, principal }) => {
-    if (!principal.can("docsIt.vault")) fail("forbidden");
+    if (!principal.can("docs.vault")) fail("forbidden");
     await confirmOwnPassword(principal.user.id, input.password, "password", loginThrottle.vault);
     if (!input.confirm) failField("confirm", "vault.keyring.errors.confirmReset");
   },

@@ -21,14 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * IT-Tresor (Recht `docsIt.vault`, auch Administratoren nur ausdrücklich): Liste mit Titel, Art, System und Zustand. Zugangsdaten stehen hier nie – nicht einmal der Benutzername; sie erscheinen
+ * IT-Tresor (Recht `docs.vault`, auch Administratoren nur ausdrücklich): Liste mit Titel, Art, System und Zustand. Zugangsdaten stehen hier nie – nicht einmal der Benutzername; sie erscheinen
  * auf der Detailseite nur nach „Anzeigen“ mit erneuter Passwortabfrage. Ohne gesicherten Wiederherstellungsschlüssel warnt die Seite, denn dann sind die Einträge nach einem Datenträgerverlust verloren.
  */
 export default async function VaultPage({ searchParams }: { searchParams: Promise<{ q?: string; kind?: string }> }) {
-  const session = await requirePermission("docsIt.vault");
+  const session = await requirePermission("docs.vault");
   const [{ t, tp, date }, sp] = await Promise.all([getI18n(), searchParams]);
   const [entries, keyConfirmed, keyring] = await Promise.all([listVaultEntries({ q: sp.q, kind: sp.kind }), recoveryKeyConfirmed(), vaultStatus()]);
-  const canManage = session.can("docsIt.vaultManage");
+  const canManage = session.can("docs.vaultManage");
   const filtered = Boolean(sp.q?.trim() || sp.kind);
 
   return (
@@ -49,7 +49,7 @@ export default async function VaultPage({ searchParams }: { searchParams: Promis
         <Alert tone="info">{t("vault.intro")}</Alert>
         {/* Tresor-Schlüssel: einrichten, entsperren (nach jedem Neustart), sperren, Passphrase ändern, zurücksetzen */}
         <VaultKeyringPanel
-          canManage={canManage && session.can("docsIt.vault")}
+          canManage={canManage && session.can("docs.vault")}
           view={{ state: keyring.state, recovery: keyring.recovery, since: keyring.unlockedSince ? date(keyring.unlockedSince, { dateStyle: "medium", timeStyle: "short" }) : null, by: keyring.unlockedByName }}
         />
         {!keyConfirmed ? (

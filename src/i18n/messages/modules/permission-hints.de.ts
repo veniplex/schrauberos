@@ -99,11 +99,11 @@ export const permissionHintsDe = {
     edit: "Firmenfahrzeuge, Fristen und Kosten eintragen und ändern.",
     delete: "Fuhrpark-Einträge löschen.",
   },
-  handbook: {
+  manual: {
     view: "Kapitel und Seiten des Handbuchs lesen (soweit die Kapitel für die Rolle freigegeben sind).",
     edit: "Handbuchseiten und Kapitel schreiben und ändern.",
   },
-  docsIt: {
+  docs: {
     view: "Die IT-Dokumentation lesen.",
     edit: "IT-Dokumentation schreiben und ändern.",
     vault: "IT-Tresor: Einträge ansehen und Zugangsdaten nach erneuter Passwortabfrage anzeigen. Gilt nur ausdrücklich – auch Administratoren bekommen es nicht von selbst.",

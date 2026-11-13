@@ -99,8 +99,8 @@ DELETE /invoices/{id}/file invoices.fileRemove invoices.edit
 POST /invoices/{id}/finalize invoices.finalize invoices.finalize
 POST /invoices/{id}/pay invoices.pay invoices.edit body=paidAt
 POST /invoices/{id}/reopen invoices.reopen invoices.edit
-GET /manual-pages manual-pages.list handbook.view query=q,slug sort=title,updatedAt
-GET /manual-pages/{id} manual-pages.get handbook.view
+GET /manual-pages manual-pages.list manual.view query=q,slug sort=title,updatedAt
+GET /manual-pages/{id} manual-pages.get manual.view
 GET /network-connections network-connections.list network.view query=deviceId sort=cableLabel
 POST /network-connections network-connections.create network.edit body=fromDeviceId,fromPort,toDeviceId,toPort,cableLabel,notes
 GET /network-connections/{id} network-connections.get network.view

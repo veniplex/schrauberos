@@ -35,4 +35,4 @@ export const UPDATE_SNAPSHOTS = process.env.E2E_UPDATE_SNAPSHOTS === "1";
 export const DEFAULT_OFF_PRESET = "daily";
 export const EXTRA_ENABLED_FEATURES: readonly string[] = [];
 /** Rechte, die nur ausdrücklich vergeben werden (`explicitOnly`, z. B. IT-Tresor): das Setup gibt sie der Administrator-Rolle, damit die Seiten geprüft werden. */
-export const ADMIN_EXPLICIT_PERMISSIONS = ["docsIt.vault", "docsIt.vaultManage"] as const;
+export const ADMIN_EXPLICIT_PERMISSIONS = ["docs.vault", "docs.vaultManage"] as const;

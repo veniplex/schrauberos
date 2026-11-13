@@ -100,11 +100,11 @@ export const permissionHintsEn: typeof permissionHintsDe = {
     edit: "Enter and change company vehicles, deadlines and costs.",
     delete: "Delete fleet entries.",
   },
-  handbook: {
+  manual: {
     view: "Read chapters and pages of the handbook (as far as the chapters are open to the role).",
     edit: "Write and change handbook pages and chapters.",
   },
-  docsIt: {
+  docs: {
     view: "Read the IT documentation.",
     edit: "Write and change the IT documentation.",
     vault: "IT vault: view entries and show credentials after entering the password again. Explicit only – administrators do not get it automatically.",

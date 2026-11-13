@@ -122,7 +122,7 @@ describe("Schnellaktionen der Übersicht", () => {
     assert.deepEqual(ids("advisor"), ["appointments.new", "orders.new", "tires.new"]);
     assert.deepEqual(ids("mechanic"), ["appointments.today", "tires.stock", "vehicles.list"], "ohne Anlegen-Rechte: Kalender, Ein-/Ausbuchen, Fahrzeuge");
     assert.deepEqual(ids("office"), ["invoices.new", "fleet.new", "handbook.new"]);
-    assert.deepEqual(ids("it_admin"), ["network.newDevice", "docsIt.new"]);
+    assert.deepEqual(ids("it_admin"), ["network.newDevice", "docs.new"]);
     for (const role of DEFAULT_ROLES) assert.ok(ids(role.key).length >= 2 && ids(role.key).length <= 3, role.key);
   });
 

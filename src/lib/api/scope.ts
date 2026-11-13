@@ -28,8 +28,8 @@ export const API_NEVER: ReadonlySet<string> = new Set([
   // Überwachungsziele lassen den Server Verbindungen ins eigene Netz aufbauen: mit einem Token wäre das ein Werkzeug zum Abtasten des Netzes. Die API liest nur den gemessenen Status (network.view).
   "network.monitor",
   // IT-Tresor: Zugangsdaten verlassen den Server nur in der Antwort einer Aktion mit Sitzung und erneuter Passwortabfrage – nie über ein Token (es gibt keinen Endpunkt, und das Recht darf in keinem stehen)
-  "docsIt.vault",
-  "docsIt.vaultManage",
+  "docs.vault",
+  "docs.vaultManage",
 ]);
 
 /** Rechte der Plattform-/Verwaltungsfunktionen (Pflichtfunktionen oder Funktionen eines Pflichtmoduls). */

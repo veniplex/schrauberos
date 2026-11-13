@@ -4,7 +4,7 @@ import { versionOf } from "@/lib/concurrency";
 import { createTestEnv, form, redirectOf, type TestEnv } from "@/test/harness";
 
 /**
- * Dokumentation im Aktions-Rahmen: Das Bearbeitungsrecht hängt vom Bereich ab (Handbuch: handbook.edit, IT: docsIt.edit) und wird aus dem
+ * Dokumentation im Aktions-Rahmen: Das Bearbeitungsrecht hängt vom Bereich ab (Handbuch: manual.edit, IT: docs.edit) und wird aus dem
  * Formular gewählt; Seiten, Verlauf, Wiederherstellen, Anheften, Kapitel, Audit.
  */
 let env: TestEnv;
@@ -33,29 +33,29 @@ beforeEach(async () => {
 });
 
 describe("Bearbeitungsrecht je Bereich", () => {
-  it("Handbuch verlangt handbook.edit, IT-Dokumentation docsIt.edit – das Recht des anderen Bereichs genügt nicht", async () => {
-    await login(["docsIt.view", "docsIt.edit"]);
+  it("Handbuch verlangt manual.edit, IT-Dokumentation docs.edit – das Recht des anderen Bereichs genügt nicht", async () => {
+    await login(["docs.view", "docs.edit"]);
     assert.equal(await redirectOf(() => save({ area: "handbook" })), "/forbidden");
     assert.match((await redirectOf(() => save({ area: "it" }))) ?? "", /^\/docs\/it\//);
 
-    await login(["handbook.view", "handbook.edit"]);
+    await login(["manual.view", "manual.edit"]);
     assert.equal(await redirectOf(() => save({ area: "it", title: "Fremd" })), "/forbidden");
     assert.match((await redirectOf(() => save({ area: "handbook" }))) ?? "", /^\/docs\/handbook\//);
     assert.deepEqual((await env.db.docPage.findMany({ orderBy: { area: "asc" } })).map((p) => p.area), ["handbook", "it"]);
   });
 
   it("ein unbekannter oder fehlender Bereich ändert nichts und führt nicht zu einem Fehler 500", async () => {
-    await login(["handbook.edit", "docsIt.edit"]);
+    await login(["manual.edit", "docs.edit"]);
     const states = [await save({ area: "geheim" }), await save({ area: undefined })];
     for (const state of states) assert.ok(state.fieldErrors?.area || state.error);
     assert.equal(await env.db.docPage.count(), 0);
   });
 
   it("Löschen, Anheften, Wiederherstellen und Kapitel folgen demselben Recht", async () => {
-    await login(["handbook.edit"]);
+    await login(["manual.edit"]);
     await redirectOf(() => save());
     const page = await env.db.docPage.findFirstOrThrow();
-    await login(["docsIt.edit", "handbook.view"]);
+    await login(["docs.edit", "manual.view"]);
     assert.equal(await redirectOf(() => actions.deleteDocPage(form({ area: "handbook", id: page.id }))), "/forbidden");
     assert.equal(await redirectOf(() => actions.togglePin(form({ area: "handbook", id: page.id }))), "/forbidden");
     assert.equal(await redirectOf(() => actions.saveDocCategory({}, form({ area: "handbook", name: "Neu" }))), "/forbidden");
@@ -66,7 +66,7 @@ describe("Bearbeitungsrecht je Bereich", () => {
 
 describe("Seiten", () => {
   it("Anlegen: Adresse aus dem Titel, eindeutig je Bereich; erste Version im Verlauf; Audit", async () => {
-    const user = await login(["handbook.edit"]);
+    const user = await login(["manual.edit"]);
     assert.equal(await redirectOf(() => save({ title: "Annahme & Übergabe" })), "/docs/handbook/annahme-uebergabe");
     assert.equal(await redirectOf(() => save({ title: "Annahme & Übergabe" })), "/docs/handbook/annahme-uebergabe-2");
     const page = await env.db.docPage.findFirstOrThrow({ where: { slug: "annahme-uebergabe" }, include: { versions: true } });
@@ -77,7 +77,7 @@ describe("Seiten", () => {
   });
 
   it("Ändern behält die Adresse, schreibt eine neue Version, prüft die Version der Seite und protokolliert", async () => {
-    await login(["handbook.edit"]);
+    await login(["manual.edit"]);
     await redirectOf(() => save());
     const page = await env.db.docPage.findFirstOrThrow();
     const stale = versionOf(page);
@@ -91,7 +91,7 @@ describe("Seiten", () => {
   });
 
   it("eine Seite eines anderen Bereichs lässt sich nicht über den eigenen ändern", async () => {
-    await login(["docsIt.edit", "handbook.edit"]);
+    await login(["docs.edit", "manual.edit"]);
     await redirectOf(() => save({ area: "it", title: "Intern" }));
     const itPage = await env.db.docPage.findFirstOrThrow();
     const state = await save({ area: "handbook", id: itPage.id, version: versionOf(itPage), title: "Gekapert" });
@@ -100,7 +100,7 @@ describe("Seiten", () => {
   });
 
   it("der Verlauf behält höchstens DOC_MAX_VERSIONS Fassungen", async () => {
-    await login(["handbook.edit"]);
+    await login(["manual.edit"]);
     await redirectOf(() => save());
     const id = (await env.db.docPage.findFirstOrThrow()).id;
     for (let i = 0; i < DOC_MAX_VERSIONS + 5; i++) {
@@ -111,7 +111,7 @@ describe("Seiten", () => {
   });
 
   it("Wiederherstellen schreibt die alte Fassung als neue Version; fremde Bereiche und unbekannte Versionen werden abgelehnt", async () => {
-    await login(["handbook.edit", "docsIt.edit"]);
+    await login(["manual.edit", "docs.edit"]);
     await redirectOf(() => save({ content: "erste Fassung" }));
     const page = await env.db.docPage.findFirstOrThrow();
     await redirectOf(() => save({ id: page.id, version: versionOf(page), content: "zweite Fassung" }));
@@ -128,7 +128,7 @@ describe("Seiten", () => {
   });
 
   it("Anheften schaltet um, ohne Verlauf und Audit; Löschen protokolliert", async () => {
-    await login(["handbook.edit"]);
+    await login(["manual.edit"]);
     await redirectOf(() => save());
     const page = await env.db.docPage.findFirstOrThrow();
     await actions.togglePin(form({ area: "handbook", id: page.id }));
@@ -146,7 +146,7 @@ describe("Seiten", () => {
   });
 
   it("eine Seite kann nur einem Kapitel desselben Bereichs zugeordnet werden", async () => {
-    await login(["handbook.edit", "docsIt.edit"]);
+    await login(["manual.edit", "docs.edit"]);
     const own = await env.db.docCategory.create({ data: { area: "handbook", name: "Eigenes" } });
     const foreign = await env.db.docCategory.create({ data: { area: "it", name: "Fremdes" } });
     assert.ok((await save({ categoryId: foreign.id })).fieldErrors?.categoryId);
@@ -157,7 +157,7 @@ describe("Seiten", () => {
 
 describe("Kapitel", () => {
   it("Anlegen mit Rollenbeschränkung: nur vorhandene Rollen werden übernommen; Ändern ersetzt die Rollen; Audit", async () => {
-    await login(["handbook.edit"]);
+    await login(["manual.edit"]);
     const boss = await env.role({ key: "boss", name: "Chef" });
     const state = await actions.saveDocCategory({}, form({ area: "handbook", name: "Intern", roleIds: [boss.id, "gibt-es-nicht"] }));
     assert.equal(state.ok, true);
@@ -172,7 +172,7 @@ describe("Kapitel", () => {
   });
 
   it("ein Kapitel eines anderen Bereichs lässt sich nicht ändern oder löschen", async () => {
-    await login(["handbook.edit"]);
+    await login(["manual.edit"]);
     const foreign = await env.db.docCategory.create({ data: { area: "it", name: "Fremdes" } });
     const changed = await actions.saveDocCategory({}, form({ area: "handbook", id: foreign.id, version: versionOf(foreign), name: "Gekapert" }));
     assert.ok(changed.error);
@@ -182,7 +182,7 @@ describe("Kapitel", () => {
   });
 
   it("ein leeres Kapitel lässt sich löschen, eines mit Seiten nicht (mit Hinweis) – beides ohne Verlust der Beschränkung", async () => {
-    await login(["handbook.edit"]);
+    await login(["manual.edit"]);
     const cat = await env.db.docCategory.create({ data: { area: "handbook", name: "Mit Seite" } });
     await env.db.docPage.create({ data: { area: "handbook", slug: "s", title: "S", content: "", categoryId: cat.id } });
     assert.equal(await redirectOf(() => actions.deleteDocCategory(form({ area: "handbook", id: cat.id }))), "/docs/handbook");

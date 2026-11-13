@@ -156,8 +156,8 @@ describe("Tokens am Dienstkonto", () => {
     const id = created.ok ? created.data.id : "";
     const beyond = await makeServiceToken(id, ["customers.view", "orders.view"]);
     assert.ok(!beyond.ok && beyond.failure.fields?.scope, "orders.view hat das Konto nicht");
-    const noEndpoint = await makeServiceToken(id, ["customers.view", "docsIt.view"]);
-    assert.ok(!noEndpoint.ok && noEndpoint.failure.fields?.scope, "zu docsIt gibt es keinen Endpunkt");
+    const noEndpoint = await makeServiceToken(id, ["customers.view", "docs.view"]);
+    assert.ok(!noEndpoint.ok && noEndpoint.failure.fields?.scope, "zu docs gibt es keinen Endpunkt");
     const forbidden = await makeServiceToken(id, ["users.manage"]);
     assert.ok(!forbidden.ok);
     const ok = await makeServiceToken(id, ["customers.view", "vehicles.view"]);
