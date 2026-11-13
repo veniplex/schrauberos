@@ -142,7 +142,7 @@ export const billingEn: typeof billingDe = {
     xml: "XRechnung (XML)",
   },
   confirm: {
-    finalize: "Finalize this {type}? The number is assigned and content, amounts, sender and recipient can no longer be changed; the document cannot be deleted any more. This cannot be undone – corrections are made with a cancellation invoice only.",
+    finalize: "Finalize this {type}? The number is assigned and content, amounts, sender and recipient can no longer be changed; the document cannot be deleted any more. The PDF and – if complete – the XRechnung are stored as the original. This cannot be undone – corrections are made with a cancellation invoice only.",
     issue: "Issue this {type}? The number is assigned and the document can no longer be changed.",
     delete: "Delete this draft permanently?",
     accept: "Mark the quote as accepted by the customer?",
@@ -173,6 +173,16 @@ export const billingEn: typeof billingDe = {
     restricted: "The customer is restricted or anonymized - the document cannot be processed further",
     deduction: "At least one selected partial invoice can no longer be credited (cancelled or credited elsewhere) - save the draft again",
     amount: "The total must be greater than 0 EUR - there are no invoices for 0 EUR or a negative amount",
+  },
+  original: {
+    badge: "Original",
+    preview: "The original is shown: the unchangeable file stored when the document was finalized.",
+    download: "Download original",
+    fresh: "Freshly generated view",
+    freshHint: "Current layout and logo – not the original.",
+    missing: "There is no original for this document (for example removed after the customer was anonymized). A freshly generated view is shown.",
+    damaged: "The original is damaged (file missing or changed). Please restore it from a backup; the freshly generated view remains available.",
+    xml: "Original (XRechnung, XML)",
   },
   xrechnung: {
     hint: "The XRechnung (UBL XML) is generated on request, mainly for public bodies and business customers. Private customers do not need it.",
@@ -308,6 +318,7 @@ export const billingEn: typeof billingDe = {
     noEmail: "The customer has no e-mail address.",
     xrechnungIncomplete: "Details are missing for the XRechnung.",
     pdf: "The PDF could not be created (too many items or too much text).",
+    originalDamaged: "The original of this invoice is damaged (file missing or changed) and will not be sent. Please restore it from a backup.",
   },
   privacy: {
     section: "Quotes and invoicing",

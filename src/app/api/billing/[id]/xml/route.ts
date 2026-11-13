@@ -4,6 +4,7 @@ import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { getSession } from "@/server/auth/session";
 import { buildDocumentXml, xrechnungProblems } from "@/modules/office/billing/xrechnung";
 import { documentFileName } from "@/modules/office/billing/domain";
+import { readOriginal } from "@/modules/office/billing/original-files";
 import { loadDocView } from "@/modules/office/billing/queries";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +21,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
   const loaded = await loadDocView(id);
   if (!loaded) return errorResponse(404, "Not found");
+  const original = loaded.view.draft ? null : await readOriginal(id, "xml");
+  if (original === "damaged") return errorResponse(500, "Original damaged");
+  if (original) return new Response(new Uint8Array(original.bytes), { headers: { ...deliveryHeaders({ mime: "application/xml", name: documentFileName(loaded.view.docType, loaded.view.number, "xml"), download: true, size: original.bytes.byteLength }), "X-Document-Version": "original" } });
   const problems = xrechnungProblems(loaded.view);
   if (problems.length > 0) return errorResponse(422, "Unprocessable", { "x-problems": problems.join(",") });
   try {
     const bytes = new TextEncoder().encode(buildDocumentXml(loaded.view));
-    return new Response(bytes, { headers: deliveryHeaders({ mime: "application/xml", name: documentFileName(loaded.view.docType, loaded.view.number, "xml"), download: true, size: bytes.byteLength }) });
+    return new Response(bytes, { headers: { ...deliveryHeaders({ mime: "application/xml", name: documentFileName(loaded.view.docType, loaded.view.number, "xml"), download: true, size: bytes.byteLength }), "X-Document-Version": "regenerated" } });
   } catch (error) {
     if (error instanceof EinvoiceError) return errorResponse(422, "Unprocessable", { "x-problems": error.problems.join(",") });
     throw error;

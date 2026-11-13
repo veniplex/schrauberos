@@ -7,9 +7,23 @@ import type { OperationHookDef } from "@/server/operations/hooks";
  *    **Name und Anschrift bleiben** (Pflichtangabe der Rechnung, Aufbewahrungsfrist – die Anonymisierung ist ohnehin erst nach Ablauf der Fristen freigegeben, `anonymizeBlock`),
  *  - das **Sendeprotokoll** (E-Mails zu Belegen des Kunden): Empfängeradresse, Betreff und Fehlercodes-freie Angaben werden unkenntlich gemacht, Inhalt und Anhänge entfallen; Zeitpunkt und Status bleiben.
  * Die Anhänge der versendeten Mails (PDF, XRechnung) liegen als Dateien im Dateispeicher; eine Datei lässt sich nicht in der Transaktion löschen. Der Hook setzt sie deshalb auf „jetzt fällig“
- *    (`InvoiceSentFile.purgeAfter`), der Aufräumlauf `billing.sent-files` löst sie vom Datenträger (Backups behalten ihre Hardlinks bis zur eigenen Aufbewahrung).
+ *    (`InvoiceSentFile.purgeAfter`), der Aufräumlauf `billing.sent-files` löst sie vom Datenträger (Backups behalten ihre Hardlinks bis zur eigenen Aufbewahrung). Dasselbe gilt für die **Originale** festgeschriebener
+ *    Rechnungen (`InvoiceOriginal.purgeAfter`, Aufräumlauf `billing.originals`).
  */
 export const hooks: OperationHookDef[] = [
+  {
+    // Storno-Gegenbeleg eines Beleges der Rechnungserstellung: bekommt wie jede festgeschriebene Rechnung sein eigenes Original (PDF, ggf. XRechnung), in derselben Transaktion – scheitert die Erzeugung, scheitert das Storno.
+    // `always`: auch bei ausgeschalteter Rechnungserstellung kann das Archiv einen Beleg stornieren (Daten und Rechnungsnummern bleiben), das Original darf dann nicht fehlen.
+    operation: "invoices.cancel",
+    feature: "office.billing",
+    always: true,
+    run: async ({ tx, result }) => {
+      const { counterId, fromBilling } = result as { counterId: string; fromBilling: boolean };
+      if (!fromBilling) return;
+      const { createOriginals } = await import("./originals");
+      await createOriginals(tx, counterId);
+    },
+  },
   {
     operation: "customers.anonymize",
     feature: "office.billing",
@@ -24,6 +38,8 @@ export const hooks: OperationHookDef[] = [
       await tx.invoice.updateMany({ where: { id: { in: ids } }, data: { buyerEmail: null } });
       await tx.invoiceSnapshot.updateMany({ where: { invoiceId: { in: ids } }, data: { rEmail: null } });
       await tx.invoiceSentFile.updateMany({ where: { invoiceId: { in: ids } }, data: { purgeAfter: new Date() } });
+      // die Originale (PDF, XRechnung) tragen Name und Anschrift: sie gehen mit – die Anonymisierung ist erst nach Ablauf der Aufbewahrungsfristen freigegeben (`anonymizeBlock`)
+      await tx.invoiceOriginal.updateMany({ where: { invoiceId: { in: ids } }, data: { purgeAfter: new Date() } });
       await tx.mailMessage.updateMany({
         where: { purpose: "billing", entityId: { in: ids } },
         data: { toAddresses: "(anonymisiert)", deliveredTo: null, subject: "(anonymisiert)", body: null, attachments: null },

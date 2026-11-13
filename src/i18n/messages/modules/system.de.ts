@@ -79,7 +79,7 @@ export const systemDe = {
     network: { monitor: "Netzwerk-Überwachung: Ziele prüfen", "monitor-prune": "Netzwerk-Überwachung: Verlauf aufräumen" },
     mail: { prune: "Sendeprotokoll aufräumen (Aufbewahrung)" },
     files: { purge: "Entfernte Dateien endgültig löschen" },
-    billing: { "sent-files": "Versendete Belegkopien aufräumen" },
+    billing: { "sent-files": "Versendete Belegkopien aufräumen", originals: "Originale von Rechnungen aufräumen" },
     customers: { "search-keys": "Suchspalten der Kunden nachziehen" },
     vehicles: { "search-keys": "Suchspalten der Fahrzeuge nachziehen" },
     invoices: { "search-keys": "Suchspalte der Rechnungen nachziehen" },

@@ -761,6 +761,19 @@ CREATE TABLE "InvoiceSentFile" (
 );
 
 -- CreateTable
+CREATE TABLE "InvoiceOriginal" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "invoiceId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "size" INTEGER NOT NULL,
+    "sha256" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "purgeAfter" DATETIME,
+    CONSTRAINT "InvoiceOriginal_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "InvoiceSnapshot" (
     "invoiceId" TEXT NOT NULL PRIMARY KEY,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1584,6 +1597,15 @@ CREATE INDEX "InvoiceSentFile_invoiceId_idx" ON "InvoiceSentFile"("invoiceId");
 
 -- CreateIndex
 CREATE INDEX "InvoiceSentFile_purgeAfter_idx" ON "InvoiceSentFile"("purgeAfter");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InvoiceOriginal_path_key" ON "InvoiceOriginal"("path");
+
+-- CreateIndex
+CREATE INDEX "InvoiceOriginal_purgeAfter_idx" ON "InvoiceOriginal"("purgeAfter");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InvoiceOriginal_invoiceId_kind_key" ON "InvoiceOriginal"("invoiceId", "kind");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "InvoiceDeduction_finalKey_key" ON "InvoiceDeduction"("finalKey");

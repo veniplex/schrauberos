@@ -40,6 +40,7 @@ after(() => env.cleanup());
 
 beforeEach(async () => {
   await env.db.invoiceDeduction.deleteMany();
+  await env.db.invoiceOriginal.deleteMany();
   await env.db.invoice.deleteMany({ where: { cancelsInvoiceId: { not: null } } });
   await env.db.invoice.deleteMany();
   await env.db.counter.deleteMany();

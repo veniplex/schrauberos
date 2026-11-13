@@ -12,6 +12,7 @@ import { versionOf } from "@/lib/concurrency";
 import { acceptOffer, createConfirmation, deleteDraft, finalizeDocument, issueDocument, orderFromOffer, rejectOffer } from "@/modules/office/billing/actions";
 import { isInvoiceType } from "@/modules/office/billing/constants";
 import { ChecklistCard, FactsCard, HistoryCard, ItemsCard, PartiesCard, PaymentsCard, SendCard } from "@/modules/office/billing/detail-parts";
+import { originalStates } from "@/modules/office/billing/original-files";
 import { docTitle, isDraft, isSmallAmount, offerState, todayKey } from "@/modules/office/billing/domain";
 import { xrechnungProblems } from "@/modules/office/billing/xrechnung";
 import { documentDetail } from "@/modules/office/billing/queries";
@@ -48,6 +49,8 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
 
   const problems = draft ? draftProblems(view, row, todayKey(), { restricted, invalidDeductions }) : [];
   const xmlProblems = invoiceLike ? xrechnungProblems(view) : [];
+  // Originale (PDF, XRechnung) festgeschriebener Rechnungen: vorhanden und unverändert? (die Vorschau zeigt dann das Original, `?fresh=1` die neu erzeugte Ansicht)
+  const originals = !draft && invoiceLike ? await originalStates(row.id) : null;
   const canFinalize = quote ? canEdit : session.can("invoices.finalize");
   const state = isOffer && !draft ? offerState(row) : null;
   const confirmation = derived.find((d) => d.docType === "confirmation");

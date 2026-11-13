@@ -6,7 +6,7 @@ import { deliveryHeaders } from "@/lib/file-delivery";
  * **vor** der Erzeugung (kein Rechenaufwand für Unberechtigte) und ruft dann diese Funktion. Ein erzeugtes PDF wird nicht gespeichert, es entsteht bei jedem Abruf aus den Daten neu
  * (oder als festgeschriebener Beleg über `files.ts`, siehe F3).
  */
-export function pdfResponse(bytes: Uint8Array, options: { name: string; download?: boolean }): Response {
+export function pdfResponse(bytes: Uint8Array, options: { name: string; download?: boolean; headers?: Record<string, string> }): Response {
   const name = /\.pdf$/i.test(options.name) ? options.name : `${options.name}.pdf`;
-  return new Response(new Uint8Array(bytes), { headers: deliveryHeaders({ mime: "application/pdf", name, download: options.download, size: bytes.byteLength }) });
+  return new Response(new Uint8Array(bytes), { headers: { ...deliveryHeaders({ mime: "application/pdf", name, download: options.download, size: bytes.byteLength }), ...options.headers } });
 }

@@ -33,6 +33,7 @@ const ALL_PRIVACY = ["customers.view", "customers.edit", "customers.disclose", "
 
 beforeEach(async () => {
   for (const table of ["auditLog", "docVersion", "docPage", "appointment", "tire", "tireSet", "vehicleOwnership", "vehicle"] as const) await (env.db[table] as unknown as { deleteMany(): Promise<unknown> }).deleteMany();
+  await env.db.invoiceOriginal.deleteMany();
   await env.db.invoice.deleteMany({ where: { cancelsInvoiceId: { not: null } } });
   await env.db.invoice.deleteMany();
   await env.db.customer.deleteMany();

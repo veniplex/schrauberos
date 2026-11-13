@@ -20,6 +20,7 @@ import { CREATABLE_TYPES, OFFER_VALIDITY_DAYS, PAYMENT_METHODS, SENT_FILES_DIR, 
 import { amountColumns, assertCustomerUsable, stripControl, checkInputOf, findLinkableCustomer, itemInputOf, loadWorkshop, normalizeItems, replaceItems, snapshotColumns, totalsOf } from "./core";
 import { dueDayKey, finalizeProblems, isDraft, mailContent, documentFileName, docTitle, remainingCents, statusAfterPayments } from "./domain";
 import { loadDocView } from "./queries";
+import { readOriginal } from "./original-files";
 import { viewPayable } from "./view";
 import { isUnusable, usabilitySelect } from "@/modules/workshop/customers/public";
 
@@ -359,6 +360,9 @@ export const finalizeDocumentOperation = defineOperation({
   audit: "billing.finalize",
   run: async ({ input, principal, tx, audit, emit }) => {
     const result = await commit(tx, input, principal, "invoice");
+    // Das Original (PDF, ggf. XRechnung) entsteht in derselben Transaktion: scheitert es, wird nichts festgeschrieben (originals.ts)
+    const { createOriginals } = await import("./originals");
+    await createOriginals(tx, result.id);
     await emit("billing.finalized", { type: result.docType }, result.id);
     audit({ target: labelOf(result.docType, result.number), entityId: result.id });
     return { id: result.id, number: result.number };
@@ -718,7 +722,10 @@ export const sendDocumentOperation = defineOperation({
     const wantXml = Boolean(input.includeXml) && isInvoiceType(view.docType);
     const stored: string[] = [];
     try {
-      const pdf = await buildDocumentPdf(view, { logo: logoForPdf(await getWorkshopLogo()) });
+      // Festgeschriebene Rechnungen gehen als **Original** hinaus (die beim Festschreiben abgelegte Datei), nicht als neu erzeugte Fassung; ohne Original (Angebote, nach der Anonymisierung gelöst) entsteht das PDF neu
+      const original = isInvoiceType(view.docType) ? await readOriginal(input.id, "pdf") : null;
+      if (original === "damaged") fail("invalid", "billing.errors.originalDamaged");
+      const pdf = original ? original.bytes : await buildDocumentPdf(view, { logo: logoForPdf(await getWorkshopLogo()) });
       const year = view.issueDay.slice(0, 4);
       const pdfName = documentFileName(view.docType, view.number, "pdf");
       const files: Prepared["files"] = [];
@@ -729,7 +736,9 @@ export const sendDocumentOperation = defineOperation({
         const problems = xrechnungProblems(view);
         if (problems.length > 0) throw new OperationError({ code: "invalid", key: "billing.errors.xrechnungIncomplete", data: { problems: problems.join(",") } });
         const xmlName = documentFileName(view.docType, view.number, "xml");
-        const xmlPath = await storeFile(`${SENT_FILES_DIR}/${year}`, xmlName, new TextEncoder().encode(buildDocumentXml(view)));
+        const originalXml = await readOriginal(input.id, "xml");
+        if (originalXml === "damaged") fail("invalid", "billing.errors.originalDamaged");
+        const xmlPath = await storeFile(`${SENT_FILES_DIR}/${year}`, xmlName, originalXml ? originalXml.bytes : new TextEncoder().encode(buildDocumentXml(view)));
         stored.push(xmlPath);
         files.push({ path: xmlPath, filename: xmlName, contentType: "application/xml" });
       }

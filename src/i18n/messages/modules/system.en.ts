@@ -81,7 +81,7 @@ export const systemEn: typeof systemDe = {
     network: { monitor: "Network monitoring: check targets", "monitor-prune": "Network monitoring: clean up history" },
     mail: { prune: "Clean up send log (retention)" },
     files: { purge: "Permanently delete removed files" },
-    billing: { "sent-files": "Clean up sent document copies" },
+    billing: { "sent-files": "Clean up sent document copies", originals: "Tidy up invoice originals" },
     customers: { "search-keys": "Update search columns of customers" },
     vehicles: { "search-keys": "Update search columns of vehicles" },
     invoices: { "search-keys": "Update search column of invoices" },

@@ -57,6 +57,7 @@ beforeEach(async () => {
   await env.db.invoiceDeduction.deleteMany();
   await env.db.invoiceSentFile.deleteMany();
   await env.db.invoicePayment.deleteMany();
+  await env.db.invoiceOriginal.deleteMany();
   await env.db.invoice.deleteMany({ where: { cancelsInvoiceId: { not: null } } });
   await env.db.invoice.deleteMany({ where: { sourceDocId: { not: null } } });
   await env.db.invoice.deleteMany();
@@ -841,7 +842,7 @@ describe("Datenschutz (Art. 15, Anonymisierung, Sendeprotokoll)", () => {
     const other = await env.db.mailMessage.create({ data: { userName: "Test", toAddresses: "andere@example.com", subject: "Anderes", status: "sent", purpose: "other", entityId: invoice } });
 
     await env.db.$transaction(async (tx) => {
-      for (const hook of hooks) await hook.run({ tx, input: { id: customerId } } as never);
+      for (const hook of hooks.filter((h) => h.operation === "customers.anonymize")) await hook.run({ tx, input: { id: customerId } } as never);
     });
 
     assert.equal(await env.db.invoice.findUnique({ where: { id: dr } }), null, "Entwurf gelöscht");
@@ -1047,7 +1048,7 @@ describe("Fix-Runde 12d: versendete Anhänge", () => {
 
       // Anonymisierung: die Kopie der Rechnung wird fällig und verschwindet mit dem nächsten Lauf
       await env.db.$transaction(async (tx) => {
-        for (const hook of hooks) await hook.run({ tx, input: { id: customerId } } as never);
+        for (const hook of hooks.filter((h) => h.operation === "customers.anonymize")) await hook.run({ tx, input: { id: customerId } } as never);
       });
       assert.equal(await purgeSentFiles(new Date(Date.now() + 1000)), 1);
       assert.ok(!(await exists(invoiceFile.path)));

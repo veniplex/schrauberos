@@ -140,7 +140,7 @@ export const billingDe = {
     xml: "XRechnung (XML)",
   },
   confirm: {
-    finalize: "{type} festschreiben? Die Nummer wird vergeben und Inhalt, Beträge, Absender und Empfänger sind danach unveränderlich; der Beleg ist nicht mehr löschbar. Das lässt sich nicht rückgängig machen – korrigiert wird nur noch mit einer Stornorechnung.",
+    finalize: "{type} festschreiben? Die Nummer wird vergeben und Inhalt, Beträge, Absender und Empfänger sind danach unveränderlich; der Beleg ist nicht mehr löschbar. PDF und – wenn vollständig – XRechnung werden als Original abgelegt. Das lässt sich nicht rückgängig machen – korrigiert wird nur noch mit einer Stornorechnung.",
     issue: "{type} ausstellen? Die Nummer wird vergeben und der Beleg ist danach unveränderlich.",
     delete: "Diesen Entwurf endgültig löschen?",
     accept: "Das Angebot als vom Kunden angenommen vermerken?",
@@ -171,6 +171,16 @@ export const billingDe = {
     restricted: "Der Kunde ist eingeschränkt oder anonymisiert – der Beleg lässt sich nicht weiterverarbeiten",
     deduction: "Mindestens ein gewählter Abschlag lässt sich nicht mehr anrechnen (storniert oder anderweitig angerechnet) – den Entwurf neu speichern",
     amount: "Der Gesamtbetrag muss größer als 0 € sein – eine Rechnung über 0 € oder einen negativen Betrag gibt es nicht",
+  },
+  original: {
+    badge: "Original",
+    preview: "Gezeigt wird das Original: die beim Festschreiben abgelegte, unveränderliche Datei.",
+    download: "Original herunterladen",
+    fresh: "Neu erzeugte Ansicht",
+    freshHint: "Aktuelles Layout und Logo – nicht das Original.",
+    missing: "Für diesen Beleg liegt kein Original vor (zum Beispiel nach der Anonymisierung des Kunden gelöst). Gezeigt wird eine neu erzeugte Ansicht.",
+    damaged: "Das Original ist beschädigt (Datei fehlt oder wurde verändert). Bitte aus einem Backup wiederherstellen; die neu erzeugte Ansicht bleibt abrufbar.",
+    xml: "Original (XRechnung, XML)",
   },
   xrechnung: {
     hint: "Die XRechnung (UBL-XML) wird auf Wunsch erzeugt, vor allem für Behörden und Geschäftskunden. Für Privatkunden ist sie nicht nötig.",
@@ -306,6 +316,7 @@ export const billingDe = {
     noEmail: "Der Kunde hat keine E-Mail-Adresse.",
     xrechnungIncomplete: "Für die XRechnung fehlen Angaben.",
     pdf: "Das PDF konnte nicht erzeugt werden (zu viele Positionen oder zu viel Text).",
+    originalDamaged: "Das Original dieser Rechnung ist beschädigt (Datei fehlt oder wurde verändert) und wird nicht versendet. Bitte aus einem Backup wiederherstellen.",
   },
   privacy: {
     section: "Angebote und Rechnungserstellung",

@@ -1049,6 +1049,7 @@ model Invoice {
   items       InvoiceItem[]
   payments    InvoicePayment[]
   sentFiles   InvoiceSentFile[]
+  originals   InvoiceOriginal[]
   snapshot    InvoiceSnapshot?
   // Schlussrechnung: die angerechneten Abschlagsrechnungen; Abschlag: in welchen Schlussrechnungen vorgesehen
   deductions  InvoiceDeduction[] @relation("FinalDeductions")
@@ -1114,6 +1115,25 @@ model InvoiceSentFile {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
 
   @@index([invoiceId])
+  @@index([purgeAfter])
+}
+
+// Die **Originale** einer festgeschriebenen Rechnung der Rechnungserstellung (Rechnung, Abschlag, Schlussrechnung, Stornorechnung): PDF und – wenn die Pflichtangaben der XRechnung vollständig sind – das XML, beim Festschreiben
+// in derselben Transaktion erzeugt und als Datei unter `rechnungen/original/…` abgelegt (nie überschrieben, nie verändert). `kind` = pdf | xml; `sha256` prüft beim Ausliefern, dass die Datei unverändert ist.
+// `purgeAfter`: ab diesem Zeitpunkt löst der Aufräumlauf die Datei vom Datenträger – gesetzt nur von der Anonymisierung des Kunden, die ohnehin erst nach Ablauf der Aufbewahrungsfristen freigegeben ist.
+model InvoiceOriginal {
+  id         String    @id @default(cuid())
+  invoiceId  String
+  kind       String
+  path       String    @unique
+  size       Int
+  sha256     String
+  createdAt  DateTime  @default(now())
+  purgeAfter DateTime?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@unique([invoiceId, kind])
   @@index([purgeAfter])
 }
 
