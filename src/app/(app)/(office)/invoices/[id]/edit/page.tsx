@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { isFinalized } from "@/modules/office/invoices/domain";
+import { archiveReadableWhere } from "@/modules/office/invoices/queries";
 import { getI18n } from "@/i18n/server";
 import { toDateInput } from "@/lib/dates";
 import { customerContacts, customerDisplayName, customerNameSelect } from "@/modules/workshop/customers/public";
@@ -22,7 +23,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
   const session = await requirePermission("invoices.edit");
   const [{ t }, { id }] = await Promise.all([getI18n(), params]);
   const [inv, cats] = await Promise.all([
-    db.invoice.findUnique({ where: { id }, include: { customer: { select: customerNameSelect }, file: { select: { name: true, size: true } } } }),
+    // Art. 18: eine nicht festgeschriebene Rechnung eines eingeschränkten Kunden ist im Archiv nicht lesbar (`archiveReadableWhere`) und lässt sich darum auch nicht bearbeiten
+    db.invoice.findFirst({ where: { AND: [{ id }, archiveReadableWhere] }, include: { customer: { select: customerNameSelect }, file: { select: { name: true, size: true } } } }),
     db.invoice.findMany({ where: { category: { not: null } }, select: { category: true }, distinct: ["category"], take: 100 }),
   ]);
   // Belege der Rechnungserstellung (Positionen, Schnappschuss) bearbeitet nur diese – das Archiv-Formular kennt sie nicht

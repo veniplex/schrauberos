@@ -269,6 +269,23 @@ describe("Zeitplan und Ausführung", () => {
     assert.equal(job.calls, 1);
   });
 
+  it("ein Job mit `always` läuft auch bei ausgeschalteter Funktion (Aufräumen zu Daten eines `always`-Hooks), „jetzt ausführen“ ebenso; ohne `always` ruht er", async () => {
+    const cleanup = counting("aufgeräumt");
+    const normal = counting();
+    const { runner } = rig([
+      { id: "test.always", feature: "office.fleet", always: true, schedule: { every: MIN }, run: cleanup },
+      { id: "test.normal", feature: "office.fleet", schedule: { every: MIN }, run: normal },
+    ]);
+    await runner.sync();
+    await env.db.featureSetting.create({ data: { key: "office.fleet", enabled: false, updatedByName: "t" } });
+    const results = await runner.tick();
+    assert.deepEqual(results.map((r) => r.jobId), ["test.always"], "nur der Aufräumlauf");
+    assert.equal(cleanup.calls, 1);
+    assert.equal(normal.calls, 0);
+    assert.ok(await runner.runNow("test.always"));
+    assert.equal(await runner.runNow("test.normal"), null);
+  });
+
   it("Plattform-Jobs ohne Funktion laufen immer; ungültige Zeitpläne und doppelte IDs werden übersprungen, die übrigen laufen", async () => {
     const ok = counting();
     const originalError = console.error;

@@ -4,9 +4,9 @@ import { startOfDay } from "@/lib/zone";
 import { db } from "@/server/db";
 import { contains, keyContains } from "@/server/search";
 import { getWorkshopBilling } from "@/server/workshop";
-import { INVOICE_TYPES, QUOTE_TYPES } from "./constants";
-import { viewOf, type DocView, type ViewRow } from "./view";
-import { isRestricted, isUnusable, restrictionSelect, usabilitySelect } from "@/modules/workshop/customers/public";
+import { INVOICE_TYPES, isInvoiceType, QUOTE_TYPES } from "./constants";
+import { ANONYMIZED_NAME, viewOf, withHiddenRecipient, type DocView, type ViewRow } from "./view";
+import { isRestricted, isUnusable, restrictionSelect, unrestrictedByCustomer, usabilitySelect } from "@/modules/workshop/customers/public";
 
 /**
  * Lesezugriffe der Rechnungserstellung (README, „Datenzugriff“): Abfragen mit ausdrücklichem `select`/`include`, Betrachter nur dort, wo Daten vom Recht abhängen. Kunden erscheinen nur als Name
@@ -21,28 +21,50 @@ export const viewInclude = {
   cancels: { select: { number: true, issueDate: true } },
   order: { select: { number: true } },
   sourceDoc: { select: { number: true } },
-  customer: { select: { customerNumber: true } },
+  customer: { select: { customerNumber: true, anonymizedAt: true } },
 } as const satisfies Prisma.InvoiceInclude;
 
-/** Das Ansichtsmodell eines Beleges der Rechnungserstellung (PDF, XRechnung, Detailseite); `null`, wenn es ihn nicht gibt oder er nicht aus der Rechnungserstellung stammt. */
+/**
+ * Das Ansichtsmodell eines Beleges der Rechnungserstellung (PDF, XRechnung, Detailseite); `null`, wenn es ihn nicht gibt oder er nicht aus der Rechnungserstellung stammt.
+ * **Nach der Anonymisierung des Kunden** (erst nach Ablauf der Aufbewahrungsfristen möglich) zeigt die **Neuansicht** weder Name noch Anschrift noch E-Mail des Empfängers („Anonymisiert“); die Zeile und der
+ * Schnappschuss bleiben unverändert (festgeschriebene Rechnungen werden nie geändert), die Originale gehen mit der Anonymisierung (`billing.originals`).
+ */
 export async function loadDocView(id: string): Promise<{ view: DocView; row: ViewRow } | null> {
   const [row, workshop] = await Promise.all([db.invoice.findFirst({ where: { id, source: "billing" }, include: viewInclude }), getWorkshopBilling()]);
-  return row ? { view: viewOf(row as ViewRow, workshop), row: row as ViewRow } : null;
+  if (!row) return null;
+  const view = viewOf(row as ViewRow, workshop);
+  return { view: row.customer?.anonymizedAt ? withHiddenRecipient(view, ANONYMIZED_NAME) : view, row: row as ViewRow };
 }
+
+/** Der Teil eines Beleges, den die Lese-Prüfung braucht. */
+export type BillingReadDoc = { customerId: string | null; finalizedAt: Date | null; docType: string };
 
 /**
- * **Lesen eines Beleges und Art. 18** (Entscheid des Besitzers): Gehört der Beleg einem Kunden mit eingeschränkter Verarbeitung, liest ihn nur, wer auch das Archiv lesen darf (`invoices.view`, Aufbewahrungspflicht) –
- * sonst gilt er als nicht vorhanden (404). Seite, PDF, XRechnung und Original rufen diese Prüfung vor jeder Ausgabe. Belege ohne Kunden oder mit nicht eingeschränktem Kunden: unverändert (`billing.view`).
+ * **Lesen eines Beleges und Art. 18** (Entscheid des Besitzers): Gehört der Beleg einem Kunden mit eingeschränkter Verarbeitung, bleibt **nur eine festgeschriebene Rechnung** lesbar (Aufbewahrungspflicht) – und nur
+ * für den, der auch das Archiv lesen darf (`invoices.view`). Entwürfe, Angebote und Auftragsbestätigungen eingeschränkter Kunden gelten als nicht vorhanden (404): für sie gilt keine Aufbewahrungspflicht, und eine
+ * Weiterverarbeitung ist ausgeschlossen. Seite, Bearbeiten-Seiten, PDF, XRechnung und Original rufen diese Prüfung vor jeder Ausgabe. `restricted` sagt, ob der Kunde eingeschränkt ist (Hinweis „Verarbeitung
+ * eingeschränkt“; sein Name steht dann nur mit `customers.view` da). Belege ohne Kunden oder mit nicht eingeschränktem Kunden: unverändert (`billing.view`).
  */
-export async function billingReadAllowed(session: { can: (permission: "invoices.view") => boolean }, customerId: string | null): Promise<boolean> {
-  if (!customerId) return true;
-  const customer = await db.customer.findUnique({ where: { id: customerId }, select: restrictionSelect });
-  return !isRestricted(customer) || session.can("invoices.view");
+export async function billingReadAccess(session: { can: (permission: "invoices.view") => boolean }, doc: BillingReadDoc): Promise<{ allowed: boolean; restricted: boolean }> {
+  if (!doc.customerId) return { allowed: true, restricted: false };
+  const customer = await db.customer.findUnique({ where: { id: doc.customerId }, select: restrictionSelect });
+  if (!isRestricted(customer)) return { allowed: true, restricted: false };
+  return { allowed: session.can("invoices.view") && doc.finalizedAt !== null && isInvoiceType(doc.docType), restricted: true };
 }
 
-/** Suchbedingung: Nummer, Empfänger (normalisiert), Fahrzeug, Referenz. */
-export function billingTextWhere(term: string): Prisma.InvoiceWhereInput[] {
-  return [{ number: contains(term) }, keyContains("partyKey", term), { vehicleLabel: contains(term) }, { buyerReference: contains(term) }];
+export const billingReadAllowed = async (session: { can: (permission: "invoices.view") => boolean }, doc: BillingReadDoc): Promise<boolean> => (await billingReadAccess(session, doc)).allowed;
+
+/**
+ * Welche Belege eingeschränkter Kunden stehen in der Liste: dieselbe Regel wie `billingReadAccess` als Datenbankbedingung (festgeschriebene Rechnungen nur mit `invoices.view`, sonst gar keine).
+ * Ohne Kunden oder mit nicht eingeschränktem Kunden: alle.
+ */
+export const billingReadableWhere = (session: { can: (permission: "invoices.view") => boolean }): Prisma.InvoiceWhereInput =>
+  session.can("invoices.view") ? { OR: [unrestrictedByCustomer, { AND: [{ finalizedAt: { not: null } }, { docType: { in: [...INVOICE_TYPES] } }] }] } : unrestrictedByCustomer;
+
+/** Suchbedingung: Nummer, Empfänger (normalisiert), Fahrzeug, Referenz. Ohne `restrictedNames` (`customers.view`) findet die Suche eingeschränkte Kunden nicht über den Namen (Art. 18). */
+export function billingTextWhere(term: string, options: { restrictedNames?: boolean } = {}): Prisma.InvoiceWhereInput[] {
+  const party = options.restrictedNames === false ? { AND: [keyContains("partyKey", term), unrestrictedByCustomer] } : keyContains("partyKey", term);
+  return [{ number: contains(term) }, party, { vehicleLabel: contains(term) }, { buyerReference: contains(term) }];
 }
 
 export const BILLING_STATUS_FILTERS = ["all", "draft", "issued", "open", "unpaid", "paid", "accepted", "rejected"] as const;
@@ -53,12 +75,12 @@ export type BillingTypeFilter = (typeof BILLING_TYPE_FILTERS)[number];
 export const parseTypeFilter = (value: string | undefined): BillingTypeFilter => ((BILLING_TYPE_FILTERS as readonly string[]).includes(value ?? "") ? (value as BillingTypeFilter) : "all");
 export const parseStatusFilter = (value: string | undefined): BillingStatusFilter => ((BILLING_STATUS_FILTERS as readonly string[]).includes(value ?? "") ? (value as BillingStatusFilter) : "all");
 
-export type BillingListFilters = { q: string; type: BillingTypeFilter; status: BillingStatusFilter; customerId?: string; orderId?: string };
+export type BillingListFilters = { q: string; type: BillingTypeFilter; status: BillingStatusFilter; customerId?: string; orderId?: string; /** Der Betrachter darf Namen eingeschränkter Kunden sehen (`customers.view`); Standard: ja (API, nur Staffelung der Suche) */ restrictedNames?: boolean };
 
 /** Bedingung der Belegliste: nur Belege der Rechnungserstellung (auch Entwürfe und Angebote). */
 export function billingListWhere(filters: BillingListFilters): Prisma.InvoiceWhereInput {
   const and: Prisma.InvoiceWhereInput[] = [{ source: "billing" }];
-  if (filters.q) and.push({ OR: billingTextWhere(filters.q) });
+  if (filters.q) and.push({ OR: billingTextWhere(filters.q, { restrictedNames: filters.restrictedNames }) });
   if (filters.type !== "all") and.push({ docType: filters.type });
   if (filters.customerId) and.push({ customerId: filters.customerId });
   if (filters.orderId) and.push({ orderId: filters.orderId });

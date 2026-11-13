@@ -1,5 +1,5 @@
 import { endOfDayIn, startOfDayIn } from "@/lib/dates";
-import { findCustomerIdsByNumber, numberKey } from "@/modules/workshop/customers/public";
+import { findCustomerIdsByNumber, isRestricted, numberKey, restrictionSelect } from "@/modules/workshop/customers/public";
 import type { AppSession } from "@/server/auth/session";
 import { columnSpecs } from "@/server/csv/columns";
 import { defineImport } from "@/server/csv/define-import";
@@ -13,7 +13,7 @@ import { db } from "@/server/db";
 import { ACCOUNTANT_COLUMNS, EXPORT_ONLY_COLUMNS, INVOICE_COLUMNS } from "./exchange-columns";
 import { DOC_TYPES_LEDGER, INVOICE_DIRECTIONS, INVOICE_STATUSES, outgoingKeyOf, paymentState } from "./domain";
 import { invoiceImportInput, invoiceRecord, type InvoiceImportFields } from "./operations";
-import { ledgerWhere } from "./queries";
+import { archiveListedWhere, archiveReadableWhere, ledgerWhere } from "./queries";
 
 /** Der Kunde einer Ausgangsrechnung steht nur mit dem Recht, Kunden zu sehen, in der Datei (Richtlinie D7). */
 const mayUseCustomer = (session: AppSession) => session.features.has("workshop.customers") && session.can("customers.view");
@@ -26,6 +26,8 @@ const endOf = (day: string) => endOfDayIn(day);
 /**
  * Export des Rechnungsarchivs (`invoices.export` und `invoices.view`) mit allen Feldern des Formulars – ohne Belege. Auswahl: `direction=incoming|outgoing` (sonst beide),
  * `from`/`to` (Rechnungsdatum, `JJJJ-MM-TT`). Der Kunde einer Ausgangsrechnung erscheint nur als Kundennummer und nur mit `customers.view`.
+ * **Art. 18:** Rechnungen von Kunden mit eingeschränkter Verarbeitung fehlen hier ganz (`archiveListedWhere`, wie in Auswahl und Schnittstelle) – dieser Export ist keine Aufbewahrung; die Pflicht erfüllt der
+ * Steuerberater-Export (`accountantExport`, ohne Namen).
  */
 export const invoicesExport: ExportDef = {
   id: "invoices",
@@ -42,6 +44,7 @@ export const invoicesExport: ExportDef = {
     // nur die Ausgangsliste: keine Angebote, Auftragsbestätigungen und Entwürfe der Rechnungserstellung
     const where = {
       ...ledgerWhere,
+      AND: [archiveListedWhere],
       ...(direction === "incoming" || direction === "outgoing" ? { direction } : {}),
       ...(from || to ? { issueDate: { ...(from ? { gte: startOf(from) } : {}), ...(to ? { lte: endOf(to) } : {}) } } : {}),
     };
@@ -82,6 +85,8 @@ export const invoicesExport: ExportDef = {
 /**
  * Steuerberater-Export (`invoices.export` und `invoices.view`): die Rechnungen eines Zeitraums (Rechnungsdatum von `from` bis `to`, beide Pflicht) – Eingang, Ausgang oder beide
  * (`direction`) – mit Nummer, Datum, Geschäftspartner, Netto, MwSt., Brutto und Zahlstatus. **Ohne Belege**, ohne Kategorie und Notizen, ohne Kundennummern.
+ * **Art. 18 (Entscheid des Besitzers, Block 15):** Rechnungen von Kunden mit eingeschränkter Verarbeitung gehören wegen der Aufbewahrungspflicht in die Übergabe an den Steuerberater – aber **nur festgeschriebene
+ * Rechnungen** (`archiveReadableWhere`) und **ohne Namen**: statt des Geschäftspartners steht die Kundennummer (sonst die Kennung) und der Text „Verarbeitung eingeschränkt“. Beträge, Nummer und Datum genügen der Buchführung.
  */
 export const accountantExport: ExportDef = {
   id: "accountant",
@@ -97,18 +102,22 @@ export const accountantExport: ExportDef = {
     if (!isDay(from) || !isDay(to) || from > to) return { error: "invoices.exchange.periodInvalid" };
     const where = {
       ...ledgerWhere,
+      AND: [archiveReadableWhere],
       ...(direction === "incoming" || direction === "outgoing" ? { direction } : {}),
       issueDate: { gte: startOf(from), lte: endOf(to) },
     };
     const dir = (code: string) => t(`invoices.tabs.${code as (typeof INVOICE_DIRECTIONS)[number]}`);
     const now = new Date();
     async function* rows() {
-      for await (const i of paged((page) => db.invoice.findMany({ ...pageArgs(page), where, orderBy: [{ issueDate: "asc" }, { number: "asc" }, { id: "asc" }], include: { cancels: { select: { number: true } } } }))) {
+      for await (const i of paged((page) =>
+        db.invoice.findMany({ ...pageArgs(page), where, orderBy: [{ issueDate: "asc" }, { number: "asc" }, { id: "asc" }], include: { cancels: { select: { number: true } }, customer: { select: { customerNumber: true, ...restrictionSelect } } } }),
+      )) {
         yield [
           dir(i.direction),
           i.number,
           formatDay(i.issueDate),
-          i.partyName,
+          // eingeschränkter Kunde: nie Name oder Anschrift – nur die Kundennummer (sonst die Kennung) und der Hinweis
+          isRestricted(i.customer) ? `${i.customer?.customerNumber || i.customerId} · ${t("invoices.restricted.notice")}` : i.partyName,
           moneyCell(i.netCents, format),
           moneyCell(i.vatCents, format),
           moneyCell(i.grossCents, format),

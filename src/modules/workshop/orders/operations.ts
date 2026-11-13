@@ -144,6 +144,7 @@ export async function createOrderInTx(
       details = value;
     },
     afterCommit: () => undefined,
+    onRollback: () => undefined,
   });
   await runOperationHooks({ operation: "orders.create", input: parsed.data, result: data, principal, tx });
   await writeAudit(tx, "order.create", { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } });

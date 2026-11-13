@@ -22,7 +22,7 @@ export { ledgerWhere };
 /**
  * **Archiv-Lesen und Art. 18** (Entscheid des Besitzers): Festgeschriebene Rechnungen eingeschränkter Kunden bleiben im Archiv lesbar (Aufbewahrungspflicht) – nur mit `invoices.view`, mit dem Hinweis „Verarbeitung
  * eingeschränkt (Aufbewahrungspflicht)", ihr Name nur mit `customers.view`. Nicht festgeschriebene Rechnungen eingeschränkter Kunden sind dort nicht lesbar. Liste, Detail, Datei und Schnellsuche nehmen diese Bedingung
- * (aus `unrestrictedByCustomer` der Kundenfunktion, nie handgeschrieben); **API, Exporte und Feeds** nehmen dagegen `unrestrictedByCustomer` allein: eingeschränkte Kunden fehlen dort ganz.
+ * (aus `unrestrictedByCustomer` der Kundenfunktion, nie handgeschrieben); **API, der allgemeine CSV-Export und Feeds** nehmen dagegen `unrestrictedByCustomer` allein (`archiveListedWhere`): eingeschränkte Kunden fehlen dort ganz. **Einzige Ausnahme: der Steuerberater-Export** (Aufbewahrungspflicht) nimmt `archiveReadableWhere` – die festgeschriebenen Rechnungen, aber ohne Klarnamen (Kundennummer und „Verarbeitung eingeschränkt“).
  */
 export const archiveReadableWhere: Prisma.InvoiceWhereInput = { OR: [unrestrictedByCustomer, { finalizedAt: { not: null } }] };
 

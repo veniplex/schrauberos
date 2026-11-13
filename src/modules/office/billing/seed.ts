@@ -10,6 +10,8 @@ import type { SeedDef } from "@/modules/types";
  * Beispiele der Rechnungserstellung für die Browser-CI und zum Ausprobieren: Angebote (offen, angenommen mit Auftragsbestätigung, abgelehnt, abgelaufen), ein Entwurf, Rechnungen
  * (offen, teilweise bezahlt, bezahlt), Abschlags- und Schlussrechnung, eine stornierte Rechnung mit Stornorechnung. Alles gehört den ersten Demo-Kunden, soweit es sie gibt. Ist das
  * Werkstattprofil noch leer, bekommt es Beispielangaben (Anschrift, Steuernummer, IBAN), damit die Belege festgeschrieben aussehen. Seeds importieren nichts mit `server-only`.
+ * **Die festgeschriebenen Demo-Belege haben kein Original** (`InvoiceOriginal`): PDF-Erzeugung (`originals.ts`, `documents.ts`) und Dateiablage (`server/files.ts`) hängen an `server-only` und lassen sich im
+ * Seed-Skript nicht laden; die Seite zeigt dort „kein Original“ und liefert die neu erzeugte Fassung (als solche gekennzeichnet). Echte Rechnungen bekommen ihr Original beim Festschreiben.
  */
 type Item = { description: string; unit?: string; quantityMilli: number; unitCents: number; taxBp?: number; discountBp?: number; kind?: string };
 

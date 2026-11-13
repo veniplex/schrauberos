@@ -358,11 +358,11 @@ export const finalizeDocumentOperation = defineOperation({
   permission: "invoices.finalize",
   input: commitInput,
   audit: "billing.finalize",
-  run: async ({ input, principal, tx, audit, emit }) => {
+  run: async ({ input, principal, tx, audit, emit, onRollback }) => {
     const result = await commit(tx, input, principal, "invoice");
-    // Das Original (PDF, ggf. XRechnung) entsteht in derselben Transaktion: scheitert es, wird nichts festgeschrieben (originals.ts)
+    // Das Original (PDF, ggf. XRechnung) entsteht in derselben Transaktion: scheitert es, wird nichts festgeschrieben (originals.ts); abgelegte Dateien gehen bei einem Rollback sofort wieder weg
     const { createOriginals } = await import("./originals");
-    await createOriginals(tx, result.id);
+    await createOriginals(tx, result.id, onRollback);
     await emit("billing.finalized", { type: result.docType }, result.id);
     audit({ target: labelOf(result.docType, result.number), entityId: result.id });
     return { id: result.id, number: result.number };

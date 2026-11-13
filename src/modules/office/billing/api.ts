@@ -13,11 +13,8 @@ import { unrestrictedByCustomer, unrestrictedCustomerWhere, unrestrictedDocument
 import { EinvoiceError } from "@/lib/einvoice/ubl";
 import { PdfError } from "@/server/pdf";
 import { apiProblem, runApiOperation } from "@/server/operations";
-import { getWorkshopLogo } from "@/server/workshop";
 import { CREATABLE_TYPES, DOC_TYPES, ITEM_KINDS, OFFER_STATUSES, PAYMENT_METHODS } from "./constants";
-import { documentFileName } from "./domain";
-import { buildDocumentPdf, logoForPdf } from "./documents";
-import { buildDocumentXml, xrechnungProblems } from "./xrechnung";
+import { deliverPdf, deliverXml } from "./deliver";
 import {
   acceptOfferOperation,
   addPaymentOperation,
@@ -420,23 +417,24 @@ const documentActions: ApiEndpoint[] = [
     path: "/billing-documents/{id}/pdf",
     permission: "billing.view",
     operationId: "billing-documents.pdf",
-    summary: "Download the document as PDF (drafts carry a draft notice; finalized documents are created from the frozen snapshot; add ?download=1 to force a download)",
+    summary: "Download the document as PDF. A finalized invoice returns the original that was stored when it was finalized (checksum verified, header X-Document-Version: original; a damaged original is an error, never replaced silently); add ?fresh=1 for a newly generated view (current layout and logo, X-Document-Version: regenerated, file name with _neu-erzeugt – never the original). Offers, order confirmations and drafts are generated on every call. Add ?download=1 to force a download",
     operations: [],
-    download: { description: "The PDF (application/pdf). Not PDF/A; the XRechnung is a separate download." },
+    download: { description: "The PDF (application/pdf), as the original or as a generated view (see header X-Document-Version). Not PDF/A; the XRechnung is a separate download." },
     handler: async (call) => {
       const id = idOf(call);
       await visible(id);
       const loaded = await loadDocView(id);
       if (!loaded) throw apiProblem("not_found");
-      let bytes: Buffer;
+      let delivered;
       try {
-        bytes = await buildDocumentPdf(loaded.view, { logo: logoForPdf(await getWorkshopLogo()) });
+        delivered = await deliverPdf(loaded.view, { fresh: call.searchParams.get("fresh") === "1" });
       } catch (error) {
         if (error instanceof PdfError) throw apiProblem("validation_failed", { reason: "billing.errors.pdf" });
         throw error;
       }
-      const headers = deliveryHeaders({ mime: "application/pdf", name: documentFileName(loaded.view.docType, loaded.view.number, "pdf"), size: bytes.byteLength, download: call.searchParams.get("download") === "1", cacheControl: "private, no-store" });
-      return { status: 200, file: { stream: Readable.toWeb(Readable.from(bytes)) as ReadableStream<Uint8Array>, headers } };
+      if (delivered.kind === "damaged") throw apiProblem("internal_error");
+      const headers = { ...deliveryHeaders({ mime: "application/pdf", name: delivered.name, size: delivered.bytes.byteLength, download: call.searchParams.get("download") === "1", cacheControl: "private, no-store" }), "X-Document-Version": delivered.kind };
+      return { status: 200, file: { stream: Readable.toWeb(Readable.from(Buffer.from(delivered.bytes))) as ReadableStream<Uint8Array>, headers } };
     },
   },
   {
@@ -445,26 +443,25 @@ const documentActions: ApiEndpoint[] = [
     path: "/billing-documents/{id}/xml",
     permission: "billing.view",
     operationId: "billing-documents.xml",
-    summary: "Download the XRechnung (UBL XML) of a finalized invoice, partial invoice, final invoice or cancellation invoice; 422 lists missing details (for example the buyer reference)",
+    summary: "Download the XRechnung (UBL XML) of a finalized invoice, partial invoice, final invoice or cancellation invoice. Like the PDF it returns the original stored at finalization (checksum verified, X-Document-Version: original); without an original (older documents) or with ?fresh=1 it is generated again (X-Document-Version: regenerated, file name with _neu-erzeugt); 422 lists missing details (for example the buyer reference)",
     operations: [],
-    download: { description: "The XRechnung 3.0 (UBL 2.1) as application/xml." },
+    download: { description: "The XRechnung 3.0 (UBL 2.1) as application/xml, as the original or as a generated view (see header X-Document-Version)." },
     handler: async (call) => {
       const id = idOf(call);
       await visible(id);
       const loaded = await loadDocView(id);
       if (!loaded) throw apiProblem("not_found");
-      const problems = xrechnungProblems(loaded.view);
-      if (problems.length > 0) throw apiProblem("validation_failed", { reason: "billing.errors.xrechnungIncomplete", params: { problems: problems.join(",") } });
-      let xml: string;
+      let delivered;
       try {
-        xml = buildDocumentXml(loaded.view);
+        delivered = await deliverXml(loaded.view, { fresh: call.searchParams.get("fresh") === "1" });
       } catch (error) {
         if (error instanceof EinvoiceError) throw apiProblem("validation_failed", { reason: "billing.errors.xrechnungIncomplete" });
         throw error;
       }
-      const bytes = new TextEncoder().encode(xml);
-      const headers = deliveryHeaders({ mime: "application/xml", name: documentFileName(loaded.view.docType, loaded.view.number, "xml"), size: bytes.byteLength, download: true, cacheControl: "private, no-store" });
-      return { status: 200, file: { stream: Readable.toWeb(Readable.from(Buffer.from(bytes))) as ReadableStream<Uint8Array>, headers } };
+      if (delivered.kind === "damaged") throw apiProblem("internal_error");
+      if (delivered.kind === "incomplete") throw apiProblem("validation_failed", { reason: "billing.errors.xrechnungIncomplete", params: { problems: delivered.problems.join(",") } });
+      const headers = { ...deliveryHeaders({ mime: "application/xml", name: delivered.name, size: delivered.bytes.byteLength, download: true, cacheControl: "private, no-store" }), "X-Document-Version": delivered.kind };
+      return { status: 200, file: { stream: Readable.toWeb(Readable.from(Buffer.from(delivered.bytes))) as ReadableStream<Uint8Array>, headers } };
     },
   },
 ];

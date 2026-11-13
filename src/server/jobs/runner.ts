@@ -262,7 +262,7 @@ export function createJobRunner(options: RunnerOptions) {
     const [active, due] = await Promise.all([activeFeatures(), db.jobState.findMany({ where: { nextRunAt: { lte: at } }, select: { id: true } })]);
     const dueIds = new Set(due.map((d) => d.id));
     const runs = definitions()
-      .filter((job) => dueIds.has(job.id) && (!job.feature || active.has(job.feature)))
+      .filter((job) => dueIds.has(job.id) && (!job.feature || job.always || active.has(job.feature)))
       .map((job) => execute(job, false).catch((error) => (logError(`job:${job.id}`, error), null)));
     return (await Promise.all(runs)).filter((r): r is RunResult => r !== null);
   }
@@ -275,7 +275,7 @@ export function createJobRunner(options: RunnerOptions) {
     const job = definitions().find((j) => j.id === jobId);
     if (!job) return null;
     await sync();
-    if (job.feature && !(await activeFeatures()).has(job.feature)) return null;
+    if (job.feature && !job.always && !(await activeFeatures()).has(job.feature)) return null;
     return execute(job, true);
   }
 

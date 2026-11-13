@@ -61,6 +61,11 @@ export type RunContext<I, P> = {
   audit(details: AuditDetails): void;
   /** Aufgabe nach erfolgreichem Commit (Datei löschen, Neustart anstoßen …); Fehler werden nur protokolliert */
   afterCommit(task: () => unknown): void;
+  /**
+   * Aufgabe, wenn die Transaktion **nicht** festgeschrieben wurde (Fehler in `run`, einem Hook oder im Audit; Rollback): zum Beispiel eine in der Transaktion abgelegte Datei sofort wieder entfernen,
+   * statt sie als Waise liegen zu lassen. Läuft auch, wenn die Operation bei einem Fehler von `run` abbricht; Fehler werden nur protokolliert. Hooks bekommen dasselbe (`OperationHookContext.onRollback`).
+   */
+  onRollback(task: () => unknown): void;
 };
 
 type AuditOption<I, R> =
@@ -162,6 +167,7 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
 
       let prepared = undefined as P;
       let committed = false;
+      const rollbackTasks: Array<() => unknown> = [];
       let outcome: Outcome<R, z.output<S>>;
       try {
         try {
@@ -190,8 +196,9 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
               details = value;
             },
             afterCommit: (task) => void afterCommit.push(task),
+            onRollback: (task) => void rollbackTasks.push(task),
           });
-          if (def.transaction !== false) await runOperationHooks({ operation: def.name, input, result: data, principal, tx });
+          if (def.transaction !== false) await runOperationHooks({ operation: def.name, input, result: data, principal, tx, onRollback: (task) => void rollbackTasks.push(task) });
           if (def.audit !== false) {
             const action = typeof def.audit === "function" ? def.audit(input, data) : def.audit;
             const entry = { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } };
@@ -233,6 +240,16 @@ export function defineOperation<S extends z.ZodType, R, P = undefined>(def: Oper
         }
         return outcome;
       } finally {
+        // nicht festgeschrieben (auch bei einem Fehler, der nach oben durchgereicht wird): Aufgaben der Rollback-Seite (abgelegte Dateien entfernen)
+        if (!committed) {
+          for (const task of rollbackTasks) {
+            try {
+              await task();
+            } catch (error) {
+              logError(`${def.name}:onRollback`, error);
+            }
+          }
+        }
         if (def.finish) {
           try {
             await def.finish(prepared, committed);

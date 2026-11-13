@@ -28,6 +28,11 @@ export type JobDef = {
   id: string;
   /** Funktion, der der Job gehört: er läuft nur, solange sie aktiv ist. Ohne Angabe: Plattform (läuft immer) */
   feature?: FeatureId;
+  /**
+   * Läuft **auch bei ausgeschalteter** Funktion (`feature` bleibt als Zuordnung stehen). Nur für Aufräumläufe zu Daten, die ein `always`-Hook (`OperationHookDef.always`) anlegt oder freigibt – sonst bliebe
+   * das Aufräumen bis zum Wiedereinschalten liegen (zum Beispiel Dateien eines anonymisierten Kunden). Der Job arbeitet nur an vorhandenen Zeilen und tut bei leerem Bestand nichts.
+   */
+  always?: boolean;
   schedule: Schedule;
   retry?: JobRetry;
   /** Obergrenze für einen Lauf (Standard 30 Minuten) */

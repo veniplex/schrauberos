@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { deflateSync } from "node:zlib";
 import { after, before, beforeEach, describe, it } from "node:test";
@@ -23,7 +23,7 @@ let filesMod: typeof import("@/server/files");
 let customerId: string;
 
 const FINALIZE = ["billing.view", "billing.edit", "invoices.view", "invoices.edit", "invoices.finalize", "customers.view", "vehicles.view", "billing.send", "mail.send"];
-const PROFILE = { id: "default", name: "Autohaus Müller", street: "Hauptstraße 1", zip: "10115", city: "Berlin", phone: "030 123456", email: "info@mueller.example", taxNumber: "12/345/67890", vatId: "DE123456789", iban: "DE89370400440532013000", bic: "COBADEFFXXX", bankName: "Commerzbank", managingDirector: "Erika Müller", paymentTermDays: 14, smallBusiness: false, invoiceNumberFormat: "{YYYY}-{NNNN}" };
+const PROFILE = { id: "default", logoDataUrl: null, name: "Autohaus Müller", street: "Hauptstraße 1", zip: "10115", city: "Berlin", phone: "030 123456", email: "info@mueller.example", taxNumber: "12/345/67890", vatId: "DE123456789", iban: "DE89370400440532013000", bic: "COBADEFFXXX", bankName: "Commerzbank", managingDirector: "Erika Müller", paymentTermDays: 14, smallBusiness: false, invoiceNumberFormat: "{YYYY}-{NNNN}" };
 
 async function sessionFor(permissions: readonly string[]): Promise<AppSession> {
   const role = await env.role({ permissions });
@@ -296,5 +296,154 @@ describe("Aufbewahrung, Anonymisierung und Aufräumen", () => {
     assert.equal(existsSync(filesMod.resolveRel(orphan)), false);
     assert.ok(existsSync(filesMod.resolveRel(young)), "zu jung: vielleicht legt eine laufende Transaktion die Zeile noch an");
     assert.ok(existsSync(filesMod.resolveRel(kept.path)), "mit Zeile: nie angefasst");
+  });
+});
+
+describe("Schnittstelle liefert dieselben Originale wie die Oberfläche (A1)", () => {
+  async function apiCall(token: string, id: string, route: "pdf" | "xml", query = "") {
+    const { apiRequest } = await import("@/test/api-helpers");
+    const router = await import("@/server/api/router");
+    return router.handleApiRequest(apiRequest("GET", `/billing-documents/${id}/${route}${query}`, { token }));
+  }
+  async function apiToken() {
+    const { makeToken } = await import("@/test/api-helpers");
+    const role = await env.role({ permissions: ["billing.view"] });
+    const user = await env.user({ username: `api-${Math.random().toString(36).slice(2)}`, roles: [role] });
+    return (await makeToken(env, { ownerId: user.id, scope: ["billing.view"], rateLimitPerMinute: 6000 })).token;
+  }
+
+  it("PDF und XRechnung: das Original (Prüfsumme, Kennzeichnung, Dateiname des Originals) – wie die Oberfläche; ?fresh=1 als gekennzeichnete neu erzeugte Ansicht; beschädigt ist ein Fehler", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session, { buyerReference: "KD-1" });
+    const token = await apiToken();
+    const rows = await env.db.invoiceOriginal.findMany({ where: { invoiceId: id } });
+    const stored = (kind: string) => rows.find((r) => r.kind === kind)!;
+    for (const kind of ["pdf", "xml"] as const) {
+      const res = await apiCall(token, id, kind);
+      assert.equal(res.status, 200, kind);
+      assert.equal(res.headers.get("x-document-version"), "original", kind);
+      assert.doesNotMatch(res.headers.get("content-disposition") ?? "", /neu-erzeugt/);
+      assert.equal(sha(new Uint8Array(await res.arrayBuffer())), stored(kind).sha256, `${kind}: genau die abgelegte Datei`);
+    }
+    // dieselben Bytes wie die Route der Oberfläche
+    env.signOut();
+    await sessionFor(["billing.view"]);
+    assert.equal(sha(new Uint8Array(await (await call("pdf", id)).arrayBuffer())), stored("pdf").sha256);
+    // ein neues Logo ändert nur die neu erzeugte Ansicht
+    await env.db.workshop.update({ where: { id: "default" }, data: { logoDataUrl: LOGO } });
+    assert.equal((await apiCall(token, id, "pdf")).headers.get("x-document-version"), "original");
+    const view = await apiCall(token, id, "pdf", "?fresh=1");
+    assert.equal(view.status, 200);
+    assert.equal(view.headers.get("x-document-version"), "regenerated");
+    assert.match(view.headers.get("content-disposition") ?? "", /_neu-erzeugt\.pdf/);
+    assert.notEqual(sha(new Uint8Array(await view.arrayBuffer())), stored("pdf").sha256, "die neu erzeugte Ansicht ist nicht das Original");
+    const xmlView = await apiCall(token, id, "xml", "?fresh=1");
+    assert.equal(xmlView.headers.get("x-document-version"), "regenerated");
+    assert.match(xmlView.headers.get("content-disposition") ?? "", /_neu-erzeugt\.xml/);
+    // beschädigt: Fehler statt stiller Ersatzfassung; die neu erzeugte Ansicht bleibt abrufbar
+    const full = filesMod.resolveRel(stored("pdf").path);
+    const good = readFileSync(full);
+    writeFileSync(full, Buffer.concat([good, Buffer.from("x")]));
+    try {
+      assert.equal((await apiCall(token, id, "pdf")).status, 500);
+      assert.equal((await apiCall(token, id, "pdf", "?fresh=1")).status, 200);
+    } finally {
+      writeFileSync(full, good);
+    }
+  });
+
+  it("Entwürfe, Angebote und Rechnungen ohne Original entstehen neu und tragen kein „_neu-erzeugt“ bzw. sind als neu erzeugt gekennzeichnet", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await draft(session);
+    const token = await apiToken();
+    const res = await apiCall(token, id, "pdf");
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("x-document-version"), "regenerated");
+    assert.doesNotMatch(res.headers.get("content-disposition") ?? "", /neu-erzeugt/, "ein Entwurf ist kein Buchungsbeleg");
+    // Altbeleg: festgeschrieben, aber ohne Original – die Auslieferung ist als neu erzeugt gekennzeichnet (auch im Dateinamen)
+    const old = await finalized(session);
+    await env.db.invoiceOriginal.deleteMany({ where: { invoiceId: old } });
+    const legacy = await apiCall(token, old, "pdf");
+    assert.equal(legacy.headers.get("x-document-version"), "regenerated");
+    assert.match(legacy.headers.get("content-disposition") ?? "", /_neu-erzeugt\.pdf/);
+  });
+});
+
+describe("Zurückgerollt: keine Datei eines nie ausgestellten Beleges (N3)", () => {
+  it("scheitert das Festschreiben nach dem Ablegen (Audit), entfernt der Rollback die Dateien sofort – die Wiederholung bekommt Nummer und Dateinamen ohne Zusatz", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await draft(session, { buyerReference: "KD-1" });
+    const dir = filesMod.resolveRel("rechnungen/original");
+    rmSync(dir, { recursive: true, force: true }); // Dateien früherer Fälle stören den Namensvergleich
+    const listing = (): string[] => {
+      const out: string[] = [];
+      const walk = (d: string) => {
+        if (!existsSync(d)) return;
+        for (const entry of readdirSync(d, { withFileTypes: true })) {
+          if (entry.isDirectory()) walk(path.join(d, entry.name));
+          else out.push(entry.name);
+        }
+      };
+      walk(dir);
+      return out;
+    };
+    await env.db.$executeRawUnsafe("CREATE TRIGGER fail_audit BEFORE INSERT ON AuditLog BEGIN SELECT RAISE(ABORT, 'Audit kaputt'); END");
+    try {
+      const outcome = await ops.finalizeDocumentOperation.execute(session, { id, version: versionOf(await fresh(id)) }).catch((e: unknown) => e);
+      assert.ok(outcome instanceof Error || (outcome as { ok: boolean }).ok === false, "das Festschreiben scheitert");
+    } finally {
+      await env.db.$executeRawUnsafe("DROP TRIGGER fail_audit");
+    }
+    assert.equal((await fresh(id)).finalizedAt, null);
+    assert.deepEqual(listing(), [], "weder PDF noch XRechnung bleiben liegen");
+    const ok = await ops.finalizeDocumentOperation.execute(session, { id, version: versionOf(await fresh(id)) });
+    assert.ok(ok.ok);
+    assert.deepEqual(listing().sort(), ["Rechnung_" + (await fresh(id)).number + ".pdf", "Rechnung_" + (await fresh(id)).number + "_xrechnung.xml"].sort(), "keine Endung „-2“");
+  });
+});
+
+describe("Originale: Dateiname und Neuansicht nach der Anonymisierung (N8, N9)", () => {
+  it("Pfad und Dateiname eines Originals nennen nur Belegart und Rechnungsnummer – nie Namen oder Anschrift des Kunden", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session, { buyerReference: "KD-1" });
+    for (const row of await env.db.invoiceOriginal.findMany({ where: { invoiceId: id } })) {
+      assert.match(row.path, /^rechnungen\/original\/\d{4}\/Rechnung_[A-Za-z0-9._-]+\.(pdf|xml)$/);
+      assert.doesNotMatch(row.path, /Mustermann|Max|Nebenweg|K-1\b/);
+    }
+  });
+
+  it("nach der Anonymisierung zeigt die Neuansicht weder Name noch Anschrift noch E-Mail; Zeile und Schnappschuss der festgeschriebenen Rechnung bleiben unverändert", async () => {
+    const session = await sessionFor(FINALIZE);
+    const id = await finalized(session);
+    const { loadDocView } = await import("./queries");
+    const before = await loadDocView(id);
+    assert.equal(before?.view.recipient.name, "Max Mustermann");
+    assert.match(before?.view.recipient.street ?? "", /Nebenweg/);
+    const row = await fresh(id);
+    await env.db.customer.update({ where: { id: customerId }, data: { anonymizedAt: new Date(), lastName: "Anonymisiert", firstName: null, street: null, zip: null, city: null, email: null, customerNumber: null } });
+    const after = await loadDocView(id);
+    assert.equal(after?.view.recipient.name, "Anonymisiert");
+    assert.deepEqual([after?.view.recipient.street, after?.view.recipient.zip, after?.view.recipient.city, after?.view.recipient.email], [null, null, null, null]);
+    const { deliverPdf } = await import("./deliver");
+    const delivered = await deliverPdf(after!.view, { fresh: true });
+    assert.equal(delivered.kind, "regenerated");
+    const text = delivered.kind === "regenerated" ? inspectPdf(delivered.bytes).pages.join(" ") : "";
+    assert.doesNotMatch(text, /Mustermann|Nebenweg/, "die neu erzeugte PDF-Ansicht nennt den Kunden nicht mehr");
+    assert.deepEqual(await fresh(id), row, "die festgeschriebene Zeile bleibt, wie sie ist");
+  });
+});
+
+describe("Dauer der PDF-Erzeugung in der Schreibtransaktion (N5, Messung)", () => {
+  it("ein Beleg mit der Höchstzahl an Positionen: Festschreiben (inklusive PDF und XRechnung in der Transaktion) bleibt weit unter dem Zeitlimit der Transaktion (20 s)", async () => {
+    const { MAX_LINES } = await import("@/lib/line-items");
+    const session = await sessionFor(FINALIZE);
+    const lines = Array.from({ length: MAX_LINES }, (_, i) => ({ description: `Position ${i + 1} mit einer etwas längeren Beschreibung für den Zeilenumbruch im Dokument`, unit: "Stk", quantityMilli: 1000 + i, unitCents: 1000 + i, taxBp: 1900, discountBp: 0 }));
+    const id = await draft(session, { items: JSON.stringify(lines), buyerReference: "KD-1" });
+    const started = performance.now();
+    const result = await ops.finalizeDocumentOperation.execute(session, { id, version: versionOf(await fresh(id)) });
+    const ms = Math.round(performance.now() - started);
+    assert.ok(result.ok, JSON.stringify(!result.ok && result.failure));
+    console.log(`  ↳ Messung N5: Festschreiben mit ${MAX_LINES} Positionen (PDF + XRechnung in der Transaktion): ${ms} ms`);
+    assert.ok(ms < 10_000, `Festschreiben mit ${MAX_LINES} Positionen dauerte ${ms} ms (Transaktionslimit 20 s)`);
   });
 });

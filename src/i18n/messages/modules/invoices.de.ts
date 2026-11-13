@@ -50,7 +50,7 @@ export const invoicesDe = {
   restricted: {
     notice: "Verarbeitung eingeschränkt (Aufbewahrungspflicht)",
     hiddenName: "Kunde eingeschränkt",
-    detail: "Der Kunde hat die Verarbeitung seiner Daten einschränken lassen (Art. 18 DSGVO). Diese festgeschriebene Rechnung bleibt wegen der Aufbewahrungspflicht lesbar; sie erscheint nicht in Auswahl, Exporten und der Schnittstelle, und der Name steht nur mit dem Recht „Kunden ansehen“ da.",
+    detail: "Der Kunde hat die Verarbeitung seiner Daten einschränken lassen (Art. 18 DSGVO). Diese festgeschriebene Rechnung bleibt wegen der Aufbewahrungspflicht lesbar; sie erscheint nicht in Auswahl, im allgemeinen Export und der Schnittstelle (der Steuerberater-Export enthält sie ohne Namen), und der Name steht nur mit dem Recht „Kunden ansehen“ da.",
   },
   docTypes: { invoice: "Rechnung", partial: "Abschlagsrechnung", final: "Schlussrechnung", credit: "Stornorechnung" },
   statuses: { open: "Offen", paid: "Bezahlt", cancelled: "Storniert" },

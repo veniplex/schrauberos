@@ -51,7 +51,7 @@ export const invoicesEn: typeof invoicesDe = {
   restricted: {
     notice: "Processing restricted (retention obligation)",
     hiddenName: "Customer restricted",
-    detail: "The customer has had the processing of their data restricted (Art. 18 GDPR). This finalized invoice stays readable because of the retention obligation; it does not appear in pickers, exports or the API, and the name is only shown with the “view customers” right.",
+    detail: "The customer has had the processing of their data restricted (Art. 18 GDPR). This finalized invoice stays readable because of the retention obligation; it does not appear in pickers, the general export or the API (the accountant export contains it without the name), and the name is only shown with the “view customers” right.",
   },
   docTypes: { invoice: "Invoice", partial: "Partial invoice", final: "Final invoice", credit: "Cancellation invoice" },
   statuses: { open: "Open", paid: "Paid", cancelled: "Cancelled" },

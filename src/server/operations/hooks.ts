@@ -17,6 +17,8 @@ export type OperationHookContext = {
   result: unknown;
   principal: AppSession;
   tx: Prisma.TransactionClient;
+  /** Aufgabe, wenn die Transaktion (der Operation, nicht nur des Hooks) zurückgerollt wird, z. B. eine in der Transaktion abgelegte Datei wieder entfernen */
+  onRollback?: (task: () => unknown) => void;
 };
 
 export type OperationHookDef = {

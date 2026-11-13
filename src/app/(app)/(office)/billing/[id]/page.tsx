@@ -15,9 +15,9 @@ import { ChecklistCard, FactsCard, HistoryCard, ItemsCard, PartiesCard, Payments
 import { originalStates } from "@/modules/office/billing/original-files";
 import { docTitle, isDraft, isSmallAmount, offerState, todayKey } from "@/modules/office/billing/domain";
 import { xrechnungProblems } from "@/modules/office/billing/xrechnung";
-import { billingReadAllowed, documentDetail } from "@/modules/office/billing/queries";
+import { billingReadAccess, documentDetail } from "@/modules/office/billing/queries";
 import { DocBadges } from "@/modules/office/billing/ui";
-import { draftProblems } from "@/modules/office/billing/view";
+import { draftProblems, withHiddenRecipient } from "@/modules/office/billing/view";
 import { cancelBlock, cancelInvoice } from "@/modules/office/invoices/public";
 import { orderRef } from "@/modules/workshop/orders/public";
 import { mailConfigured } from "@/server/mail";
@@ -28,10 +28,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const sessionAllowed = await sessionIfAllowed("billing.view");
   if (!sessionAllowed) return {};
-  const doc = await db.invoice.findFirst({ where: { id, source: "billing" }, select: { number: true, docType: true, partyName: true, customerId: true } });
-  // Art. 18: Belege eingeschränkter Kunden liefern ohne `invoices.view` keinen Titel (auch keinen Namen)
-  if (doc && !(await billingReadAllowed({ can: (p) => Boolean(sessionAllowed?.can(p)) }, doc.customerId))) return {};
-  return { title: doc ? `${doc.number || docTitle(doc.docType)} · ${doc.partyName}` : undefined };
+  const doc = await db.invoice.findFirst({ where: { id, source: "billing" }, select: { number: true, docType: true, partyName: true, customerId: true, finalizedAt: true } });
+  if (!doc) return {};
+  // Art. 18: nicht lesbare Belege eingeschränkter Kunden liefern keinen Titel; der Name eines eingeschränkten Kunden steht nur mit `customers.view` darin
+  const access = await billingReadAccess({ can: (p) => Boolean(sessionAllowed.can(p)) }, doc);
+  if (!access.allowed) return {};
+  const named = !access.restricted || sessionAllowed.can("customers.view");
+  return { title: named ? `${doc.number || docTitle(doc.docType)} · ${doc.partyName}` : doc.number || docTitle(doc.docType) };
 }
 
 export default async function BillingDocumentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,8 +42,13 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
   const [{ id }, i18n] = await Promise.all([params, getI18n()]);
   const { t, td } = i18n;
   const detail = await documentDetail(id);
-  if (!detail || !(await billingReadAllowed(session, detail.row.customerId))) notFound(); // Art. 18: Belege eingeschränkter Kunden nur mit invoices.view
-  const { view, row, payments, derived, counter, restricted, sendTo, originalId, deductedInFinal, invalidDeductions } = detail;
+  // Art. 18: bei eingeschränkten Kunden nur festgeschriebene Rechnungen und nur mit invoices.view; sonst gilt der Beleg als nicht vorhanden
+  const access = detail ? await billingReadAccess(session, detail.row) : null;
+  if (!detail || !access?.allowed) notFound();
+  const { row, payments, derived, counter, restricted, sendTo, originalId, deductedInFinal, invalidDeductions } = detail;
+  // Name und Anschrift eines eingeschränkten Kunden nur mit `customers.view` (der Beleg selbst – PDF, Original – bleibt, wie er ist)
+  const nameHidden = access.restricted && !session.can("customers.view");
+  const view = nameHidden ? withHiddenRecipient(detail.view, i18n.t("invoices.restricted.hiddenName")) : detail.view;
 
   const draft = isDraft(row);
   const invoiceLike = isInvoiceType(view.docType);
@@ -100,7 +108,12 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
         }
       />
 
-      {restricted ? <Alert tone="warning" className="mb-5">{t("billing.errors.restricted")}</Alert> : null}
+      {access.restricted ? (
+        <Alert tone="warning" className="mb-5">
+          <strong>{t("invoices.restricted.notice")}.</strong> {t("invoices.restricted.detail")}
+        </Alert>
+      ) : null}
+      {restricted && !access.restricted ? <Alert tone="warning" className="mb-5">{t("billing.errors.restricted")}</Alert> : null}
       {state === "expired" ? <Alert tone="warning" className="mb-5">{t("billing.offerExpired")}</Alert> : null}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">

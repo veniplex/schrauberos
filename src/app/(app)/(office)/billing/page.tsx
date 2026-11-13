@@ -11,8 +11,8 @@ import { getI18n } from "@/i18n/server";
 import { INTL_LOCALE } from "@/i18n/config";
 import { clampPage, listLinks, pageWindow, parseListParams, sortFields } from "@/lib/list-params";
 import { formatCents } from "@/lib/money";
-import { unrestrictedByCustomer } from "@/modules/workshop/customers/public";
-import { BILLING_STATUS_FILTERS, BILLING_TYPE_FILTERS, billingListWhere, billingStats, parseStatusFilter, parseTypeFilter } from "@/modules/office/billing/queries";
+import { isRestricted, restrictionSelect } from "@/modules/workshop/customers/public";
+import { BILLING_STATUS_FILTERS, BILLING_TYPE_FILTERS, billingListWhere, billingReadableWhere, billingStats, parseStatusFilter, parseTypeFilter } from "@/modules/office/billing/queries";
 import { DocBadges } from "@/modules/office/billing/ui";
 import { payableCents } from "@/modules/office/billing/domain";
 import { requirePermission } from "@/server/auth/session";
@@ -35,8 +35,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const type = parseTypeFilter(sp.type);
   const status = parseStatusFilter(sp.status);
   const list = parseListParams(sp, { sorts: SORTS, ...DEFAULT });
-  // Belege eingeschränkter Kunden (Art. 18) stehen nur mit `invoices.view` in der Liste (wie das Archiv, `billingReadAllowed`)
-  const where = { AND: [billingListWhere({ q, type, status }), session.can("invoices.view") ? {} : unrestrictedByCustomer] };
+  // Belege eingeschränkter Kunden (Art. 18): nur festgeschriebene Rechnungen und nur mit `invoices.view` (wie die Detailseite, `billingReadAccess`); ihr Name nur mit `customers.view`
+  const namesVisible = session.can("customers.view");
+  const where = { AND: [billingListWhere({ q, type, status, restrictedNames: namesVisible }), billingReadableWhere(session)] };
   const orderBy =
     list.sort === "number"
       ? [{ number: list.dir }]
@@ -52,7 +53,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     where,
     orderBy,
     ...pageWindow(page, list.pageSize),
-    select: { id: true, source: true, docType: true, number: true, partyName: true, issueDate: true, finalizedAt: true, offerStatus: true, validUntil: true, status: true, dueDate: true, grossCents: true, deductedCents: true, paidCents: true, sentAt: true, createdAt: true },
+    select: { id: true, source: true, docType: true, number: true, partyName: true, issueDate: true, finalizedAt: true, offerStatus: true, validUntil: true, status: true, dueDate: true, grossCents: true, deductedCents: true, paidCents: true, sentAt: true, createdAt: true, customer: { select: restrictionSelect } },
   });
   const links = listLinks("/billing", { q: q || undefined, type: type === "all" ? undefined : type, status: status === "all" ? undefined : status }, list, DEFAULT);
   const canEdit = session.can("billing.edit");
@@ -133,7 +134,17 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
               </div>
             ),
           },
-          { id: "recipient", header: t("billing.columns.recipient"), sort: "recipient", cell: (row) => <span className="text-sm">{row.partyName}</span> },
+          {
+            id: "recipient",
+            header: t("billing.columns.recipient"),
+            sort: "recipient",
+            cell: (row) => (
+              <div className="text-sm">
+                {isRestricted(row.customer) && !namesVisible ? <span className="text-ink-muted">{t("invoices.restricted.hiddenName")}</span> : row.partyName}
+                {isRestricted(row.customer) ? <div className="text-xs text-warning-ink">{t("invoices.restricted.notice")}</div> : null}
+              </div>
+            ),
+          },
           { id: "date", header: t("billing.columns.date"), sort: "date", cell: (row) => <span className="whitespace-nowrap tabular text-sm">{row.finalizedAt ? date(row.issueDate) : "–"}</span> },
           {
             id: "amount",

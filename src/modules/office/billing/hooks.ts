@@ -17,11 +17,11 @@ export const hooks: OperationHookDef[] = [
     operation: "invoices.cancel",
     feature: "office.billing",
     always: true,
-    run: async ({ tx, result }) => {
+    run: async ({ tx, result, onRollback }) => {
       const { counterId, fromBilling } = result as { counterId: string; fromBilling: boolean };
       if (!fromBilling) return;
       const { createOriginals } = await import("./originals");
-      await createOriginals(tx, counterId);
+      await createOriginals(tx, counterId, onRollback);
     },
   },
   {

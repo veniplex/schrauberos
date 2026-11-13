@@ -246,6 +246,68 @@ test.describe.serial("IT-Tresor", () => {
     expect(await cspViolations(page)).toEqual([]);
     expect(browserErrors()).toEqual([]);
   });
+
+  test("IT-Tresor: Passphrase ändern verlangt die bisherige Passphrase; ohne Hülle für den Wiederherstellungsschlüssel warnt die Seite und das Anlegen lehnt einen fehlenden Schlüssel ab", async ({ page }) => {
+    test.setTimeout(150_000);
+    const browserErrors = collectBrowserErrors(page);
+    await watchCsp(page);
+    await ensureVaultUnlocked(page);
+    const NEW_PASSPHRASE = "E2E-Neue-Tresor-Passphrase für den Browsertest 2027";
+
+    // ohne Hülle für den Wiederherstellungsschlüssel: Warnung, Verweis in die Verwaltung und das Formular zum Hinterlegen
+    await page.goto("/docs/vault");
+    await expect(page.getByText(/Der Wiederherstellungsschlüssel öffnet diesen Tresor noch nicht/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Wiederherstellungsschlüssel einrichten" })).toBeVisible();
+    const wrap = page.getByRole("heading", { name: "Wiederherstellungsschlüssel hinterlegen" });
+    await expect(wrap).toBeVisible();
+    // es gibt (noch) keinen Wiederherstellungsschlüssel: das Anlegen der Hülle wird mit klarer Meldung abgelehnt
+    await page.getByLabel("Wiederherstellungsschlüssel", { exact: true }).fill("ABCD-EFGH");
+    await page.getByLabel("Eigenes Passwort (zur Bestätigung)").nth(0).fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Wiederherstellungsschlüssel hinterlegen" }).click();
+    await expect(page.getByText("Es gibt noch keinen Wiederherstellungsschlüssel.", { exact: false }).first()).toBeVisible();
+
+    // Passphrase ändern: eine falsche bisherige Passphrase wird abgewiesen, die Hülle bleibt
+    await page.goto("/docs/vault");
+    const change = page.getByRole("button", { name: "Passphrase ändern", exact: true });
+    await page.getByText("Passphrase ändern", { exact: true }).first().click();
+    const form = page.locator("form").filter({ has: change });
+    await form.getByLabel("Bisherige Passphrase").fill("das-ist-nicht-die-bisherige-Passphrase");
+    await form.getByLabel("Tresor-Passphrase").fill(NEW_PASSPHRASE);
+    await form.getByLabel("Passphrase wiederholen").fill(NEW_PASSPHRASE);
+    await form.getByLabel("Eigenes Passwort (zur Bestätigung)").fill(TEST_PASSWORD);
+    await change.click();
+    await expect(page.getByText("Die Passphrase ist falsch.", { exact: true })).toBeVisible();
+
+    // mit der richtigen bisherigen Passphrase gelingt es; nach dem Sperren öffnet nur die neue
+    await form.getByLabel("Bisherige Passphrase").fill(VAULT_PASSPHRASE);
+    await form.getByLabel("Tresor-Passphrase").fill(NEW_PASSPHRASE);
+    await form.getByLabel("Passphrase wiederholen").fill(NEW_PASSPHRASE);
+    await form.getByLabel("Eigenes Passwort (zur Bestätigung)").fill(TEST_PASSWORD);
+    await change.click();
+    await expect(page.getByText("Passphrase geändert.")).toBeVisible();
+    await page.getByRole("button", { name: "Tresor sperren" }).click();
+    await expect(page.getByRole("button", { name: "Tresor entsperren", exact: true })).toBeVisible();
+    await page.getByLabel("Tresor-Passphrase").fill(VAULT_PASSPHRASE);
+    await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
+    await expect(page.getByText("Die Passphrase ist falsch.", { exact: true })).toBeVisible();
+    await page.getByLabel("Tresor-Passphrase").fill(NEW_PASSPHRASE);
+    await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Tresor sperren" })).toBeVisible();
+
+    // zurück zur Passphrase der übrigen Fälle (mit der gerade gesetzten als Nachweis)
+    await page.getByText("Passphrase ändern", { exact: true }).first().click();
+    const back = page.locator("form").filter({ has: page.getByRole("button", { name: "Passphrase ändern", exact: true }) });
+    await back.getByLabel("Bisherige Passphrase").fill(NEW_PASSPHRASE);
+    await back.getByLabel("Tresor-Passphrase").fill(VAULT_PASSPHRASE);
+    await back.getByLabel("Passphrase wiederholen").fill(VAULT_PASSPHRASE);
+    await back.getByLabel("Eigenes Passwort (zur Bestätigung)").fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Passphrase ändern", exact: true }).click();
+    await expect(page.getByText("Passphrase geändert.")).toBeVisible();
+    expect(await cspViolations(page)).toEqual([]);
+    expect(browserErrors()).toEqual([]);
+  });
 });
 
 test("Dienstkonto: Schlüssel mit begrenzter und mit unbegrenzter Laufzeit, jeder Schlüssel einzeln widerrufbar, „unbegrenzt“ nur für Dienstkonten", async ({ page, playwright, baseURL }, info) => {

@@ -5,14 +5,18 @@ import { INTL_LOCALE } from "@/i18n/config";
 import { startOfDay } from "@/lib/zone";
 import type { InvoiceTotals } from "@/modules/office/invoices/domain";
 import { outstandingCents } from "@/modules/office/invoices/domain";
-import { invoiceSums, ledgerWhere } from "@/modules/office/invoices/queries";
+import { archiveReadableWhere, invoiceSums, ledgerWhere } from "@/modules/office/invoices/queries";
 import { formatCents } from "@/lib/money";
+import { isRestricted, restrictionSelect } from "@/modules/workshop/customers/public";
+import { getSession } from "@/server/auth/session";
 import { db } from "@/server/db";
 import type { WidgetDef } from "@/modules/types";
 
 /** Offene und überfällige Rechnungen (Eingang und Ausgang) mit Summen. */
 export async function InvoicesWidget() {
-  const { t, tp, date, locale } = await getI18n();
+  const [{ t, tp, date, locale }, session] = await Promise.all([getI18n(), getSession()]);
+  // Namen von Kunden mit eingeschränkter Verarbeitung (Art. 18) nur mit `customers.view`; nicht lesbare Rechnungen (nicht festgeschriebene eingeschränkter Kunden) stehen nicht in der Liste
+  const namesVisible = Boolean(session?.can("customers.view"));
   const eur = (c: number) => formatCents(c, INTL_LOCALE[locale]);
 
   // Summen von der Datenbank gerechnet (aggregate), nicht über geladene Zeilen; geladen werden nur die fünf ältesten überfälligen
@@ -20,8 +24,8 @@ export async function InvoicesWidget() {
     invoiceSums({ direction: "incoming" }),
     invoiceSums({ direction: "outgoing" }),
     db.invoice.findMany({
-      where: { AND: [ledgerWhere, { status: "open", dueDate: { lt: startOfDay(new Date()) } }] },
-      select: { id: true, number: true, partyName: true, dueDate: true, grossCents: true, deductedCents: true, paidCents: true },
+      where: { AND: [ledgerWhere, archiveReadableWhere, { status: "open", dueDate: { lt: startOfDay(new Date()) } }] },
+      select: { id: true, number: true, partyName: true, dueDate: true, grossCents: true, deductedCents: true, paidCents: true, customer: { select: restrictionSelect } },
       orderBy: { dueDate: "asc" },
       take: 5,
     }),
@@ -52,7 +56,7 @@ export async function InvoicesWidget() {
             <li key={i.id}>
               <Link href={`/invoices/${i.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm hover:bg-surface-hover">
                 <span className="min-w-0">
-                  <span className="block truncate font-medium">{i.partyName}</span>
+                  <span className="block truncate font-medium">{isRestricted(i.customer) && !namesVisible ? <span className="text-ink-muted">{t("invoices.restricted.hiddenName")}</span> : i.partyName}</span>
                   <span className="font-mono text-xs text-ink-muted">{i.number}</span>
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-0.5">

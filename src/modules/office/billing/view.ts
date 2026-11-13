@@ -28,6 +28,12 @@ export type SenderView = {
   smallBusiness: boolean;
 };
 export type RecipientView = { name: string; street: string | null; zip: string | null; city: string | null; email: string | null; customerNumber: string | null };
+/** Name in der Neuansicht eines Beleges, dessen Kunde anonymisiert wurde (wie der Stammsatz des Kunden) */
+export const ANONYMIZED_NAME = "Anonymisiert";
+
+/** Dieselbe Ansicht, aber ohne Namen, Anschrift und E-Mail des Empfängers (Kunde mit eingeschränkter Verarbeitung, Betrachter ohne `customers.view`); Kundennummer und Beträge bleiben. */
+export const withHiddenRecipient = (view: DocView, hiddenName: string): DocView => ({ ...view, recipient: { name: hiddenName, street: null, zip: null, city: null, email: null, customerNumber: view.recipient.customerNumber } });
+
 export type LineView = { kind: string; description: string; unit: string; quantityMilli: number; unitCents: number; taxBp: number; discountBp: number };
 
 export type DocView = {
@@ -79,7 +85,7 @@ export type ViewRow = Invoice & {
   cancels: { number: string; issueDate: Date } | null;
   order: { number: string } | null;
   sourceDoc: { number: string } | null;
-  customer: { customerNumber: string | null } | null;
+  customer: { customerNumber: string | null; /** Der Kunde wurde anonymisiert (die Neuansicht zeigt dann weder Name noch Anschrift) */ anonymizedAt?: Date | null } | null;
 };
 
 const day = (value: Date | null): string | null => (value ? dayKey(value) : null);
