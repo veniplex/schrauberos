@@ -34,10 +34,10 @@ afterEach(() => gateway.setGatewayTestHooks({}));
 describe("isAllowedTarget", () => {
   it("sperrt das Host-Gateway immer, private Netze nur ohne Freigabe; Öffentliches ist erlaubt", () => {
     gateway.setGatewayTestHooks({ gateways: [GATEWAY] });
-    assert.equal(gateway.isAllowedTarget(GATEWAY), false);
+    assert.equal(gateway.isAllowedTarget(GATEWAY, { allowPrivate: false }), false);
     assert.equal(gateway.isAllowedTarget(GATEWAY, { allowPrivate: true }), false, "allowPrivate öffnet nie den Server selbst");
     assert.equal(gateway.isAllowedTarget("::ffff:172.18.0.1", { allowPrivate: true }), false, "auch in der gemappten Schreibweise");
-    assert.equal(gateway.isAllowedTarget("10.0.0.5"), true);
+    assert.equal(gateway.isAllowedTarget("10.0.0.5", { allowPrivate: true }), true);
     assert.equal(gateway.isAllowedTarget("10.0.0.5", { allowPrivate: false }), false);
     assert.equal(gateway.isAllowedTarget("10.0.0.5", { allowPrivate: true }), true);
     assert.equal(gateway.isAllowedTarget("8.8.8.8", { allowPrivate: false }), true);

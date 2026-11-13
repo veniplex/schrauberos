@@ -26,7 +26,7 @@ export type Lookup = (name: string, options: { all: true; verbatim: true }) => P
 const dnsLane = new Semaphore(2, 16);
 
 /** Erlaubt: nicht in einem gesperrten Bereich und nicht das Host-Gateway des Containers (der Docker-Host ist „der eigene Rechner“, `server/host-gateway.ts`) */
-const allowed = (address: string): boolean => isAllowedTarget(address);
+const allowed = (address: string): boolean => isAllowedTarget(address, { allowPrivate: true });
 
 /** Nur für Tests: vorgegebene Namensauflösung (Rebinding, mehrere Antworten). Im Betrieb wirkungslos – es wirft. */
 export const monitorTestHooks: { lookup?: Lookup } = {};

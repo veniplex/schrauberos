@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { parseNetList } from "@/lib/api/cidr";
 import { checkTokenScope } from "@/lib/api/scope";
+import { TOKEN_EXPIRY_DAYS } from "@/lib/api/token-expiry";
 import { actorOf } from "@/lib/rbac";
 import { generateApiToken, hashApiToken, tokenHint } from "@/lib/api/token";
 import { FEATURES, MARKED_PERMISSIONS, fullFeatureId } from "@/modules/catalog";
@@ -25,7 +26,7 @@ import { apiRuntime } from "./state";
  *  - Das Klartext-Token steht **nur** im Ergebnis der Erzeugung (nie im Audit-Log, nie in Logs). Gespeichert wird der SHA-256-Hash.
  *  - **Besitzer** ist der Erzeuger („Mein Konto“) **oder ein Dienstkonto** (`ownerId`, `service-accounts.ts`): Ein Token am Dienstkonto überlebt Passwortwechsel, „Überall abmelden“ und Notzugang des Erzeugers und endet
  *    mit dem Dienstkonto; sein Scope darf höchstens die Rechte enthalten, die **Erzeuger und Dienstkonto** haben. Ein Token am eigenen Konto endet mit dem Passwortwechsel (Widerruf des Zugangs) und bleibt an die
- *    Zwei-Faktor-Pflicht für Administratoren gebunden. Ablauf ist Pflicht (höchstens 365 Tage) – nur Tokens eines Dienstkontos dürfen `unlimited` (ohne Ablauf, bis zum Widerruf) gewählt werden.
+ *    Zwei-Faktor-Pflicht für Administratoren gebunden. Ablauf ist Pflicht (30, 90, 180 oder 365 Tage) – nur Tokens eines Dienstkontos dürfen `unlimited` (ohne Ablauf, bis zum Widerruf) gewählt werden.
  *  - Der Scope darf nur Rechte enthalten, zu denen die Schnittstelle Endpunkte hat (`apiGrantablePermissions`) – die Oberfläche bietet nur diese an, der Server setzt es durch.
  */
 export const TOKEN_MAX_DAYS = 365;
@@ -42,8 +43,8 @@ const createInput = z.object({
   name: nameField,
   description: descriptionField,
   scope: z.array(z.string().min(1).max(60)).min(1).max(100),
-  /** Tage bis zum Ablauf (1–365) oder `unlimited` (nur für Tokens eines Dienstkontos: gilt bis zum Widerruf) */
-  expiresInDays: z.union([z.literal("unlimited"), z.coerce.number().int().min(1).max(TOKEN_MAX_DAYS)]).default(TOKEN_DEFAULT_DAYS),
+  /** Tage bis zum Ablauf (30, 90, 180 oder 365: `TOKEN_EXPIRY_DAYS`) oder `unlimited` (nur für Tokens eines Dienstkontos: gilt bis zum Widerruf) */
+  expiresInDays: z.union([z.literal("unlimited"), z.coerce.number().int().refine((days) => (TOKEN_EXPIRY_DAYS as readonly number[]).includes(days))]).default(TOKEN_DEFAULT_DAYS),
   rateLimitPerMinute: rateField,
   /** Adressbereiche (CIDR; Zeilen oder Komma getrennt), leer = keine Beschränkung */
   allowedNets: z.string().max(2000).default(""),

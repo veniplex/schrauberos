@@ -8,6 +8,7 @@ import { Alert, Badge, Card } from "@/components/ui/layout";
 import { LinkButton } from "@/components/ui/buttons";
 import { SecretField } from "@/components/ui/secret-field";
 import { useI18n } from "@/i18n/client";
+import { TOKEN_EXPIRY_DAYS } from "@/lib/api/token-expiry";
 import { createApiToken } from "./actions";
 
 export type ScopeItem = { key: string; label: string; hint?: string; read: boolean; mark?: string };
@@ -15,7 +16,7 @@ export type ScopeGroup = { id: string; label: string; items: ScopeItem[] };
 
 type TokenState = { ok?: boolean; error?: string; fieldErrors?: Record<string, string>; message?: string; token?: { value: string; hint: string; expiresOn: string } };
 
-const EXPIRY_DAYS = [30, 90, 180, 365] as const;
+const EXPIRY_DAYS = TOKEN_EXPIRY_DAYS;
 
 /**
  * Neues API-Token anlegen: Name, Beschreibung, Ablauf, Rechte je Ressource (nichts ist vorgewählt; „Lesen“ und „Schreiben/Löschen“ sind getrennte Rechte), optional Adressbereiche, **erneute

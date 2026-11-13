@@ -126,7 +126,9 @@ describe("Token erzeugen", () => {
     const admin = await adminSession();
     const ok = await create(admin, { expiresInDays: 365, rateLimitPerMinute: 10 });
     assert.ok(ok.ok);
-    for (const bad of [{ expiresInDays: 366 }, { expiresInDays: 0 }, { rateLimitPerMinute: 0 }, { rateLimitPerMinute: 100_000 }, { name: "" }, { name: "x".repeat(51) }, { description: "x".repeat(201) }]) {
+    // genau die Laufzeiten, die Formular und Hilfe nennen (30, 90, 180, 365) – keine andere Zahl dazwischen
+    for (const days of [30, 90, 180]) assert.ok((await create(admin, { expiresInDays: days })).ok, String(days));
+    for (const bad of [{ expiresInDays: 7 }, { expiresInDays: 45 }, { expiresInDays: 366 }, { expiresInDays: 0 }, { rateLimitPerMinute: 0 }, { rateLimitPerMinute: 100_000 }, { name: "" }, { name: "x".repeat(51) }, { description: "x".repeat(201) }]) {
       const outcome = await create(admin, bad);
       assert.ok(!outcome.ok, JSON.stringify(bad));
     }
