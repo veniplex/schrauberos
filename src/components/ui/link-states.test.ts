@@ -49,7 +49,7 @@ describe("LinkButton und Meldung", () => {
   it("Alert nimmt Links im Fließtext die Tap-Mindesthöhe, Knöpfe nicht", async () => {
     const { Alert, TextLink } = await import("./layout");
     const { LinkButton } = await import("./buttons");
-    const root = await show(createElement(Alert, { tone: "warning", children: ["Es fehlt eine Anschrift. ", createElement(TextLink, { key: "t", href: "/settings" }, "Adresse eintragen"), createElement(LinkButton, { key: "b", href: "/x" }, "Los")] }));
+    const root = await show(createElement(Alert as never, { tone: "warning" }, "Es fehlt eine Anschrift. ", createElement(TextLink, { href: "/settings" }, "Adresse eintragen"), createElement(LinkButton, { href: "/x" }, "Los")));
     const alert = root.querySelector("[role=status]")!;
     assert.match(alert.className, /\[&_a:not\(\.btn\)\]:min-h-0/);
     assert.match(alert.className, /\[&_a:not\(\.btn\)\]:min-w-0/);

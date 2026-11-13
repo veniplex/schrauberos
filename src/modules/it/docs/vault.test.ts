@@ -23,11 +23,8 @@ let queries: typeof import("./vault-queries");
 let secrets: typeof import("@/server/secrets");
 let keyring: typeof import("@/server/vault-keyring");
 let vaultKeys: typeof import("@/lib/vault-keys");
-let keyringOps: typeof import("./vault-keyring-operations");
 let secretReset: typeof import("@/server/secret-reset");
 let issueMod: typeof import("@/server/secret-key-issue");
-let recoveryKey: typeof import("@/server/recovery-key");
-let recoveryMod: typeof import("@/server/secret-key-recovery");
 let throttle: typeof import("@/server/auth/throttle");
 let runtime: typeof import("@/server/auth/runtime");
 
@@ -48,12 +45,9 @@ before(async () => {
   secrets = await import("@/server/secrets");
   keyring = await import("@/server/vault-keyring");
   vaultKeys = await import("@/lib/vault-keys");
-  keyringOps = await import("./vault-keyring-operations");
   keyring.setVaultScryptForTests({ N: 2 ** 10, r: 8, p: 1 }); // schnelle Ableitung in Tests (im Betrieb 2^17)
   secretReset = await import("@/server/secret-reset");
   issueMod = await import("@/server/secret-key-issue");
-  recoveryKey = await import("@/server/recovery-key");
-  recoveryMod = await import("@/server/secret-key-recovery");
   throttle = await import("@/server/auth/throttle");
   runtime = await import("@/server/auth/runtime");
   runtime.authRuntime.sleep = async () => undefined;

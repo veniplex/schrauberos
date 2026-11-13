@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { MessageKey } from "@/i18n/translate";
 import { checkMailLimits, MAIL_SECURITY, MAX_MAIL_LIMIT, normalizeMailAddress } from "@/lib/mail";
-import { canonicalHost, isForbiddenHost, isPrivateAddress } from "@/lib/offsite/host-policy";
+import { canonicalHost, isPrivateAddress } from "@/lib/offsite/host-policy";
 import { logError } from "@/lib/log-safe";
 import { db } from "@/server/db";
 import { isForbiddenTargetHost } from "@/server/host-gateway";

@@ -106,6 +106,20 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
           <Card title={t("billing.sections.preview")} padded={false}>
+            {originals ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-3 text-sm">
+                {originals.pdf === "ok" ? <Badge tone="success">{t("billing.original.badge")}</Badge> : null}
+                <span className="min-w-0 flex-1 text-ink-muted">{originals.pdf === "ok" ? t("billing.original.preview") : originals.pdf === "damaged" ? t("billing.original.damaged") : t("billing.original.missing")}</span>
+                {originals.pdf === "ok" ? (
+                  <LinkButton href={`/api/billing/${row.id}/pdf?download=1`} external size="sm" variant="secondary">
+                    <Download className="size-3.5" aria-hidden /> {t("billing.original.download")}
+                  </LinkButton>
+                ) : null}
+                <LinkButton href={`/api/billing/${row.id}/pdf?fresh=1`} external size="sm" variant="secondary" title={t("billing.original.freshHint")}>
+                  {t("billing.original.fresh")}
+                </LinkButton>
+              </div>
+            ) : null}
             <PdfPreview
               src={`/api/billing/${row.id}/pdf`}
               title={title}
@@ -169,9 +183,13 @@ export default async function BillingDocumentPage({ params }: { params: Promise<
             <Card title={t("billing.sections.xrechnung")}>
               <p className="mb-2 text-sm text-ink-muted">{t("billing.xrechnung.hint")}</p>
               {xmlProblems.length === 0 ? (
-                <LinkButton href={`/api/billing/${row.id}/xml`} external size="sm">
-                  <Download className="size-3.5" aria-hidden /> {t("billing.actions.xml")}
-                </LinkButton>
+                <div className="flex flex-wrap items-center gap-2">
+                  <LinkButton href={`/api/billing/${row.id}/xml`} external size="sm">
+                    <Download className="size-3.5" aria-hidden /> {originals?.xml === "ok" ? t("billing.original.xml") : t("billing.actions.xml")}
+                  </LinkButton>
+                  {originals?.xml === "ok" ? <Badge tone="success">{t("billing.original.badge")}</Badge> : null}
+                  {originals?.xml === "damaged" ? <span className="text-sm text-danger-ink">{t("billing.original.damaged")}</span> : null}
+                </div>
               ) : (
                 <>
                   <p className="mb-1 text-sm">{t("billing.xrechnung.missingIntro")}</p>
