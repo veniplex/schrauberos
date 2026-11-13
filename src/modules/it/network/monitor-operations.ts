@@ -4,7 +4,7 @@ import { MAX_TARGETS, MONITOR_KINDS, MONITOR_METHODS } from "@/lib/monitor/model
 import { normalizeTarget, targetKey } from "@/lib/monitor/target";
 import { loginThrottle } from "@/server/auth/throttle";
 import { defineOperation, fail, failField } from "@/server/operations";
-import { isHostGateway } from "@/server/host-gateway";
+import { isForbiddenTargetHost } from "@/server/host-gateway";
 import { MONITOR_ENABLED_SETTING } from "@/server/monitor/run";
 import { setSetting } from "@/server/settings";
 
@@ -53,7 +53,7 @@ export const saveMonitorTargetOperation = defineOperation({
     if (!normalized.ok) failField(normalized.problem.field, `network.monitor.errors.${normalized.problem.key}`);
     const n = normalized.value;
     // Der Docker-Host ist „der eigene Rechner“ (im Container: Host-Gateway; Namen wie host.docker.internal sperrt normalizeTarget)
-    if (isHostGateway(n.host)) failField("host", "network.monitor.errors.forbiddenHost");
+    if (isForbiddenTargetHost(n.host)) failField("host", "network.monitor.errors.forbiddenHost");
     if (input.deviceId && !(await tx.netDevice.findUnique({ where: { id: input.deviceId }, select: { id: true } }))) failField("deviceId", "validation.invalid");
 
     // Doppelte Ziele (gleiche Art, Host, Port, Pfad) bringen nichts außer doppelter Last

@@ -7,7 +7,7 @@ import { WEBHOOK_EVENTS } from "@/modules/catalog";
 import { getActiveFeatureIds } from "@/modules/features";
 import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { db } from "@/server/db";
-import { isHostGatewayHost } from "@/server/host-gateway";
+import { isForbiddenTargetHost } from "@/server/host-gateway";
 import { defineOperation, fail, failField } from "@/server/operations";
 import { attemptDelivery, parseEvents, TEST_TYPE } from "@/server/webhooks/deliver";
 import { issueWebhookSecret, removeWebhookSecrets, hasWebhookSecret, rotateWebhookSecret } from "@/server/webhooks/secrets";
@@ -79,7 +79,7 @@ export const saveWebhookOperation = defineOperation({
     if (events.some((type) => !known.has(type))) failField("events", "api.webhooks.errors.events");
     const checked = checkWebhookUrl(input.url, { allowPrivate: input.allowPrivate });
     if (!checked.ok) failField("url", urlProblemKey(checked.problem));
-    if (isHostGatewayHost(checked.url.hostname)) failField("url", urlProblemKey("forbiddenHost")); // das Host-Gateway des Containers ist der Server selbst
+    if (isForbiddenTargetHost(checked.url.hostname)) failField("url", urlProblemKey("forbiddenHost")); // das Host-Gateway des Containers ist der Server selbst
     const url = checked.url.toString();
     const data = { name: input.name, url, events: events.join(","), allowPrivate: input.allowPrivate };
 

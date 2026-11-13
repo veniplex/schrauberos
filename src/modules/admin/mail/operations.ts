@@ -4,7 +4,7 @@ import { checkMailLimits, MAIL_SECURITY, MAX_MAIL_LIMIT, normalizeMailAddress } 
 import { canonicalHost, isForbiddenHost, isPrivateAddress } from "@/lib/offsite/host-policy";
 import { logError } from "@/lib/log-safe";
 import { db } from "@/server/db";
-import { isHostGatewayHost } from "@/server/host-gateway";
+import { isForbiddenTargetHost } from "@/server/host-gateway";
 import { asMailError, sendTestMail, TEST_MAIL, testMailConnection } from "@/server/mail/deliver";
 import { LIMIT_MESSAGE, mailCounts } from "@/server/mail/queue";
 import { getMailSettings, MAIL_PASSWORD_SECRET, saveMailSettings, setMailPassword, type MailSettings } from "@/server/mail/settings";
@@ -63,7 +63,7 @@ const saveSettingsOperation = defineOperation({
     if (host) {
       const canonical = canonicalHost(host);
       if (!canonical) failField("host", "mail.errors.host");
-      if (isForbiddenHost(host) || isHostGatewayHost(host)) failField("host", "mail.errors.hostForbidden");
+      if (isForbiddenTargetHost(host)) failField("host", "mail.errors.hostForbidden");
       if (canonical.kind === "ip" && isPrivateAddress(canonical.ip) && !input.allowPrivate) failField("host", "mail.errors.privateNeedsApproval");
     }
     const fromAddress = input.fromAddress ? (normalizeMailAddress(input.fromAddress) ?? failField("fromAddress", "mail.errors.fromAddress")) : "";

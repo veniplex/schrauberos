@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { addressKey, canonicalHost } from "@/lib/offsite/host-policy";
+import { addressKey, canonicalHost, isAllowedAddress, isForbiddenHost, isPrivateAddress } from "@/lib/offsite/host-policy";
 
 /**
  * Die **Gateways des Containers** gelten als „der eigene Rechner“ (der Docker-Host): Im Container führt jede Route zum Host über die Brücke (`172.17.0.1`, `172.18.0.1` …) – ein Ziel dort wäre ein Dienst auf dem
@@ -146,4 +146,19 @@ export function isHostGateway(address: string): boolean {
 export function isHostGatewayHost(host: string): boolean {
   const canonical = canonicalHost(host);
   return canonical?.kind === "ip" && isHostGateway(canonical.ip);
+}
+
+/**
+ * **Die eine Zielregel für jede ausgehende Verbindung** (Webhooks, Off-Site-Backup, E-Mail-Versand, Überwachung; Entscheid des Besitzers: einheitlich, auch mit `allowPrivate`): Eine aufgelöste Adresse ist nur dann
+ * ein Ziel, wenn sie nicht in einem gesperrten Bereich liegt (Loopback, Verbindungs-lokal, Metadaten, eigene Schnittstellen: `isAllowedAddress`), **nicht das Host-Gateway des Containers ist** (der Docker-Host ist der
+ * Server selbst) und – nur wenn die Verbindungsart private Netze von einer Freigabe abhängig macht (`allowPrivate: false`, Standard `true`) – nicht in einem privaten Netz liegt. `allowPrivate` öffnet also private Netze,
+ * nie den Server selbst. **Jeder Resolver ruft diese Funktion für jede Antwort der Namensauflösung** (und für Literale), keiner baut eine eigene Bedingung (Test `outbound-targets.test.ts`).
+ */
+export function isAllowedTarget(address: string, options: { allowPrivate?: boolean } = {}): boolean {
+  return isAllowedAddress(address) && !isHostGateway(address) && ((options.allowPrivate ?? true) || !isPrivateAddress(address));
+}
+
+/** Eingabeprüfung für jede Verbindungsart (ohne Namensauflösung): der Host ist als Ziel verboten (Name oder Adresse des eigenen Rechners, Metadaten-Dienste, Docker-Host-Namen) oder ein Literal des Host-Gateways. */
+export function isForbiddenTargetHost(host: string): boolean {
+  return isForbiddenHost(host) || isHostGatewayHost(host);
 }

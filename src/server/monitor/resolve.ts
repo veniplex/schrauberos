@@ -2,9 +2,9 @@ import "server-only";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { isForbiddenMonitorHost } from "@/lib/monitor/target";
-import { canonicalHost, isAllowedAddress } from "@/lib/offsite/host-policy";
+import { canonicalHost } from "@/lib/offsite/host-policy";
 import { Semaphore } from "@/lib/semaphore";
-import { isHostGateway } from "@/server/host-gateway";
+import { isAllowedTarget } from "@/server/host-gateway";
 
 /**
  * Ziel einer Erreichbarkeitsprüfung beim **Verbinden**: Name **einmal** auflösen, **jede** Antwort gegen die Zielsperre prüfen (`lib/offsite/host-policy.ts`), danach nur mit den geprüften Adressen
@@ -26,7 +26,7 @@ export type Lookup = (name: string, options: { all: true; verbatim: true }) => P
 const dnsLane = new Semaphore(2, 16);
 
 /** Erlaubt: nicht in einem gesperrten Bereich und nicht das Host-Gateway des Containers (der Docker-Host ist „der eigene Rechner“, `server/host-gateway.ts`) */
-const allowed = (address: string): boolean => isAllowedAddress(address) && !isHostGateway(address);
+const allowed = (address: string): boolean => isAllowedTarget(address);
 
 /** Nur für Tests: vorgegebene Namensauflösung (Rebinding, mehrere Antworten). Im Betrieb wirkungslos – es wirft. */
 export const monitorTestHooks: { lookup?: Lookup } = {};

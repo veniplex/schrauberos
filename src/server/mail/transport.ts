@@ -3,8 +3,8 @@ import { lookup } from "node:dns/promises";
 import net, { isIP } from "node:net";
 import nodemailer, { type Transporter } from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { canonicalHost, isAllowedAddress, isForbiddenHost, isPrivateAddress } from "@/lib/offsite/host-policy";
-import { isHostGateway } from "@/server/host-gateway";
+import { canonicalHost, isForbiddenHost, isPrivateAddress } from "@/lib/offsite/host-policy";
+import { isAllowedTarget } from "@/server/host-gateway";
 import { classifyMailError, normalizeMailAddress, sanitizeDisplayName, type MailErrorCode, type MailSecurity } from "@/lib/mail";
 
 /**
@@ -49,7 +49,7 @@ export async function resolveMailTarget(host: string, options: { allowPrivate: b
   if (!canonical) throw new MailError("config");
   if (isForbiddenHost(host)) throw new MailError("forbiddenHost");
   // Das Host-Gateway des Containers ist der Server selbst: auch mit der Freigabe `allowPrivate` nie erlaubt (`server/host-gateway.ts`)
-  const allowed = (address: string) => isAllowedAddress(address) && !isHostGateway(address) && (options.allowPrivate || !isPrivateAddress(address));
+  const allowed = (address: string) => isAllowedTarget(address, { allowPrivate: options.allowPrivate });
   if (canonical.kind === "ip") {
     if (!allowed(canonical.ip)) throw new MailError("forbiddenHost");
     return { address: canonical.ip, family: isIP(canonical.ip) as 4 | 6, private: isPrivateAddress(canonical.ip), servername: null };

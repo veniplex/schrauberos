@@ -41,9 +41,10 @@ describe("Presets (ausgeliefert)", () => {
     assert.ok(daily.enable.includes("office.billing"));
     const plan = planPreset(daily, MODULES, FEATURES);
     assert.equal(plan.overrides["office.billing"], true);
-    const billing = FEATURES.find((f) => `${f.module}.${f.id}` === "office.billing")!;
+    const loose = FEATURES as readonly { id: string; module: string; requires?: readonly string[]; defaultEnabled?: boolean }[];
+    const billing = loose.find((f) => `${f.module}.${f.id}` === "office.billing")!;
     for (const dependency of billing.requires ?? []) {
-      const target = FEATURES.find((f) => `${f.module}.${f.id}` === dependency)!;
+      const target = loose.find((f) => `${f.module}.${f.id}` === dependency)!;
       assert.ok(target.defaultEnabled !== false || plan.overrides[dependency] === true, `${dependency} ist an oder wird mit eingeschaltet`);
     }
     assert.deepEqual(plan.skipped.filter((s) => s.reason === "unknown"), []);
