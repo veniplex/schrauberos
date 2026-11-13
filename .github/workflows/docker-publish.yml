@@ -149,7 +149,8 @@ jobs:
     name: Browser-Tests (Playwright)
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: check
-    runs-on: ubuntu-latest
+    # Fest auf 24.04 statt ubuntu-latest: Das Label wechselt auf Ubuntu 26 (Schriften, Browser-Abhängigkeiten); die Baseline-Screenshots entstehen mit dem Playwright-Image zu Ubuntu 24.04 (noble)
+    runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -187,7 +188,8 @@ jobs:
     name: Lighthouse (mobil)
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: check
-    runs-on: ubuntu-latest
+    # Wie e2e: fest auf 24.04 (siehe dort)
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
