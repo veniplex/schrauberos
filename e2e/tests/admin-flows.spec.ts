@@ -139,110 +139,113 @@ test("Webhook: anlegen, Test-Ereignis an einen lokalen Empfänger – die Signat
   expect(browserErrors()).toEqual([]);
 });
 
-test("IT-Tresor: Eintrag anlegen, Zugangsdaten nie in Liste und Seite, Anzeige nur mit Passwort und nach 30 Sekunden wieder verborgen, no-store", async ({ page, request }, info) => {
-  test.setTimeout(120_000);
-  const browserErrors = collectBrowserErrors(page);
-  await watchCsp(page);
-  const title = uniqueName(info, "Firewall");
-  const secretText = `Geheim-${Date.now().toString(36)}-xyz`;
+/** Beide Tests legen den Tresor an bzw. sperren ihn – der Zustand liegt im Speicher des einen Servers, deshalb nie gleichzeitig (ein Worker, feste Reihenfolge). */
+test.describe.serial("IT-Tresor", () => {
+  test("IT-Tresor: Eintrag anlegen, Zugangsdaten nie in Liste und Seite, Anzeige nur mit Passwort und nach 30 Sekunden wieder verborgen, no-store", async ({ page, request }, info) => {
+    test.setTimeout(120_000);
+    const browserErrors = collectBrowserErrors(page);
+    await watchCsp(page);
+    const title = uniqueName(info, "Firewall");
+    const secretText = `Geheim-${Date.now().toString(36)}-xyz`;
 
-  await ensureVaultUnlocked(page);
-  await page.goto("/docs/vault/new");
-  await expect(page.getByRole("textbox", { name: "Titel" })).toBeVisible(); // die Seite streamt: erst messen, wenn das Formular da ist
-  // Struktur gegen Passwortmanager: keine Felder namens username/password für die Zugangsdaten, kein type="password" für das Geheimnis, autocomplete aus
-  const fields = await page.evaluate(() => [...document.querySelectorAll("main input, main textarea")].map((el) => ({ name: el.getAttribute("name") ?? "", type: el.getAttribute("type"), autocomplete: el.getAttribute("autocomplete") })));
-  const secretField = fields.find((field) => field.name.includes("secret"));
-  expect(secretField, "Feld für das Geheimnis").toBeTruthy();
-  expect(secretField!.type).not.toBe("password");
-  expect(secretField!.autocomplete).toBe("off");
-  expect(fields.filter((field) => field.type === "password"), "kein Passwortfeld im Eintragsformular").toHaveLength(0);
-  expect(fields.filter((field) => /^(username|password)$/.test(field.name))).toHaveLength(0);
+    await ensureVaultUnlocked(page);
+    await page.goto("/docs/vault/new");
+    await expect(page.getByRole("textbox", { name: "Titel" })).toBeVisible(); // die Seite streamt: erst messen, wenn das Formular da ist
+    // Struktur gegen Passwortmanager: keine Felder namens username/password für die Zugangsdaten, kein type="password" für das Geheimnis, autocomplete aus
+    const fields = await page.evaluate(() => [...document.querySelectorAll("main input, main textarea")].map((el) => ({ name: el.getAttribute("name") ?? "", type: el.getAttribute("type"), autocomplete: el.getAttribute("autocomplete") })));
+    const secretField = fields.find((field) => field.name.includes("secret"));
+    expect(secretField, "Feld für das Geheimnis").toBeTruthy();
+    expect(secretField!.type).not.toBe("password");
+    expect(secretField!.autocomplete).toBe("off");
+    expect(fields.filter((field) => field.type === "password"), "kein Passwortfeld im Eintragsformular").toHaveLength(0);
+    expect(fields.filter((field) => /^(username|password)$/.test(field.name))).toHaveLength(0);
 
-  await page.getByRole("textbox", { name: "Titel" }).fill(title);
-  await page.getByRole("textbox", { name: "System" }).fill("fw-e2e");
-  await page.getByRole("textbox", { name: "Adresse (URL)" }).fill("https://fw.example.org");
-  await page.getByRole("textbox", { name: "Benutzername" }).fill("admin-e2e");
-  await page.getByRole("textbox", { name: "Passwort / Geheimnis" }).fill(secretText);
-  await save(page);
-  await page.waitForURL((url) => /^\/docs\/vault\/(?!new$)[^/]+$/.test(url.pathname));
-  const detailUrl = page.url();
+    await page.getByRole("textbox", { name: "Titel" }).fill(title);
+    await page.getByRole("textbox", { name: "System" }).fill("fw-e2e");
+    await page.getByRole("textbox", { name: "Adresse (URL)" }).fill("https://fw.example.org");
+    await page.getByRole("textbox", { name: "Benutzername" }).fill("admin-e2e");
+    await page.getByRole("textbox", { name: "Passwort / Geheimnis" }).fill(secretText);
+    await save(page);
+    await page.waitForURL((url) => /^\/docs\/vault\/(?!new$)[^/]+$/.test(url.pathname));
+    const detailUrl = page.url();
 
-  // Seite und Liste: nichts von den Zugangsdaten; Köpfe: nie zwischenspeichern
-  const detail = await request.get(detailUrl);
-  expect(detail.headers()["cache-control"] ?? "").toContain("no-store");
-  expect(await detail.text()).not.toContain(secretText);
-  await page.goto("/docs/vault");
-  await expect(page.locator("a:visible", { hasText: title }).first()).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(secretText);
+    // Seite und Liste: nichts von den Zugangsdaten; Köpfe: nie zwischenspeichern
+    const detail = await request.get(detailUrl);
+    expect(detail.headers()["cache-control"] ?? "").toContain("no-store");
+    expect(await detail.text()).not.toContain(secretText);
+    await page.goto("/docs/vault");
+    await expect(page.locator("a:visible", { hasText: title }).first()).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(secretText);
 
-  // Anzeige mit dem richtigen Passwort zeigt die Werte. Die Uhr des Browsers läuft ab hier unter Kontrolle (Z6-4 L-4): „nach 30 Sekunden wieder verborgen“ wird vorgespult statt abgewartet
-  await page.clock.install();
-  await page.goto(detailUrl);
-  await page.getByRole("textbox", { name: "Passwort" }).first().fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
-  await expect(page.getByText("admin-e2e")).toBeVisible();
-  await expect(page.getByText("https://fw.example.org")).toBeVisible();
-  const masked = page.getByRole("textbox", { name: "Passwort / Geheimnis" });
-  await expect(masked, "das Geheimnis bleibt verdeckt, bis man „Anzeigen“ wählt").toHaveValue("Verborgen");
-  await page.getByRole("button", { name: "Anzeigen", exact: true }).click();
-  await expect(masked).toHaveValue(secretText);
+    // Anzeige mit dem richtigen Passwort zeigt die Werte. Die Uhr des Browsers läuft ab hier unter Kontrolle (Z6-4 L-4): „nach 30 Sekunden wieder verborgen“ wird vorgespult statt abgewartet
+    await page.clock.install();
+    await page.goto(detailUrl);
+    await page.getByRole("textbox", { name: "Passwort" }).first().fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
+    await expect(page.getByText("admin-e2e")).toBeVisible();
+    await expect(page.getByText("https://fw.example.org")).toBeVisible();
+    const masked = page.getByRole("textbox", { name: "Passwort / Geheimnis" });
+    await expect(masked, "das Geheimnis bleibt verdeckt, bis man „Anzeigen“ wählt").toHaveValue("Verborgen");
+    await page.getByRole("button", { name: "Anzeigen", exact: true }).click();
+    await expect(masked).toHaveValue(secretText);
 
-  // nach 30 Sekunden sind die Werte wieder verborgen (Uhr des Browsers vorspulen statt zu warten)
-  await page.clock.fastForward(31_000);
-  await expect(page.getByText("admin-e2e")).toHaveCount(0);
-  await expect(page.locator("body")).not.toContainText(secretText);
-  await expect(page.getByText("Die Zugangsdaten sind wieder verborgen.")).toBeVisible();
+    // nach 30 Sekunden sind die Werte wieder verborgen (Uhr des Browsers vorspulen statt zu warten)
+    await page.clock.fastForward(31_000);
+    await expect(page.getByText("admin-e2e")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(secretText);
+    await expect(page.getByText("Die Zugangsdaten sind wieder verborgen.")).toBeVisible();
 
-  // mit falschem Passwort zeigt die Anwendung nichts (zuletzt: ein Fehlversuch bremst weitere Eingaben)
-  await page.goto(detailUrl);
-  await page.getByRole("textbox", { name: "Passwort" }).first().fill("falsches-Passwort-123");
-  await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
-  await expect(page.getByText("Das aktuelle Passwort ist falsch.").first()).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("admin-e2e");
-  expect(await cspViolations(page)).toEqual([]);
-  expect(browserErrors()).toEqual([]);
-});
+    // mit falschem Passwort zeigt die Anwendung nichts (zuletzt: ein Fehlversuch bremst weitere Eingaben)
+    await page.goto(detailUrl);
+    await page.getByRole("textbox", { name: "Passwort" }).first().fill("falsches-Passwort-123");
+    await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
+    await expect(page.getByText("Das aktuelle Passwort ist falsch.").first()).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("admin-e2e");
+    expect(await cspViolations(page)).toEqual([]);
+    expect(browserErrors()).toEqual([]);
+  });
 
-test("IT-Tresor: nach dem Sperren (Neustart) nichts lesbar, falsche Passphrase abgewiesen, richtige entsperrt wieder", async ({ page }, info) => {
-  test.setTimeout(120_000);
-  const browserErrors = collectBrowserErrors(page);
-  await watchCsp(page);
-  await ensureVaultUnlocked(page);
-  const title = uniqueName(info, "Router");
-  await page.goto("/docs/vault/new");
-  await page.getByRole("textbox", { name: "Titel" }).fill(title);
-  await page.getByRole("textbox", { name: "Passwort / Geheimnis" }).fill("Router-Pw-e2e-1");
-  await save(page);
-  await page.waitForURL((url) => /^\/docs\/vault\/(?!new$)[^/]+$/.test(url.pathname));
-  const detailUrl = page.url();
+  test("IT-Tresor: nach dem Sperren (Neustart) nichts lesbar, falsche Passphrase abgewiesen, richtige entsperrt wieder", async ({ page }, info) => {
+    test.setTimeout(120_000);
+    const browserErrors = collectBrowserErrors(page);
+    await watchCsp(page);
+    await ensureVaultUnlocked(page);
+    const title = uniqueName(info, "Router");
+    await page.goto("/docs/vault/new");
+    await page.getByRole("textbox", { name: "Titel" }).fill(title);
+    await page.getByRole("textbox", { name: "Passwort / Geheimnis" }).fill("Router-Pw-e2e-1");
+    await save(page);
+    await page.waitForURL((url) => /^\/docs\/vault\/(?!new$)[^/]+$/.test(url.pathname));
+    const detailUrl = page.url();
 
-  // sperren: der Eintrag lässt sich nicht mehr anzeigen, die Seite verweist auf das Entsperren
-  await page.goto("/docs/vault");
-  await page.getByRole("button", { name: "Tresor sperren" }).click();
-  await expect(page.getByRole("button", { name: "Tresor entsperren", exact: true })).toBeVisible();
-  await page.goto(detailUrl);
-  await expect(page.getByText("Der Tresor ist gesperrt").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Zugangsdaten anzeigen" })).toHaveCount(0);
+    // sperren: der Eintrag lässt sich nicht mehr anzeigen, die Seite verweist auf das Entsperren
+    await page.goto("/docs/vault");
+    await page.getByRole("button", { name: "Tresor sperren" }).click();
+    await expect(page.getByRole("button", { name: "Tresor entsperren", exact: true })).toBeVisible();
+    await page.goto(detailUrl);
+    await expect(page.getByText("Der Tresor ist gesperrt").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zugangsdaten anzeigen" })).toHaveCount(0);
 
-  // falsche Passphrase: abgewiesen, der Tresor bleibt gesperrt
-  await page.goto("/docs/vault");
-  await page.getByLabel("Tresor-Passphrase").fill("das-ist-die-falsche-Passphrase-1");
-  await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
-  await expect(page.getByText("Die Passphrase ist falsch.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Tresor sperren" })).toHaveCount(0);
+    // falsche Passphrase: abgewiesen, der Tresor bleibt gesperrt
+    await page.goto("/docs/vault");
+    await page.getByLabel("Tresor-Passphrase").fill("das-ist-die-falsche-Passphrase-1");
+    await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
+    await expect(page.getByText("Die Passphrase ist falsch.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tresor sperren" })).toHaveCount(0);
 
-  // richtige Passphrase: entsperrt, Anzeige geht wieder
-  await page.getByLabel("Tresor-Passphrase").fill(VAULT_PASSPHRASE);
-  await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Tresor sperren" })).toBeVisible();
-  await page.goto(detailUrl);
-  await page.getByRole("textbox", { name: "Passwort" }).first().fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
-  await expect(page.getByRole("button", { name: "Ausblenden" })).toBeVisible();
-  expect(await cspViolations(page)).toEqual([]);
-  expect(browserErrors()).toEqual([]);
+    // richtige Passphrase: entsperrt, Anzeige geht wieder
+    await page.getByLabel("Tresor-Passphrase").fill(VAULT_PASSPHRASE);
+    await page.getByLabel("Eigenes Passwort (zur Bestätigung)").first().fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Tresor entsperren", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Tresor sperren" })).toBeVisible();
+    await page.goto(detailUrl);
+    await page.getByRole("textbox", { name: "Passwort" }).first().fill(TEST_PASSWORD);
+    await page.getByRole("button", { name: "Zugangsdaten anzeigen" }).click();
+    await expect(page.getByRole("button", { name: "Ausblenden" })).toBeVisible();
+    expect(await cspViolations(page)).toEqual([]);
+    expect(browserErrors()).toEqual([]);
+  });
 });
 
 test("Dienstkonto: Schlüssel mit begrenzter und mit unbegrenzter Laufzeit, jeder Schlüssel einzeln widerrufbar, „unbegrenzt“ nur für Dienstkonten", async ({ page, playwright, baseURL }, info) => {
@@ -261,7 +264,7 @@ test("Dienstkonto: Schlüssel mit begrenzter und mit unbegrenzter Laufzeit, jede
     await page.goto("/admin/api/tokens/new");
     await page.getByLabel("Besitzer").selectOption({ label: `${account} (Dienstkonto)` });
     await page.getByRole("textbox", { name: "Name", exact: true }).fill(name);
-    await page.getByLabel("Gültigkeit").selectOption(expiry);
+    await page.getByLabel("Gültig für").selectOption(expiry);
     await page.getByRole("checkbox", { name: /^Termine ansehen/ }).check();
     await confirm(page, "Eigenes Passwort");
     await page.getByRole("button", { name: "Token anlegen" }).click();
@@ -278,7 +281,7 @@ test("Dienstkonto: Schlüssel mit begrenzter und mit unbegrenzter Laufzeit, jede
 
   // Ohne Dienstkonto als Besitzer gibt es „Unbegrenzt“ nicht
   await page.goto("/admin/api/tokens/new");
-  await expect(page.getByLabel("Gültigkeit").locator('option[value="unlimited"]')).toHaveCount(0);
+  await expect(page.getByLabel("Gültig für").locator('option[value="unlimited"]')).toHaveCount(0);
 
   const call = async (token: string) => {
     const api = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] }, extraHTTPHeaders: { authorization: `Bearer ${token}` } });

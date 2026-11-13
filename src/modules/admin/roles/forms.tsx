@@ -59,8 +59,9 @@ export function RoleForm({
           preview={preview}
           onTemplate={(template) => {
             // eine Vorlage füllt leeren Namen und leere Beschreibung vor
-            if (!name.trim()) setName(template.name);
-            if (!description.trim()) setDescription(template.description);
+            // aus dem aktuellen Zustand rechnen (Funktionsupdate), nicht aus dem Rückruf der letzten Darstellung
+            setName((current) => (current.trim() ? current : template.name));
+            setDescription((current) => (current.trim() ? current : template.description));
           }}
         />
       )}

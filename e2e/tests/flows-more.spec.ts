@@ -157,12 +157,14 @@ test("Benutzer und Rollen: Rolle anlegen, Benutzer anlegen, Anzeigename ändern,
 
   // Rolle aus der Vorlage „Mechaniker“ (Masken-Details prüft ein eigener Durchlauf), und eine zweite, die wieder gelöscht wird
   for (const name of [roleName, spareRole]) {
-    await page.goto("/admin/roles/new");
-    await page.waitForLoadState("networkidle");
-    // gesteuertes Feld: erst wenn der Wert nach der Hydration hält (sonst überschreibt die Vorlage den leeren Namen)
-    await fillStable(page.getByRole("textbox", { name: "Name", exact: true }), name);
-    await page.getByRole("button", { name: "Mechaniker – Vorlage übernehmen" }).click();
-    await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(name);
+    // gesteuertes Feld: Tippt der Test vor der Hydration (WebKit am Handy unter Last), steht der Wert nur im Feld, nicht im Zustand, und die Vorlage überschreibt ihn – dann das Formular neu laden
+    await expect(async () => {
+      await page.goto("/admin/roles/new");
+      await page.waitForLoadState("networkidle");
+      await fillStable(page.getByRole("textbox", { name: "Name", exact: true }), name);
+      await page.getByRole("button", { name: "Mechaniker – Vorlage übernehmen" }).click();
+      await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(name, { timeout: 2_500 });
+    }).toPass({ timeout: 40_000 });
     await save(page);
     await page.waitForURL((url) => url.pathname === "/admin/roles");
     await expect(page.getByText(name).first()).toBeVisible();
