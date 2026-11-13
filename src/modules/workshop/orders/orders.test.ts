@@ -89,7 +89,7 @@ describe("Auftragsnummer (Zähler)", () => {
     const b = await created();
     assert.equal(a.number, `A-${year}-0001`);
     assert.equal(b.number, `A-${year}-0002`);
-    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "orders.create" }, orderBy: { createdAt: "asc" } });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "order.create" }, orderBy: { createdAt: "asc" } });
     assert.match(entry.target ?? "", /A-\d{4}-0001 · B AB 1/);
   });
 
@@ -284,7 +284,7 @@ describe("Abschluss ist atomar über Hooks", () => {
     assert.equal(order.status, "in_progress");
     assert.equal(order.closedAt, null);
     assert.equal(order.events.filter((e) => e.status === "picked_up").length, 0);
-    assert.equal(await env.db.auditLog.count({ where: { action: "orders.close" } }), 0);
+    assert.equal(await env.db.auditLog.count({ where: { action: "order.close" } }), 0);
     assert.ok((await close(id)).ok, "danach lässt er sich abschließen");
   });
 
@@ -297,7 +297,7 @@ describe("Abschluss ist atomar über Hooks", () => {
     assert.ok((await ops.reopenOrderOperation.execute(admin, { id, version: await versionNow(id) })).ok);
     const order = await env.db.order.findUniqueOrThrow({ where: { id } });
     assert.deepEqual([order.status, order.closedAt], ["ready", null]);
-    assert.equal(await env.db.auditLog.count({ where: { action: "orders.reopen" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "order.reopen" } }), 1);
     assert.ok(!(await ops.reopenOrderOperation.execute(admin, { id, version: await versionNow(id) })).ok, "nur ein abgeschlossener Auftrag");
     assert.ok((await step(id, "in_progress")).ok, "danach wieder änderbar");
   });
@@ -540,7 +540,7 @@ describe("Freigabe: Unterschrift und getippter Name (Fix-Runde 12b: M3, M4)", ()
   it("das Audit-Log der Freigabe nennt nur die Auftragsnummer, nie den Namen der freigebenden Person", async () => {
     const { id, number } = await created();
     await ops.approveOperation.execute(advisor, { id, ...base, method: "phone", approverName: "Erika Muster" });
-    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "orders.approve" } });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "order.approve" } });
     assert.equal(entry.target, number);
     assert.doesNotMatch(JSON.stringify(entry), /Erika|Muster/);
   });
@@ -619,7 +619,7 @@ describe("Aufträge: Fix-Runde 12b (N1, N2, N4, N5, N6)", () => {
     assert.deepEqual(!unknown.ok && unknown.failure.fields?.appointmentId, !refused.ok ? refused.failure.fields?.appointmentId : undefined, "kein Unterschied zwischen vorhanden und unbekannt");
     const ok = await create({ appointmentId: appointment.id, mileageKm: 120_000 });
     assert.ok(ok.ok);
-    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "orders.create" } });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "order.create" } });
     assert.match(entry.target ?? "", /120000 km → Fahrzeug/);
   });
 
@@ -634,13 +634,13 @@ describe("Aufträge: Fix-Runde 12b (N1, N2, N4, N5, N6)", () => {
     // Erfolg: alles gemeinsam mit dem Schreiben des Aufrufers
     const made = await db.$transaction(async (tx) => {
       const order = await createOrderInTx({ principal: advisor, tx, emit: emitFor(tx) }, { vehicleId, request: "Aus Angebot", mileageKm: 101_000 });
-      await tx.auditLog.create({ data: { action: "orders.update", actorName: "Aufrufer", target: "Angebot angenommen" } });
+      await tx.auditLog.create({ data: { action: "order.update", actorName: "Aufrufer", target: "Angebot angenommen" } });
       return order;
     });
     assert.match(made.number, /^A-\d{4}-0001$/);
     assert.equal((await env.db.order.findUniqueOrThrow({ where: { id: made.id } })).request, "Aus Angebot");
     assert.equal(await env.db.orderEvent.count({ where: { orderId: made.id, kind: "created" } }), 1);
-    assert.equal(await env.db.auditLog.count({ where: { action: "orders.create", entityId: made.id } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "order.create", entityId: made.id } }), 1);
     assert.equal((await env.db.vehicle.findUniqueOrThrow({ where: { id: vehicleId } })).mileageKm, 101_000);
     assert.equal(await env.db.outboxEvent.count({ where: { type: "order.created" } }), 1);
 
@@ -652,7 +652,7 @@ describe("Aufträge: Fix-Runde 12b (N1, N2, N4, N5, N6)", () => {
       }),
     );
     assert.equal(await env.db.order.count(), 1);
-    assert.equal(await env.db.auditLog.count({ where: { action: "orders.create" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "order.create" } }), 1);
     assert.equal(await env.db.outboxEvent.count({ where: { type: "order.created" } }), 1);
     assert.equal((await env.db.vehicle.findUniqueOrThrow({ where: { id: vehicleId } })).mileageKm, 101_000);
     const next = await db.$transaction(async (tx) => createOrderInTx({ principal: advisor, tx, emit: emitFor(tx) }, { vehicleId }));
@@ -679,7 +679,7 @@ describe("Aufträge: Fix-Runde 12b (N1, N2, N4, N5, N6)", () => {
     await ops.addFindingOperation.execute(mechanic, { id, text: "Geheimer Befundtext" });
     const finding = await env.db.orderFinding.findFirstOrThrow();
     await ops.removeFindingOperation.execute(mechanic, { id, findingId: finding.id });
-    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "orders.findingRemove" } });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "order.findingRemove" } });
     assert.ok((entry.target ?? "").startsWith(`${number} · ${finding.authorName},`));
     assert.doesNotMatch(entry.target ?? "", /Geheimer/);
   });

@@ -104,7 +104,7 @@ describe("Artikel", () => {
     assert.ok((await ops.saveArticleOperation.execute(warehouse, { id: row.id, version: stale, number: "OEL 5W30", name: "Motoröl neu", unit: "l" })).ok);
     const conflict = await ops.saveArticleOperation.execute(warehouse, { id: row.id, version: stale, number: "OEL 5W30", name: "x", unit: "l" });
     assert.equal(!conflict.ok && conflict.failure.code, "conflict");
-    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "parts.create" } });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "part.create" } });
     assert.equal(entry.target, "OEL 5W30 · Motoröl");
     assert.doesNotMatch(JSON.stringify(entry), /7,80|14,50|780|1450/);
   });
@@ -173,7 +173,7 @@ describe("Wareneingang und Inventur", () => {
     assert.ok(!(await receive(id, "-3")).ok);
     assert.ok(!(await receive(id, "abc")).ok);
     assert.equal(await env.db.stockMovement.count(), 1);
-    assert.equal(await env.db.auditLog.count({ where: { action: "parts.receipt" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "part.receipt" } }), 1);
   });
 
   it("gleichzeitige Wareneingänge gehen nicht verloren (atomarer Zuwachs) und die Stände danach sind lückenlos", async () => {
@@ -199,7 +199,7 @@ describe("Wareneingang und Inventur", () => {
     assert.deepEqual([correction.quantityMilli, correction.stockAfterMilli, correction.note], [-2000, 8000, "Jahresinventur"]);
     assert.match(correction.reference ?? "", /^Inventur \d{4}-\d{2}-\d{2}$/);
     assert.equal(await env.db.stockMovement.count({ where: { articleId: b, kind: "correction" } }), 0);
-    assert.equal(await env.db.auditLog.count({ where: { action: "parts.count" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "part.count" } }), 1);
     const bad = await ops.countOperation.execute(warehouse, { counts: { [a]: "x" } });
     assert.ok(!bad.ok && bad.failure.fields?.[`counts.${a}`]);
     const unknown = await ops.countOperation.execute(warehouse, { counts: { gibtsnicht: "3", [b]: "1" } });

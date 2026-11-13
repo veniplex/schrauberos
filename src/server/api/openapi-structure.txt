@@ -87,7 +87,7 @@ POST /fleet-vehicles fleet-vehicles.create fleet.edit body=plate,make,model,vin,
 GET /fleet-vehicles/{id} fleet-vehicles.get fleet.view
 PATCH /fleet-vehicles/{id} fleet-vehicles.update fleet.edit body=plate,make,model,vin,year,fuelType,color,status,driverId,location,huDue,serviceDue,serviceDueKm,insuranceCompany,insurancePolicy,insuranceUntil,leasingProvider,leasingUntil,leasingRateCents,fuelCardNo,notes,allowDuplicate
 DELETE /fleet-vehicles/{id} fleet-vehicles.delete fleet.delete
-GET /invoices invoices.list invoices.view query=direction,status,customerId,q,issuedFrom,issuedTo sort=issueDate,dueDate,number,grossCents,createdAt
+GET /invoices invoices.list invoices.view query=direction,status,customerId,q,from,to sort=issueDate,dueDate,number,grossCents,createdAt
 POST /invoices invoices.create invoices.edit body=direction,number,partyName,customerId,issueDate,dueDate,netCents,vatCents,grossCents,status,paidAt,category,reference,notes
 GET /invoices/{id} invoices.get invoices.view
 PATCH /invoices/{id} invoices.update invoices.edit body=direction,number,partyName,customerId,issueDate,dueDate,netCents,vatCents,grossCents,status,paidAt,category,reference,notes

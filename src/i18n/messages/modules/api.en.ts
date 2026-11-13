@@ -182,7 +182,7 @@ export const apiEn: typeof apiDe = {
     events: {
       order: {
         created: "Order created",
-        status: "Order status changed",
+        statusChanged: "Order status changed",
         closed: "Order closed",
         reopened: "Order reopened",
         approved: "Customer approval recorded",

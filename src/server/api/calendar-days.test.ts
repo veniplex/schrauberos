@@ -132,7 +132,7 @@ describe("API-Körper: ungültige Kalendertage sind 422 (nie 500), nichts wird a
 });
 
 describe("API-Filter: ungültige Kalendertage sind 422 statt 500 oder stillem Weglassen des Filters", () => {
-  const FILTERS = ["/appointments?from=", "/appointments?to=", "/invoices?issuedFrom=", "/invoices?issuedTo=", "/employee-absences?from=", "/employee-absences?to="];
+  const FILTERS = ["/appointments?from=", "/appointments?to=", "/invoices?from=", "/invoices?to=", "/employee-absences?from=", "/employee-absences?to="];
   for (const filter of FILTERS) {
     it(filter, async () => {
       for (const day of BAD_DAYS.filter((d) => d !== " 2026-01-01")) {

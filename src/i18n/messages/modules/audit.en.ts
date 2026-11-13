@@ -33,15 +33,15 @@ export const auditEn: typeof auditDe = {
     appointment: "Appointments",
     customer: "Customers",
     vehicle: "Vehicles",
-    tires: "Tyre storage",
-    orders: "Orders",
-    parts: "Parts & stock",
+    tire: "Tyre storage",
+    order: "Orders",
+    part: "Parts & stock",
     reports: "Reports",
     invoice: "Invoices",
     employee: "Employees",
     time: "Time tracking",
-    files: "Documents & photos",
-    checklists: "Checklists",
+    file: "Documents & photos",
+    checklist: "Checklists",
     billing: "Quotes & invoicing",
     fleet: "Fleet",
     network: "Network",
@@ -203,7 +203,7 @@ export const auditEn: typeof auditDe = {
       export: "Vehicles exported (CSV)",
       import: "Vehicles imported (CSV)",
     },
-    tires: {
+    tire: {
       create: "Tyre set created",
       update: "Tyre set changed",
       stock: "Tyre set booked in/out",
@@ -212,7 +212,7 @@ export const auditEn: typeof auditDe = {
       export: "Tyre sets exported (CSV)",
       import: "Tyre sets imported (CSV)",
     },
-    orders: {
+    order: {
       create: "Order accepted",
       update: "Order changed",
       status: "Order status changed",
@@ -223,7 +223,7 @@ export const auditEn: typeof auditDe = {
       findingRemove: "Finding removed",
       approve: "Customer approval recorded",
     },
-    parts: {
+    part: {
       create: "Article created",
       update: "Article changed",
       archive: "Article archived",
@@ -258,7 +258,7 @@ export const auditEn: typeof auditDe = {
       paymentRemove: "Payment removed",
       send: "Document queued for sending by e-mail",
     },
-    checklists: {
+    checklist: {
       templateCreate: "Checklist template created",
       templateUpdate: "Checklist template changed (new version)",
       templateArchive: "Checklist template archived or reactivated",
@@ -267,7 +267,7 @@ export const auditEn: typeof auditDe = {
       reopen: "Checklist reopened",
       discard: "Checklist discarded",
     },
-    files: {
+    file: {
       upload: "File uploaded",
       update: "File caption changed",
       archive: "File removed",

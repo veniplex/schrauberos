@@ -50,7 +50,7 @@ describe("Reifensatz: Speichern", () => {
     const fl = set.tires.find((t) => t.position === "FL")!;
     assert.deepEqual([fl.dot, fl.producedWeek, fl.producedYear, fl.treadDepthMm], ["2321", 23, 2021, 6.5]);
     assert.equal(set.tires.find((t) => t.position === "FR")!.condition, "worn");
-    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "tires.create" } });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "tire.create" } });
     assert.deepEqual([entry.target, entry.entityId], ["B AB 1", set.id]);
 
     await env.db.tireSet.deleteMany();
@@ -88,7 +88,7 @@ describe("Reifensatz: Speichern", () => {
     const conflict = await update({ id: set.id, version: stale, brand: "Veraltet" });
     assert.ok(conflict.error);
     assert.equal((await env.db.tireSet.findUniqueOrThrow({ where: { id: set.id } })).brand, "Neu");
-    assert.equal(await env.db.auditLog.count({ where: { action: "tires.update" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "tire.update" } }), 1);
   });
 });
 
@@ -111,7 +111,7 @@ describe("Reifensatz: Status, Löschen, Einstellungen", () => {
     assert.ok((await book(set.id, "kaputt")).fieldErrors?.status, "ungültiger Status wird abgelehnt");
     assert.ok((await book(set.id, "disposed")).fieldErrors?.status, "Entsorgen ist kein Buchen");
     assert.equal((await fresh(set.id)).status, "stored");
-    const entries = await env.db.auditLog.findMany({ where: { action: "tires.stock" }, orderBy: { createdAt: "asc" } });
+    const entries = await env.db.auditLog.findMany({ where: { action: "tire.stock" }, orderBy: { createdAt: "asc" } });
     assert.equal(entries.length, 2);
     assert.deepEqual([entries[0].target, entries[0].entityId], ["B AB 1: mounted", set.id]);
   });
@@ -130,7 +130,7 @@ describe("Reifensatz: Status, Löschen, Einstellungen", () => {
     assert.equal((await fresh(set.id)).status, "mounted");
     // ohne Version wird nicht gebucht (Pflichtfeld)
     assert.ok((await actions.setTireSetStatus({}, form({ id: set.id, status: "stored" }))).fieldErrors?.version);
-    assert.equal(await env.db.auditLog.count({ where: { action: "tires.stock" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "tire.stock" } }), 1);
   });
 
   it("ein entsorgter Satz lässt sich nicht buchen; Entsorgen braucht tires.edit mit Version und wird als tires.dispose protokolliert", async () => {
@@ -142,7 +142,7 @@ describe("Reifensatz: Status, Löschen, Einstellungen", () => {
     assert.equal((await fresh(set.id)).status, "stored", "veraltete Version: nichts passiert");
     await actions.disposeTireSet(form({ id: set.id, version: versionOf(await fresh(set.id)) }));
     assert.equal((await fresh(set.id)).status, "disposed");
-    assert.equal(await env.db.auditLog.count({ where: { action: "tires.dispose" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "tire.dispose" } }), 1);
     const state = await book(set.id, "mounted");
     assert.ok(state.error && !state.ok);
     assert.equal((await fresh(set.id)).status, "disposed");
@@ -157,7 +157,7 @@ describe("Reifensatz: Status, Löschen, Einstellungen", () => {
     assert.equal(await redirectOf(() => actions.deleteTireSet(form({ id: set.id }))), "/tires");
     assert.equal(await env.db.tireSet.count(), 0);
     assert.equal(await env.db.tire.count(), 0);
-    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "tires.delete" } });
+    const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "tire.delete" } });
     assert.deepEqual([entry.target, entry.entityId], ["B AB 1", set.id]);
   });
 

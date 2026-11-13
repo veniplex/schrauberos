@@ -22,7 +22,7 @@ export const tiresExport: ExportDef = {
   feature: "workshop.tires",
   permission: "tires.export",
   also: ["tires.view"],
-  audit: "tires.export",
+  audit: "tire.export",
   filename: () => `reifen-${formatDay(new Date())}.csv`,
   open: async ({ query, format, t }) => {
     const status = query.get("status");
@@ -115,7 +115,7 @@ export const tiresImport = defineImport<TireRow>({
   feature: "workshop.tires",
   permission: "tires.import",
   operationName: "tires.import",
-  audit: "tires.import",
+  audit: "tire.import",
   duplicateOverride: true,
   columns: () => columnSpecs(TIRE_COLUMNS),
   parse: parseTire,

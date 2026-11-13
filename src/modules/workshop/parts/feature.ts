@@ -19,5 +19,5 @@ export const partsFeature = defineFeature({
     { id: "parts.list", kind: "open", labelKey: "parts.quick.list", href: "/parts", icon: "parts", permission: "parts.view", order: 204 },
   ],
   routes: ["parts", "api/parts"],
-  auditActions: ["parts.create", "parts.update", "parts.archive", "parts.unarchive", "parts.receipt", "parts.count"],
+  auditActions: ["part.create", "part.update", "part.archive", "part.unarchive", "part.receipt", "part.count"],
 });

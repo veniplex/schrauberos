@@ -29,5 +29,5 @@ export const checklistsFeature = defineFeature({
     { type: "checklist.started", resource: "checklists" },
     { type: "checklist.completed", resource: "checklists" },
   ],
-  auditActions: ["checklists.templateCreate", "checklists.templateUpdate", "checklists.templateArchive", "checklists.start", "checklists.complete", "checklists.reopen", "checklists.discard"],
+  auditActions: ["checklist.templateCreate", "checklist.templateUpdate", "checklist.templateArchive", "checklist.start", "checklist.complete", "checklist.reopen", "checklist.discard"],
 });

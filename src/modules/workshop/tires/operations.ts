@@ -91,7 +91,7 @@ export const createTireSetOperation = defineOperation({
   name: "tires.create",
   permission: "tires.create",
   input: tireSetInput.refine((d) => !d.id, { message: "validation.invalid", path: ["id"] }),
-  audit: "tires.create",
+  audit: "tire.create",
   run: saveTireSetRun,
 });
 
@@ -99,7 +99,7 @@ export const updateTireSetOperation = defineOperation({
   name: "tires.update",
   permission: "tires.edit",
   input: tireSetInput.refine((d) => !!d.id, { message: "validation.invalid", path: ["id"] }),
-  audit: "tires.update",
+  audit: "tire.update",
   run: saveTireSetRun,
 });
 
@@ -116,7 +116,7 @@ export const setStatusOperation = defineOperation({
   name: "tires.setStatus",
   permission: "tires.stock",
   input: z.object({ id: z.string().min(1), version: z.string().min(1), status: z.enum(STOCK_STATUSES) }),
-  audit: "tires.stock",
+  audit: "tire.stock",
   run: async ({ input, tx, audit }) => {
     const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { status: true, vehicle: { select: { plate: true } } } });
     if (!set) fail("notFound");
@@ -135,7 +135,7 @@ export const disposeOperation = defineOperation({
   name: "tires.dispose",
   permission: "tires.edit",
   input: z.object({ id: z.string().min(1), version: z.string().min(1) }),
-  audit: "tires.dispose",
+  audit: "tire.dispose",
   run: async ({ input, tx, audit }) => {
     const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { status: true, vehicle: { select: { plate: true } } } });
     if (!set) fail("notFound");
@@ -151,7 +151,7 @@ export const deleteTireSetOperation = defineOperation({
   name: "tires.delete",
   permission: "tires.delete",
   input: z.object({ id: z.string().min(1) }),
-  audit: "tires.delete",
+  audit: "tire.delete",
   run: async ({ input, tx, audit }) => {
     const set = await tx.tireSet.findUnique({ where: { id: input.id }, select: { vehicle: { select: { plate: true } } } });
     if (!set) fail("notFound");

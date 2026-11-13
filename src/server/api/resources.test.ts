@@ -248,7 +248,7 @@ describe("Rechnungsarchiv", () => {
     assert.deepEqual([paid.json.data.status, paid.json.data.paidAt], ["paid", "2026-04-10"]);
     assert.equal((await api("POST", `/invoices/${invoice.id}/reopen`)).json.data.status, "open");
     assert.equal((await api("GET", "/invoices?direction=outgoing&status=open&q=kunde")).json.page.total, 1);
-    assert.equal((await api("GET", "/invoices?issuedFrom=2026-05-01")).json.page.total, 0);
+    assert.equal((await api("GET", "/invoices?from=2026-05-01")).json.page.total, 0);
     assert.equal((await api("POST", "/invoices/gibtsnicht/pay")).status, 404);
     assert.ok(await env.db.auditLog.findFirst({ where: { action: "invoice.pay" } }));
   });

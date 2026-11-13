@@ -79,7 +79,7 @@ export const saveTemplateOperation = defineOperation({
   name: "checklists.saveTemplate",
   permission: "checklists.manage",
   input: saveTemplateInput,
-  audit: (input) => (input.id ? "checklists.templateUpdate" : "checklists.templateCreate"),
+  audit: (input) => (input.id ? "checklist.templateUpdate" : "checklist.templateCreate"),
   run: async ({ input: d, principal, tx, audit }) => {
     const defs = toDefs(d.items);
     // alle Fehler der Punkte auf einmal melden (der Editor zeigt sie je Punkt)
@@ -123,7 +123,7 @@ export const archiveTemplateOperation = defineOperation({
   name: "checklists.archiveTemplate",
   permission: "checklists.manage",
   input: z.object({ id: z.string().min(1), archived: boolField }),
-  audit: "checklists.templateArchive",
+  audit: "checklist.templateArchive",
   run: async ({ input: d, tx, audit }) => {
     const template = await tx.checklistTemplate.findUnique({ where: { id: d.id }, select: { name: true } });
     if (!template) fail("notFound");
@@ -137,7 +137,7 @@ export const installDefaultsOperation = defineOperation({
   name: "checklists.installDefaults",
   permission: "checklists.manage",
   input: z.object({}),
-  audit: "checklists.templateCreate",
+  audit: "checklist.templateCreate",
   run: async ({ principal, tx, audit }) => {
     const created = await installDefaultTemplates(tx, byName(principal));
     if (created === 0) fail("invalid", "checklists.errors.defaultsPresent");
@@ -155,7 +155,7 @@ export const startChecklistOperation = defineOperation({
   name: "checklists.start",
   permission: "checklists.fill",
   input: startInput,
-  audit: "checklists.start",
+  audit: "checklist.start",
   run: async ({ input: d, principal, tx, audit, emit }) => {
     const owner = await ownerAccess(principal, d, tx);
     const template = await tx.checklistTemplate.findUnique({
@@ -263,7 +263,7 @@ export const completeChecklistOperation = defineOperation({
   name: "checklists.complete",
   permission: "checklists.fill",
   input: completeInput,
-  audit: "checklists.complete",
+  audit: "checklist.complete",
   prepare: async ({ input: d, principal }): Promise<PreparedSignature> => {
     const where = visibleChecklistsWhere(principal);
     if (!where) fail("forbidden");
@@ -338,7 +338,7 @@ export const reopenChecklistOperation = defineOperation({
   name: "checklists.reopen",
   permission: "checklists.reopen",
   input: z.object({ id: z.string().min(1), version: z.string().min(1), reason: z.string().trim().min(5, { error: "checklists.errors.reasonRequired" }).max(300) }),
-  audit: "checklists.reopen",
+  audit: "checklist.reopen",
   run: async ({ input: d, principal, tx, audit }) => {
     const where = visibleChecklistsWhere(principal);
     if (!where) fail("forbidden");
@@ -362,7 +362,7 @@ export const discardChecklistOperation = defineOperation({
   name: "checklists.discard",
   permission: "checklists.fill",
   input: z.object({ id: z.string().min(1), version: z.string().min(1) }),
-  audit: "checklists.discard",
+  audit: "checklist.discard",
   run: async ({ input: d, principal, tx, audit }) => {
     const where = visibleChecklistsWhere(principal);
     if (!where) fail("forbidden");

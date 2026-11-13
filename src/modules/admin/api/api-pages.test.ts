@@ -244,7 +244,7 @@ describe("Seiten", () => {
     for (const key of ["workshop.orders", "office.billing"]) await env.db.featureSetting.create({ data: { key, enabled: true, updatedByName: "Test" } });
     const root = await render(await Page());
     const events = [...root.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="events"]')].map((c) => c.value).sort();
-    assert.deepEqual(events, ["billing.accepted", "billing.cancelled", "billing.finalized", "billing.paid", "billing.sent", "order.approved", "order.closed", "order.created", "order.reopened", "order.status"]);
+    assert.deepEqual(events, ["billing.accepted", "billing.cancelled", "billing.finalized", "billing.paid", "billing.sent", "order.approved", "order.closed", "order.created", "order.reopened", "order.statusChanged"]);
     assert.match(plain(root.textContent), /Auftrag abgeschlossen/);
   });
 

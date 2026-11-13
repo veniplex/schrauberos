@@ -94,7 +94,7 @@ describe("Hochladen: Prüfung und Bereinigung", () => {
     assert.equal(row.caption, "Front");
     assert.match(row.path, /^auftraege\/A-2026-0001\/foto-[\dTZ-]+\.png$/);
     assert.equal(row.uploadedById, mechanic.user.id);
-    const audit = await env.db.auditLog.findFirstOrThrow({ where: { action: "files.upload" } });
+    const audit = await env.db.auditLog.findFirstOrThrow({ where: { action: "file.upload" } });
     assert.ok(!(audit.target ?? "").includes("Müller"), "kein Dateiname im Audit");
     assert.match(audit.target ?? "", /A-2026-0001 · photo/);
   });
@@ -266,7 +266,7 @@ describe("Entfernen und Beschriften", () => {
     assert.equal(failure(await ops.archiveFileOperation.execute(mechanic, { id: mine.id })).code, "notFound", "zweites Entfernen");
     const other = out(await upload(mechanic));
     out(await ops.archiveFileOperation.execute(lead, { id: other.id }));
-    assert.equal(await env.db.auditLog.count({ where: { action: "files.archive" } }), 2);
+    assert.equal(await env.db.auditLog.count({ where: { action: "file.archive" } }), 2);
   });
 
   it("gleichzeitiges Entfernen: genau eines gelingt", async () => {

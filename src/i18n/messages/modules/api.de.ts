@@ -180,7 +180,7 @@ export const apiDe = {
     events: {
       order: {
         created: "Auftrag angelegt",
-        status: "Auftragsstatus geändert",
+        statusChanged: "Auftragsstatus geändert",
         closed: "Auftrag abgeschlossen",
         reopened: "Auftrag wieder geöffnet",
         approved: "Freigabe des Kunden erfasst",

@@ -131,7 +131,7 @@ describe("Vorlagen und Versionen", () => {
     const versions = await env.db.checklistTemplateVersion.findMany({ where: { templateId }, orderBy: { version: "asc" }, include: { items: true } });
     assert.deepEqual(versions.map((v) => [v.version, v.items.length, v.name, v.signatureMode]), [[1, 5, "Prüfung", "optional"], [2, 6, "Prüfung neu", "required"]]);
     assert.equal(versions[1].note, "Punkt ergänzt");
-    assert.equal(await env.db.auditLog.count({ where: { action: "checklists.templateUpdate" } }), 2, "auch das Speichern ohne Änderung steht im Audit-Log (als unverändert)");
+    assert.equal(await env.db.auditLog.count({ where: { action: "checklist.templateUpdate" } }), 2, "auch das Speichern ohne Änderung steht im Audit-Log (als unverändert)");
   });
 
   it("laufende und abgeschlossene Checklisten behalten ihre Version und ihre Punkte, wenn die Vorlage geändert wird", async () => {
@@ -186,7 +186,7 @@ describe("Beginnen und Punkte", () => {
     assert.equal((await checklist(onVehicle)).orderId, null);
     assert.equal(failure(await ops.startChecklistOperation.execute(worker, { templateId })).key, "checklists.errors.ownerRequired");
     assert.equal(await env.db.checklistEvent.count({ where: { checklistId: id, kind: "created" } }), 1);
-    assert.match((await env.db.auditLog.findFirstOrThrow({ where: { action: "checklists.start", entityId: id } })).target ?? "", /Prüfung · A-2026-0001/);
+    assert.match((await env.db.auditLog.findFirstOrThrow({ where: { action: "checklist.start", entityId: id } })).target ?? "", /Prüfung · A-2026-0001/);
   });
 
   it("Punkte je Art: Haken, Messwert (mit Komma), Drehmoment außerhalb der Grenzen (gespeichert und markiert), Auswahl, Text; Unsinn wird abgewiesen", async () => {
@@ -249,7 +249,7 @@ describe("Abschließen, Unveränderlichkeit, Wiederöffnen", () => {
     assert.equal(failure(await ops.setItemOperation.execute(worker, { id: item.id, version: versionOf(item), done: "0" })).key, "checklists.errors.completed");
     assert.equal(failure(await ops.completeChecklistOperation.execute(worker, { id, version: versionOf(row) })).key, "checklists.errors.completed");
     assert.equal(failure(await ops.discardChecklistOperation.execute(lead, { id, version: versionOf(row) })).key, "checklists.errors.notOpen");
-    assert.equal(await env.db.auditLog.count({ where: { action: "checklists.complete" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "checklist.complete" } }), 1);
     assert.equal(await env.db.checklistEvent.count({ where: { checklistId: id, kind: "completed" } }), 1);
   });
 
@@ -321,7 +321,7 @@ describe("Abschließen, Unveränderlichkeit, Wiederöffnen", () => {
     assert.ok(existsSync(path.join(env.dir, "files", ...signedPath.split("/"))), "die Datei bleibt");
     const event = await env.db.checklistEvent.findFirstOrThrow({ where: { checklistId: id, kind: "reopened" } });
     assert.deepEqual([event.note, event.signaturePath, event.signatureHash], ["Messwert falsch abgelesen", signedPath, hash]);
-    assert.equal(await env.db.auditLog.count({ where: { action: "checklists.reopen" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "checklist.reopen" } }), 1);
     // wieder änderbar und erneut abschließbar (mit neuer Unterschrift)
     out(await setItem(worker, "Profiltiefe", id, { numberValue: "3" }));
     assert.equal(failure(await ops.reopenChecklistOperation.execute(reopener, { id, version: versionOf(await checklist(id)), reason: "noch offen" })).key, "checklists.errors.notCompleted");

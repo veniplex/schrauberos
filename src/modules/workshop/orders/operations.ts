@@ -146,7 +146,7 @@ export async function createOrderInTx(
     afterCommit: () => undefined,
   });
   await runOperationHooks({ operation: "orders.create", input: parsed.data, result: data, principal, tx });
-  await writeAudit(tx, "orders.create", { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } });
+  await writeAudit(tx, "order.create", { ...details, actor: { id: principal.user.id, name: auditActorName(principal) } });
   return data;
 }
 
@@ -154,7 +154,7 @@ export const createOrderOperation = defineOperation({
   name: "orders.create",
   permission: "orders.create",
   input: createOrderInput,
-  audit: "orders.create",
+  audit: "order.create",
   run: createOrderRun,
 });
 
@@ -169,7 +169,7 @@ export const updateOrderOperation = defineOperation({
   name: "orders.update",
   permission: "orders.edit",
   input: updateOrderInput,
-  audit: "orders.update",
+  audit: "order.update",
   run: async ({ input: d, tx, audit }) => {
     const order = await tx.order.findUnique({ where: { id: d.id }, select: { number: true, status: true, vehicleId: true, mileageKm: true } });
     if (!order) fail("notFound");
@@ -192,7 +192,7 @@ export const setStatusOperation = defineOperation({
   name: "orders.setStatus",
   permission: "orders.edit",
   input: stepInput,
-  audit: "orders.status",
+  audit: "order.status",
   run: async ({ input: d, principal, tx, audit, emit }): Promise<OrderChange> => {
     const order = await tx.order.findUnique({ where: { id: d.id }, select: { number: true, status: true, appointmentId: true } });
     if (!order) fail("notFound");
@@ -205,7 +205,7 @@ export const setStatusOperation = defineOperation({
     if (!(await claimRow(tx.order, d.id, d.version))) fail("conflict");
     await tx.order.update({ where: { id: d.id }, data: { status: d.status } });
     await addEvent(tx, d.id, "status", byName(principal), { status: d.status });
-    await emit("order.status", { number: order.number, status: d.status }, d.id);
+    await emit("order.statusChanged", { number: order.number, status: d.status }, d.id);
     audit({ target: `${order.number}: ${d.status}`, entityId: d.id });
     return { id: d.id, number: order.number, status: d.status, previous: order.status as OrderStatus, appointmentId: order.appointmentId, items: await itemsOf(d.id, tx) };
   },
@@ -221,7 +221,7 @@ export const closeOrderOperation = defineOperation({
   name: "orders.close",
   permission: "orders.close",
   input: closeInput,
-  audit: "orders.close",
+  audit: "order.close",
   run: async ({ input: d, principal, tx, audit, emit }): Promise<OrderChange> => {
     const order = await tx.order.findUnique({ where: { id: d.id }, select: { number: true, status: true, appointmentId: true } });
     if (!order) fail("notFound");
@@ -243,7 +243,7 @@ export const reopenOrderOperation = defineOperation({
   name: "orders.reopen",
   permission: "orders.reopen",
   input: closeInput,
-  audit: "orders.reopen",
+  audit: "order.reopen",
   run: async ({ input: d, principal, tx, audit, emit }): Promise<OrderChange> => {
     const order = await tx.order.findUnique({ where: { id: d.id }, select: { number: true, status: true, appointmentId: true } });
     if (!order) fail("notFound");
@@ -269,7 +269,7 @@ export const saveItemsOperation = defineOperation({
   name: "orders.saveItems",
   permission: "orders.edit",
   input: saveItemsInput,
-  audit: "orders.items",
+  audit: "order.items",
   run: async ({ input: d, principal, tx, audit }) => {
     if (!principal.can("orders.prices")) fail("forbidden");
     const order = await tx.order.findUnique({ where: { id: d.id }, select: { number: true, status: true } });
@@ -307,7 +307,7 @@ export const addFindingOperation = defineOperation({
   name: "orders.addFinding",
   permission: "orders.edit",
   input: z.object({ id: z.string().min(1), text: z.string().trim().min(1).max(2000) }),
-  audit: "orders.finding",
+  audit: "order.finding",
   run: async ({ input: d, principal, tx, audit }) => {
     const order = await tx.order.findUnique({ where: { id: d.id }, select: { number: true, status: true } });
     if (!order) fail("notFound");
@@ -322,7 +322,7 @@ export const removeFindingOperation = defineOperation({
   name: "orders.removeFinding",
   permission: "orders.edit",
   input: z.object({ id: z.string().min(1), findingId: z.string().min(1) }),
-  audit: "orders.findingRemove",
+  audit: "order.findingRemove",
   run: async ({ input: d, tx, audit }) => {
     const finding = await tx.orderFinding.findFirst({ where: { id: d.findingId, orderId: d.id }, select: { id: true, authorName: true, createdAt: true, order: { select: { number: true, status: true } } } });
     if (!finding) fail("notFound");
@@ -364,7 +364,7 @@ export const approveOperation = defineOperation({
   name: "orders.approve",
   permission: "orders.edit",
   input: approvalInput,
-  audit: "orders.approve",
+  audit: "order.approve",
   prepare: async ({ input: d, principal }): Promise<PreparedApproval> => {
     if (!principal.can("orders.prices")) fail("forbidden");
     if (d.amount <= 0 || d.amount > MAX_APPROVAL_CENTS) failField("amount", "validation.invalid");

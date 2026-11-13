@@ -163,7 +163,7 @@ describe("Vorschlag „Satz ein-/ausbuchen?“ nach „Fertig“", () => {
     await act(() => inDialog(second.root, /^Ausbuchen$/).click());
     await sleep(120);
     assert.equal((await setOf(second.set.id)).status, "mounted");
-    assert.equal(await env.db.auditLog.count({ where: { action: "tires.stock" } }), 1);
+    assert.equal(await env.db.auditLog.count({ where: { action: "tire.stock" } }), 1);
     assert.equal(dialog(second.root), null, "der Dialog bleibt nach der Buchung zu");
   });
 
@@ -185,7 +185,7 @@ describe("Vorschlag „Satz ein-/ausbuchen?“ nach „Fertig“", () => {
     await act(() => inDialog(root, /^Ausbuchen$/).click());
     await sleep(120);
     assert.equal((await setOf(set.id)).status, "mounted");
-    assert.equal(await env.db.auditLog.count({ where: { action: "tires.stock" } }), 0);
+    assert.equal(await env.db.auditLog.count({ where: { action: "tire.stock" } }), 0);
     assert.ok(toasts().some((t) => t.startsWith("error:")), toasts().join("|"));
   });
 

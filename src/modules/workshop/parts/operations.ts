@@ -74,7 +74,7 @@ export const saveArticleOperation = defineOperation({
   name: "parts.save",
   permission: "parts.edit",
   input: articleInput,
-  audit: (input) => (input.id ? "parts.update" : "parts.create"),
+  audit: (input) => (input.id ? "part.update" : "part.create"),
   run: async ({ input: d, principal, tx, audit }) => {
     const wantsPrices = d.purchase !== undefined || d.sale !== undefined;
     // Preise ändert nur, wer sie sehen darf (sonst bliebe ein Preis ungesehen überschreibbar)
@@ -113,7 +113,7 @@ export const setArchivedOperation = defineOperation({
   name: "parts.setArchived",
   permission: "parts.edit",
   input: z.object({ id: z.string().min(1), version: z.string().min(1), archived: z.enum(["0", "1"]).transform((v) => v === "1") }),
-  audit: (input) => (input.archived ? "parts.archive" : "parts.unarchive"),
+  audit: (input) => (input.archived ? "part.archive" : "part.unarchive"),
   run: async ({ input: d, tx, audit }) => {
     const article = await tx.article.findUnique({ where: { id: d.id }, select: { number: true, archivedAt: true } });
     if (!article) fail("notFound");
@@ -142,7 +142,7 @@ export const receiptOperation = defineOperation({
   name: "parts.receipt",
   permission: "parts.stock",
   input: receiptInput,
-  audit: "parts.receipt",
+  audit: "part.receipt",
   run: async ({ input: d, principal, tx, audit }) => {
     const article = await tx.article.findUnique({ where: { id: d.articleId }, select: { number: true, archivedAt: true } });
     if (!article) failField("articleId", "validation.invalid");
@@ -167,7 +167,7 @@ export const countOperation = defineOperation({
   name: "parts.count",
   permission: "parts.stock",
   input: countInput,
-  audit: "parts.count",
+  audit: "part.count",
   run: async ({ input: d, principal, tx, audit }: RunContext<z.output<typeof countInput>, undefined>) => {
     const entries = Object.entries(d.counts).filter(([, value]) => value.trim() !== "");
     const reference = `Inventur ${todayInput()}`;

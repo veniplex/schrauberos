@@ -156,14 +156,14 @@ const resourceEndpoints = defineResource({
       customerId: z.string().max(64).optional(),
       q: z.string().max(100).optional(),
       /** Rechnungsdatum ab / bis (einschließlich) */
-      issuedFrom: dateOnly.optional(),
-      issuedTo: dateOnly.optional(),
+      from: dateOnly.optional(),
+      to: dateOnly.optional(),
     }),
-    where: ({ direction, status, customerId, q, issuedFrom, issuedTo }) => ({
+    where: ({ direction, status, customerId, q, from, to }) => ({
       ...(direction ? { direction } : {}),
       ...(status ? { status } : {}),
       ...(customerId ? { customerId } : {}),
-      ...(issuedFrom || issuedTo ? { issueDate: { ...(issuedFrom ? { gte: startOfDayIn(issuedFrom) } : {}), ...(issuedTo ? { lte: endOfDayIn(issuedTo) } : {}) } } : {}),
+      ...(from || to ? { issueDate: { ...(from ? { gte: startOfDayIn(from) } : {}), ...(to ? { lte: endOfDayIn(to) } : {}) } } : {}),
       ...(q ? { OR: invoiceTextWhere(q) } : {}),
     }),
     sorts: {

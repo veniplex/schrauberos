@@ -46,7 +46,7 @@ export const uploadFileOperation = defineOperation({
   name: "files.upload",
   permission: "files.upload",
   input: uploadFileInput,
-  audit: "files.upload",
+  audit: "file.upload",
   prepare: async ({ input: d, principal }): Promise<Prepared> => {
     // Wiederholung mit demselben Schlüssel zuerst (auch wenn der Auftrag inzwischen geschlossen ist): der vorhandene Eintrag, solange er zum selben Ziel gehört und nicht entfernt ist
     if (d.uploadKey) {
@@ -145,7 +145,7 @@ export const updateFileOperation = defineOperation({
   name: "files.update",
   permission: "files.view",
   input: updateInput,
-  audit: "files.update",
+  audit: "file.update",
   run: async ({ input: d, principal, tx, audit }) => {
     const where = visibleFilesWhere(principal);
     if (!where) fail("forbidden");
@@ -168,7 +168,7 @@ export const archiveFileOperation = defineOperation({
   name: "files.archive",
   permission: "files.view",
   input: z.object({ id: z.string().min(1) }),
-  audit: "files.archive",
+  audit: "file.archive",
   run: async ({ input: d, principal, tx, audit }) => {
     const where = visibleFilesWhere(principal);
     if (!where) fail("forbidden");

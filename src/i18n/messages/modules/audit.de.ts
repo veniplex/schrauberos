@@ -31,11 +31,11 @@ export const auditDe = {
     appointment: "Termine",
     customer: "Kunden",
     vehicle: "Fahrzeuge",
-    tires: "Reifenlager",
-    orders: "Aufträge",
-    parts: "Teile & Lager",
-    files: "Dokumente & Fotos",
-    checklists: "Checklisten",
+    tire: "Reifenlager",
+    order: "Aufträge",
+    part: "Teile & Lager",
+    file: "Dokumente & Fotos",
+    checklist: "Checklisten",
     billing: "Angebote & Rechnungen",
     reports: "Berichte",
     invoice: "Rechnungen",
@@ -201,7 +201,7 @@ export const auditDe = {
       export: "Fahrzeuge exportiert (CSV)",
       import: "Fahrzeuge importiert (CSV)",
     },
-    tires: {
+    tire: {
       create: "Reifensatz angelegt",
       update: "Reifensatz geändert",
       stock: "Reifensatz ein-/ausgebucht",
@@ -210,7 +210,7 @@ export const auditDe = {
       export: "Reifensätze exportiert (CSV)",
       import: "Reifensätze importiert (CSV)",
     },
-    orders: {
+    order: {
       create: "Auftrag angenommen",
       update: "Auftrag geändert",
       status: "Auftragsstatus geändert",
@@ -221,7 +221,7 @@ export const auditDe = {
       findingRemove: "Befund entfernt",
       approve: "Kundenfreigabe protokolliert",
     },
-    parts: {
+    part: {
       create: "Artikel angelegt",
       update: "Artikel geändert",
       archive: "Artikel archiviert",
@@ -256,7 +256,7 @@ export const auditDe = {
       paymentRemove: "Zahlung entfernt",
       send: "Beleg per E-Mail zum Versand vorgemerkt",
     },
-    checklists: {
+    checklist: {
       templateCreate: "Checklisten-Vorlage angelegt",
       templateUpdate: "Checklisten-Vorlage geändert (neue Version)",
       templateArchive: "Checklisten-Vorlage archiviert oder wieder aktiviert",
@@ -265,7 +265,7 @@ export const auditDe = {
       reopen: "Checkliste wieder geöffnet",
       discard: "Checkliste verworfen",
     },
-    files: {
+    file: {
       upload: "Datei hochgeladen",
       update: "Beschriftung einer Datei geändert",
       archive: "Datei entfernt",
