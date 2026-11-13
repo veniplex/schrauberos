@@ -1867,10 +1867,9 @@ Skript gar nicht erst erzeugt. Nicht beglaubigte Schlüssel werden abgelehnt. De
 gültige Manifeste signieren, eine Beglaubigung für einen neuen Schlüssel entzieht dem alten nichts. Dagegen bräuchte es eine Widerrufsliste oder einen
 **neuen Wurzelschlüssel samt neuem Image**, das jede Installation einmal von Hand zieht.
 
-* **Ausgangslage:** `ROOT_PUBLIC_KEY` ist noch `= RELEASE_PUBLIC_KEY` – dann schützt die Kette nicht. **`scripts/make-release.mjs` bricht beim
-  Tag-Build deshalb ab** (kein stilles Zurückfallen auf den Release-Schlüssel; getestet in `src/lib/updates/make-release.test.ts`), bis der Besitzer
-  einen eigenen Wurzelschlüssel erzeugt (Befehle oben, andere Dateinamen), den öffentlichen Teil als `ROOT_PUBLIC_KEY` einträgt (vor der
-  Veröffentlichung, die Wurzel steht im Image) und den privaten Teil offline verwahrt.
+* **Stand (Zeremonie 2026-11-13):** `ROOT_PUBLIC_KEY` und `RELEASE_PUBLIC_KEY` sind getrennte Paare; der private Wurzelschlüssel liegt offline beim Besitzer, der
+  private Release-Schlüssel nur als Environment-Secret der Umgebung `release`. Wären beide gleich, würde die Kette nicht schützen: **`scripts/make-release.mjs` bricht beim
+  Tag-Build dann ab** (kein stilles Zurückfallen auf den Release-Schlüssel; getestet in `src/lib/updates/make-release.test.ts`).
 * **Release-Schlüssel tauschen:** neues Paar erzeugen, Secret `RELEASE_SIGNING_KEY` ersetzen, offline beglaubigen:
   `ROOT_SIGNING_KEY_FILE="$KEYDIR/wurzel-privat.pem" node scripts/endorse-release-key.mjs --public "$KEYDIR/release-public-key.pem" --valid-until 2031-12-31`,
   `release-keys.json` committen, Release veröffentlichen – Installationen nehmen den neuen Schlüssel über die Beglaubigung an.

@@ -9,17 +9,18 @@
  *    beglaubigt nur Release-Schlüssel (`scripts/endorse-release-key.mjs`, mit Pflicht-Ablaufdatum), nie Pakete. Die App akzeptiert
  *    Manifeste, die mit `RELEASE_PUBLIC_KEY` oder einem vom Wurzelschlüssel beglaubigten Schlüssel signiert sind.
  *
- * **Ausgangslage:** Solange hier kein eigener Offline-Wurzelschlüssel eingetragen ist (`ROOT_PUBLIC_KEY = RELEASE_PUBLIC_KEY`),
- * schützt die Kette nicht vor einem Diebstahl des GitHub-Secrets. **Das Release-Skript (`scripts/make-release.mjs`) bricht deshalb
- * beim Tag-Build ab**, bis ein eigener Wurzelschlüssel eingetragen ist – es fällt nie still auf den Release-Schlüssel zurück.
- * Vor der Veröffentlichung: Wurzelpaar offline erzeugen, öffentlichen Teil unten eintragen.
+ * **Stand:** Wurzel- und Release-Schlüssel sind getrennte Paare (Zeremonie 2026-11-13). Die Wurzel ist offline verwahrt; der Release-Schlüssel liegt als
+ * Environment-Secret `RELEASE_SIGNING_KEY` der Umgebung `release`. Das Release-Skript bricht beim Tag-Build weiter ab, wenn beide gleich wären.
  *
  * Die Schlüssel kommen **nur** aus dieser Datei (Build): keine Umgebungsvariable überschreibt sie, weder in der App noch im Starter (der Starter im Image
  * bekommt seinen Header aus derselben Datei, `scripts/gen-trust-header.mjs`). Eigene Forks tragen hier ihre Schlüssel ein.
  */
 export const RELEASE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAOY1veyDs85EBZMw40+3aDEBedu6QJAO7+u5hORhnf7g=
+MCowBQYDK2VwAyEAqSLOJX4qmmywpHqs+orov8u1QZGmj0xlSLOeiOApuZw=
 -----END PUBLIC KEY-----
 `;
 
-export const ROOT_PUBLIC_KEY = RELEASE_PUBLIC_KEY;
+export const ROOT_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAWPyud9PDlkVyRlc8w6swG2Y1LenHbFIq+r0hsmqzDl4=
+-----END PUBLIC KEY-----
+`;
