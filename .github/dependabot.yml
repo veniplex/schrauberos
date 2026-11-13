@@ -1,5 +1,8 @@
 # Dependabot: schlägt Updates für Abhängigkeiten, GitHub Actions (Commit-SHAs) und das Basisimage (Digest) als Pull Requests vor.
 # Nichts wird von selbst eingespielt – jede Änderung läuft durch dieselbe Pipeline (Typen, Lint, Tests, Build, Audit, Browser-Tests bei PRs).
+#
+# Lieferkette: `cooldown` hält jede Version, die jünger als 7 Tage ist, zurück (eine frisch veröffentlichte, womöglich gekaperte oder
+# zurückgezogene Version wird nie sofort vorgeschlagen). Sicherheitsupdates sind davon ausgenommen (Dependabot wendet den Cooldown dort nicht an).
 version: 2
 updates:
   - package-ecosystem: npm
@@ -7,14 +10,27 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
     groups:
       # Kleine Änderungen gebündelt, größere Versionssprünge (Next.js, Prisma, React …) einzeln
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Die Typen folgen der Laufzeit im Basisimage (Dockerfile), nicht der neuesten Node-Hauptversion: Bei einem Wechsel der Node-Hauptversion
+      # werden @types/node und das Basisimage gemeinsam von Hand angehoben.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # `typescript` ist ein Alias auf @typescript/typescript6 (JS-Schnittstelle für typescript-eslint und Next), `@typescript/native` ist TypeScript 7 (`tsc`).
+      # Der Alias bleibt auf 6.x, bis typescript-eslint TypeScript >= 7.1 unterstützt (Peer-Bereich derzeit < 6.1.0).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
@@ -22,7 +38,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    ignore:
+      # Das Basisimage ist eine gerade Node-Hauptversion mit Langzeitunterstützung (LTS): ungerade Hauptversionen (25, 27, 29 …) sind nie LTS und
+      # laufen nach wenigen Monaten aus der Wartung. Der Wechsel auf die nächste gerade Hauptversion geschieht von Hand
+      # (Starter, Pakete und native Module prüfen, @types/node gemeinsam anheben).
+      - dependency-name: "node"
+        versions: ["25.x", "27.x", "29.x"]
   - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
