@@ -648,10 +648,10 @@ describe("Richtlinie: Pflicht für Administratoren und Leerlauf-Abmeldung", () =
     env.signOut();
     await env.signIn(boss);
     const started = (await sec.startTwoFactor({}, form({ password: ADMIN_PW }))) as import("@/platform/account/security-actions").TwoFactorSetupState;
-    assert.ok(started.setup, started.error);
+    assert.ok(started.setup, started.error ?? "");
     const secretBytes = base32Decode(started.setup.secret)!;
     const done = await sec.enableTwoFactor({}, form({ code: totp(secretBytes, clock), backupConfirmed: true }));
-    assert.equal(done.ok, true, done.error);
+    assert.equal(done.ok, true, done.error ?? "");
 
     // nach der Einrichtung ist boss frei, kann den zweiten Faktor aber nicht mehr ausschalten
     assert.equal((await session.getSession())?.user.mustSetupTwoFactor, false);

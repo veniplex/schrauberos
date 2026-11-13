@@ -361,7 +361,7 @@ describe("Fehlende Datei ohne Hülle: Neuanfang nur durch die Administration", (
     assert.ok(wrong.error || wrong.fieldErrors);
     assert.equal(existsSync(keyPath()), false, "falsches Passwort: nichts geschieht");
     const done = await keyActions.resetSecrets({}, form({ password: PASSWORD }));
-    assert.equal(done.ok, true, done.error);
+    assert.equal(done.ok, true, done.error ?? "");
     assert.match(readFileSync(keyPath(), "utf8"), /^[0-9a-f]{64}$/);
     assert.equal(readdirSync(resetDir()).length, 1);
     assert.equal((await env.db.twoFactor.findUniqueOrThrow({ where: { userId: user.id } })).secret, null);
