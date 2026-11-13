@@ -41,7 +41,7 @@ export default async function CalendarFeedPage() {
             <Alert tone="warning">{t("appointments.feedPage.secretNotice")}</Alert>
             {base ? null : (
               <Alert tone="info">
-                {t("appointments.feedPage.noAddress")} {session.can("settings.manage") ? <TextLink href="/settings?tab=security">{t("appointments.feedPage.setAddress")}</TextLink> : null}
+                {t("appointments.feedPage.noAddress")} {session.can("settings.manage") ? <TextLink href="/settings?tab=security" className="inline! min-h-0! min-w-0!">{t("appointments.feedPage.setAddress")}</TextLink> : null}
               </Alert>
             )}
             <FeedCard status={status} base={base} />

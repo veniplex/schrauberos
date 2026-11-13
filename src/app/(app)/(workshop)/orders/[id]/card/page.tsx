@@ -54,7 +54,7 @@ export default async function OrderCardPage({ params, searchParams }: { params: 
         />
         {base ? null : (
           <Alert tone="warning" className="mb-5">
-            {t("orders.card.noQr")} {session.can("settings.manage") ? <TextLink href="/settings?tab=security">{t("orders.card.setAddress")}</TextLink> : t("orders.card.askAdmin")}
+            {t("orders.card.noQr")} {session.can("settings.manage") ? <TextLink href="/settings?tab=security" className="inline! min-h-0! min-w-0!">{t("orders.card.setAddress")}</TextLink> : t("orders.card.askAdmin")}
           </Alert>
         )}
         <Alert tone="info" className="mb-5">

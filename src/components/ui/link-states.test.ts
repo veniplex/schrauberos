@@ -46,13 +46,20 @@ describe("LinkButton und Meldung", () => {
     assert.match(css, /\.btn:has\(> \[data-pending\]\) > \.btn-label\s*\{\s*opacity:/);
   });
 
-  it("Alert nimmt Links im Fließtext die Tap-Mindesthöhe, Knöpfe nicht", async () => {
+  it("ein Link im Fließtext einer Meldung wird als Fließtext-Link gesetzt (inline, ohne Tap-Mindesthöhe); die Meldung selbst verkleinert keine anderen Links oder Knöpfe", async () => {
     const { Alert, TextLink } = await import("./layout");
     const { LinkButton } = await import("./buttons");
-    const root = await show(createElement(Alert as never, { tone: "warning" }, "Es fehlt eine Anschrift. ", createElement(TextLink, { href: "/settings" }, "Adresse eintragen"), createElement(LinkButton, { href: "/x" }, "Los")));
+    const root = await show(
+      createElement(Alert as never, { tone: "warning" }, "Es fehlt eine Anschrift. ", createElement(TextLink, { href: "/settings", className: "inline! min-h-0! min-w-0!" }, "Adresse eintragen"), createElement(LinkButton, { href: "/x" }, "Los"), createElement(TextLink, { href: "/y" }, "Eigene Zeile")),
+    );
     const alert = root.querySelector("[role=status]")!;
-    assert.match(alert.className, /\[&_a:not\(\.btn\)\]:min-h-0/);
-    assert.match(alert.className, /\[&_a:not\(\.btn\)\]:min-w-0/);
-    assert.ok(alert.querySelector("a.btn"), "der Knopf bleibt ein Knopf (Selektor schließt .btn aus)");
+    assert.doesNotMatch(alert.className, /min-h-0/, "die Meldung ändert keine Zielgrößen (Links neben dem Text brauchen das Touch-Ziel, axe target-size)");
+    const links = [...alert.querySelectorAll("a")];
+    const inline = links.find((a) => a.textContent === "Adresse eintragen")!;
+    assert.match(inline.className, /inline!/);
+    assert.match(inline.className, /min-h-0!/);
+    const other = links.find((a) => a.textContent === "Eigene Zeile")!;
+    assert.match(other.className, /min-h-\(--tap-row\)/, "ein gewöhnlicher TextLink behält die Tap-Mindesthöhe");
+    assert.ok(alert.querySelector("a.btn"));
   });
 });

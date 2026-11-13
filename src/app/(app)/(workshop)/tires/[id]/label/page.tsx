@@ -59,7 +59,7 @@ export default async function TireLabelPage({ params, searchParams }: { params: 
         {base ? null : (
           <Alert tone="warning" className="mb-5">
             {t("tires.label.noQr")}{" "}
-            {session.can("settings.manage") ? <TextLink href="/settings?tab=security">{t("tires.label.setAddress")}</TextLink> : t("tires.label.askAdmin")}
+            {session.can("settings.manage") ? <TextLink href="/settings?tab=security" className="inline! min-h-0! min-w-0!">{t("tires.label.setAddress")}</TextLink> : t("tires.label.askAdmin")}
           </Alert>
         )}
         {copiesAsked.clamped ? (
