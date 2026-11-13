@@ -396,7 +396,7 @@ test("Überwachung: Ziel gegen einen lokalen Port anlegen, die Messung zeigt „
     await expect
       .poll(async () => {
         await page.goto(detailUrl);
-        return (await page.locator("main").innerText()).includes("Erreichbar");
+        return (await page.locator("#main-content").innerText()).includes("Erreichbar");
       }, { timeout: 180_000, intervals: [5_000], message: "das Ziel wird als erreichbar gemessen" })
       .toBe(true);
 
@@ -405,7 +405,7 @@ test("Überwachung: Ziel gegen einen lokalen Port anlegen, die Messung zeigt „
     await expect
       .poll(async () => {
         await page.goto(detailUrl);
-        return /Nicht erreichbar|Ausgefallen|Offline/.test(await page.locator("main").innerText());
+        return /Nicht erreichbar|Ausgefallen|Offline/.test(await page.locator("#main-content").innerText());
       }, { timeout: 240_000, intervals: [10_000], message: "der Ausfall wird gemessen (zwei Fehlschläge in Folge, Wiederholung nach kurzer Pause)" })
       .toBe(true);
   } finally {

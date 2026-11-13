@@ -207,7 +207,7 @@ Die Datenbank ist `dev.db` im Projektordner; Backups, Dateien und Update-Daten l
 | `npm run db:release-check` | Pipeline bei einem Versions-Tag: alles eingefroren? Seit dem letzten eingefrorenen Release nur Neues hinzugekommen? |
 | `npm run db:fresh` | lokale Datenbank löschen, neu anlegen und seeden |
 | `npm run db:studio` | Datenbank im Browser ansehen |
-| `npm run e2e` | Browser-Tests (Playwright) gegen die gebaute App – vorher `npm run build`; siehe [Browser-CI](#browser-ci-playwright) |
+| `npm run e2e` | Browser-Tests (Playwright) gegen die gebaute App in zwei Läufen (erst Screenshots, dann der Rest) – vorher `npm run build`; siehe [Browser-CI](#browser-ci-playwright) |
 | `npm run e2e:build` | `npm run build` und danach `npm run e2e` |
 | `npm run native:test` | C-Prüfer und Starter (`docker/`): Stufen `crypto`, `corpus`, `mutation`, `parser`, `asan`, `starter`, `pidns`, `-- fuzz --fuzz-seconds 60`, `-- l3` (Docker); Linux oder WSL mit gcc/clang, siehe „Starter: Umsetzung“ |
 | `npm run anchor:corpus` / `anchor:corpus:check` / `anchor:rehearse` | Goldkorpus des Starter-Vertrauensankers erzeugen bzw. auf Aktualität prüfen; Generalprobe der Release-Skripte (nur Testschlüssel) |
@@ -1787,6 +1787,11 @@ außer `E2E_ALLOW_BASELINE_GROWTH="<Begründung>"` (mindestens 10 Zeichen) ist g
 **Snapshots:** Baseline-Screenshots (`e2e/snapshots/<projekt>/`) gelten nur auf Linux. Aktualisieren ausschließlich in einem eigenen Commit „snapshots“: den Workflow „Build & publish“ von
 Hand mit `update_snapshots` starten (oder unter Linux/Docker `E2E_UPDATE_SNAPSHOTS=1 npm run e2e`), das Artefakt `snapshots` einchecken. Solange keine Baselines eingecheckt sind (oder auf Windows/macOS),
 werden die Screenshot-Tests übersprungen.
+**Zwei Läufe:** Die Screenshots zeigen Seiten mit Daten (Übersicht, Listen). Zwischen den Ablauf-Tests zeigten sie, was diese anlegen (Termine und Kunden mit zufälligen Namen): Jeder Lauf unterschied sich vom
+Baseline-Bild (in der Pipeline 29 bis 40 rote Screenshot-Tests, obwohl die Bilder zur Oberfläche passten). `npm run e2e` (`scripts/run-e2e.mjs`) führt deshalb zuerst nur `screenshots.spec.ts` gegen eine frisch
+eingerichtete App aus (`E2E_SCREENSHOTS=only`, Fehlerspuren unter `test-results/only`) und danach alle übrigen Tests gegen eine neue App (`E2E_SCREENSHOTS=skip`, `test-results/skip`); `E2E_UPDATE_SNAPSHOTS=1` gilt nur für den ersten Lauf.
+Gezielte Aufrufe (`npx playwright test <Datei>`, oder `npm run e2e -- <Datei>`) laufen unverändert in einem Lauf. In den Tests heißt „die Seite“ `#main-content`: Direkt nach dem Laden kann der Wartezustand (`loading.tsx`, ebenfalls ein `<main>`)
+neben dem noch verborgenen, gestreamten Inhalt im DOM stehen – `locator("main")` traf dann zwei Elemente (strict-mode-Fehler im Überwachungstest).
 
 **Pipeline:** Der Job `e2e` läuft **nicht** bei jedem Push auf `main` (Action-Minuten), sondern bei Versions-Tags (dort blockiert er Image und Release), Pull Requests und von Hand.
 

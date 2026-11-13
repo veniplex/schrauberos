@@ -11,8 +11,18 @@ const iphone = devices["iPhone 13"];
 const chromium = devices["Desktop Chrome"];
 const TEXT_ARGS = ["--font-render-hinting=none", "--disable-lcd-text", "--disable-font-subpixel-positioning"];
 
+/**
+ * Die Screenshots vergleichen Seiten **mit Daten** (Übersicht, Listen). Laufen sie zwischen den Ablauf-Tests, zeigen sie, was diese gerade angelegt haben (Termine, Kunden, Aufträge mit
+ * zufälligen Namen): Jeder Lauf unterschied sich, ein Vergleich mit dem Baseline-Bild war nie stabil. Deshalb zwei Läufe, jeder gegen eine frisch eingerichtete App (`npm run e2e` → scripts/run-e2e.mjs):
+ * `E2E_SCREENSHOTS=only` nur die Screenshots (unberührte Demo-Daten), `E2E_SCREENSHOTS=skip` alles andere. Ohne die Variable (gezielter Aufruf `npx playwright test <Datei>`) läuft alles wie angegeben.
+ */
+const screenshotMode = process.env.E2E_SCREENSHOTS === "only" || process.env.E2E_SCREENSHOTS === "skip" ? process.env.E2E_SCREENSHOTS : null;
+
 export default defineConfig({
   testDir: "./e2e/tests",
+  ...(screenshotMode === "only" ? { testMatch: "**/screenshots.spec.ts" } : screenshotMode === "skip" ? { testIgnore: "**/screenshots.spec.ts" } : {}),
+  // Je Lauf eigene Ordner (Playwright leert sie beim Start; sonst überschriebe der zweite Lauf die Fehlerspuren des ersten)
+  outputDir: screenshotMode ? `test-results/${screenshotMode}` : "test-results",
   timeout: 120_000,
   expect: { timeout: 10_000, toHaveScreenshot: { maxDiffPixelRatio: 0.01 } },
   fullyParallel: true,
@@ -22,7 +32,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   forbidOnly: !!process.env.CI,
-  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+  reporter: process.env.CI ? [["list"], ["html", { open: "never", outputFolder: screenshotMode ? `playwright-report/${screenshotMode}` : "playwright-report" }]] : "list",
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
   // Baseline-Screenshots: ein Ordner je Projekt, unabhängig vom Betriebssystem (nur auf Linux verbindlich, siehe e2e/tests/screenshots.spec.ts)

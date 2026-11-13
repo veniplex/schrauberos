@@ -69,5 +69,5 @@ test("mit aktivem Service Worker: ohne Netz erscheint die Offline-Seite, Downloa
   expect(apiOffline, "/api/* wird nie durch die Offline-Seite ersetzt").toBe("netzfehler");
   await context.setOffline(false);
   await page.goto("/");
-  await expect(page.locator("main")).toBeVisible();
+  await expect(page.locator("#main-content")).toBeVisible();
 });

@@ -25,8 +25,8 @@
     "anchor:corpus:check": "node --no-warnings scripts/gen-anchor-corpus.mjs --check",
     "anchor:rehearse": "node --no-warnings scripts/rehearse-release.mjs",
     "native:test": "node --no-warnings docker/test/run.mjs",
-    "e2e": "playwright test",
-    "e2e:build": "npm run build && playwright test"
+    "e2e": "node scripts/run-e2e.mjs",
+    "e2e:build": "npm run build && node scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.1",
