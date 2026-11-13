@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { personRef } from "@/lib/audit-ref";
 import { claimRow } from "@/lib/concurrency";
 import { dayKey, parseZoned, timeKey } from "@/lib/zone";
 import { dateText } from "@/lib/zod-fields";
@@ -85,7 +86,7 @@ export const startTimeOperation = defineOperation({
       data: { employeeId: employee.id, orderId, startedAt, activity: d.activity || null, source: "stamp", runningKey: employee.id, startKey: d.key ?? null },
       select: { id: true },
     });
-    audit({ target: label(dayKey(startedAt), `${employee.firstName} ${employee.lastName}`), entityId: row.id });
+    audit({ target: label(dayKey(startedAt), personRef("Mitarbeiter", employee)), entityId: row.id });
     return { id: row.id, replayed: false };
   },
 });
@@ -116,7 +117,7 @@ export const stopTimeOperation = defineOperation({
     if (d.breakMinutes > entryMinutes({ startedAt: running.startedAt, endedAt, breakMinutes: 0 }, endedAt)) failField("breakMinutes", "time.errors.breakTooLong");
     const done = await tx.timeEntry.updateMany({ where: { id: running.id, runningKey: employee.id, endedAt: null }, data: { endedAt, runningKey: null, stopKey: d.key ?? null, breakMinutes: d.breakMinutes } });
     if (done.count === 0) fail("invalid", "time.errors.notRunning");
-    audit({ target: label(dayKey(endedAt), `${employee.firstName} ${employee.lastName}`), entityId: running.id });
+    audit({ target: label(dayKey(endedAt), personRef("Mitarbeiter", employee)), entityId: running.id });
     return { id: running.id, replayed: false };
   },
 });
@@ -199,7 +200,7 @@ export const correctTimeOperation = defineOperation({
       where: { id: entry.id },
       data: { startedAt: start, endedAt: end, breakMinutes: d.breakMinutes, orderId, activity: d.activity || null, note: d.note || null, ...(end && entry.runningKey ? { runningKey: null } : {}) },
     });
-    audit({ target: label(dayKey(start), `${entry.employee.firstName} ${entry.employee.lastName}`), entityId: entry.id });
+    audit({ target: label(dayKey(start), personRef("Mitarbeiter", { id: entry.employeeId })), entityId: entry.id });
     return { id: entry.id };
   },
 });
@@ -223,7 +224,7 @@ export const voidTimeOperation = defineOperation({
       data: { entryId: entry.id, kind: "void", reason: d.reason, byName: principal.user.name.slice(0, 80), prevStartedAt: entry.startedAt, prevEndedAt: entry.endedAt, prevBreakMinutes: entry.breakMinutes, prevOrderId: entry.orderId, prevActivity: entry.activity, prevNote: entry.note },
     });
     await tx.timeEntry.update({ where: { id: entry.id }, data: { voidedAt: new Date(), runningKey: null } });
-    audit({ target: label(dayKey(entry.startedAt), `${entry.employee.firstName} ${entry.employee.lastName}`), entityId: entry.id });
+    audit({ target: label(dayKey(entry.startedAt), personRef("Mitarbeiter", { id: entry.employeeId })), entityId: entry.id });
     return { id: entry.id };
   },
 });
@@ -264,7 +265,7 @@ export const addManualTimeOperation = defineOperation({
       select: { id: true },
     });
     await tx.timeCorrection.create({ data: { entryId: row.id, kind: "create", reason: d.reason, byName: principal.user.name.slice(0, 80) } });
-    audit({ target: label(dayKey(start), `${target.firstName} ${target.lastName}`), entityId: row.id });
+    audit({ target: label(dayKey(start), personRef("Mitarbeiter", target)), entityId: row.id });
     return { id: row.id };
   },
 });

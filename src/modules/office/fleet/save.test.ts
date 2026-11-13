@@ -129,7 +129,7 @@ describe("Führerscheinkontrolle", () => {
     const check = await env.db.fleetLicenseCheck.findFirstOrThrow();
     assert.equal(check.checkedByName, user.name);
     assert.equal(check.nextDue.getMonth(), 6, "Januar + 6 Monate = Juli");
-    assert.equal((await entries("fleet.licenseCheck"))[0].target, "Fahrer Eins");
+    assert.equal((await entries("fleet.licenseCheck"))[0].target, `Mitarbeiter ${emp.id.slice(-8)}`);
     await actions.deleteLicenseCheck(form({ id: check.id }));
     assert.equal(await env.db.fleetLicenseCheck.count(), 0);
     assert.equal((await entries("fleet.licenseCheckDelete")).length, 1);

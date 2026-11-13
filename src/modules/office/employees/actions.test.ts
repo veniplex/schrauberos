@@ -39,7 +39,8 @@ describe("Mitarbeiter speichern", () => {
     assert.equal(target, `/employees/${emp.id}`);
     assert.equal(emp.active, true);
     const [entry] = await entries("employee.create");
-    assert.deepEqual([entry.target, entry.entityId], ["Erika Muster", emp.id]);
+    assert.deepEqual([entry.target, entry.entityId], [`Mitarbeiter ${emp.id.slice(-8)}`, emp.id], "Audit nennt nie den Namen");
+    assert.equal(JSON.stringify(entry).includes("Muster"), false);
   });
 
   it("Personalnummer ist eindeutig, Austritt nicht vor Eintritt, Konto nur einem Mitarbeiter zugeordnet", async () => {
@@ -75,7 +76,7 @@ describe("Mitarbeiter speichern", () => {
     await login(["employees.delete"]);
     assert.equal(await redirectOf(() => actions.deleteEmployee(form({ id: emp.id }))), "/employees");
     assert.equal(await env.db.employee.count(), 0);
-    assert.equal((await entries("employee.delete"))[0].target, "Erika Muster");
+    assert.equal((await entries("employee.delete"))[0].target, `Mitarbeiter ${emp.id.slice(-8)}`);
   });
 
   it("Historie verschwindet nie mit dem Mitarbeiter (Z7, Schema: Restrict): mit Abwesenheit oder Führerscheinkontrolle nicht löschbar, Qualifikationen fallen mit weg", async () => {
@@ -166,7 +167,7 @@ describe("Abwesenheiten und Qualifikationen", () => {
     assert.equal(await redirectOf(() => absence({ returnTo: "https://evil.example", endDate: "2030-07-06" })), "/employees/absences?month=2030-07");
     assert.equal(await env.db.absence.count(), 2);
     const [entry] = await entries("employee.absenceCreate");
-    assert.equal(entry.target, "Erika Muster");
+    assert.equal(entry.target, `Mitarbeiter ${emp.id.slice(-8)}`);
     assert.equal(JSON.stringify(entry).includes("vacation"), false);
     assert.equal((await absence({ employeeId: "gibt-es-nicht" })).fieldErrors?.employeeId !== undefined, true);
   });
@@ -202,7 +203,7 @@ describe("Abwesenheiten und Qualifikationen", () => {
     await actions.deleteQualification(form({ id: q.id }));
     assert.equal(await env.db.qualification.count(), 0);
     assert.deepEqual([(await entries("employee.qualificationCreate")).length, (await entries("employee.qualificationDelete")).length], [1, 1]);
-    assert.equal((await entries("employee.qualificationCreate"))[0].target, "Erika Muster: Staplerschein");
+    assert.equal((await entries("employee.qualificationCreate"))[0].target, `Mitarbeiter ${emp.id.slice(-8)}: Staplerschein`);
   });
 
   it("alles verlangt employees.edit", async () => {
@@ -304,7 +305,7 @@ describe("Abwesenheit und Qualifikation bearbeiten (P4b-4)", () => {
     assert.ok((await absenceSave({ id: second.id, version: versionOf(second), startDate: "2030-07-01", endDate: "2030-07-08" })).fieldErrors?.startDate);
     assert.equal(await redirectOf(() => absenceSave({ id: second.id, version: versionOf(second), startDate: "2030-08-01", endDate: "2030-08-03" })), "/employees/absences?month=2030-08");
     const [entry] = await entries("employee.absenceUpdate");
-    assert.equal(entry.target, "Erika Muster");
+    assert.equal(entry.target, `Mitarbeiter ${emp.id.slice(-8)}`);
     assert.equal(JSON.stringify(await env.db.auditLog.findMany()).includes("vacation"), false);
     assert.ok((await absenceSave({ id: "gibt-es-nicht", version: "1" })).error, "unbekannte Abwesenheit");
   });
@@ -336,7 +337,7 @@ describe("Abwesenheit und Qualifikation bearbeiten (P4b-4)", () => {
     const other = await env.db.employee.create({ data: { firstName: "Max", lastName: "Andere", active: true } });
     assert.ok((await actions.saveQualification({}, form({ employeeId: other.id, id: q.id, version: versionOf(changed), name: "X" }))).fieldErrors?.employeeId);
     assert.equal((await entries("employee.qualificationUpdate")).length, 1);
-    assert.equal((await entries("employee.qualificationUpdate"))[0].target, "Erika Muster: Staplerschein");
+    assert.equal((await entries("employee.qualificationUpdate"))[0].target, `Mitarbeiter ${emp.id.slice(-8)}: Staplerschein`);
   });
 });
 

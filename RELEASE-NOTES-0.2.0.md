@@ -46,7 +46,7 @@ Beim ersten Start: Einrichtungs-Token aus dem Container-Log, Einrichtung im Brow
 
 * **Neuinstallation nötig** bleibt: Schema und Baseline haben sich geändert (`updatedAt`/Version an sechs Konfigurationstabellen, `Restrict` statt `Cascade` auf Historie, `auto_vacuum`, Versionsangabe der Suchspalten); es gibt weiterhin keine Migration von 0.1.0.
 * Bedienung: „Auftrag aus Termin“ und „Terminzettel“ stehen auch im Bearbeiten-Dialog eines Termins; die Prüfliste einer Rechnung verlinkt fehlende Punkte und kann die Anschrift aus dem Kunden neu übernehmen; Diagramme bleiben am Handy lesbar; Meldungen nennen Auftrag, Beleg oder Funktion; Stempeln wird angesagt; der Fokus bleibt nach Aktionen auf der Seite.
-* Datenschutz: Die **Anonymisierung** ersetzt den Namen in den Audit-Einträgen des Kunden (Aktion, Zeit, Handelnde und Kennung bleiben). Die **Urlaubsberechnung** ist eine Vereinfachung (kein Ersatz für Rechtsprüfung; Wartezeit und Austritt nach dem 30.6. nicht automatisch; der Verfall des Übertrags ohne Hinweis des Arbeitgebers nach § 7 BUrlG wird nicht abgebildet).
+* Datenschutz: Das **Audit-Log bleibt bei der Anonymisierung unverändert**. Neue Einträge zu Kunden und Mitarbeitern nennen keinen Namen, sondern Art und Kennung; Namen aus früheren Fassungen blieben bis zur Audit-Aufbewahrungsfrist (Standard 730 Tage, 0 = dauerhaft) stehen – Hinweis an die Datenschutzberatung. Die **Urlaubsberechnung** ist eine Vereinfachung (kein Ersatz für Rechtsprüfung; Wartezeit und Austritt nach dem 30.6. nicht automatisch; der Verfall des Übertrags ohne Hinweis des Arbeitgebers nach § 7 BUrlG wird nicht abgebildet).
 
 ## Für Betreiber
 

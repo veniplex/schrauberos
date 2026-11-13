@@ -1,5 +1,6 @@
 import { noon } from "@/lib/dates";
 import { z } from "zod";
+import { personRef } from "@/lib/audit-ref";
 import { claimRow } from "@/lib/concurrency";
 import { dateText, moneyCents } from "@/lib/zod-fields";
 import { formatPlate, normalizePlate } from "@/lib/plate";
@@ -213,7 +214,7 @@ export const saveLicenseCheckOperation = defineOperation({
     const row = await tx.fleetLicenseCheck.create({
       data: { employeeId: d.employeeId, checkedAt, nextDue: nextLicenseCheck(checkedAt), method: d.method ?? null, note: d.note ?? null, checkedByName: principal.user.name },
     });
-    audit({ target: `${employee.firstName} ${employee.lastName}`.trim(), entityId: row.id });
+    audit({ target: personRef("Mitarbeiter", { id: d.employeeId }), entityId: row.id });
     return { id: row.id };
   },
 });
@@ -227,7 +228,7 @@ export const deleteLicenseCheckOperation = defineOperation({
     const row = await tx.fleetLicenseCheck.findUnique({ where: { id: input.id }, include: { employee: { select: { firstName: true, lastName: true } } } });
     if (!row) fail("notFound");
     await tx.fleetLicenseCheck.delete({ where: { id: input.id } });
-    audit({ target: `${row.employee.firstName} ${row.employee.lastName}`.trim(), entityId: input.id });
+    audit({ target: personRef("Mitarbeiter", { id: row.employeeId }), entityId: input.id });
     return { id: input.id };
   },
 });

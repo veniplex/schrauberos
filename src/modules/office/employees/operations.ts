@@ -2,6 +2,7 @@ import { noon } from "@/lib/dates";
 import { z } from "zod";
 import { dateText } from "@/lib/zod-fields";
 import { claimRow } from "@/lib/concurrency";
+import { personRef } from "@/lib/audit-ref";
 import { ABSENCE_TYPES, DEPARTMENTS, employeeDeletable, employeeName } from "@/modules/office/employees/domain";
 import { writeAudit } from "@/server/audit";
 import { defineOperation, fail, failField } from "@/server/operations";
@@ -110,9 +111,9 @@ export const saveEmployeeOperation = defineOperation({
       saved = await tx.employee.create({ data, select: SAVED });
       emergencyChanged = sensitive && Object.values(emergency).some((value) => value !== null);
     }
-    audit({ target: employeeName(saved), entityId: saved.id });
+    audit({ target: personRef("Mitarbeiter", saved), entityId: saved.id });
     // Notfallkontakt ist besonders geschützt: eigener Eintrag, ohne die Werte selbst festzuhalten
-    if (emergencyChanged) await writeAudit(tx, "employee.sensitiveUpdate", { target: employeeName(saved), entityId: saved.id, actor: { id: principal.user.id, name: principal.user.name } });
+    if (emergencyChanged) await writeAudit(tx, "employee.sensitiveUpdate", { target: personRef("Mitarbeiter", saved), entityId: saved.id, actor: { id: principal.user.id, name: principal.user.name } });
     return { id: saved.id };
   },
 });
@@ -128,7 +129,7 @@ export const deleteEmployeeOperation = defineOperation({
     // Historie (Abwesenheiten, Führerscheinkontrollen, Zeiteinträge) verschwindet nie mit dem Mitarbeiter: Löschen nur ohne sie, sonst auf inaktiv setzen
     if (!employeeDeletable(employee._count)) fail("inUse", "employees.errors.inUse", employee._count);
     await tx.employee.delete({ where: { id: input.id } });
-    audit({ target: employeeName(employee), entityId: input.id });
+    audit({ target: personRef("Mitarbeiter", { id: input.id }), entityId: input.id });
     return { id: input.id };
   },
 });
@@ -179,7 +180,7 @@ export const saveAbsenceOperation = defineOperation({
       absence = await tx.absence.create({ data: { employeeId: d.employeeId, ...data } });
     }
     // Das Audit-Log nennt weder Art (Krankheit) noch Zeitraum noch Notiz
-    audit({ target: employeeName(employee), entityId: absence.id });
+    audit({ target: personRef("Mitarbeiter", { id: d.employeeId }), entityId: absence.id });
     return { id: absence.id };
   },
 });
@@ -195,7 +196,7 @@ export const deleteAbsenceOperation = defineOperation({
     // Krankheitseinträge dürfen nur mit dem Recht für sensible Daten gelöscht werden
     if (absence.type === "sick" && !principal.can("employees.sensitive")) fail("forbidden", "employees.errors.sickRestricted");
     await tx.absence.delete({ where: { id: input.id } });
-    audit({ target: employeeName(absence.employee), entityId: input.id });
+    audit({ target: personRef("Mitarbeiter", { id: absence.employeeId }), entityId: input.id });
     return { employeeId: absence.employeeId };
   },
 });
@@ -236,7 +237,7 @@ export const saveQualificationOperation = defineOperation({
     } else {
       q = await tx.qualification.create({ data: { employeeId, ...data } });
     }
-    audit({ target: `${employeeName(employee)}: ${d.name}`, entityId: q.id });
+    audit({ target: `${personRef("Mitarbeiter", { id: employeeId })}: ${d.name}`, entityId: q.id });
     return { id: q.id };
   },
 });
@@ -250,7 +251,7 @@ export const deleteQualificationOperation = defineOperation({
     const q = await tx.qualification.findUnique({ where: { id: input.id }, include: { employee: { select: { firstName: true, lastName: true } } } });
     if (!q) fail("notFound");
     await tx.qualification.delete({ where: { id: input.id } });
-    audit({ target: `${employeeName(q.employee)}: ${q.name}`, entityId: input.id });
+    audit({ target: `${personRef("Mitarbeiter", { id: q.employeeId })}: ${q.name}`, entityId: input.id });
     return { employeeId: q.employeeId };
   },
 });

@@ -39,7 +39,8 @@ describe("saveCustomer", () => {
     const c = await env.db.customer.findFirstOrThrow();
     assert.equal(target, `/customers/${c.id}`);
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.create" } });
-    assert.equal(entry.target, "Anna Müller");
+    assert.equal(entry.target, `Kunde ${c.id.slice(-8)}`, "Audit nennt nie den Namen: nur Art und Kennung (ohne Kundennummer das Ende der Kennung)");
+    assert.equal(JSON.stringify(entry).includes("Müller"), false);
     assert.equal(entry.entityId, c.id);
   });
 
@@ -81,7 +82,7 @@ describe("deleteCustomer", () => {
     const c = await env.db.customer.create({ data: { lastName: "Weg" } });
     assert.equal(await redirectOf(() => actions.deleteCustomer(form({ id: c.id }))), "/customers");
     assert.equal(await env.db.customer.count(), 0);
-    assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.delete" } })).target, "Weg");
+    assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.delete" } })).target, `Kunde ${c.id.slice(-8)}`);
     assert.equal(lastFlash()?.key, "common.deleted");
   });
 

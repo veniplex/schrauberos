@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { personRef } from "@/lib/audit-ref";
 import { claimRow } from "@/lib/concurrency";
 import { anonymizeBlock, type RetentionItem } from "@/lib/privacy";
 import { collectRetention, privacySubject } from "@/modules/privacy";
@@ -76,7 +77,7 @@ export const saveCustomerOperation = defineOperation({
     }
     if (id && !(await claimRow(tx.customer, id, version))) fail("conflict");
     const saved = id ? await tx.customer.update({ where: { id }, data }) : await tx.customer.create({ data });
-    audit({ target: customerDisplayName(saved), entityId: saved.id });
+    audit({ target: personRef("Kunde", { id: saved.id, number: saved.customerNumber }), entityId: saved.id });
     return { id: saved.id };
   },
 });
@@ -95,7 +96,7 @@ export const archiveCustomerOperation = defineOperation({
     if (!customer) fail("notFound");
     if (customer.archivedAt) fail("conflict", "archive.errors.alreadyArchived");
     await tx.customer.update({ where: { id: input.id }, data: { archivedAt: new Date() } });
-    audit({ target: customerDisplayName(customer), entityId: input.id });
+    audit({ target: personRef("Kunde", { id: customer.id, number: customer.customerNumber }), entityId: input.id });
     return { id: input.id };
   },
 });
@@ -110,7 +111,7 @@ export const unarchiveCustomerOperation = defineOperation({
     if (!customer) fail("notFound");
     if (!customer.archivedAt) fail("conflict", "archive.errors.notArchived");
     await tx.customer.update({ where: { id: input.id }, data: { archivedAt: null } });
-    audit({ target: customerDisplayName(customer), entityId: input.id });
+    audit({ target: personRef("Kunde", { id: customer.id, number: customer.customerNumber }), entityId: input.id });
     return { id: input.id };
   },
 });
@@ -127,7 +128,7 @@ export const deleteCustomerOperation = defineOperation({
     const links = customer._count;
     if (customerHasLinks(links)) fail("inUse", "customers.errors.inUse", { vehicles: links.vehicles, former: formerOwnerships(links), invoices: links.invoices, orders: links.orders });
     await tx.customer.delete({ where: { id: input.id } });
-    audit({ target: customerDisplayName(customer), entityId: input.id });
+    audit({ target: personRef("Kunde", { id: customer.id, number: customer.customerNumber }), entityId: input.id });
     return { id: input.id };
   },
 });
@@ -150,7 +151,7 @@ export const restrictCustomerOperation = defineOperation({
     if (customer.processingRestrictedAt) fail("conflict", "privacy.errors.alreadyRestricted");
     await tx.customer.update({ where: { id: input.id }, data: { processingRestrictedAt: new Date(), restrictionNote: input.note ?? null } });
     // Das Audit-Log nennt den Kunden, nie die Notiz zum Anlass
-    audit({ target: customerDisplayName(customer), entityId: input.id });
+    audit({ target: personRef("Kunde", { id: customer.id, number: customer.customerNumber }), entityId: input.id });
     return { id: input.id };
   },
 });
@@ -165,7 +166,7 @@ export const unrestrictCustomerOperation = defineOperation({
     if (!customer) fail("notFound");
     if (!customer.processingRestrictedAt) fail("conflict", "privacy.errors.notRestricted");
     await tx.customer.update({ where: { id: input.id }, data: { processingRestrictedAt: null, restrictionNote: null } });
-    audit({ target: customerDisplayName(customer), entityId: input.id });
+    audit({ target: personRef("Kunde", { id: customer.id, number: customer.customerNumber }), entityId: input.id });
     return { id: input.id };
   },
 });
@@ -221,11 +222,10 @@ export const anonymizeCustomerOperation = defineOperation({
         archivedAt: customer.archivedAt ?? now,
       },
     });
-    // Die Einträge dieses Kunden im Audit-Log (angelegt, geändert, archiviert …) tragen als Bezeichnung seinen Namen: Sie bekommen dieselbe Kennung wie die Anonymisierung, die Kennung der
-    // Sache (`entityId`) und Zeit, Handelnde und Aktion bleiben – die Nachvollziehbarkeit bleibt, der Name verschwindet. (Einträge anderer Funktionen nennen nie den Namen, siehe `labelOf` der Rechnungserstellung;
-    // Namen in Mail-Vermerken und in Backups bleiben bis zu deren Fristen, siehe Hilfe „Datenschutz bei Kunden“.)
-    await tx.auditLog.updateMany({ where: { entityId: input.id, action: { startsWith: "customer.", not: "customer.anonymize" } }, data: { target: "Kunde anonymisiert" } });
-    audit({ target: "Kunde anonymisiert", entityId: input.id });
+    // Das Audit-Log wird **nie verändert**: Einträge nennen Kunden seit jeher nur mit Art und Kundennummer/Kennung (`personRef`), nie mit dem Namen – es gibt nichts zu maskieren. Einträge aus früheren Fassungen
+    // (Namen in der Bezeichnung) bleiben unverändert bis zur Audit-Aufbewahrungsfrist (Einstellung, Standard 730 Tage, 0 = dauerhaft); wer das nicht will, wählt eine kürzere Frist (Hilfe „Datenschutz bei Kunden“).
+    // Namen in Mail-Vermerken und in Backups bleiben bis zu deren Fristen.
+    audit({ target: personRef("Kunde", { id: input.id, number: customer.customerNumber }), entityId: input.id });
     return { id: input.id };
   },
 });

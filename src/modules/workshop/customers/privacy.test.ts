@@ -72,7 +72,8 @@ describe("Verarbeitung einschränken", () => {
     assert.ok(row.processingRestrictedAt);
     assert.equal(row.restrictionNote, "Anfrage per Brief vom 3.5.");
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.restrict" } });
-    assert.equal(entry.target, "Erika Beispiel");
+    assert.equal(entry.target, "Kunde K-100", "Audit nennt Kundennummer, nie den Namen");
+    assert.equal(JSON.stringify(entry).includes("Beispiel"), false);
     assert.equal(JSON.stringify(entry).includes("Brief"), false, "die Notiz steht nicht im Audit-Log");
     // doppelt einschränken ist ein Konflikt
     await actions.restrictCustomer(form({ id: customer.id }));
@@ -198,7 +199,7 @@ describe("Aufbewahrungsfristen und Anonymisierung", () => {
     const { customer, vehicle, set, appointment } = await customerWithData();
     await login(ALL_PRIVACY, false);
     const anonymize = () => actions.anonymizeCustomer(form({ id: customer.id }));
-    // frühere Einträge im Audit-Log nennen den Namen des Kunden (Bezeichnung = Anzeigename) – und ein fremder Eintrag mit anderer Kennung bleibt unberührt
+    // Einträge aus früheren Fassungen nennen den Namen des Kunden in der Bezeichnung – das Audit-Log wird nie verändert, sie müssen bei der Anonymisierung unberührt bleiben
     await env.db.auditLog.createMany({
       data: [
         { actorName: "Test", action: "customer.create", target: "Erika Beispiel", entityId: customer.id },
@@ -246,11 +247,10 @@ describe("Aufbewahrungsfristen und Anonymisierung", () => {
     // Rechnung: Empfänger und Verknüpfung bleiben
     const invoice = await env.db.invoice.findFirstOrThrow();
     assert.deepEqual([invoice.partyName, invoice.customerId, invoice.grossCents], ["Erika Beispiel", customer.id, 11900]);
-    // Audit ohne Namen; zweites Mal gesperrt. Frühere Einträge zu diesem Kunden verlieren den Namen, behalten aber Aktion, Zeit, Handelnde und Kennung
+    // Das Audit-Log wird nie verändert: bestehende Einträge behalten ihre Bezeichnung (Namen bleiben bis zur Audit-Aufbewahrungsfrist), der neue Eintrag der Anonymisierung nennt keinen Namen
     const earlier = await env.db.auditLog.findMany({ where: { entityId: customer.id, action: { not: "customer.anonymize" } } });
     assert.equal(earlier.length, 2);
-    for (const row of earlier) assert.deepEqual([row.target, row.actorName], ["Kunde anonymisiert", "Test"]);
-    assert.equal(await env.db.auditLog.count({ where: { target: { contains: "Beispiel" } } }), 0, "der Name steht in keinem Eintrag mehr");
+    for (const row of earlier) assert.deepEqual([row.target, row.actorName], ["Erika Beispiel", "Test"], "unverändert");
     assert.equal((await env.db.auditLog.findFirstOrThrow({ where: { entityId: "fremd" } })).target, "Anderer Kunde", "Einträge zu anderen Sachen bleiben");
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.anonymize" } });
     assert.equal(JSON.stringify(entry).includes("Beispiel"), false);
