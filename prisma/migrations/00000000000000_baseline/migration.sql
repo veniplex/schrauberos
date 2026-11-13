@@ -963,7 +963,7 @@ CREATE TABLE "ApiToken" (
     "tokenHash" TEXT NOT NULL,
     "hint" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "expiresAt" DATETIME NOT NULL,
+    "expiresAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdByName" TEXT,
     "lastUsedAt" DATETIME,

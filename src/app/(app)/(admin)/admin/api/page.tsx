@@ -96,7 +96,7 @@ export default async function ApiTokensPage() {
                 return (
                   <span className="flex flex-col gap-1">
                     <StatusBadge tone={TOKEN_STATUS_TONE[status]}>{td(`api.tokens.status.${status}`, status)}</StatusBadge>
-                    <span className="text-xs text-ink-muted">{status === "revoked" && token.revokedAt ? day(token.revokedAt) : t("api.tokens.list.until", { date: day(token.expiresAt) })}</span>
+                    <span className="text-xs text-ink-muted">{status === "revoked" && token.revokedAt ? day(token.revokedAt) : token.expiresAt ? t("api.tokens.list.until", { date: day(token.expiresAt) }) : t("api.tokens.list.unlimited")}</span>
                   </span>
                 );
               },

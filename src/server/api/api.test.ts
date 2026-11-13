@@ -250,7 +250,8 @@ describe("Schreiben über dieselben Operationen wie die Oberfläche", () => {
     const entry = await env.db.auditLog.findFirstOrThrow({ where: { action: "customer.create" } });
     assert.equal(entry.actorId, userId);
     assert.match(entry.actorName, /\[API: Importer · sos_\S{4}…\]$/);
-    assert.equal(entry.target, "Anna Müller");
+    assert.match(entry.target ?? "", /^Kunde \S+$/, "Audit nennt nie den Namen");
+    assert.ok(!JSON.stringify(entry).includes("Müller"));
     assert.ok(!JSON.stringify(entry).includes(token));
   });
 

@@ -24,7 +24,7 @@ export const createApiToken = defineAction(createApiTokenOperation, {
   }),
   revalidate: ["/admin/api"],
   message: "api.tokens.created",
-  state: (data, _input, { date }) => ({ token: { value: data.token, hint: data.hint, expiresOn: date(data.expiresAt, { dateStyle: "medium" }) } }),
+  state: (data, _input, { date }) => ({ token: { value: data.token, hint: data.hint, expiresOn: data.expiresAt ? date(data.expiresAt, { dateStyle: "medium" }) : "" } }),
 });
 
 export const revokeApiToken = defineAction(revokeApiTokenOperation, { revalidate: ["/admin/api"], message: "api.tokens.revoked" });

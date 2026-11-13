@@ -62,7 +62,7 @@ describe("Token erzeugen", () => {
     assert.notEqual(row.tokenHash, token);
     assert.equal(row.rateLimitPerMinute, 120);
     // Standard-Ablauf: 90 Tage
-    assert.ok(Math.abs(expiresAt.getTime() - (Date.now() + 90 * 86_400_000)) < 60_000);
+    assert.ok(Math.abs(expiresAt!.getTime() - (Date.now() + 90 * 86_400_000)) < 60_000);
 
     const dump = JSON.stringify([await env.db.apiToken.findMany(), await env.db.auditLog.findMany(), await env.db.apiTokenScope.findMany(), await env.db.outboxEvent.findMany(), await env.db.appSetting.findMany()]);
     assert.ok(!dump.includes(token), "das Klartext-Token darf nirgends gespeichert sein");

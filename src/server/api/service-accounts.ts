@@ -130,7 +130,7 @@ export async function listServiceAccounts(): Promise<ServiceAccountInfo[]> {
   const rows = await db.user.findMany({
     where: { authSource: SERVICE_SOURCE },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, name: true, username: true, active: true, createdAt: true, roles: { select: { role: { select: { name: true } } } }, apiTokens: { where: { revokedAt: null, expiresAt: { gt: new Date() } }, select: { id: true } } },
+    select: { id: true, name: true, username: true, active: true, createdAt: true, roles: { select: { role: { select: { name: true } } } }, apiTokens: { where: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, select: { id: true } } },
   });
   return rows.map((r) => ({ id: r.id, name: r.name, username: r.username, active: r.active, createdAt: r.createdAt, roleNames: r.roles.map((x) => x.role.name).sort(), activeTokens: r.apiTokens.length }));
 }

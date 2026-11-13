@@ -1391,7 +1391,8 @@ model ApiToken {
   // erste Zeichen des Tokens (nicht geheim, nur zum Wiedererkennen in Listen und im Audit-Log)
   hint               String
   userId             String
-  expiresAt          DateTime
+  // Ablauf; null = unbegrenzt (nur Tokens eines Dienstkontos, bis zum Widerruf; Tokens am eigenen Konto laufen immer ab)
+  expiresAt          DateTime?
   createdAt          DateTime  @default(now())
   createdByName      String?
   lastUsedAt         DateTime?

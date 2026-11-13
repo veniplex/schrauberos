@@ -219,6 +219,53 @@ describe("Tokens am Dienstkonto", () => {
     for (const action of ["serviceAccount.create", "serviceAccount.disable", "serviceAccount.enable", "serviceAccount.delete"]) assert.ok(await env.db.auditLog.findFirst({ where: { action } }), action);
   });
 
+  it("Ablauf je Schlüssel: gewählte Tage laufen ab, „unbegrenzt“ gibt es nur für Dienstkonten und gilt bis zum Widerruf; jeder Schlüssel ist einzeln widerrufbar", async () => {
+    const created = await create([(await officeRole()).id]);
+    const id = created.ok ? created.data.id : "";
+    const mk = (expiresInDays: number | "unlimited", ownerId?: string, name = "Schlüssel") =>
+      tokens.createApiTokenOperation.execute(admin, { name, description: "", scope: ["customers.view"], expiresInDays, rateLimitPerMinute: 120, allowedNets: "", acknowledgeMarked: false, password: PASSWORD, ...(ownerId ? { ownerId } : {}) });
+
+    // unbegrenzt am eigenen Konto: abgelehnt (ein persönliches Token läuft immer ab)
+    const own = await mk("unlimited");
+    assert.ok(!own.ok && own.failure.fields?.expiresInDays?.key === "api.errors.unlimitedNeedsAccount", JSON.stringify(!own.ok && own.failure));
+    assert.equal(await env.db.apiToken.count({ where: { userId: adminId } }), 0);
+
+    // Dienstkonto: 30 Tage und unbegrenzt
+    const timed = await mk(30, id, "befristet");
+    const forever = await mk("unlimited", id, "ohne Ablauf");
+    assert.ok(timed.ok && forever.ok);
+    if (!timed.ok || !forever.ok) return;
+    assert.ok(timed.data.expiresAt);
+    assert.equal(forever.data.expiresAt, null);
+    assert.equal((await env.db.apiToken.findUniqueOrThrow({ where: { id: forever.data.id } })).expiresAt, null);
+    assert.match((await env.db.auditLog.findFirstOrThrow({ where: { entityId: forever.data.id } })).target ?? "", /ohne Ablauf/);
+    assert.equal((await call(timed.data.token, "GET", "/customers")).status, 200);
+    assert.equal((await call(forever.data.token, "GET", "/customers")).status, 200);
+
+    // Zehn Jahre später: das befristete Token ist abgelaufen, das unbegrenzte gilt noch
+    const { apiRuntime } = await import("./state");
+    const real = apiRuntime.now;
+    apiRuntime.now = () => Date.now() + 10 * 365 * 86_400_000;
+    try {
+      (await import("./state")).resetApiLimiters();
+      assert.equal((await call(timed.data.token, "GET", "/customers")).status, 401);
+      assert.equal((await call(forever.data.token, "GET", "/customers")).status, 200);
+    } finally {
+      apiRuntime.now = real;
+    }
+    assert.equal((await ops.listServiceAccounts()).find((a) => a.id === id)?.activeTokens, 2, "unbegrenzte Tokens zählen als aktiv");
+
+    // einzeln widerrufen: nur dieser Schlüssel endet
+    assert.ok((await tokens.revokeApiTokenOperation.execute(admin, { id: forever.data.id })).ok);
+    assert.equal((await call(forever.data.token, "GET", "/customers")).status, 401);
+    assert.equal((await call(timed.data.token, "GET", "/customers")).status, 200, "die anderen Schlüssel des Kontos bleiben");
+    const listed = (await tokens.listApiTokens()).find((t) => t.id === forever.data.id);
+    assert.equal(listed?.expiresAt, null);
+    const { tokenStatusOf } = await import("@/modules/admin/api/status-tone");
+    assert.equal(tokenStatusOf({ revokedAt: null, expiresAt: null }), "active");
+    assert.equal(tokenStatusOf({ revokedAt: new Date(), expiresAt: null }), "revoked");
+  });
+
   it("Zwei-Faktor-Pflicht für Administratoren: ein Administrator-Token wird bis zur Einrichtung abgelehnt, das Token eines Dienstkontos nicht (keine Sitzung, kein Administrator)", async () => {
     const created = await create([(await officeRole()).id]);
     const id = created.ok ? created.data.id : "";

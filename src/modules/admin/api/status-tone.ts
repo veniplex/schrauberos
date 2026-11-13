@@ -9,4 +9,4 @@ export type TokenStatus = "active" | "expired" | "revoked";
 export const TOKEN_STATUS_TONE: Record<TokenStatus, StatusTone> = { active: "success", expired: "danger", revoked: "neutral" };
 
 /** `now` kommt von außen (Komponenten rufen die Uhr nicht selbst; Tests geben sie vor). */
-export const tokenStatusOf = (token: { revokedAt: Date | null; expiresAt: Date }, now = Date.now()): TokenStatus => (token.revokedAt ? "revoked" : token.expiresAt.getTime() <= now ? "expired" : "active");
+export const tokenStatusOf = (token: { revokedAt: Date | null; expiresAt: Date | null }, now = Date.now()): TokenStatus => (token.revokedAt ? "revoked" : token.expiresAt !== null && token.expiresAt.getTime() <= now ? "expired" : "active");

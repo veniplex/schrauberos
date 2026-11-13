@@ -10,7 +10,9 @@ Ein **Token** ist das Passwort eines anderen Systems. Es gehört einem Konto –
 
 Unter **Dienstkonten → Neues Dienstkonto** vergeben Sie einen Namen und wählen die **Rollen** des Kontos. Ein Dienstkonto hat **kein Passwort und keine Anmeldung**: Es kann sich nicht in der Oberfläche anmelden, hat keinen Notzugang und keinen zweiten Faktor und ändert nie Benutzer, Rollen oder Einstellungen. Zur Wahl stehen nur Rollen ohne Administrator-Flag und ohne Verwaltungsrechte, und nur solche, die Ihr eigenes Konto vollständig besitzt – ein Dienstkonto hat nie mehr Rechte als die Person, die es angelegt hat. Das Passwort Ihres Kontos wird dabei erneut abgefragt. In der Benutzerliste erscheint das Konto mit dem Hinweis **Dienstkonto** und lässt sich dort nicht ändern.
 
-Tokens eines Dienstkontos überleben Ihren Passwortwechsel. Sie enden, wenn das Token abläuft oder widerrufen wird oder wenn das Dienstkonto **ausgeschaltet oder gelöscht** wird (dann enden alle seine Tokens sofort; Einschalten verlangt Ihr Passwort, die früheren Tokens bleiben beendet). Hat die Pflicht-Zwei-Faktor-Anmeldung für Administratoren eine Wirkung auf Tokens, dann nur auf die **Ihres eigenen Administrator-Kontos** (es wird abgelehnt, bis Sie den zweiten Faktor eingerichtet haben) – nicht auf Tokens von Dienstkonten.
+**Ein Dienstkonto funktioniert nur mit API-Schlüsseln (Tokens):** Es gibt kein Passwort, keine Anmeldung in der Oberfläche und keine Sitzung. **Jeder Schlüssel lässt sich einzeln widerrufen** (Liste der Tokens, Knopf „Token widerrufen“), ohne die anderen Schlüssel des Kontos zu berühren, und hat seine **eigene Laufzeit** (30 bis 365 Tage oder unbegrenzt).
+
+Tokens eines Dienstkontos überleben Ihren Passwortwechsel. Sie enden, wenn das Token abläuft (ohne Ablauf: nie) oder widerrufen wird oder wenn das Dienstkonto **ausgeschaltet oder gelöscht** wird (dann enden alle seine Tokens sofort; Einschalten verlangt Ihr Passwort, die früheren Tokens bleiben beendet). Hat die Pflicht-Zwei-Faktor-Anmeldung für Administratoren eine Wirkung auf Tokens, dann nur auf die **Ihres eigenen Administrator-Kontos** (es wird abgelehnt, bis Sie den zweiten Faktor eingerichtet haben) – nicht auf Tokens von Dienstkonten.
 
 ## API-Token anlegen
 
@@ -18,7 +20,7 @@ Unter **Tokens → Neues Token** geben Sie an:
 
 * **Besitzer:** Ihr eigenes Konto oder ein Dienstkonto (siehe oben). Ein Token hat höchstens die Rechte des Besitzers – bei einem Dienstkonto zusätzlich nur solche, die Sie selbst haben.
 * **Name und Beschreibung:** Wofür das Token gedacht ist („Buchhaltung Import“). Der Name erscheint in der Liste und im Audit-Log.
-* **Gültigkeit:** 30, 90, 180 oder 365 Tage. Ein Token läuft immer ab und muss danach neu angelegt werden.
+* **Gültigkeit:** 30, 90, 180 oder 365 Tage; danach muss das Token neu angelegt werden. Ein Token an Ihrem **eigenen Konto** läuft immer ab. Für ein **Dienstkonto** gibt es zusätzlich **Unbegrenzt (bis zum Widerruf)**: Das Token läuft nie ab und gilt, bis Sie es widerrufen oder das Dienstkonto ausschalten bzw. löschen. Das ist bequem für Integrationen, aber ein vergessenes Token bleibt dauerhaft wirksam – wählen Sie Rechte und Adressbereiche dann besonders eng und prüfen Sie die Liste regelmäßig (die Liste zeigt „ohne Ablauf“).
 * **Rechte:** Gewählt wird je Ressource, und **Lesen und Schreiben/Löschen sind getrennte Rechte** – es ist nichts vorgewählt. „Alle lesenden Rechte“ wählt in einem Zug alles, was nur liest. Angeboten wird nur, was die Schnittstelle nutzt und was Ihr eigenes Konto selbst darf: Ein Token kann nie mehr als sein Besitzer (und der Server lehnt Rechte ohne Endpunkt ab).
 * **Rechte mit Kennzeichnung** (zum Beispiel Versand oder Festschreiben) sind markiert. Sie lösen Unumkehrbares oder Ausgehendes aus – eine festgeschriebene Rechnung lässt sich nicht mehr ändern, ein versendeter Beleg nicht zurückholen. Sie lassen sich nur mit ausdrücklicher Bestätigung wählen.
 * **Anfragen je Minute:** Darüber antwortet die Schnittstelle mit „429“.
@@ -30,7 +32,7 @@ Nach dem Anlegen steht das Token **genau einmal** auf dem Bildschirm. Kopieren S
 ### Sicher aufbewahren
 
 * Nur über **HTTPS** verwenden; das Token steht bei jeder Anfrage im Kopf.
-* Je System ein eigenes Token mit möglichst wenigen Rechten und kurzer Laufzeit.
+* Je System ein eigenes Token mit möglichst wenigen Rechten und kurzer Laufzeit; „Unbegrenzt“ nur, wenn ein Wechsel des Schlüssels im anderen System wirklich nicht zumutbar ist.
 * Bei Verdacht sofort **Widerrufen**: Das wirkt bei der nächsten Anfrage.
 
 ### Wann ein Token ungültig wird

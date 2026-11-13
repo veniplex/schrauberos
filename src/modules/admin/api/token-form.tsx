@@ -26,6 +26,10 @@ export function TokenForm({ groups, markLabels, behindProxy, accounts, base }: {
   const { t } = useI18n();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [created, setCreated] = useState<{ value: string; hint: string; expiresOn: string } | null>(null);
+  // Ohne Ablauf gibt es nur Tokens eines Dienstkontos: die Wahl hängt vom Besitzer ab
+  const [owner, setOwner] = useState("");
+  const [expiry, setExpiry] = useState("90");
+  const unlimited = owner !== "" && expiry === "unlimited";
 
   const marked = groups.flatMap((g) => g.items).filter((item) => item.mark && selected.has(item.key));
   const toggle = (key: string, on: boolean) =>
@@ -53,7 +57,7 @@ export function TokenForm({ groups, markLabels, behindProxy, accounts, base }: {
     return (
       <Card title={t("api.tokens.created")}>
         <div className="flex flex-col gap-4">
-          <Alert tone="success">{t("api.tokens.createdHint", { date: created.expiresOn })}</Alert>
+          <Alert tone="success">{created.expiresOn ? t("api.tokens.createdHint", { date: created.expiresOn }) : t("api.tokens.createdHintUnlimited")}</Alert>
           <SecretField value={created.value} label={t("api.tokens.secretLabel")} once autoHideSeconds={300} onDismiss={() => {
               setCreated(null);
               setSelected(new Set());
@@ -78,7 +82,15 @@ export function TokenForm({ groups, markLabels, behindProxy, accounts, base }: {
         <div className="grid gap-4">
           {accounts.length > 0 ? (
             <Field label={t("api.tokens.form.owner")} htmlFor="token-owner" name="ownerId" hint={t("api.tokens.form.ownerHint")}>
-              <Select id="token-owner" name="ownerId" defaultValue="">
+              <Select
+                id="token-owner"
+                name="ownerId"
+                defaultValue=""
+                onChange={(event) => {
+                  setOwner(event.target.value);
+                  if (event.target.value === "") setExpiry((current) => (current === "unlimited" ? "90" : current));
+                }}
+              >
                 <option value="">{t("api.tokens.form.ownerMe")}</option>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
@@ -96,18 +108,20 @@ export function TokenForm({ groups, markLabels, behindProxy, accounts, base }: {
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("api.tokens.form.expires")} htmlFor="token-expires" name="expiresInDays" hint={t("api.tokens.form.expiresHint")}>
-              <Select id="token-expires" name="expiresInDays" defaultValue="90">
+              <Select id="token-expires" name="expiresInDays" value={expiry} onChange={(event) => setExpiry(event.target.value)}>
                 {EXPIRY_DAYS.map((days) => (
                   <option key={days} value={days}>
                     {t("api.tokens.form.days", { days })}
                   </option>
                 ))}
+                {owner !== "" ? <option value="unlimited">{t("api.tokens.form.unlimited")}</option> : null}
               </Select>
             </Field>
             <Field label={t("api.tokens.form.rate")} htmlFor="token-rate" name="rateLimitPerMinute" hint={t("api.tokens.form.rateHint")}>
               <Input id="token-rate" name="rateLimitPerMinute" type="number" inputMode="numeric" min={1} max={6000} defaultValue={120} />
             </Field>
           </div>
+          {unlimited ? <Alert tone="warning">{t("api.tokens.form.unlimitedWarning")}</Alert> : null}
         </div>
       </Card>
 

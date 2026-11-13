@@ -52,7 +52,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthR
     include: { scope: true, user: { include: { roles: { include: { role: { include: { permissions: true } } } }, twoFactor: { select: { enabledAt: true } } } } },
   });
   const now = apiRuntime.now();
-  if (!row || row.revokedAt || row.expiresAt.getTime() <= now || !row.user.active || row.user.mustChangePassword) return reject(request);
+  if (!row || row.revokedAt || (row.expiresAt !== null && row.expiresAt.getTime() <= now) || !row.user.active || row.user.mustChangePassword) return reject(request);
   // Verlangt die Richtlinie den zweiten Faktor für Administratoren, gilt das auch für ihre Tokens: Ein Administrator-Konto, das ihn noch nicht eingerichtet hat, darf die Pflicht
   // nicht über die Programmierschnittstelle umgehen (die Sitzung kommt nur bis „Mein Konto“) – sein Token wird bis zur Einrichtung abgelehnt, nicht widerrufen.
   if (row.user.roles.some((r) => r.role.isAdmin) && !row.user.twoFactor?.enabledAt && (await authPolicy()).requireTwoFactorForAdmins) return reject(request);
