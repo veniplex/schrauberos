@@ -34,7 +34,7 @@ export async function resetVaultEntries(tx: Pick<typeof db, "vaultEntry">, now =
     const dir = path.join(/*turbopackIgnore: true*/ dataDir(), "secret-reset");
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     backup = `vault-${now.toISOString().replace(/[-:]/g, "").replace(/\..*/, "")}Z-${randomBytes(3).toString("hex")}.json`;
-    const file = path.join(dir, backup);
+    const file = path.join(/*turbopackIgnore: true*/ dir, backup);
     writeFileSync(file, JSON.stringify({ version: 1, at: now.toISOString(), reason: "Tresor ausdrücklich zurückgesetzt", note: "Nur verschlüsselte Blöcke (kein Klartext); sie gehören zum bisherigen Tresor-Hauptschlüssel.", entries: rows }, null, 2), { mode: 0o600, flag: "wx" });
     try {
       chmodSync(file, 0o600);
