@@ -42,6 +42,8 @@ export type TextStyle = {
   /** Abstand nach dem Block in Punkt */
   after?: number;
   lineGap?: number;
+  /** Rolle im Strukturbaum des getaggten PDF (Standard `P`; Überschriften `H1`–`H3`) */
+  structType?: "P" | "H1" | "H2" | "H3";
 };
 export type TableColumn = { header: string; /** relative Breite (Standard 1) */ weight?: number; align?: PdfAlign };
 export type TableSpec = {
@@ -136,6 +138,8 @@ export class PdfBuilder {
   private readonly pageWidth: number;
   private readonly pageHeight: number;
   private finished = false;
+  /** Wurzel des Strukturbaums (`Document`): das PDF ist **getaggt** (Z6-5 N14) – Absätze und Überschriften sind Kinder, Bilder `Figure` mit Alternativtext, Linien, Flächen, Kopf- und Fußzeile Artefakte */
+  private readonly root: { add(child: unknown): unknown };
   /** bisher gesetzte Zeichen (Summe aller Texte und Zellen) – Obergrenze `MAX_DOCUMENT_CHARS` */
   private chars = 0;
 
@@ -158,7 +162,10 @@ export class PdfBuilder {
     if (options.subject) info.Subject = cleanPdfText(options.subject).slice(0, 200);
     if (options.keywords) info.Keywords = cleanPdfText(options.keywords).slice(0, 400);
     // `font` als Puffer: pdfkit lädt dann nicht die eingebaute Helvetica (Dateien neben der Bibliothek) – das Paket braucht nur die eigene Schrift
-    this.doc = new PDFDocument({ size: [this.pageWidth, this.pageHeight], margins: this.margins, bufferPages: true, font: fonts.regular as unknown as string, info, lang: options.language ?? "de-DE", displayTitle: true });
+    this.doc = new PDFDocument({ size: [this.pageWidth, this.pageHeight], margins: this.margins, bufferPages: true, font: fonts.regular as unknown as string, info, lang: options.language ?? "de-DE", displayTitle: true, tagged: true } as ConstructorParameters<typeof PDFDocument>[0]);
+    const docApi = this.doc as unknown as { struct(type: string, options?: Record<string, unknown>, children?: unknown[] | null): { add(child: unknown): unknown }; addStructure(element: unknown): void };
+    this.root = docApi.struct("Document");
+    docApi.addStructure(this.root);
     this.doc.registerFont("regular", fonts.regular as unknown as string);
     this.doc.registerFont("bold", fonts.bold as unknown as string);
     this.doc.on("data", (chunk: Buffer) => this.chunks.push(chunk));
@@ -210,6 +217,34 @@ export class PdfBuilder {
     return this.doc.bufferedPageRange().count;
   }
 
+  /** Optionen, die einen Text als Absatz/Überschrift in den Strukturbaum hängen */
+  private tag(type: "P" | "H1" | "H2" | "H3" = "P") {
+    return { structParent: this.root, structType: type } as Record<string, unknown>;
+  }
+
+  /** Zeichnet Dekoration (Linien, Flächen, Kopf-/Fußzeile) als **Artefakt**: Vorleseprogramme überspringen sie. */
+  private artifact<T>(type: "Layout" | "Pagination", draw: () => T): T {
+    const api = this.doc as unknown as { markContent(tag: string, options?: Record<string, unknown>): unknown; endMarkedContent(): unknown };
+    api.markContent("Artifact", { type });
+    try {
+      return draw();
+    } finally {
+      api.endMarkedContent();
+    }
+  }
+
+  /** Zeichnet ein Bild bzw. eine Grafik als `Figure` mit Alternativtext. */
+  private figure<T>(alt: string, draw: () => T): T {
+    const api = this.doc as unknown as { markStructureContent(tag: string): unknown; struct(type: string, options: Record<string, unknown>, children: unknown[]): unknown; endMarkedContent(): unknown };
+    const content = api.markStructureContent("Figure");
+    this.root.add(api.struct("Figure", { alt: cleanPdfText(alt).slice(0, 200) }, [content]));
+    try {
+      return draw();
+    } finally {
+      api.endMarkedContent();
+    }
+  }
+
   private font(bold: boolean, size: number) {
     this.doc.font(bold ? "bold" : "regular").fontSize(size);
   }
@@ -243,7 +278,7 @@ export class PdfBuilder {
     this.font(bold, size);
     const height = this.doc.heightOfString(text, { width, align, lineGap });
     if (height <= this.limit - this.margins.top) this.ensure(height);
-    this.doc.fillColor(color ?? (muted ? MUTED : INK)).text(text, x, this.doc.y, { width, align, lineGap });
+    this.doc.fillColor(color ?? (muted ? MUTED : INK)).text(text, x, this.doc.y, { width, align, lineGap, ...this.tag(style.structType) });
     this.doc.y += after;
     return this;
   }
@@ -256,13 +291,13 @@ export class PdfBuilder {
     const height = this.doc.heightOfString(text, { width: this.contentWidth });
     this.ensure(before + height + 24); // eine Überschrift steht nie allein am Seitenende
     this.doc.y += before;
-    return this.put(text, { size, bold: true, after: level === 1 ? 8 : 4 });
+    return this.put(text, { size, bold: true, after: level === 1 ? 8 : 4, structType: `H${level}` as "H1" | "H2" | "H3" });
   }
 
   rule(): this {
     this.ensure(8);
     const y = this.doc.y + 3;
-    this.doc.moveTo(this.left, y).lineTo(this.right, y).lineWidth(0.6).strokeColor(LINE).stroke();
+    this.artifact("Layout", () => this.doc.moveTo(this.left, y).lineTo(this.right, y).lineWidth(0.6).strokeColor(LINE).stroke());
     this.doc.y = y + 5;
     return this;
   }
@@ -280,9 +315,9 @@ export class PdfBuilder {
       const height = Math.max(this.doc.heightOfString(labelText, { width: labelWidth }), this.doc.heightOfString(valueText, { width: total - labelWidth - gap }));
       this.ensure(height + 2);
       const top = this.doc.y;
-      this.doc.fillColor(MUTED).text(labelText, this.left, top, { width: labelWidth });
+      this.doc.fillColor(MUTED).text(labelText, this.left, top, { width: labelWidth, ...this.tag() });
       this.font(false, size);
-      this.doc.fillColor(INK).text(valueText, this.left + labelWidth + gap, top, { width: total - labelWidth - gap });
+      this.doc.fillColor(INK).text(valueText, this.left + labelWidth + gap, top, { width: total - labelWidth - gap, ...this.tag() });
       this.doc.y = top + height + 2;
     }
     return this;
@@ -311,11 +346,11 @@ export class PdfBuilder {
     const drawRow = (cells: readonly string[], bold: boolean, fill: string | null) => {
       const height = cellHeight(cells, bold);
       const top = this.doc.y;
-      if (fill) this.doc.rect(this.left, top, this.contentWidth, height).fill(fill);
+      if (fill) this.artifact("Layout", () => this.doc.rect(this.left, top, this.contentWidth, height).fill(fill));
       this.font(bold, size);
       this.doc.fillColor(INK);
-      cells.forEach((cell, i) => this.doc.text(cell, offsets[i] + pad, top + pad, { width: widths[i] - 2 * pad, align: spec.columns[i].align ?? "left" }));
-      this.doc.moveTo(this.left, top + height).lineTo(this.right, top + height).lineWidth(0.4).strokeColor(LINE).stroke();
+      cells.forEach((cell, i) => this.doc.text(cell, offsets[i] + pad, top + pad, { width: widths[i] - 2 * pad, align: spec.columns[i].align ?? "left", ...this.tag() }));
+      this.artifact("Layout", () => this.doc.moveTo(this.left, top + height).lineTo(this.right, top + height).lineWidth(0.4).strokeColor(LINE).stroke());
       this.doc.y = top + height;
     };
     const header = head;
@@ -345,14 +380,14 @@ export class PdfBuilder {
     const x = this.right - width;
     for (const row of rows) {
       if (row.strong) {
-        this.doc.moveTo(x, this.doc.y + 1).lineTo(this.right, this.doc.y + 1).lineWidth(0.8).strokeColor(INK).stroke();
+        this.artifact("Layout", () => this.doc.moveTo(x, this.doc.y + 1).lineTo(this.right, this.doc.y + 1).lineWidth(0.8).strokeColor(INK).stroke());
         this.doc.y += 4;
       }
       const top = this.doc.y;
       this.font(Boolean(row.strong), row.strong ? size + 1 : size);
       this.doc.fillColor(INK);
-      this.doc.text(oneLine(row.label, 80), x, top, { width: width * 0.58, lineBreak: false });
-      this.doc.text(oneLine(row.value, 60), x + width * 0.58, top, { width: width * 0.42, align: "right", lineBreak: false });
+      this.doc.text(oneLine(row.label, 80), x, top, { width: width * 0.58, lineBreak: false, ...this.tag() });
+      this.doc.text(oneLine(row.value, 60), x + width * 0.58, top, { width: width * 0.42, align: "right", lineBreak: false, ...this.tag() });
       this.doc.y = top + lineHeight;
     }
     return this;
@@ -364,7 +399,7 @@ export class PdfBuilder {
    * QR-Code als Vektorgrafik (kein Bild, kein Dienst): `data` ist der Inhalt (meist ein Link). Mit Ruhezone von zwei Modulen auf weißem Grund. Ohne `x`/`y` im Textfluss
    * (Kantenlänge `size` Punkt, danach geht es darunter weiter), mit beiden an fester Stelle.
    */
-  qr(data: string, options: { size?: number; x?: number; y?: number } = {}): this {
+  qr(data: string, options: { size?: number; x?: number; y?: number; /** Alternativtext des getaggten PDF (Standard „QR-Code“) */ alt?: string } = {}): this {
     const size = options.size ?? mm(28);
     const placed = options.y !== undefined;
     if (!placed) this.ensure(size);
@@ -378,27 +413,29 @@ export class PdfBuilder {
     }
     const quiet = 2;
     const cell = size / (matrix.size + 2 * quiet);
-    this.doc.rect(x, y, size, size).fill("#ffffff");
-    this.doc.fillColor("#000000");
-    matrix.rows.forEach((row, r) => {
-      let c = 0;
-      while (c < row.length) {
-        if (row[c] !== "1") {
-          c++;
-          continue;
+    this.figure(options.alt ?? "QR-Code", () => {
+      this.doc.rect(x, y, size, size).fill("#ffffff");
+      this.doc.fillColor("#000000");
+      matrix.rows.forEach((row, r) => {
+        let c = 0;
+        while (c < row.length) {
+          if (row[c] !== "1") {
+            c++;
+            continue;
+          }
+          let end = c;
+          while (end < row.length && row[end] === "1") end++;
+          this.doc.rect(x + (c + quiet) * cell, y + (r + quiet) * cell, (end - c) * cell, cell + 0.15).fill();
+          c = end;
         }
-        let end = c;
-        while (end < row.length && row[end] === "1") end++;
-        this.doc.rect(x + (c + quiet) * cell, y + (r + quiet) * cell, (end - c) * cell, cell + 0.15).fill();
-        c = end;
-      }
+      });
     });
     if (!placed) this.doc.y = y + size + 4;
     return this;
   }
 
   /** Bild (PNG/JPEG, z. B. das Firmenlogo) in den Textfluss oder an eine feste Stelle. */
-  image(data: Buffer | Uint8Array, options: { width?: number; height?: number; x?: number; y?: number } = {}): this {
+  image(data: Buffer | Uint8Array, options: { width?: number; height?: number; x?: number; y?: number; /** Alternativtext des getaggten PDF (Standard „Bild“) */ alt?: string } = {}): this {
     if (data.byteLength > MAX_IMAGE_BYTES) throw new PdfError("tooLarge", "image");
     // pdfkit dekodiert Bilder ohne Obergrenze: Bildpunkte vorab aus dem Dateikopf prüfen (kleine Dateien können riesige Bilder sein)
     const checked = sanitizeImage(data, LOGO_LIMITS);
@@ -407,7 +444,7 @@ export class PdfBuilder {
     const fit: [number, number] = [options.width ?? mm(40), options.height ?? mm(20)];
     if (!placed) this.ensure(fit[1]);
     const y = options.y ?? this.doc.y;
-    this.doc.image(Buffer.from(data), options.x ?? this.left, y, { fit });
+    this.figure(options.alt ?? "Bild", () => this.doc.image(Buffer.from(data), options.x ?? this.left, y, { fit }));
     if (!placed) this.doc.y = y + fit[1] + 4;
     return this;
   }
@@ -439,25 +476,27 @@ export class PdfBuilder {
     this.font(bold, size);
     const used = Math.min(box.height, this.doc.heightOfString(text, { width: box.width, align, lineGap }));
     const top = valign === "middle" ? box.y + (box.height - used) / 2 : box.y;
-    this.doc.fillColor(color ?? (muted ? MUTED : INK)).text(text, box.x, top, { width: box.width, height: valign === "middle" ? used + 0.5 : box.height, align, lineGap, ellipsis: true });
+    this.doc.fillColor(color ?? (muted ? MUTED : INK)).text(text, box.x, top, { width: box.width, height: valign === "middle" ? used + 0.5 : box.height, align, lineGap, ellipsis: true, ...this.tag() });
     return used;
   }
 
   /** Rahmen und/oder Fläche an fester Stelle (Etikettenrand, Kästchen zum Abhaken, Schreibfläche für Notizen). */
   rectAt(box: { x: number; y: number; width: number; height: number }, options: { stroke?: boolean; fill?: string; lineWidth?: number; dash?: number } = {}): this {
-    if (options.fill) this.doc.rect(box.x, box.y, box.width, box.height).fill(options.fill);
-    if (options.stroke) {
-      this.doc.save();
-      if (options.dash) this.doc.dash(options.dash, { space: options.dash });
-      this.doc.rect(box.x, box.y, box.width, box.height).lineWidth(options.lineWidth ?? 0.6).strokeColor(LINE).stroke();
-      this.doc.restore();
-    }
+    this.artifact("Layout", () => {
+      if (options.fill) this.doc.rect(box.x, box.y, box.width, box.height).fill(options.fill);
+      if (options.stroke) {
+        this.doc.save();
+        if (options.dash) this.doc.dash(options.dash, { space: options.dash });
+        this.doc.rect(box.x, box.y, box.width, box.height).lineWidth(options.lineWidth ?? 0.6).strokeColor(LINE).stroke();
+        this.doc.restore();
+      }
+    });
     return this;
   }
 
   /** Linie an fester Stelle (Schreiblinien, Trennlinie). */
   lineAt(x1: number, y1: number, x2: number, y2: number, options: { lineWidth?: number; dark?: boolean } = {}): this {
-    this.doc.moveTo(x1, y1).lineTo(x2, y2).lineWidth(options.lineWidth ?? 0.5).strokeColor(options.dark ? INK : LINE).stroke();
+    this.artifact("Layout", () => this.doc.moveTo(x1, y1).lineTo(x2, y2).lineWidth(options.lineWidth ?? 0.5).strokeColor(options.dark ? INK : LINE).stroke());
     return this;
   }
 
@@ -470,17 +509,20 @@ export class PdfBuilder {
       this.doc.switchToPage(index);
       this.doc.page.margins.bottom = 0; // sonst bricht pdfkit für Text im unteren Rand eine neue Seite um
       this.doc.page.margins.top = 0;
+      // Kopf- und Fußzeile sind Artefakte (Seitenzahlen, wiederkehrende Texte): sie stehen nicht im Lesefluss
       if (this.options.runningHeader && index > 0) {
         this.font(false, 8);
-        this.doc.fillColor(MUTED).text(oneLine(this.options.runningHeader, 200), this.left, mm(10), { width: this.contentWidth, lineBreak: false });
+        this.artifact("Pagination", () => this.doc.fillColor(MUTED).text(oneLine(this.options.runningHeader!, 200), this.left, mm(10), { width: this.contentWidth, lineBreak: false }));
       }
       if (footer !== false) {
         const label = (footer?.pageLabel ?? ((page: number, count: number) => `Seite ${page} von ${count}`))(index + 1, total);
         const y = this.pageHeight - mm(12);
         this.font(false, 8);
         this.doc.fillColor(MUTED);
-        if (footer?.text) this.doc.text(oneLine(footer.text, 160), this.left, y, { width: this.contentWidth * 0.7, lineBreak: false });
-        this.doc.text(oneLine(label, 80), this.left, y, { width: this.contentWidth, align: "right", lineBreak: false });
+        this.artifact("Pagination", () => {
+          if (footer?.text) this.doc.text(oneLine(footer.text, 160), this.left, y, { width: this.contentWidth * 0.7, lineBreak: false });
+          this.doc.text(oneLine(label, 80), this.left, y, { width: this.contentWidth, align: "right", lineBreak: false });
+        });
       }
     }
   }

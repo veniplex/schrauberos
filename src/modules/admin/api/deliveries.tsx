@@ -14,7 +14,7 @@ import { DELIVERY_STATUS_TONE } from "./status-tone";
  */
 export async function DeliveryTable({ rows, showWebhook }: { rows: DeliveryRow[]; showWebhook: boolean }) {
   const { t, td, date } = await getI18n();
-  const when = (d: Date) => date(d, { dateStyle: "short", timeStyle: "medium" });
+  const when = (d: Date) => date(d, { dateStyle: "medium", timeStyle: "medium" });
   return (
     <DataTable
       caption={t("api.webhooks.log.title")}

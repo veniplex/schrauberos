@@ -55,6 +55,8 @@ export const appointmentsEn: typeof appointmentsDe = {
   noBay: "No bay",
   emptyList: "No appointments in the selected period.",
   emptyDay: "No appointments on this day.",
+  emptyWeek: "No appointments this week.",
+  closedDaysHidden: "Not shown (closed, no appointments): {days}.",
   weekDays: "Days of the week",
   dayCount_one: "{count} appointment",
   dayCount_other: "{count} appointments",

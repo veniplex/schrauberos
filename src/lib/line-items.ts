@@ -21,6 +21,8 @@ export const PERCENT_DECIMALS = 2;
 export const MAX_QUANTITY_MILLI = 1_000_000 * 1000;
 export const MAX_UNIT_CENTS = 10_000_000 * 100;
 export const MAX_LINES = 200;
+/** Positionsname: höchstens 200 Zeichen (Z6-6 L3) – PDF und XRechnung (BT-153) zeigen damit denselben Text, nichts wird still gekürzt. */
+export const MAX_ITEM_DESCRIPTION = 200;
 
 /** Eine auswertbare Position (alle Werte ganzzahlig). */
 export type ParsedLine = {

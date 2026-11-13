@@ -63,6 +63,20 @@ describe("Pflichtangaben der XRechnung", () => {
     assert.throws(() => buildUblXml(bad), EinvoiceError);
     assert.deepEqual(einvoiceProblems(base), []);
   });
+  it("BR-DE-27/28 (Z6-6 L2): Telefon des Verkäufers mit mindestens drei Ziffern, E-Mail-Adressen mit genau einem @ – die Prüfliste meldet es vorab, es entsteht kein XML", () => {
+    const phone = (value: string) => einvoiceProblems({ ...base, seller: { ...seller, phone: value } });
+    assert.ok(phone("12").includes("sellerPhoneInvalid"));
+    assert.ok(phone("ab-cd").includes("sellerPhoneInvalid"));
+    assert.ok(!phone("12").includes("sellerPhone"), "gefüllt, aber ungültig: eigener Code");
+    for (const ok of ["030 123456", "+49 (30) 12 34", "123", "0 1 2"]) assert.deepEqual(phone(ok), [], ok);
+    const mail = (value: string) => einvoiceProblems({ ...base, seller: { ...seller, email: value } });
+    for (const bad of ["info", "info@", "@mueller.example", "a@b@c.de", "info @mueller.example", "info@muel ler.de"]) assert.ok(mail(bad).includes("sellerEmailInvalid"), bad);
+    assert.deepEqual(mail("info@mueller.example"), []);
+    const buyerMail = (value: string) => einvoiceProblems({ ...base, buyer: { ...buyer, email: value } });
+    assert.ok(buyerMail("kein-at").includes("buyerEmailInvalid"));
+    assert.deepEqual(buyerMail("max@kunde.example"), []);
+    assert.throws(() => buildUblXml({ ...base, seller: { ...seller, phone: "12" } }), EinvoiceError);
+  });
   it("0 % ohne Kleinunternehmer verlangt den Grund der Steuerbefreiung", () => {
     const zero = { ...base, lines: [{ ...base.lines[0], taxBp: 0 }] };
     assert.ok(einvoiceProblems(zero).includes("taxNote"));

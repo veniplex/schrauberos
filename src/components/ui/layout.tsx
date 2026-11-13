@@ -119,7 +119,7 @@ export function Alert({
     success: "bg-success-bg text-success-ink",
   }[tone];
   return (
-    <div role={rest.role ?? (live ? (tone === "danger" ? "alert" : "status") : undefined)} {...rest} className={clsx("rounded-md px-3.5 py-2.5 text-sm", icon ? "flex items-start gap-2" : null, toneClass, className)}>
+    <div role={rest.role ?? (live ? (tone === "danger" ? "alert" : "status") : undefined)} {...rest} className={clsx("rounded-md px-3.5 py-2.5 text-sm", /* Links im Fließtext der Meldung: ohne Tap-Mindesthöhe (sie sprengte den Zeilenabstand, Z6-5 N11); Fließtext-Links sind vom Mindestziel ausgenommen */ "[&_a:not(.btn)]:min-h-0 [&_a:not(.btn)]:min-w-0", icon ? "flex items-start gap-2" : null, toneClass, className)}>
       {icon}
       {icon ? <div className="min-w-0 flex-1">{children}</div> : children}
     </div>

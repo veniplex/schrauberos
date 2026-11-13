@@ -122,6 +122,17 @@ describe("Kalender: zwei Darstellungen per CSS", () => {
     assert.equal(phone.querySelector("a[data-slot]"), null);
   });
 
+  it("Raster: geschlossene Tage ohne Termin fehlen mit Hinweis, eine leere Woche sagt es, die erste Stunde trägt ihr Zeitlabel (Z6-5 N13)", async () => {
+    const { desktop } = await render("WeekView");
+    assert.match(desktop!.textContent ?? "", /Nicht angezeigt \(geschlossen, keine Termine\): Samstag, Sonntag\./);
+    assert.doesNotMatch(desktop!.textContent ?? "", /Keine Termine in dieser Woche/, "diese Woche hat Termine");
+    assert.match(desktop!.querySelector("[aria-hidden]")!.textContent ?? "", /08:00/, "die erste Stunde (8 Uhr) hat ein Label");
+    await view!.unmount();
+    await env.db.appointment.deleteMany();
+    const empty = await render("WeekView");
+    assert.match(empty.desktop!.textContent ?? "", /Keine Termine in dieser Woche\./);
+  });
+
   it("Wochenstreifen: sieben Tage, der gewählte trägt aria-current, die Zahl nennt die Termine des Tages (ohne stornierte)", async () => {
     const { phone, text } = await render("WeekView");
     const chips = [...phone!.querySelectorAll("nav li a")];

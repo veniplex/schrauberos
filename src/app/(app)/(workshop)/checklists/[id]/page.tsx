@@ -47,7 +47,7 @@ export default async function ChecklistPage({ params }: { params: Promise<{ id: 
     done: i.done,
     numberValue: i.numberValue,
     textValue: i.textValue,
-    doneLabel: i.doneByName && i.doneAt ? t("checklists.detail.doneBy", { name: i.doneByName, time: date(i.doneAt, { dateStyle: "short", timeStyle: "short" }) }) : null,
+    doneLabel: i.doneByName && i.doneAt ? t("checklists.detail.doneBy", { name: i.doneByName, time: date(i.doneAt, { dateStyle: "medium", timeStyle: "short" }) }) : null,
     version: i.version,
   }));
   const timeline: TimelineItem[] = checklist.events.map((e) => ({

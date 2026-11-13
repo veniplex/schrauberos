@@ -94,6 +94,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         title={
           <span className="flex flex-wrap items-center gap-3">
             <Plate>{order.vehicle.plate}</Plate>
+            {/* Trenner für Textauszug und Screenreader: ohne ihn liefen Kennzeichen und Nummer zusammen („B ZT 100A-2026-0006“) */}
+            <span className="sr-only"> · </span>
             <span className="tabular">{order.number}</span>
           </span>
         }

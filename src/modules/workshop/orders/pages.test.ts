@@ -106,6 +106,14 @@ describe("Detail", () => {
     assert.match(text, /Auftrag angenommen/);
   });
 
+  it("die Überschrift trennt Kennzeichen und Auftragsnummer (Textauszug und Screenreader lesen sie nicht als ein Wort; Z6-5 N4)", async () => {
+    await login(ALL);
+    const { default: OrderPage } = await import("@/app/(app)/(workshop)/orders/[id]/page");
+    const root = await render(await OrderPage({ params: Promise.resolve({ id: ids.open }) }));
+    const heading = root.querySelector("h1")!.textContent ?? "";
+    assert.match(heading, /B-AB 1234 · \S+/, heading);
+  });
+
   it("Mechaniker: Positionen ohne Preise (nur lesen), kein Preis, keine Freigabe, Status ja, Abschließen nein", async () => {
     await login(["orders.view", "orders.edit", "vehicles.view"]);
     const { default: OrderPage } = await import("@/app/(app)/(workshop)/orders/[id]/page");

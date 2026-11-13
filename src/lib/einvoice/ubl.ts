@@ -134,6 +134,12 @@ export function unitCode(unit: string): string {
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Anzahl der Ziffern (BR-DE-27: das Telefon des Verkäufers braucht mindestens drei). */
+const digitCount = (value: string | null | undefined): number => (value ?? "").replace(/[^0-9]/g, "").length;
+
+/** Gültige Form einer E-Mail-Adresse für die XRechnung (BR-DE-28 verlangt genau ein @, nicht am Anfang oder Ende; dazu ohne Leerraum). */
+const validMail = (value: string | null | undefined): boolean => /^[^@\s]+@[^@\s]+$/.test((value ?? "").trim());
+
 /**
  * Was für eine gültige XRechnung noch fehlt (Codes; die Oberfläche übersetzt sie als `billing.xrechnung.problems.<code>`). Leer = vollständig.
  */
@@ -150,13 +156,16 @@ export function einvoiceProblems(input: EinvoiceInput): string[] {
   if (missing(seller.city)) out.push("sellerCity");
   if (missing(seller.vatId) && missing(seller.taxNumber)) out.push("sellerTaxId");
   if (missing(seller.phone)) out.push("sellerPhone");
+  else if (digitCount(seller.phone) < 3) out.push("sellerPhoneInvalid"); // BR-DE-27: Telefon des Verkäufers mit mindestens drei Ziffern
   if (missing(seller.email)) out.push("sellerEmail");
+  else if (!validMail(seller.email)) out.push("sellerEmailInvalid"); // BR-DE-28: genau ein @, nicht am Anfang oder Ende
   const buyer = input.buyer;
   if (missing(buyer.name)) out.push("buyerName");
   if (missing(buyer.street)) out.push("buyerStreet");
   if (missing(buyer.zip)) out.push("buyerZip");
   if (missing(buyer.city)) out.push("buyerCity");
   if (missing(buyer.email)) out.push("buyerEmail");
+  else if (!validMail(buyer.email)) out.push("buyerEmailInvalid");
   if (input.lines.length === 0) out.push("noLines");
   if (input.payment.method === "transfer" && missing(input.payment.iban)) out.push("iban");
   if (!input.smallBusiness && input.lines.some((line) => line.taxBp === 0) && missing(input.taxNote)) out.push("taxNote");

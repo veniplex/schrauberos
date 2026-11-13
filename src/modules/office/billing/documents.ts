@@ -61,7 +61,7 @@ export async function buildDocumentPdf(view: DocView, options: { logo?: Buffer |
   const top = mm(18);
   if (options.logo) {
     try {
-      pdf.image(options.logo, { width: mm(50), height: mm(18), x: pdf.left, y: top });
+      pdf.image(options.logo, { width: mm(50), height: mm(18), x: pdf.left, y: top, alt: "Logo der Werkstatt" });
     } catch {
       // ein nicht lesbares oder zu großes Logo darf den Beleg nie verhindern
     }

@@ -133,6 +133,10 @@ h1, h2, h3, h4 {
   .btn[aria-busy="true"] {
     @apply cursor-progress opacity-70;
   }
+  /* Link-Knopf beim Seitenwechsel: das Warte-Symbol sitzt mittig, die Beschriftung tritt zurück (statt dass das Symbol den letzten Buchstaben verdeckt; Z6-5 N11) */
+  .btn:has(> [data-pending]) > .btn-label {
+    opacity: 0.35;
+  }
   .btn-primary {
     @apply bg-accent text-accent-ink;
   }

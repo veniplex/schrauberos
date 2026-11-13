@@ -14,7 +14,7 @@ export type Crumb = { href: string; label: ReactNode };
  * - `back` / `breadcrumbs`: der Weg zurück. **Auf jeder Detail-, Bearbeiten- und Neu-Seite Pflicht** (ein installiertes Web-App-Fenster auf dem iPhone hat keine
  *   Zurück-Taste). `breadcrumbs` sind die Vorfahren von oben nach unten (ohne die aktuelle Seite), `back` ist der unmittelbare Vorfahre. Ab `sm` steht der ganze
  *   Pfad, darunter nur „← Vorfahre“.
- * - `help`: Kapitel der Hilfe (`/help/<id>`, Id aus der `help.ts` der Funktion oder ein Allgemein-Kapitel wie `arbeiten-in-der-anwendung`) – ein Hilfe-Knopf in den Aktionen.
+ * - `help`: Kapitel der Hilfe (`/help/<id>`, Id aus der `help.ts` der Funktion oder ein Allgemein-Kapitel wie `arbeiten-in-der-anwendung`) – ein Hilfe-Symbol am Ende der Titelzeile (nicht bei den Aktionen: dort rutschte es mobil in eine eigene Zeile).
  *   Der Knopf erscheint nur, wenn das Kapitel für diese Anmeldung sichtbar ist (Funktion aktiv, Leserecht) – sonst führte er auf eine 404-Seite.
  */
 export async function PageHeader({
@@ -59,20 +59,19 @@ export async function PageHeader({
         </nav>
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          {description ? <div className="mt-1 max-w-prose text-sm text-ink-muted">{description}</div> : null}
-        </div>
-        {actions || showHelp ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {actions}
+        <div className="min-w-0 flex-1">
+          {/* Das Hilfe-Symbol steht immer am Ende der Titelzeile – auf jeder Seite und in jeder Breite an derselben Stelle (nie allein in einer eigenen Zeile zwischen Beschreibung und Aktionen) */}
+          <div className="flex items-start justify-between gap-2" data-page-title-row="">
+            <h1 className="min-w-0 text-2xl font-semibold">{title}</h1>
             {showHelp ? (
               <LinkButton href={`/help/${help}`} variant="ghost" size="icon" aria-label={t("common.helpForPage")} title={t("common.helpForPage")}>
                 <CircleHelp className="size-4" aria-hidden />
               </LinkButton>
             ) : null}
           </div>
-        ) : null}
+          {description ? <div className="mt-1 max-w-prose text-sm text-ink-muted">{description}</div> : null}
+        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     </header>
   );

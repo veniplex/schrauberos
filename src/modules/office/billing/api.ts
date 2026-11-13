@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import { z } from "zod";
 import type { Invoice, InvoiceItem, InvoicePayment } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
+import { MAX_ITEM_DESCRIPTION } from "@/lib/line-items";
 import { parseIfMatch } from "@/lib/api/query";
 import { deliveryHeaders } from "@/lib/file-delivery";
 import { centsText, day, dayOrNull, iso, isoOrNull, nullableString, oneOf, optionalDate, optionalRef, requiredRef, text } from "@/server/api/format";
@@ -54,7 +55,7 @@ const DOC_SCOPE = { source: "billing", ...unrestrictedDocument };
 type Row = Invoice & { items: InvoiceItem[]; cancelledBy: { id: string } | null; deductions: Array<{ partialId: string }> };
 
 const lineBody = z.strictObject({
-  description: z.string().min(1).max(300),
+  description: z.string().min(1).max(MAX_ITEM_DESCRIPTION),
   unit: z.string().max(20).optional(),
   kind: z.enum(ITEM_KINDS).optional(),
   /** Menge in Tausendsteln (1,5 = 1500) */

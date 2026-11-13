@@ -48,7 +48,7 @@ async function MailSettingsTab() {
           minWidth="44rem"
           empty={<p className="px-5 py-8 text-center text-sm text-ink-muted">{t("mail.log.empty")}</p>}
           columns={[
-            { id: "time", header: t("mail.log.time"), priority: "primary", cell: (row) => date(row.createdAt, { dateStyle: "short", timeStyle: "short" }) },
+            { id: "time", header: t("mail.log.time"), priority: "primary", cell: (row) => date(row.createdAt, { dateStyle: "medium", timeStyle: "short" }) },
             { id: "sender", header: t("mail.log.sender"), cell: (row) => (row.userId ? row.userName : t("mail.log.system")) },
             { id: "recipient", header: t("mail.log.recipient"), cell: (row) => row.toAddresses },
             { id: "subject", header: t("mail.log.subject"), cell: (row) => row.subject },

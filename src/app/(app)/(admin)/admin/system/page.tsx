@@ -45,7 +45,7 @@ export default async function SystemPage() {
     monitorHealth(active.has("it.network")),
     secretHoldings(),
   ]);
-  const when = (d: Date | string) => date(d, { dateStyle: "short", timeStyle: "medium" });
+  const when = (d: Date | string) => date(d, { dateStyle: "medium", timeStyle: "medium" });
   const nameOf = (id: string) => td(`system.names.${id}`, id);
   const runner = jobRunner().status();
   const problems = evaluateSystem({

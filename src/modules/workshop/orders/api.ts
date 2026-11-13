@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Order, OrderApproval, OrderItem } from "@/generated/prisma/client";
 import { versionOf } from "@/lib/concurrency";
+import { MAX_ITEM_DESCRIPTION } from "@/lib/line-items";
 import { centsText, iso, isoOrNull, nullableString, oneOf, optionalRef, requiredRef, text } from "@/server/api/format";
 import { defineResource, type Delegate } from "@/server/api/resource";
 import { db } from "@/server/db";
@@ -56,7 +57,7 @@ const lineBody = z.strictObject({
   id: z.string().max(64).optional(),
   orderId: z.string().max(64).optional(),
   position: z.number().int().optional(),
-  description: z.string().min(1).max(300),
+  description: z.string().min(1).max(MAX_ITEM_DESCRIPTION),
   unit: z.string().max(20).optional(),
   kind: z.enum(ORDER_ITEM_KINDS).optional(),
   /** Menge in Tausendsteln (1,5 = 1500) */

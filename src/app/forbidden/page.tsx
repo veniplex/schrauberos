@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import { ShieldAlert } from "lucide-react";
 import { LinkButton } from "@/components/ui/buttons";
 import { getI18n } from "@/i18n/server";
 import { getSession } from "@/server/auth/session";
+
+/** Titel der Registerkarte wie die Überschrift (Z6-5 N4; vorher nur der Name der Anwendung). */
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("auth.forbiddenTitle") };
+}
 
 export default async function ForbiddenPage() {
   const [{ t }, session] = await Promise.all([getI18n(), getSession()]);

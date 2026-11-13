@@ -54,6 +54,8 @@ export const appointmentsDe = {
   noBay: "Ohne Arbeitsplatz",
   emptyList: "Keine Termine im angezeigten Zeitraum.",
   emptyDay: "Keine Termine an diesem Tag.",
+  emptyWeek: "Keine Termine in dieser Woche.",
+  closedDaysHidden: "Nicht angezeigt (geschlossen, keine Termine): {days}.",
   weekDays: "Wochentage",
   dayCount_one: "{count} Termin",
   dayCount_other: "{count} Termine",

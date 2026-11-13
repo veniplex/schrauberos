@@ -12,6 +12,7 @@ import {
   evaluateRows,
   LINE_ITEM_ADD_EVENT,
   lineResult,
+  MAX_ITEM_DESCRIPTION,
   MAX_LINES,
   parseDraft,
   rowsFromItems,
@@ -192,7 +193,7 @@ export function LineItemEditor({
                   <Input
                     ref={(element) => focusNew(element, row.key)}
                     value={row.description}
-                    maxLength={300}
+                    maxLength={MAX_ITEM_DESCRIPTION}
                     disabled={disabled}
                     autoComplete="off"
                     onChange={(event) => set(row.key, "description", event.target.value)}

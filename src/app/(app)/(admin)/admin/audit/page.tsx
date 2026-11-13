@@ -68,7 +68,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         footer={<Pagination page={page} pageSize={list.pageSize} total={total} hrefFor={links.pageHref} />}
         empty={<EmptyState title={t("audit.empty")} />}
         columns={[
-          { id: "time", header: t("audit.cols.time"), priority: "primary", cell: (e) => <span className="tabular whitespace-nowrap">{date(e.createdAt, { dateStyle: "short", timeStyle: "medium" })}</span> },
+          { id: "time", header: t("audit.cols.time"), priority: "primary", cell: (e) => <span className="tabular whitespace-nowrap">{date(e.createdAt, { dateStyle: "medium", timeStyle: "medium" })}</span> },
           { id: "actor", header: t("audit.cols.actor"), cell: (e) => e.actorName },
           { id: "action", header: t("audit.cols.action"), cell: (e) => td(`audit.actions.${e.action}`, e.action) },
           { id: "target", header: t("audit.cols.target"), cell: (e) => <span className="text-ink-muted">{e.target ?? "–"}</span> },

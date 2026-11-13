@@ -1498,6 +1498,8 @@ Persistenter Zeitgeber für alles, was die App im Hintergrund erledigt. Zustand 
 
 Voraussetzung für Rechnung/Angebot (F3) und Etiketten (F8). Läuft in der `FROM scratch`-Laufzeit: kein Chromium, keine Systemschriften, kein natives Addon.
 
+* **Getaggt (Z6-5 N14):** Jedes PDF hat Strukturbaum und `MarkInfo` (`Marked true`), Sprache und Titel: Überschriften (`H1`–`H3`) und Absätze/Zellen (`P`) hängen am Wurzelelement `Document`, Bilder und QR-Codes sind `Figure` mit Alternativtext (`alt`), Linien, Flächen sowie Kopf- und Fußzeile Artefakte (`Layout`/`Pagination`). Tabellen sind flach (kein `Table`/`TR`/`TD`): Der Lesefluss stimmt, ein PDF/UA-Nachweis ist es nicht. Test `server/pdf/tagged.test.ts` (aus den Bytes, BDC/EMC je Seite ausgeglichen).
+
 * **Bibliothek (Entscheidung):** `pdfkit` **0.20.2** (MIT, reines JavaScript; Abhängigkeiten `fontkit` (MIT), `fflate`, `png-js`, `linebreak`, `@noble/hashes`/`@noble/ciphers`, alle ohne Installationsskript) – exakt gepinnt. Verworfen: `pdf-lib` (1.17.1, seit Jahren
   ohne Pflege, Text umbrechen und Tabellen müssten komplett selbst gebaut werden), HTML-zu-PDF über einen Browser (Chromium passt nicht in das Image). `next.config.ts`: `pdfkit`, `fontkit`, `nodemailer` stehen in `serverExternalPackages`
   (kein Bündeln; pdfkit liest Dateien neben seinem Code). Die eingebaute Standardschrift Helvetica wird **nie** geladen (die Schrift wird als Puffer übergeben), das Paket braucht also keine `data/*.afm` der Bibliothek.

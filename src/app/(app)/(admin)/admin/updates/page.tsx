@@ -179,7 +179,7 @@ export default async function UpdatesPage() {
               )}
             </div>
           )}
-          {"at" in check ? <p className="mt-4 text-xs text-ink-muted">{t("updates.check.checkedAt", { date: date(check.at, { dateStyle: "short", timeStyle: "medium" }) })}</p> : null}
+          {"at" in check ? <p className="mt-4 text-xs text-ink-muted">{t("updates.check.checkedAt", { date: date(check.at, { dateStyle: "medium", timeStyle: "medium" }) })}</p> : null}
         </Card>
 
         <Card title={t("updates.changelog.title")}>

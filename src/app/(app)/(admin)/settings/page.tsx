@@ -4,11 +4,14 @@ import { PageHeader } from "@/components/ui/page-header";
 import { TabNav } from "@/components/ui/tab-nav";
 import { getI18n } from "@/i18n/server";
 import { settingsTabsFor } from "@/modules/registry";
-import { requireSession } from "@/server/auth/session";
+import { getSession, requireSession } from "@/server/auth/session";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const { t } = await getI18n();
-  return { title: t("nav.settings") };
+/** Der Titel der Registerkarte nennt den gewählten Reiter („Einstellungen · Sicherheit“); ohne Sitzung nur „Einstellungen“ (Z6-5 N4). Die Reiter-Namen sind keine geschützten Daten. */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ tab?: string }> }): Promise<Metadata> {
+  const [{ t }, sp, session] = await Promise.all([getI18n(), searchParams, getSession()]);
+  const tabs = session ? settingsTabsFor(session) : [];
+  const active = tabs.find((tab) => tab.id === sp.tab) ?? tabs[0];
+  return { title: active ? `${t("nav.settings")} · ${t(active.labelKey)}` : t("nav.settings") };
 }
 
 /** Die Reiter liefern die Funktionen selbst (siehe SettingsTabDef) – ausgeschaltete Funktionen haben hier keinen Reiter. */

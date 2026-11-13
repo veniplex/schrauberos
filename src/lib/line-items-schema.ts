@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_LINES, MAX_QUANTITY_MILLI, MAX_UNIT_CENTS, computeTotals, lineExceedsLimit } from "./line-items";
+import { MAX_ITEM_DESCRIPTION, MAX_LINES, MAX_QUANTITY_MILLI, MAX_UNIT_CENTS, computeTotals, lineExceedsLimit } from "./line-items";
 
 // Die Eingabeschemas liegen bewusst getrennt von der Rechnerei in `line-items.ts`: Der Editor (Browser) braucht nur die Rechnerei, zod gehört nicht ins Browserbündel.
 
@@ -25,7 +25,7 @@ export const lineItemsSchema = (options: { max?: number } = {}) =>
   z
     .array(
       z.object({
-        description: z.string().trim().min(1, { error: "validation.required" }).max(300),
+        description: z.string().trim().min(1, { error: "validation.required" }).max(MAX_ITEM_DESCRIPTION),
         unit: z.string().trim().max(20).default(""),
         quantityMilli: z.number({ error: "validation.number" }).int().min(-MAX_QUANTITY_MILLI).max(MAX_QUANTITY_MILLI),
         unitCents: z.number({ error: "validation.invalid" }).int().min(-MAX_UNIT_CENTS).max(MAX_UNIT_CENTS),

@@ -17,9 +17,10 @@ import { VehiclePicker } from "@/modules/workshop/vehicles/public";
 import { requirePermission } from "@/server/auth/session";
 import { getWorkshop } from "@/server/workshop";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const { t } = await getI18n();
-  return { title: t("billing.new.title") };
+/** Der Titel der Registerkarte folgt der Überschrift: „Rechnung aus Auftrag“ bei `?order=`, sonst „Neuer Beleg“ (Z6-5 N4). */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ order?: string }> }): Promise<Metadata> {
+  const [{ t }, sp] = await Promise.all([getI18n(), searchParams]);
+  return { title: sp.order ? t("billing.fromOrder.title") : t("billing.new.title") };
 }
 
 const TYPES = CREATABLE_TYPES.filter((type) => type !== "confirmation");

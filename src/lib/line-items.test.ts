@@ -10,6 +10,7 @@ import {
   evaluateRows,
   lineExceedsLimit,
   lineResult,
+  MAX_ITEM_DESCRIPTION,
   mulDiv,
   parseDraft,
   parsePercentBp,
@@ -250,6 +251,15 @@ describe("Auswertung und Übergabe an den Server", () => {
     assert.equal(lineItemsInput().safeParse("{kaputt").success, false);
     const two = createEditorState([{ description: "a", unitPrice: "1" }, { description: "b", unitPrice: "1" }]).rows;
     assert.equal(lineItemsInput({ max: 1 }).safeParse(serializeSubmit(two)).success, false);
+  });
+
+  it("der Positionsname hat höchstens 200 Zeichen (Z6-6 L3): PDF und XRechnung zeigen denselben Text, nichts wird still gekürzt", () => {
+    const submit = (description: string) => serializeSubmit(createEditorState([{ description, unitPrice: "1,00" }]).rows);
+    assert.equal(MAX_ITEM_DESCRIPTION, 200);
+    assert.equal(lineItemsInput().safeParse(submit("x".repeat(200))).success, true);
+    const tooLong = lineItemsInput().safeParse(submit("x".repeat(201)));
+    assert.equal(tooLong.success, false);
+    assert.ok(!tooLong.success && tooLong.error.issues.some((issue) => issue.path.join(".") === "0.description"));
   });
 
   it("rowsFromItems → Editor → Absendefeld ist verlustfrei (Bearbeiten)", () => {

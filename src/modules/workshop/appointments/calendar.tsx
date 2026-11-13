@@ -236,8 +236,9 @@ function TimeColumn({ ctx, startHour, endHour }: { ctx: Ctx; startHour: number; 
   return (
     <div className="sticky left-0 z-20 w-12 shrink-0 bg-surface" style={{ height: px((endHour - startHour) * 60) }} aria-hidden>
       {hours.map((h, i) => (
-        <span key={h} className="absolute right-2 -translate-y-1/2 text-xs tabular text-ink-muted" style={{ top: px(i * 60) }}>
-          {i === 0 ? "" : ctx.i18n.date(instantOf(2000, 1, 1, h), { hour: "2-digit", minute: "2-digit" })}
+        // Die erste Stunde trägt ihr Zeitlabel ebenfalls (Z6-5 N13: ein Termin um 07:00 stand vorher ohne Uhrzeit am Rand); sie sitzt unter der Kopfzeile statt auf der Linie, damit nichts abgeschnitten wird
+        <span key={h} className={clsx("absolute right-2 text-xs tabular text-ink-muted", i === 0 ? "translate-y-0.5" : "-translate-y-1/2")} style={{ top: px(i * 60) }}>
+          {ctx.i18n.date(instantOf(2000, 1, 1, h), { hour: "2-digit", minute: "2-digit" })}
         </span>
       ))}
     </div>
@@ -299,7 +300,7 @@ function DayColumn({ ctx, column, col, startHour, endHour, initial }: { ctx: Ctx
               <Link
                 key={i}
                 href={calendarHref(ctx.view, ctx.date, params)}
-                aria-label={ctx.i18n.t("appointments.newAt", { time: ctx.i18n.date(at, { dateStyle: "short", timeStyle: "short" }) })}
+                aria-label={ctx.i18n.t("appointments.newAt", { time: ctx.i18n.date(at, { dateStyle: "medium", timeStyle: "short" }) })}
                 data-slot=""
                 data-col={col}
                 data-row={i}
@@ -483,7 +484,11 @@ function MobileAgenda({ ctx, events, view }: { ctx: Ctx; events: AppointmentRow[
 
 export function WeekView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }) {
   const monday = startOfWeek(ctx.date, { weekStartsOn: 1 });
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i)).filter((d) => ctx.hours[weekdayKey(d)] !== null || events.some((a) => overlapsDay(a, d)));
+  const allDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const days = allDays.filter((d) => ctx.hours[weekdayKey(d)] !== null || events.some((a) => overlapsDay(a, d)));
+  // Geschlossene Tage ohne Termin fehlen im Raster – das Raster sagt es (Z6-5 N13), und eine leere Woche sagt es ebenfalls
+  const hiddenDays = allDays.filter((d) => !days.includes(d)).map((d) => ctx.i18n.date(d, { weekday: "long" }));
+  const weekEmpty = !events.some((a) => allDays.some((d) => overlapsDay(a, d)));
   const columns: Column[] = days.map((d) => {
     const today = isSameDay(d, ctx.now);
     return {
@@ -509,6 +514,8 @@ export function WeekView({ ctx, events }: { ctx: Ctx; events: AppointmentRow[] }
       </div>
       <div className="hidden md:block">
         <TimeGrid ctx={ctx} columns={columns} />
+        {hiddenDays.length > 0 ? <p className="mt-2 text-xs text-ink-muted">{ctx.i18n.t("appointments.closedDaysHidden", { days: hiddenDays.join(", ") })}</p> : null}
+        {weekEmpty ? <EmptyState title={ctx.i18n.t("appointments.emptyWeek")} /> : null}
       </div>
     </>
   );

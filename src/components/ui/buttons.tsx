@@ -43,8 +43,9 @@ export function LinkButton({
     const { children, ...rest } = props;
     return (
       <Link {...rest} className={classes}>
-        {children}
-        <LinkPending />
+        {/* eigener Rahmen für die Beschriftung: beim Warten tritt sie zurück, das Symbol sitzt mittig darüber (globals.css, `.btn-label`) */}
+        <span className="btn-label inline-flex min-w-0 max-w-full items-center justify-center gap-2">{children}</span>
+        <LinkPending className="absolute inset-0 m-auto size-4" />
       </Link>
     );
   }
