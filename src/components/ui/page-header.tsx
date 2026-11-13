@@ -59,14 +59,18 @@ export async function PageHeader({
         </nav>
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        {/* `grow` statt `flex-1`: Basis bleibt die Inhaltsbreite, damit die Aktionen darunter umbrechen, statt den Titel zusammenzudrücken (und das Hilfe-Symbol zu überdecken) */}
+        <div className="min-w-0 grow">
           {/* Das Hilfe-Symbol steht immer am Ende der Titelzeile – auf jeder Seite und in jeder Breite an derselben Stelle (nie allein in einer eigenen Zeile zwischen Beschreibung und Aktionen) */}
           <div className="flex items-start justify-between gap-2" data-page-title-row="">
-            <h1 className="min-w-0 text-2xl font-semibold">{title}</h1>
+            <h1 className="min-w-0 text-2xl font-semibold [overflow-wrap:anywhere]">{title}</h1>
             {showHelp ? (
-              <LinkButton href={`/help/${help}`} variant="ghost" size="icon" aria-label={t("common.helpForPage")} title={t("common.helpForPage")}>
-                <CircleHelp className="size-4" aria-hidden />
-              </LinkButton>
+              // `shrink-0`: ein langer Titel darf das Symbol nie zusammendrücken (es würde vom Titel teilweise verdeckt – zu kleines Touch-Ziel)
+              <span className="shrink-0">
+                <LinkButton href={`/help/${help}`} variant="ghost" size="icon" aria-label={t("common.helpForPage")} title={t("common.helpForPage")}>
+                  <CircleHelp className="size-4" aria-hidden />
+                </LinkButton>
+              </span>
             ) : null}
           </div>
           {description ? <div className="mt-1 max-w-prose text-sm text-ink-muted">{description}</div> : null}
