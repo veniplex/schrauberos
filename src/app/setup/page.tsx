@@ -31,7 +31,7 @@ export default async function SetupPage() {
   const { t } = await getI18n();
   // Funktionsumfang nur anbieten, wenn es eine echte Wahl gibt (mindestens ein Preset schaltet etwas ein)
   const choices = presetChoices(PRESETS, MODULES, FEATURES);
-  const presets = choices.length > 1 ? choices.map((p) => ({ id: p.id, name: t(p.nameKey), description: t(p.descriptionKey) })) : [];
+  const presets = choices.length > 1 ? choices.map((p) => ({ id: p.id, name: t(p.nameKey), description: t(p.descriptionKey), billing: p.enable.includes("office.billing") })) : [];
   const timezones = Intl.supportedValuesOf("timeZone");
 
   return (

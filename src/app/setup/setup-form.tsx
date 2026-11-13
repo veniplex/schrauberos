@@ -24,7 +24,8 @@ function useBrowserTimezone(): string {
   );
 }
 
-export type SetupPreset = { id: string; name: string; description: string };
+/** `billing`: das Preset schaltet die Rechnungserstellung ein (die Einrichtung weist darauf hin, dass der Steuerberater sie vor dem produktiven Einsatz freigeben muss) */
+export type SetupPreset = { id: string; name: string; description: string; billing?: boolean };
 
 export function SetupForm({ timezones, presets = [], done = false }: { timezones: string[]; presets?: SetupPreset[]; done?: boolean }) {
   const { t } = useI18n();
@@ -80,6 +81,7 @@ export function SetupForm({ timezones, presets = [], done = false }: { timezones
           </Select>
         </Field>
       ) : null}
+      {preset?.billing ? <Alert tone="warning">{t("setup.billingNotice")}</Alert> : null}
 
       <hr className="border-line" />
       <p className="text-sm font-medium">{t("setup.adminTitle")}</p>

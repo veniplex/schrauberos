@@ -23,8 +23,8 @@ export const PRESETS: readonly PresetDef[] = [
   { id: "orders", nameKey: "setup.presets.orders.name", descriptionKey: "setup.presets.orders.description", enable: ["workshop.orders", "workshop.parts"] },
   // Mit Angeboten und Rechnungen (F3): Aufträge, Teile & Lager und die Rechnungserstellung
   { id: "invoicing", nameKey: "setup.presets.invoicing.name", descriptionKey: "setup.presets.invoicing.description", enable: ["workshop.orders", "workshop.parts", "office.billing", "office.reports"] },
-  // Werkstattalltag (F5–F7): zusätzlich Zeiterfassung, Dokumente & Fotos und Checklisten
-  { id: "daily", nameKey: "setup.presets.daily.name", descriptionKey: "setup.presets.daily.description", enable: ["workshop.orders", "workshop.parts", "office.time", "workshop.files", "workshop.checklists", "office.reports"] },
+  // Werkstattalltag (F5–F7): zusätzlich Zeiterfassung, Dokumente & Fotos und Checklisten – und, auf Entscheid des Besitzers, die Rechnungserstellung (F3; vor dem produktiven Einsatz vom Steuerberater freizugeben, die Einrichtung weist darauf hin)
+  { id: "daily", nameKey: "setup.presets.daily.name", descriptionKey: "setup.presets.daily.description", enable: ["workshop.orders", "workshop.parts", "office.time", "workshop.files", "workshop.checklists", "office.billing", "office.reports"] },
 ];
 
 export type SkippedReason = "unknown" | "required" | "alreadyOn";

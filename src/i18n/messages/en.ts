@@ -229,11 +229,12 @@ export const en: Messages = {
     timezoneHint: "Appointments are shown and entered in this time zone.",
     adminTitle: "Administrator account",
     preset: "Scope of features",
+    billingNotice: "This scope includes invoicing (quotes & invoices). It has not been approved for professional use: before productive use, a tax advisor must review mandatory details, the small-business wording, partial invoices and cancellations. If you do not need it yet, choose another scope or switch it off later under “Modules & features”.",
     presetHint: "What the workshop starts with. Everything can be switched on and off later under “Modules & features”.",
     presets: {
       basic: { name: "Basic", description: "Appointments, tire storage, customers, vehicles, invoice archive, employees, fleet, handbook and IT documentation." },
       orders: { name: "With orders and stock", description: "Additionally workshop orders (job cards) and parts & stock for the daily workshop routine." },
-      daily: { name: "Daily workshop routine", description: "Orders, parts & stock, time tracking (clocking in, working times, weekly overview), documents & photos and checklists (intake report, oil change, tyre change, inspection preparation)." },
+      daily: { name: "Daily workshop routine", description: "Orders, parts & stock, time tracking (clocking in, working times, weekly overview), documents & photos, checklists (intake report, oil change, tyre change, inspection preparation) and quotes & invoicing." },
       invoicing: { name: "With quotes and invoicing", description: "Additionally orders, parts & stock and quotes & invoicing (quotes, invoices, XRechnung, sending by e-mail)." },
     },
     demo: "Start with sample data",

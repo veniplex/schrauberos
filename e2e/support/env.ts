@@ -30,9 +30,9 @@ export const UPDATE_SNAPSHOTS = process.env.E2E_UPDATE_SNAPSHOTS === "1";
 
 /**
  * Funktionen mit `defaultEnabled: false` müssen in der Browser-CI an sein, sonst wären ihre Seiten 404 und blieben ungeprüft. Die Einrichtung wählt das Preset
- * „Werkstattalltag“; was kein Preset zusammen mit ihm einschaltet, setzt das Setup danach als Schalter (wie die Seite „Module & Funktionen“).
+ * „Werkstattalltag“ (schaltet seit 0.2.0 auch die Rechnungserstellung ein); was kein Preset zusammen mit ihm einschaltet, setzt das Setup danach als Schalter (wie die Seite „Module & Funktionen“) – derzeit nichts.
  */
 export const DEFAULT_OFF_PRESET = "daily";
-export const EXTRA_ENABLED_FEATURES = ["office.billing"] as const;
+export const EXTRA_ENABLED_FEATURES: readonly string[] = [];
 /** Rechte, die nur ausdrücklich vergeben werden (`explicitOnly`, z. B. IT-Tresor): das Setup gibt sie der Administrator-Rolle, damit die Seiten geprüft werden. */
 export const ADMIN_EXPLICIT_PERMISSIONS = ["docsIt.vault", "docsIt.vaultManage"] as const;

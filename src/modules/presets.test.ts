@@ -35,6 +35,19 @@ describe("Presets (ausgeliefert)", () => {
     assert.deepEqual(Object.keys(planPreset(orders, MODULES, FEATURES).overrides).sort(), orders.enable.slice().sort(), "jede Funktion des Presets ist von Haus aus aus und wird eingeschaltet");
     assert.deepEqual(presetChoices(PRESETS, MODULES, FEATURES).map((p) => p.id), ["basic", "orders", "invoicing", "daily"]);
   });
+
+  it("„daily“ (Werkstattalltag) schaltet die Rechnungserstellung samt ihren harten Abhängigkeiten ein (Entscheid des Besitzers, 0.2.0)", () => {
+    const daily = PRESETS.find((p) => p.id === "daily")!;
+    assert.ok(daily.enable.includes("office.billing"));
+    const plan = planPreset(daily, MODULES, FEATURES);
+    assert.equal(plan.overrides["office.billing"], true);
+    const billing = FEATURES.find((f) => `${f.module}.${f.id}` === "office.billing")!;
+    for (const dependency of billing.requires ?? []) {
+      const target = FEATURES.find((f) => `${f.module}.${f.id}` === dependency)!;
+      assert.ok(target.defaultEnabled !== false || plan.overrides[dependency] === true, `${dependency} ist an oder wird mit eingeschaltet`);
+    }
+    assert.deepEqual(plan.skipped.filter((s) => s.reason === "unknown"), []);
+  });
 });
 
 describe("planPreset (Mechanismus mit einem Beispielkatalog)", () => {

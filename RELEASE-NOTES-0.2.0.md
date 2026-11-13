@@ -14,7 +14,7 @@ Beim ersten Start: Einrichtungs-Token aus dem Container-Log, Einrichtung im Brow
 
 ## Neu
 
-**Alle neuen Funktionen sind standardmäßig aus.** Ein Administrator schaltet sie in „Module & Funktionen“ ein oder wählt bei der Einrichtung ein Preset (`basic`, `orders`, `invoicing`, `daily`). Ausgeschaltete Funktionen haben weder Menü noch Rechte; Daten bleiben beim Ausschalten erhalten.
+**Alle neuen Funktionen sind standardmäßig aus.** Ein Administrator schaltet sie in „Module & Funktionen“ ein oder wählt bei der Einrichtung ein Preset (`basic`, `orders`, `invoicing`, `daily`; **`daily` (Werkstattalltag) schaltet auch die Rechnungserstellung ein** – die Einrichtung warnt, dass sie vor dem produktiven Einsatz vom Steuerberater freizugeben ist). Ausgeschaltete Funktionen haben weder Menü noch Rechte; Daten bleiben beim Ausschalten erhalten.
 
 * **Werkstatt:** Aufträge (aus Terminen, mit Befunden, Positionen, Freigabe durch den Kunden, Schnellstatus), Teile & Lager (Wareneingang, Inventur, Bestandsbuchung beim Abschluss), Dokumente & Fotos (Kamera, Mehrfach-Upload, Metadaten werden entfernt), Checklisten (Annahmeprotokoll mit Unterschrift, eigene Vorlagen), Reifenwechsel-Kreis (Ein-/Ausbuchen, Etiketten mit QR-Code), Kalender für Handy und Tablet, Kalender-Abo (iCal), Terminzettel, Halterwechsel und Archiv statt Löschen.
 * **Büro:** Angebote, Auftragsbestätigungen, Abschlags- und Schlussrechnungen, Festschreiben und Storno per Gegenbeleg, E-Rechnung (XRechnung) als getrennter Download, Versand per E-Mail; Berichte (Umsatz, offene Posten, Auslastung); Zeiterfassung (Stempeln, Nachtragen, Übernahme in Aufträge); Mitarbeiter mit Teilzeit und Urlaubsstand; Feiertage nach Region.

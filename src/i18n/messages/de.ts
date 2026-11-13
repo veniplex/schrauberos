@@ -230,11 +230,12 @@ export const de = {
     timezoneHint: "Termine werden in dieser Zeitzone angezeigt und eingegeben.",
     adminTitle: "Administrator-Konto",
     preset: "Funktionsumfang",
+    billingNotice: "Dieser Funktionsumfang enthält die Rechnungserstellung (Angebote & Rechnungen). Sie ist fachlich nicht freigegeben: Vor dem produktiven Einsatz müssen Pflichtangaben, Kleinunternehmer-Text, Abschläge und Storno von der Steuerberatung geprüft werden. Wer sie vorerst nicht braucht, wählt einen anderen Umfang oder schaltet sie später unter „Module & Funktionen“ aus.",
     presetHint: "Womit die Werkstatt startet. Später lässt sich alles unter „Module & Funktionen“ ein- und ausschalten.",
     presets: {
       basic: { name: "Basis", description: "Termine, Reifenlager, Kunden, Fahrzeuge, Rechnungsarchiv, Mitarbeiter, Fuhrpark, Handbuch und IT-Dokumentation." },
       orders: { name: "Mit Aufträgen und Lager", description: "Zusätzlich Werkstattaufträge (Arbeitskarten) und Teile & Lager für den Werkstattalltag." },
-      daily: { name: "Werkstattalltag", description: "Aufträge, Teile & Lager, Zeiterfassung (Stempeln, Arbeitszeiten, Wochenübersicht), Dokumente & Fotos und Checklisten (Annahmeprotokoll, Ölwechsel, Reifenwechsel, HU-Vorbereitung)." },
+      daily: { name: "Werkstattalltag", description: "Aufträge, Teile & Lager, Zeiterfassung (Stempeln, Arbeitszeiten, Wochenübersicht), Dokumente & Fotos, Checklisten (Annahmeprotokoll, Ölwechsel, Reifenwechsel, HU-Vorbereitung) sowie Angebote & Rechnungen." },
       invoicing: { name: "Mit Angeboten und Rechnungen", description: "Zusätzlich Aufträge, Teile & Lager sowie Angebote & Rechnungen (Angebot, Rechnung, XRechnung, Versand per E-Mail)." },
     },
     demo: "Mit Beispieldaten starten",

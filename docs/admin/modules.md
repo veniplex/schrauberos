@@ -2,7 +2,7 @@
 
 Die fachlichen Bereiche (Werkstatt, Büro, IT & Netzwerk, Handbuch) bestehen aus **Funktionen** (Termine, Reifenlager, Rechnungsarchiv …).
 Unter **Module & Funktionen** schalten Administratoren ganze Module oder einzelne Funktionen ein und aus – etwa, wenn ein Betrieb
-den Fuhrpark nicht nutzt.
+den Fuhrpark nicht nutzt. Bei der **Einrichtung** wählt ein Preset den Anfangsumfang; „Mit Angeboten und Rechnungen“ und „Werkstattalltag“ schalten auch **Angebote & Rechnungen** ein – die Einrichtung weist darauf hin, dass die Rechnungserstellung vor dem produktiven Einsatz von der Steuerberatung freigegeben werden muss.
 
 * Beim Ausschalten **bleiben alle Daten erhalten**; nur der Zugriff wird gesperrt (Seiten, Navigation, Übersicht, Rechte).
 * Jede Funktion hat einen **Schalter**. Das **Ausschalten** fragt vorher nach (mit den Folgen für abhängige Funktionen), das Einschalten geht sofort; danach meldet
