@@ -48,15 +48,24 @@ describe("StampButton", () => {
     await flush();
   });
 
-  it("nach Erfolg ignoriert der Knopf Antippen noch kurz (Cooldown), danach bucht er wieder – mit einem neuen Schlüssel", async () => {
-    const keys: string[] = [];
-    const { button, status } = await mountStamp(async (key) => void keys.push(key));
-    await act(() => button.click());
+  it("nach Erfolg ignoriert der Knopf Antippen (Cooldown), danach bucht er wieder – mit einem neuen Schlüssel", async () => {
+    // Zeitunabhängig: ein sehr langer Cooldown prüft das Ignorieren (kann unter Last nie früher ablaufen),
+    // ein ganz kurzer das Wiederbuchen (es wird auf das Ende des Cooldowns gewartet, nie auf eine feste Zeit gewettet).
+    const first: string[] = [];
+    const long = await mountStamp(async (key) => void first.push(key), { cooldownMs: 600_000 });
+    await act(() => long.button.click());
     await flush();
-    assert.match(status(), /Gebucht/);
+    assert.match(long.status(), /Gebucht/);
+    await act(() => long.button.click());
+    assert.equal(first.length, 1, "im Cooldown ignoriert");
+    await view?.unmount();
+    view = null;
+
+    const keys: string[] = [];
+    const { button } = await mountStamp(async (key) => void keys.push(key), { cooldownMs: 5 });
     await act(() => button.click());
-    assert.equal(keys.length, 1, "im Cooldown ignoriert");
-    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 60)));
+    for (let i = 0; i < 200 && button.getAttribute("aria-disabled") !== null; i++) await flush();
+    assert.equal(button.getAttribute("aria-disabled"), null, "der Cooldown endet");
     await act(() => button.click());
     await flush();
     assert.equal(keys.length, 2);
