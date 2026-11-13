@@ -139,10 +139,10 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             header: t("billing.columns.recipient"),
             sort: "recipient",
             cell: (row) => (
-              <div className="text-sm">
-                {isRestricted(row.customer) && !namesVisible ? <span className="text-ink-muted">{t("invoices.restricted.hiddenName")}</span> : row.partyName}
+              <>
+                <span className="text-sm">{isRestricted(row.customer) && !namesVisible ? <span className="text-ink-muted">{t("invoices.restricted.hiddenName")}</span> : row.partyName}</span>
                 {isRestricted(row.customer) ? <div className="text-xs text-warning-ink">{t("invoices.restricted.notice")}</div> : null}
-              </div>
+              </>
             ),
           },
           { id: "date", header: t("billing.columns.date"), sort: "date", cell: (row) => <span className="whitespace-nowrap tabular text-sm">{row.finalizedAt ? date(row.issueDate) : "–"}</span> },
