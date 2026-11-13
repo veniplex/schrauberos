@@ -17,8 +17,9 @@
 #     Das Release-Paket wird aus dem getesteten Image gezogen (docker cp /app), nicht aus einem zweiten Build.
 
 # Basisimage per Digest festgelegt (Lieferkette): ein verschobenes Tag ändert den Build nicht. Dependabot (docker) schlägt neue Digests als Pull
-# Request vor. Von Hand erneuern: Digest von `node:24-slim` (Index über alle Architekturen) aus dem Docker-Hub-Register lesen und hier ersetzen.
-FROM node:24-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS base
+# Request vor. Von Hand erneuern: Digest des Tags (Index über alle Architekturen) aus dem Docker-Hub-Register lesen und hier ersetzen.
+# Node 26 ("Lithium") ist seit dem 28.10.2026 LTS (Wartung bis 04/2029); ungerade Hauptversionen (25, 27 …) sind nie LTS. Die Patchversion ist ausdrücklich genannt und mindestens sieben Tage alt (Lieferkette).
+FROM node:26.13.0-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072 AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
@@ -40,14 +41,14 @@ ARG APP_COMMIT
 RUN npx prisma generate \
  && node scripts/write-version.mjs --out . \
  && npm run build \
- && npx esbuild src/launcher/main.ts --bundle --platform=node --format=esm --target=node24 --outfile=launcher.mjs
+ && npx esbuild src/launcher/main.ts --bundle --platform=node --format=esm --target=node26 --outfile=launcher.mjs
 
 # Laufzeit zum Mitliefern: Node, alle Bibliotheken, die Node und die nativen Module laden (glibc, libstdc++ …), der Lader und die
 # Namensauflösung (nss). Gestartet wird über den mitgelieferten Lader – das Betriebssystem des Hosts/Images wird nicht gebraucht.
 RUN set -eux; \
     mkdir -p /runtime/lib; \
     cp /usr/local/bin/node /runtime/node; \
-    native="$(find node_modules \( -path 'node_modules/sharp' -o -path 'node_modules/@img' \) -prune -o -name '*.node' -print | tr '\n' ' ')"; \
+    native="$(find node_modules \( -path 'node_modules/sharp' -o -path 'node_modules/@img' \) -prune -o -name '*.node' ! -name 'linuxmusl-*.node' ! -name 'darwin-*.node' ! -name 'win32-*.node' -print | tr '\n' ' ')"; \
     for f in $(ldd /usr/local/bin/node $native 2>/dev/null | awk '/=>/ {print $3} /ld-linux/ {print $1}' | sort -u); do cp -L "$f" /runtime/lib/; done; \
     triplet="$(gcc -dumpmachine)"; \
     for n in libnss_files.so.2 libnss_dns.so.2 libresolv.so.2; do cp -L "/lib/$triplet/$n" /runtime/lib/; done; \
@@ -66,6 +67,7 @@ RUN set -eux; \
     mkdir -p /bundle/.next /bundle/prisma/migrations /bundle/assets /bundle/docs /bundle/public; \
     cp -a .next/standalone/. /bundle/; \
     rm -rf /bundle/src /bundle/.env /bundle/.env.* /bundle/node_modules/sharp /bundle/node_modules/@img; \
+    find /bundle/node_modules/better-sqlite3/prebuilds \( -name 'linuxmusl-*.node' -o -name 'darwin-*.node' -o -name 'win32-*.node' \) -delete; \
     cp -a .next/static /bundle/.next/static; \
     cp -a public/. /bundle/public/; \
     cp -a docs/. /bundle/docs/; \
@@ -118,15 +120,15 @@ set -eux
 cat > /etc/apt/sources.list.d/debian.sources <<SOURCES
 Types: deb
 URIs: http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}
-Suites: bookworm bookworm-updates
+Suites: trixie trixie-updates
 Components: main
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp
 
 Types: deb
 URIs: http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}
-Suites: bookworm-security
+Suites: trixie-security
 Components: main
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp
 SOURCES
 # Schnappschuss-Archive tragen ein Ablaufdatum, das lange vorbei ist
 apt-get -o Acquire::Check-Valid-Until=false update

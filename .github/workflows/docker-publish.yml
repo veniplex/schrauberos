@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
       - name: clang für die libFuzzer-Ziele
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang
       # Ubuntu 24.04 beschränkt Benutzer-Namensräume per AppArmor; der PID-Namensraum-Test (unshare -rpf) braucht sie
@@ -141,7 +141,7 @@ jobs:
       # wenn ROOT_PUBLIC_KEY fehlt, gleich dem Release-Schlüssel ist oder ein Testschlüssel im Image landen würde. Schreibt nichts (Ausgabe nur ins Runner-Temp-Verzeichnis).
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
       - name: Wurzelschlüssel ist ein eigener Schlüssel (Tag-Build-Gate)
         run: SOS_TAG_BUILD=1 node scripts/gen-trust-header.mjs --out "$RUNNER_TEMP/trust-keys.h"
 
@@ -155,7 +155,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -193,7 +193,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -230,7 +230,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -270,7 +270,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
       - id: ver
         run: |
           pkg=$(node -p "require('./package.json').version")
@@ -397,7 +397,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
       # Reihenfolge der Tags: "latest" und "X.Y" setzt nur der höchste Versions-Tag. Der Job "guard" prüft nur, dass der Commit auf main liegt; ein Tag auf einem alten main-Commit mit
       # passender package.json-Version würde "latest" sonst zurückdrehen. Vor allem anderen (Signatur, Veröffentlichung, Retag) – es gibt bewusst keinen Pfad für Rückportierungen.
       - name: Der Tag ist der höchste Versions-Tag
@@ -473,7 +473,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
       - run: node scripts/rehearse-release.mjs
 
   # Prüft, dass das Secret RELEASE_SIGNING_KEY zum öffentlichen Schlüssel im Code passt (signiert und prüft eine Zufallsnachricht; veröffentlicht nichts, gibt nichts aus).
@@ -489,7 +489,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
       - name: Schlüsselpaar-Konsistenz
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}

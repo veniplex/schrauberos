@@ -179,7 +179,7 @@ Container muss nichts mehr angefasst werden. Alle Daten liegen im Volume `app-da
 
 ## Schnellstart (lokale Entwicklung)
 
-Voraussetzung: Node.js 22 oder neuer (getestet mit 24).
+Voraussetzung: Node.js 22 oder neuer (das Image läuft mit Node 26, dem aktuellen LTS; lokal getestet mit 24).
 
 ```bash
 npm install
@@ -1990,8 +1990,17 @@ bekommen kein `latest`, nur ihren vollen Namen). Der Inhalt von `main` heißt `x
 
 **Lieferkette:** Alle Actions in der Pipeline sind auf einen Commit-SHA festgelegt (Version im Kommentar, per `gh api` gegen den Tag aufgelöst); das Basisimage im
 `Dockerfile` ist per Digest festgelegt, und der Übersetzer des Starters (Stufe `cc`) kommt aus einem festen Debian-Schnappschuss (`DEBIAN_SNAPSHOT`, dasselbe Datum wie das Basisimage): gleicher Quelltext, gleiche Schlüssel und gleiche Werkzeuge ergeben dasselbe Binary (ein Neubau liefert denselben SHA-256). Dependabot (`.github/dependabot.yml`: npm, Actions, Docker, Compose) schlägt Updates als Pull Requests vor – nichts wird
-von selbst eingespielt, jede Änderung läuft durch dieselbe Pipeline. Digest von Hand erneuern: den Digest des Index von `node:24-slim` aus dem Docker-Hub-Register
-lesen und im `Dockerfile` ersetzen.
+von selbst eingespielt, jede Änderung läuft durch dieselbe Pipeline. Digest von Hand erneuern: den Digest des Index des Tags (`node:26.13.0-slim`) aus dem Docker-Hub-Register
+lesen und im `Dockerfile` ersetzen. Die Hauptversion ist immer eine **gerade** (LTS): Dependabot ignoriert 25/27/29 (`ignore` in `.github/dependabot.yml`), die nächste gerade
+Hauptversion wird von Hand eingeführt (Starter, Pakete, native Module, `@types/node`, `node-version` der Pipeline und `--target` des Launcher-Bündels gemeinsam). Die Patchversion im Tag
+ist mindestens sieben Tage alt; `cooldown` (7 Tage) hält Dependabot für alle Quellen zurück (Lieferkette). Node 26 beruht auf **Debian 13 (trixie)**: Die Stufe `cc` nutzt denselben Schnappschuss-Zeitpunkt
+wie das Basisimage, aber die Suites `trixie*` (gcc 14, glibc 2.41); das Paket bringt Lader und Bibliotheken des Basisimages mit.
+
+**Werkzeugkette (npm):** `typescript` ist ein Alias auf `@typescript/typescript6` (die JS-Schnittstelle, die typescript-eslint und `next build` brauchen – TypeScript 7 liefert keine), `@typescript/native`
+ist TypeScript 7 (`tsc` für `npm run typecheck`, rund 4 s statt 25 s; `next build` prüft zusätzlich mit 6.x). Der Alias bleibt auf 6.x, bis typescript-eslint TypeScript ≥ 7.1 unterstützt. **ESLint 10:** die Plugins aus
+`eslint-config-next` (`import`, `jsx-a11y`, `react`) nennen ESLint 10 noch nicht in ihrem Peer-Bereich (`npm ls` meldet „invalid“, npm überschreibt den Peer beim Auflösen); ihre Regeln laufen nachweislich
+(Probe mit absichtlichen Verstößen). **better-sqlite3 13** (N-API, Prebuilds im Paket statt `prebuild-install`/`node-gyp`): `overrides` zwingt auch den Prisma-Adapter auf dieselbe Kopie (der Adapter
+verlangt `^12.6.0`); das Dockerfile nimmt nur die glibc-Prebuilds in Laufzeit und Paket auf (`linuxmusl-*`, `darwin-*`, `win32-*` werden entfernt).
 
 **Smoke-Test des Images** (`bash scripts/smoke-image.sh <lokales-image>`, lokal mit Docker ebenso): prüft den Besitzer im Image (`/app` root, `/data` 1000), startet
 es mit `docker-compose.yml` **und** mit `docker-compose.hardened.yml` und verlangt je: gesund, `/api/health` ok, `/login` mit erzwungener CSP, Weiterleitung ohne Anmeldung,
