@@ -12,8 +12,8 @@ async function demo(db: PrismaClient) {
     loc[name] = await db.netLocation.create({ data: { name, sortOrder: i } });
   }
   const vlan: Record<number, { id: string }> = {};
-  for (const [vlanId, name] of [[10, "Büro"], [20, "Werkstatt"], [30, "Gäste-WLAN"], [99, "Management"]] as Array<[number, string]>) {
-    vlan[vlanId] = await db.netVlan.create({ data: { vlanId, name } });
+  for (const [number, name] of [[10, "Büro"], [20, "Werkstatt"], [30, "Gäste-WLAN"], [99, "Management"]] as Array<[number, string]>) {
+    vlan[number] = await db.netVlan.create({ data: { number, name } });
   }
   const subnet = (name: string, cidr: string, v: number, extra: object = {}) =>
     db.netSubnet.create({ data: { name, cidr, vlanId: vlan[v].id, ...extra } });

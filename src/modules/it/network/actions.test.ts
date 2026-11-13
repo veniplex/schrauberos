@@ -75,23 +75,23 @@ describe("VLANs, Subnetze und IP-Adressen", () => {
 
   it("VLAN-Nummern sind eindeutig und zwischen 1 und 4094", async () => {
     await login(["network.edit"]);
-    assert.equal((await actions.saveVlan({}, form({ vlanId: 10, name: "Büro" }))).ok, true);
-    assert.ok((await actions.saveVlan({}, form({ vlanId: 10, name: "Doppelt" }))).fieldErrors?.vlanId);
-    assert.ok((await actions.saveVlan({}, form({ vlanId: 4095, name: "Zu hoch" }))).fieldErrors?.vlanId);
+    assert.equal((await actions.saveVlan({}, form({ number: 10, name: "Büro" }))).ok, true);
+    assert.ok((await actions.saveVlan({}, form({ number: 10, name: "Doppelt" }))).fieldErrors?.number);
+    assert.ok((await actions.saveVlan({}, form({ number: 4095, name: "Zu hoch" }))).fieldErrors?.number);
     assert.equal(await env.db.netVlan.count(), 1);
     const vlan = await env.db.netVlan.findFirstOrThrow();
-    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, version: versionOf(vlan), vlanId: 10, name: "Umbenannt" }))).ok, true, "die eigene Nummer bleibt erlaubt");
+    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, version: versionOf(vlan), number: 10, name: "Umbenannt" }))).ok, true, "die eigene Nummer bleibt erlaubt");
   });
 
   it("gleichzeitiges Bearbeiten (Z7): VLAN und Subnetz tragen eine Version; wer mit veraltetem Stand speichert, überschreibt nichts", async () => {
     await login(["network.edit"]);
-    await actions.saveVlan({}, form({ vlanId: 30, name: "Drucker" }));
+    await actions.saveVlan({}, form({ number: 30, name: "Drucker" }));
     const vlan = await env.db.netVlan.findFirstOrThrow();
     const stale = versionOf(vlan);
-    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, version: stale, vlanId: 30, name: "Drucker 2" }))).ok, true);
-    const lost = await actions.saveVlan({}, form({ id: vlan.id, version: stale, vlanId: 30, name: "Überschrieben" }));
+    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, version: stale, number: 30, name: "Drucker 2" }))).ok, true);
+    const lost = await actions.saveVlan({}, form({ id: vlan.id, version: stale, number: 30, name: "Überschrieben" }));
     assert.equal(lost.error, de.common.conflict);
-    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, vlanId: 30, name: "Ohne Version" }))).error, de.common.conflict, "ohne Version gibt es keine Speicherung");
+    assert.equal((await actions.saveVlan({}, form({ id: vlan.id, number: 30, name: "Ohne Version" }))).error, de.common.conflict, "ohne Version gibt es keine Speicherung");
     assert.equal((await env.db.netVlan.findUniqueOrThrow({ where: { id: vlan.id } })).name, "Drucker 2");
 
     await redirectOf(() => subnet());
@@ -136,7 +136,7 @@ describe("VLANs, Subnetze und IP-Adressen", () => {
 
   it("Löschen von IP, Subnetz und VLAN braucht network.delete und wird protokolliert; ein Subnetz nimmt seine IPs mit", async () => {
     await login(["network.edit", "network.delete"]);
-    await actions.saveVlan({}, form({ vlanId: 20, name: "Gäste" }));
+    await actions.saveVlan({}, form({ number: 20, name: "Gäste" }));
     await redirectOf(() => subnet());
     const net = await env.db.netSubnet.findFirstOrThrow();
     await redirectOf(() => ip(net.id));
@@ -186,7 +186,7 @@ describe("Standorte und Kabel", () => {
     await login(["network.view"]);
     for (const run of [
       () => actions.saveLocation({}, form({ name: "X" })),
-      () => actions.saveVlan({}, form({ vlanId: 5, name: "X" })),
+      () => actions.saveVlan({}, form({ number: 5, name: "X" })),
       () => actions.saveConnection({}, form({ fromDeviceId: "a", toDeviceId: "b" })),
       () => actions.deleteLocation(form({ id: "x" })),
       () => actions.deleteConnection(form({ id: "x" })),
@@ -197,7 +197,7 @@ describe("Standorte und Kabel", () => {
 
 describe("Subnetze: Überschneidung, /31, /32 und IP-Eindeutigkeit je Netz (P4b-6)", () => {
   const subnet = (fields: Record<string, string | undefined>) => actions.saveSubnet({}, form({ name: "Netz", ...fields }));
-  const vlan = async (vlanId: number) => (await env.db.netVlan.create({ data: { vlanId, name: `VLAN ${vlanId}` } })).id;
+  const vlan = async (number: number) => (await env.db.netVlan.create({ data: { number, name: `VLAN ${number}` } })).id;
 
   it("im selben VLAN (auch ohne VLAN) sind Überschneidungen gesperrt – gleiches Netz, Teilnetz und Obernetz; aneinandergrenzende Netze gehen", async () => {
     await login(["network.edit"]);

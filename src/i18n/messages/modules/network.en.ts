@@ -82,7 +82,7 @@ export const networkEn: typeof networkDe = {
     warrantyUntil: "Warranty until",
     monitorEnabled: "Monitor reachability",
     monitorHint: "Marks the device for monitoring. Measuring starts once a target for this device is set up under “Monitoring” and monitoring is switched on; until then the status stays “unknown”.",
-    vlanId: "VLAN ID",
+    vlanNumber: "VLAN ID",
     vlanName: "Name",
     description: "Description",
     locationName: "Location/room name",

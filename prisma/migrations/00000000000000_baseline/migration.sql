@@ -385,7 +385,7 @@ CREATE TABLE "NetLocation" (
 -- CreateTable
 CREATE TABLE "NetVlan" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "vlanId" INTEGER NOT NULL,
+    "number" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "updatedAt" DATETIME NOT NULL
@@ -1484,7 +1484,7 @@ CREATE INDEX "TireSet_status_idx" ON "TireSet"("status");
 CREATE UNIQUE INDEX "Tire_tireSetId_position_key" ON "Tire"("tireSetId", "position");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "NetVlan_vlanId_key" ON "NetVlan"("vlanId");
+CREATE UNIQUE INDEX "NetVlan_number_key" ON "NetVlan"("number");
 
 -- CreateIndex
 CREATE INDEX "NetSubnet_cidr_idx" ON "NetSubnet"("cidr");

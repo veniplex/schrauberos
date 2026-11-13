@@ -9,13 +9,13 @@ import { saveConnection, saveIp, saveLocation, saveSubnet, saveVlan } from "./ac
 
 /* ───────────── VLAN (eine Zeile) ───────────── */
 
-export function VlanForm({ initial }: { initial?: { id: string; version: string; vlanId: number; name: string; description: string } }) {
+export function VlanForm({ initial }: { initial?: { id: string; version: string; number: number; name: string; description: string } }) {
   const { t } = useI18n();
   return (
     <Form action={saveVlan} className="flex flex-wrap items-start gap-3">
       {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
       {initial ? <input type="hidden" name="version" value={initial.version} /> : null}
-      <Input name="vlanId" type="number" min={1} max={4094} defaultValue={initial?.vlanId} placeholder="VLAN-ID" aria-label={t("network.fields.vlanId")} className="w-28" required />
+      <Input name="number" type="number" min={1} max={4094} defaultValue={initial?.number} placeholder="VLAN-ID" aria-label={t("network.fields.vlanNumber")} className="w-28" required />
       <Input name="name" defaultValue={initial?.name} placeholder={t("network.fields.vlanName")} aria-label={t("network.fields.vlanName")} className="min-w-36 flex-1" maxLength={60} required />
       <Input name="description" defaultValue={initial?.description} placeholder={t("network.fields.description")} aria-label={t("network.fields.description")} className="min-w-40 flex-[2]" maxLength={200} />
       <SubmitButton variant={initial ? "secondary" : "primary"} size="sm" className="mt-0.5">
@@ -108,7 +108,7 @@ export function SubnetForm({
   cancelHref,
 }: {
   initial: SubnetFormInitial;
-  vlans: Array<{ id: string; vlanId: number; name: string }>;
+  vlans: Array<{ id: string; number: number; name: string }>;
   cancelHref: string;
 }) {
   const { t } = useI18n();
@@ -135,7 +135,7 @@ export function SubnetForm({
             <option value="">{t("common.none")}</option>
             {vlans.map((v) => (
               <option key={v.id} value={v.id}>
-                VLAN {v.vlanId} · {v.name}
+                VLAN {v.number} · {v.name}
               </option>
             ))}
           </Select>

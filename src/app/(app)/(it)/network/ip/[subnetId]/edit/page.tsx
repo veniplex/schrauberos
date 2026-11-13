@@ -20,7 +20,7 @@ export default async function EditSubnetPage({ params }: { params: Promise<{ sub
   const [{ t }, { subnetId }] = await Promise.all([getI18n(), params]);
   const [subnet, vlans] = await Promise.all([
     db.netSubnet.findUnique({ where: { id: subnetId }, include: { _count: { select: { ips: true } } } }),
-    db.netVlan.findMany({ orderBy: { vlanId: "asc" } }),
+    db.netVlan.findMany({ orderBy: { number: "asc" } }),
   ]);
   if (!subnet) notFound();
 

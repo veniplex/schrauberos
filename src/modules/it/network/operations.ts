@@ -79,7 +79,7 @@ export const deleteDeviceOperation = defineOperation({
 const vlanInput = z.object({
   id: z.string().optional(),
   version: z.string().optional(),
-  vlanId: z.coerce.number().int().min(1).max(4094),
+  number: z.coerce.number().int().min(1).max(4094),
   name: z.string().trim().min(1).max(60),
   description: z.string().max(200).optional(),
 });
@@ -90,12 +90,12 @@ export const saveVlanOperation = defineOperation({
   input: vlanInput,
   audit: (input) => (input.id ? "network.update" : "network.create"),
   run: async ({ input: { id, version, ...d }, tx, audit }) => {
-    const dup = await tx.netVlan.findFirst({ where: { vlanId: d.vlanId, ...(id ? { id: { not: id } } : {}) } });
-    if (dup) failField("vlanId", "network.errors.vlanExists");
-    const data = { vlanId: d.vlanId, name: d.name, description: d.description ?? null };
+    const dup = await tx.netVlan.findFirst({ where: { number: d.number, ...(id ? { id: { not: id } } : {}) } });
+    if (dup) failField("number", "network.errors.vlanExists");
+    const data = { number: d.number, name: d.name, description: d.description ?? null };
     if (id && !(await claimRow(tx.netVlan, id, version))) fail("conflict");
     const saved = id ? await tx.netVlan.update({ where: { id }, data }) : await tx.netVlan.create({ data });
-    audit({ target: `VLAN: ${saved.vlanId} ${saved.name}`, entityId: saved.id });
+    audit({ target: `VLAN: ${saved.number} ${saved.name}`, entityId: saved.id });
     return { id: saved.id };
   },
 });
@@ -106,10 +106,10 @@ export const deleteVlanOperation = defineOperation({
   input: idInput,
   audit: "network.delete",
   run: async ({ input, tx, audit }) => {
-    const vlan = await tx.netVlan.findUnique({ where: { id: input.id }, select: { vlanId: true, name: true } });
+    const vlan = await tx.netVlan.findUnique({ where: { id: input.id }, select: { number: true, name: true } });
     if (!vlan) fail("notFound");
     await tx.netVlan.delete({ where: { id: input.id } });
-    audit({ target: `VLAN: ${vlan.vlanId} ${vlan.name}`, entityId: input.id });
+    audit({ target: `VLAN: ${vlan.number} ${vlan.name}`, entityId: input.id });
     return { id: input.id };
   },
 });

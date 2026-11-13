@@ -63,7 +63,7 @@ export default async function SubnetPage({
         description={
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-mono">{subnet.cidr}</span>
-            {subnet.vlan ? <Badge tone="info">VLAN {subnet.vlan.vlanId} · {subnet.vlan.name}</Badge> : null}
+            {subnet.vlan ? <Badge tone="info">VLAN {subnet.vlan.number} · {subnet.vlan.name}</Badge> : null}
           </span>
         }
         actions={

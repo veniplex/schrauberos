@@ -175,7 +175,6 @@ const vlanBody = z.strictObject({
   description: text(200),
 });
 const vlanItem = z.object({ id: z.string(), version: z.string(), number: z.number().int(), name: z.string(), description: nullableString });
-const vlanInput = ({ number, ...rest }: Record<string, unknown>): Record<string, unknown> => ({ ...rest, vlanId: number });
 
 export const vlanEndpoints = defineResource({
   feature: "it.network",
@@ -187,19 +186,18 @@ export const vlanEndpoints = defineResource({
   model: db.netVlan as unknown as Delegate<NetVlan>,
   item: vlanItem,
   version: versionOf,
-  toItem: (v): z.input<typeof vlanItem> => ({ id: v.id, version: versionOf(v), number: v.vlanId, name: v.name, description: v.description }),
+  toItem: (v): z.input<typeof vlanItem> => ({ id: v.id, version: versionOf(v), number: v.number, name: v.name, description: v.description }),
   list: {
     filters: z.strictObject({}),
-    sorts: { number: (dir) => ({ vlanId: dir }), name: (dir) => ({ name: dir }) },
+    sorts: { number: (dir) => ({ number: dir }), name: (dir) => ({ name: dir }) },
     defaultSort: [{ key: "number", dir: "asc" }],
   },
-  create: { permission: "network.edit", operation: saveVlanOperation, body: vlanBody, toInput: vlanInput, rename: { vlanId: "number" } },
+  create: { permission: "network.edit", operation: saveVlanOperation, body: vlanBody, toInput: (b) => b },
   update: {
     permission: "network.edit",
     operation: saveVlanOperation,
-    current: (v) => ({ number: v.vlanId, name: v.name, description: v.description }),
-    toInput: (merged, { id, version }) => ({ ...vlanInput(merged), id, version }),
-    rename: { vlanId: "number" },
+    current: (v) => ({ number: v.number, name: v.name, description: v.description }),
+    toInput: (merged, { id, version }) => ({ ...merged, id, version }),
   },
   remove: { permission: "network.delete", operation: deleteVlanOperation },
 });

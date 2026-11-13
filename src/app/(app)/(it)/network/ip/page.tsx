@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function IpamPage() {
   const session = await requirePermission("network.view");
   const { t, tp, number } = await getI18n();
-  const [subnets, vlans] = await Promise.all([listSubnets(), db.netVlan.findMany({ orderBy: { vlanId: "asc" }, include: { _count: { select: { subnets: true } } } })]);
+  const [subnets, vlans] = await Promise.all([listSubnets(), db.netVlan.findMany({ orderBy: { number: "asc" }, include: { _count: { select: { subnets: true } } } })]);
   const canEdit = session.can("network.edit");
   const canDelete = session.can("network.delete");
 
@@ -57,7 +57,7 @@ export default async function IpamPage() {
             columns={[
               { id: "name", header: t("network.cols.subnet"), priority: "primary", cell: (s) => s.name },
               { id: "cidr", header: t("network.fields.cidr"), cell: (s) => <span className="font-mono text-[13px]">{s.cidr}</span> },
-              { id: "vlan", header: "VLAN", cell: (s) => (s.vlan ? <Badge tone="info">VLAN {s.vlan.vlanId}</Badge> : <span className="text-ink-muted">–</span>) },
+              { id: "vlan", header: "VLAN", cell: (s) => (s.vlan ? <Badge tone="info">VLAN {s.vlan.number}</Badge> : <span className="text-ink-muted">–</span>) },
               { id: "gateway", header: t("network.fields.gateway"), cell: (s) => <span className="font-mono text-[13px]">{s.gateway ?? <span className="font-sans text-ink-muted">–</span>}</span> },
               {
                 id: "utilization",
@@ -92,11 +92,11 @@ export default async function IpamPage() {
                 <li key={v.id} className="flex flex-wrap items-start gap-3 px-5 py-3">
                   {canEdit ? (
                     <div className="min-w-0 flex-1">
-                      <VlanForm initial={{ id: v.id, version: versionOf(v), vlanId: v.vlanId, name: v.name, description: v.description ?? "" }} />
+                      <VlanForm initial={{ id: v.id, version: versionOf(v), number: v.number, name: v.name, description: v.description ?? "" }} />
                     </div>
                   ) : (
                     <div className="min-w-0 flex-1 text-sm">
-                      <span className="font-medium">VLAN {v.vlanId}</span> · {v.name}
+                      <span className="font-medium">VLAN {v.number}</span> · {v.name}
                       {v.description ? <span className="text-ink-muted"> – {v.description}</span> : null}
                     </div>
                   )}
@@ -104,7 +104,7 @@ export default async function IpamPage() {
                   {canDelete ? (
                     <form action={deleteVlan}>
                       <input type="hidden" name="id" value={v.id} />
-                      <ConfirmSubmitButton message={t("network.vlanDeleteConfirm")} target={`VLAN ${v.vlanId} ${v.name}`} label={t("common.delete")}>
+                      <ConfirmSubmitButton message={t("network.vlanDeleteConfirm")} target={`VLAN ${v.number} ${v.name}`} label={t("common.delete")}>
                         <Trash2 className="size-3.5" aria-hidden />
                       </ConfirmSubmitButton>
                     </form>

@@ -568,7 +568,8 @@ model NetLocation {
 
 model NetVlan {
   id          String  @id @default(cuid())
-  vlanId      Int     @unique
+  // die VLAN-Nummer (802.1Q, 1–4094); `NetSubnet.vlanId` ist dagegen der Fremdschlüssel auf diese Zeile (Konvention: Fremdschlüssel heißen `<Beziehung>Id`, fachliche Nummern anders)
+  number      Int     @unique
   name        String
   description String?
   updatedAt DateTime @updatedAt

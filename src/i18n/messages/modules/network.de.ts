@@ -81,7 +81,7 @@ export const networkDe = {
     warrantyUntil: "Garantie bis",
     monitorEnabled: "Erreichbarkeit überwachen",
     monitorHint: "Merkt das Gerät für die Überwachung vor. Gemessen wird, sobald unter „Überwachung“ ein Ziel für dieses Gerät eingerichtet und die Überwachung eingeschaltet ist; bis dahin bleibt der Status „unbekannt“.",
-    vlanId: "VLAN-ID",
+    vlanNumber: "VLAN-ID",
     vlanName: "Name",
     description: "Beschreibung",
     locationName: "Name des Standorts/Raums",

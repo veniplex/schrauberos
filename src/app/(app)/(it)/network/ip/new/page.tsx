@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function NewSubnetPage() {
   await requirePermission("network.edit");
-  const [{ t }, vlans] = await Promise.all([getI18n(), db.netVlan.findMany({ orderBy: { vlanId: "asc" } })]);
+  const [{ t }, vlans] = await Promise.all([getI18n(), db.netVlan.findMany({ orderBy: { number: "asc" } })]);
   return (
     <>
       <PageHeader back={{ href: "/network/ip", label: t("nav.ipam") }} help="it.network" title={t("network.subnetNew")} />
