@@ -325,6 +325,7 @@ export const auditDe = {
       unlockRecovery: "Tresor mit dem Wiederherstellungsschlüssel entsperrt",
       lock: "Tresor gesperrt",
       passphrase: "Tresor-Passphrase geändert",
+      recoveryWrap: "Wiederherstellungsschlüssel für den Tresor hinterlegt",
       reset: "Tresor zurückgesetzt (Zugangsdaten entfernt)",
     },
     docs: {

@@ -98,16 +98,25 @@ describe("Kryptografie der Hülle (lib/vault-keys)", () => {
 
   it("scrypt-Kosten aus dem Datensatz werden begrenzt (Speicherbedarf, abgesenkte Kosten)", () => {
     assert.equal(keys.validScryptParams({ N: 2 ** 17, r: 8, p: 1 }), true);
-    for (const bad of [{ N: 2 ** 19, r: 8, p: 1 }, { N: 2 ** 10, r: 8, p: 1 }, { N: 3 * 2 ** 14, r: 8, p: 1 }, { N: 2 ** 15, r: 64, p: 1 }, { N: 2 ** 15, r: 8, p: 9 }]) assert.equal(keys.validScryptParams(bad), false, JSON.stringify(bad));
+    for (const bad of [{ N: 2 ** 19, r: 8, p: 1 }, { N: 2 ** 10, r: 8, p: 1 }, { N: 3 * 2 ** 14, r: 8, p: 1 }, { N: 2 ** 15, r: 64, p: 1 }, { N: 2 ** 15, r: 9, p: 1 }, { N: 2 ** 15, r: 16, p: 1 }, { N: 2 ** 15, r: 8, p: 3 }, { N: 2 ** 15, r: 8, p: 9 }]) assert.equal(keys.validScryptParams(bad), false, JSON.stringify(bad));
+    assert.equal(keys.validScryptParams({ N: 2 ** 18, r: 8, p: 2 }), true, "die Obergrenze der eigenen Wahl");
   });
 
   it("Mindestqualität der Passphrase", () => {
     assert.equal(keys.passphraseProblem("kurz"), "tooShort");
     assert.equal(keys.passphraseProblem("a".repeat(300)), "tooLong");
     assert.equal(keys.passphraseProblem("aaaaaaaaaaaaaaaa"), "weak");
-    assert.equal(keys.passphraseProblem("123456789012345"), "weak");
+    assert.equal(keys.passphraseProblem("Sommer2026!!"), "tooShort", "12 Zeichen genügen nicht mehr: die Passphrase ist der Schutz gegen Offline-Raten auf einer Sicherung");
+    assert.equal(keys.passphraseProblem("123456789012345"), "tooShort");
+    assert.equal(keys.passphraseProblem("1234567890123456"), "weak");
     assert.equal(keys.passphraseProblem("Passwort Passwort"), "weak");
-    assert.equal(keys.passphraseProblem("chef-meier-2026", { username: "chef-meier" }), "username");
+    assert.equal(keys.passphraseProblem("abcabcabcabcabcabc"), "weak", "Wiederholung eines kurzen Bausteins");
+    assert.equal(keys.passphraseProblem("Haus-Haus-Haus-Haus-Haus"), "weak");
+    assert.equal(keys.passphraseProblem("abcdefghijklmnopqrst"), "weak", "Zeichenfolge");
+    assert.equal(keys.passphraseProblem("zyxwvutsrqponmlkjih"), "weak", "absteigende Zeichenfolge");
+    assert.equal(keys.passphraseProblem("aabbccddaabbccdd1"), "weak", "zu wenige verschiedene Zeichen");
+    assert.equal(keys.passphraseProblem("Mein Hund heißt Bello 7"), null, "ein Satz genügt");
+    assert.equal(keys.passphraseProblem("chef-meier-20261", { username: "chef-meier" }), "username");
     assert.equal(keys.passphraseProblem(PASSPHRASE, { username: "chef" }), null);
   });
 });
@@ -205,9 +214,10 @@ describe("Passphrase ändern", () => {
     assert.ok((await setup()).ok);
     const entry = await sealedEntry();
     const before = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
-    const change = (passphrase: string, password = PASSWORD) => ops.changeVaultPassphraseOperation.execute(session, { passphrase, confirm: passphrase, password });
+    const change = (passphrase: string, password = PASSWORD, extra: Record<string, unknown> = {}) => ops.changeVaultPassphraseOperation.execute(session, { current: PASSPHRASE, passphrase, confirm: passphrase, password, ...extra });
     assert.ok(failure(await change(NEW_PASSPHRASE, "falsch")).fields?.password);
     assert.equal(failure(await change("kurz")).fields?.passphrase?.key, "vault.keyring.errors.tooShort");
+    assert.equal(failure(await change("Sommer2026!!")).fields?.passphrase?.key, "vault.keyring.errors.tooShort", "mindestens 16 Zeichen");
     assert.ok((await change(NEW_PASSPHRASE)).ok);
     const after = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
     assert.notEqual(after.wrappedKey, before.wrappedKey);
@@ -241,7 +251,7 @@ describe("Wiederherstellungsschlüssel (ein Schlüssel für alles)", () => {
     assert.ok((await unlockRecovery(key1)).ok);
     assert.equal(crypto.openVaultEntry(await env.db.vaultEntry.findUniqueOrThrow({ where: { id: entry.id } })).ok, true);
     // Passphrase vergessen: nach dem Entsperren mit dem Schlüssel neu setzen
-    assert.ok((await ops.changeVaultPassphraseOperation.execute(session, { passphrase: NEW_PASSPHRASE, confirm: NEW_PASSPHRASE, password: PASSWORD })).ok);
+    assert.ok((await ops.changeVaultPassphraseOperation.execute(session, { recoveryKey: key1, passphrase: NEW_PASSPHRASE, confirm: NEW_PASSPHRASE, password: PASSWORD })).ok, "mit dem Wiederherstellungsschlüssel als Nachweis");
     // neuer Schlüssel ersetzt die Hülle: der alte öffnet nichts mehr
     const key2 = await recovery.issueRecoveryKey(env.db);
     keyring.lockVault();
@@ -302,5 +312,286 @@ describe("Zurücksetzen", () => {
     assert.ok((await setup(NEW_PASSPHRASE)).ok, "danach neu einrichten");
     assert.equal(rows.find((r) => r.id === empty.id)?.unreadableAt, null);
     assert.equal(existsSync(path.join(env.dir, "secret-reset")), true);
+  });
+});
+
+/** Hängt sich in den Eigentümer-Pfad (scrypt-Rechnung): `onCall(n)` läuft beim n-ten Aufruf vor der Rechnung und darf die Datenbank oder den Speicher ändern – das Fenster, in dem Fremde dazwischenfunken. */
+async function hookOwnerLane(onCall: (n: number) => Promise<void> | void): Promise<() => void> {
+  const { ownerLane } = await import("@/server/auth/password");
+  const original = ownerLane.run.bind(ownerLane);
+  let calls = 0;
+  const target = ownerLane as unknown as { run: (owner: string, fn: () => Promise<unknown>) => Promise<unknown> };
+  target.run = async (owner, fn) => {
+    calls++;
+    await onCall(calls);
+    return original(owner, fn as () => Promise<never>);
+  };
+  return () => {
+    target.run = original as unknown as typeof target.run;
+  };
+}
+const FAIL_AUDIT = "CREATE TRIGGER fail_audit BEFORE INSERT ON AuditLog BEGIN SELECT RAISE(ABORT, 'Audit kaputt'); END";
+const recoveryText = async (fill: number) => (await import("@/lib/recovery-key")).formatRecoveryKey(Buffer.alloc(32, fill));
+
+describe("Nebenläufigkeit: nie einen veralteten oder genullten Schlüssel einsetzen (F1)", () => {
+  const change = (extra: Record<string, unknown> = {}) => ops.changeVaultPassphraseOperation.execute(session, { current: PASSPHRASE, passphrase: NEW_PASSPHRASE, confirm: NEW_PASSPHRASE, password: PASSWORD, ...extra });
+
+  it("Sperren während „Passphrase ändern“ (Fenster der scrypt-Rechnung): die neue Passphrase öffnet danach den Tresor und die Einträge – nie eine Hülle um Nullbytes", async () => {
+    assert.ok((await setup()).ok);
+    const entry = await sealedEntry();
+    // Aufrufe im Eigentümer-Pfad: 1 Passwort, 2 bisherige Passphrase, 3 neue Hülle – gesperrt wird mitten in der Ableitung der neuen Hülle
+    const restore = await hookOwnerLane((n) => {
+      if (n === 3) keyring.lockVault();
+    });
+    let result;
+    try {
+      result = await change();
+    } finally {
+      restore();
+    }
+    assert.equal((await keyring.vaultStatus()).state, "locked", "gesperrt wurde tatsächlich");
+    assert.equal(result.ok, true, "der Schlüssel stammt aus dem Nachweis, nicht aus dem Speicher: die Änderung gelingt");
+    throttle.resetLoginThrottle();
+    assert.ok((await unlock(NEW_PASSPHRASE)).ok, "die neue Passphrase öffnet den Tresor");
+    assert.equal(crypto.openVaultEntry(await env.db.vaultEntry.findUniqueOrThrow({ where: { id: entry.id } })).ok, true, "und die Einträge sind lesbar");
+  });
+
+  it("Der Hauptschlüssel der Zeile wechselt während „Passphrase ändern“ (Zurücksetzen und neu einrichten): abgelehnt, die Zeile bleibt unberührt", async () => {
+    assert.ok((await setup()).ok);
+    const before = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    const restore = await hookOwnerLane(async (n) => {
+      // Prüfwert eines anderen Schlüssels – wie nach „zurücksetzen und neu einrichten“
+      if (n === 3) await env.db.vaultKeyring.update({ where: { id: "default" }, data: { check: keys.keyCheck(keys.newMasterKey()) } });
+    });
+    let result;
+    try {
+      result = await change();
+    } finally {
+      restore();
+    }
+    assert.equal(failure(result).key, "vault.keyring.errors.stale");
+    const after = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    assert.equal(after.wrappedKey, before.wrappedKey, "keine neue Hülle um einen fremden Schlüssel");
+    assert.equal(after.salt, before.salt);
+  });
+
+  it("Entsperren mit einem Schlüssel, der nicht mehr zur Zeile gehört (Tresor währenddessen neu eingerichtet): conflict, der Tresor bleibt gesperrt, nichts im Speicher", async () => {
+    assert.ok((await setup()).ok);
+    keyring.lockVault();
+    const restore = await hookOwnerLane(async (n) => {
+      if (n === 2) await env.db.vaultKeyring.update({ where: { id: "default" }, data: { check: keys.keyCheck(keys.newMasterKey()) } });
+    });
+    let result;
+    try {
+      result = await unlock();
+    } finally {
+      restore();
+    }
+    assert.equal(failure(result).key, "vault.keyring.errors.stale");
+    assert.equal((await keyring.vaultStatus()).state, "locked");
+  });
+
+  it("der Hauptschlüssel im Speicher wird nur gesetzt, wenn er zur aktuellen Hülle gehört; ein veralteter wird nie verpackt (Wiederherstellungsschlüssel erzeugen)", async () => {
+    assert.ok((await setup()).ok);
+    keyring.lockVault();
+    assert.equal(await keyring.unlockVaultIfCurrent(env.db, keys.newMasterKey(), "Fremd"), false);
+    assert.equal((await keyring.vaultStatus()).state, "locked", "ein fremder Schlüssel kommt nicht in den Speicher");
+    // veralteter Schlüssel im Speicher (der Zeile nach ein anderer): wird nicht verpackt, der Tresor gilt als gesperrt
+    keyring.unlockVault(keys.newMasterKey(), "Veraltet");
+    const before = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    await assert.rejects(() => recovery.issueRecoveryKey(env.db), keyring.VaultLockedError);
+    assert.equal((await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } })).recoveryWrap, before.recoveryWrap);
+    assert.equal((await keyring.vaultStatus()).state, "locked");
+  });
+
+  it("copyVaultMasterKey liefert eine eigene Kopie: Sperren nullt sie nicht", async () => {
+    assert.ok((await setup()).ok);
+    const copy = keyring.copyVaultMasterKey();
+    const same = Buffer.from(copy);
+    keyring.lockVault();
+    assert.deepEqual(copy, same);
+    assert.ok(copy.some((b) => b !== 0));
+  });
+
+  it("scheitert das Audit (Rollback), gelangt kein Schlüssel in den Speicher und es bleibt keine Hülle (Einrichten) bzw. der Tresor gesperrt (Entsperren)", async () => {
+    await env.db.$executeRawUnsafe(FAIL_AUDIT);
+    try {
+      await setup().catch(() => null);
+      assert.equal(await env.db.vaultKeyring.count(), 0, "zurückgerollt");
+      assert.equal((await keyring.vaultStatus()).state, "notSetUp");
+      assert.equal(keyring.isVaultUnlocked(), false, "kein Schlüssel im Speicher");
+    } finally {
+      await env.db.$executeRawUnsafe("DROP TRIGGER fail_audit");
+    }
+    assert.ok((await setup()).ok);
+    const key = await recovery.issueRecoveryKey(env.db);
+    keyring.lockVault();
+    await env.db.$executeRawUnsafe(FAIL_AUDIT);
+    try {
+      await unlock().catch(() => null);
+      assert.equal(keyring.isVaultUnlocked(), false, "ohne Audit-Eintrag kein Entsperren");
+      await ops.unlockVaultWithRecoveryKeyOperation.execute(session, { recoveryKey: key, password: PASSWORD }).catch(() => null);
+      assert.equal(keyring.isVaultUnlocked(), false);
+    } finally {
+      await env.db.$executeRawUnsafe("DROP TRIGGER fail_audit");
+    }
+  });
+});
+
+describe("Passphrase ändern verlangt den Nachweis (F3)", () => {
+  it("ohne bisherige Passphrase (und ohne Wiederherstellungsschlüssel) nicht; eine falsche zählt auf dem Limit des Entsperrens und im Audit; die richtige genügt; die Hülle bleibt bei Fehlern unverändert", async () => {
+    assert.ok((await setup()).ok);
+    const before = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    const change = (extra: Record<string, unknown>) => ops.changeVaultPassphraseOperation.execute(session, { passphrase: NEW_PASSPHRASE, confirm: NEW_PASSPHRASE, password: PASSWORD, ...extra });
+    assert.equal(failure(await change({})).fields?.current?.key, "vault.keyring.errors.currentRequired");
+    assert.equal(throttle.loginThrottle.vaultKey.attemptsOf("vault"), 0, "ein fehlendes Feld zählt keinen Versuch");
+    assert.equal(failure(await change({ current: "eine ganz falsche Passphrase" })).fields?.current?.key, "vault.keyring.errors.wrong");
+    assert.equal(throttle.loginThrottle.vaultKey.attemptsOf("vault"), 1, "gezählt auf demselben Limit wie das Entsperren");
+    assert.ok((await audits()).includes("vault.unlockFailed Passphrase ändern"));
+    assert.ok(!JSON.stringify(await env.db.auditLog.findMany()).includes("ganz falsche"));
+    assert.equal((await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } })).wrappedKey, before.wrappedKey);
+    for (let i = 0; i < 4; i++) await change({ current: `falsch ${i} falsch falsch falsch` });
+    assert.equal((await change({ current: PASSPHRASE })).ok, false, "gedrosselt: nach fünf Fehlversuchen wartet auch die richtige");
+    throttle.resetLoginThrottle();
+    assert.ok((await change({ current: PASSPHRASE })).ok);
+    assert.equal(throttle.loginThrottle.vaultKey.attemptsOf("vault"), 0, "ein richtiger Nachweis setzt zurück");
+  });
+
+  it("der Wiederherstellungsschlüssel ersetzt die bisherige Passphrase als Nachweis (vergessen); ein falscher wird abgewiesen", async () => {
+    assert.ok((await setup()).ok);
+    const key = await recovery.issueRecoveryKey(env.db);
+    const change = (extra: Record<string, unknown>) => ops.changeVaultPassphraseOperation.execute(session, { passphrase: NEW_PASSPHRASE, confirm: NEW_PASSPHRASE, password: PASSWORD, ...extra });
+    assert.equal(failure(await change({ recoveryKey: await recoveryText(5) })).fields?.recoveryKey?.key, "vault.keyring.errors.recoveryWrong");
+    assert.equal(failure(await change({ recoveryKey: "Unsinn" })).fields?.recoveryKey?.key, "vault.keyring.errors.recoveryFormat");
+    assert.ok((await change({ recoveryKey: key })).ok);
+    keyring.lockVault();
+    throttle.resetLoginThrottle();
+    assert.ok((await unlock(NEW_PASSPHRASE)).ok);
+  });
+});
+
+describe("Hülle für den Wiederherstellungsschlüssel anlegen (F2)", () => {
+  it("Schlüssel vor der Einrichtung erzeugt: bei entsperrtem Tresor lässt sich die Hülle anlegen (nur der aktuelle Schlüssel), danach öffnet er den Tresor", async () => {
+    const key = await recovery.issueRecoveryKey(env.db); // vor der Einrichtung: keine Hülle möglich
+    assert.ok((await setup()).ok);
+    assert.equal((await keyring.vaultStatus()).recovery, false);
+    const wrap = (recoveryKey: string, password = PASSWORD) => ops.addVaultRecoveryWrapOperation.execute(session, { recoveryKey, password });
+    assert.equal(failure(await wrap(await recoveryText(4))).fields?.recoveryKey?.key, "vault.keyring.errors.recoveryNotCurrent", "ein fremder Schlüssel legt keine nie öffenbare Hülle an");
+    assert.equal(failure(await wrap("Unsinn")).fields?.recoveryKey?.key, "vault.keyring.errors.recoveryFormat");
+    assert.ok(failure(await wrap(key, "falsch")).fields?.password);
+    assert.equal((await keyring.vaultStatus()).recovery, false);
+    assert.ok((await wrap(key)).ok);
+    assert.equal((await keyring.vaultStatus()).recovery, true);
+    assert.ok((await audits()).includes("vault.recoveryWrap –"));
+    keyring.lockVault();
+    assert.ok((await ops.unlockVaultWithRecoveryKeyOperation.execute(session, { recoveryKey: key, password: PASSWORD })).ok);
+  });
+
+  it("gesperrt, ohne Tresor, ohne Wiederherstellungsschlüssel und ohne beide Rechte nicht; falsche Schlüssel zählen auf dem globalen Limit des Wiederherstellungsschlüssels", async () => {
+    const wrap = (recoveryKey: string) => ops.addVaultRecoveryWrapOperation.execute(session, { recoveryKey, password: PASSWORD });
+    const someKey = await recoveryText(8);
+    assert.equal(failure(await wrap(someKey)).key, "vault.errors.notSetUp");
+    assert.ok((await setup()).ok);
+    assert.equal(failure(await wrap(someKey)).key, "vault.keyring.errors.noRecoveryKey", "es gibt noch keinen Wiederherstellungsschlüssel");
+    await recovery.issueRecoveryKey(env.db);
+    for (let i = 0; i < 7; i++) await wrap(await recoveryText(20 + i));
+    assert.ok(throttle.loginThrottle.recoveryKey.delayMs() > 0, "global gedrosselt (verlangsamt, weist nicht ab)");
+    keyring.lockVault();
+    assert.equal(failure(await wrap(someKey)).key, "vault.errors.locked");
+    const manageOnly = await sessionFor(["docs.vaultManage"]);
+    assert.equal(failure(await ops.addVaultRecoveryWrapOperation.execute(manageOnly, { recoveryKey: someKey, password: PASSWORD })).code, "forbidden", "Verwalten setzt Ansehen voraus");
+    const viewOnly = await sessionFor(["docs.vault"]);
+    assert.equal(failure(await ops.addVaultRecoveryWrapOperation.execute(viewOnly, { recoveryKey: someKey, password: PASSWORD })).code, "forbidden");
+  });
+});
+
+describe("Rechte der Hülle: Verwalten setzt Ansehen voraus (Testlücke)", () => {
+  it("Einrichten, Passphrase ändern und Zurücksetzen mit nur `docs.vaultManage` (ohne `docs.vault`) sind verboten – nichts geschieht", async () => {
+    const manageOnly = await sessionFor(["docs.vaultManage"]);
+    assert.equal(failure(await ops.setupVaultOperation.execute(manageOnly, { passphrase: PASSPHRASE, confirm: PASSPHRASE, password: PASSWORD })).code, "forbidden");
+    assert.equal(await env.db.vaultKeyring.count(), 0);
+    assert.ok((await setup()).ok);
+    const before = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    assert.equal(failure(await ops.changeVaultPassphraseOperation.execute(manageOnly, { current: PASSPHRASE, passphrase: NEW_PASSPHRASE, confirm: NEW_PASSPHRASE, password: PASSWORD })).code, "forbidden");
+    assert.equal(failure(await ops.resetVaultOperation.execute(manageOnly, { password: PASSWORD, confirm: true })).code, "forbidden");
+    assert.deepEqual(await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } }), before);
+  });
+});
+
+describe("Manipulierter oder neuerer Datensatz (F7)", () => {
+  it("ein manipulierter Prüfwert (`check`) lässt auch die richtige Passphrase und den richtigen Wiederherstellungsschlüssel nicht öffnen: `invalid`, der Tresor bleibt gesperrt", async () => {
+    assert.ok((await setup()).ok);
+    const key = await recovery.issueRecoveryKey(env.db);
+    keyring.lockVault();
+    await env.db.vaultKeyring.update({ where: { id: "default" }, data: { check: keys.keyCheck(keys.newMasterKey()) } });
+    assert.equal(failure(await unlock()).key, "vault.keyring.errors.invalid");
+    assert.equal(failure(await ops.unlockVaultWithRecoveryKeyOperation.execute(session, { recoveryKey: key, password: PASSWORD })).key, "vault.keyring.errors.invalid");
+    assert.equal((await keyring.vaultStatus()).state, "locked");
+    await env.db.vaultKeyring.update({ where: { id: "default" }, data: { check: "kein-hex" } });
+    assert.equal(failure(await unlock()).key, "vault.keyring.errors.invalid");
+  });
+
+  it("eine Hülle einer neueren Fassung (`m2:`, version 2) wird als „nicht unterstützt“ gemeldet, zählt nicht auf dem Limit, wird nie verändert oder zurückgesetzt", async () => {
+    assert.ok((await setup()).ok);
+    const key = await recovery.issueRecoveryKey(env.db);
+    keyring.lockVault();
+    const row = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    // (a) Präfix einer höheren Fassung
+    await env.db.vaultKeyring.update({ where: { id: "default" }, data: { wrappedKey: row.wrappedKey.replace(/^m1:/, "m2:") } });
+    for (let i = 0; i < 8; i++) assert.equal(failure(await unlock()).key, "vault.keyring.errors.unsupported");
+    assert.equal(throttle.loginThrottle.vaultKey.attemptsOf("vault"), 0, "kein Fehlversuch an der Passphrase");
+    assert.equal(throttle.loginThrottle.vaultKey.check("vault"), 0);
+    // (b) Spalte version
+    await env.db.vaultKeyring.update({ where: { id: "default" }, data: { wrappedKey: row.wrappedKey, version: 2 } });
+    assert.equal(failure(await unlock()).key, "vault.keyring.errors.unsupported");
+    assert.equal(failure(await ops.unlockVaultWithRecoveryKeyOperation.execute(session, { recoveryKey: key, password: PASSWORD })).key, "vault.keyring.errors.unsupported");
+    // (c) Wiederherstellungshülle einer höheren Fassung
+    await env.db.vaultKeyring.update({ where: { id: "default" }, data: { version: 1, recoveryWrap: row.recoveryWrap!.replace(/^m1:/, "m3:") } });
+    assert.equal(failure(await ops.unlockVaultWithRecoveryKeyOperation.execute(session, { recoveryKey: key, password: PASSWORD })).key, "vault.keyring.errors.unsupported");
+    assert.ok((await unlock()).ok, "die Passphrase-Hülle ist in Ordnung");
+    const after = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    assert.equal(after.recoveryWrap, row.recoveryWrap!.replace(/^m1:/, "m3:"), "unverändert");
+    assert.equal(keys.masterWrapShape("m2:a:b:c"), "unsupported");
+    assert.equal(keys.masterWrapShape("x:a:b:c"), "damaged");
+    assert.equal(keys.masterWrapShape(row.wrappedKey), "ok");
+  });
+});
+
+describe("Zurücksetzen: Sicherung samt Hüllen (F4)", () => {
+  it("die Sicherungsdatei enthält die Zeile der Hüllen (nur Verschlüsseltes) – mit ihr lassen sich die gesicherten Blöcke bei wiederaufgetauchter Passphrase öffnen; auch ohne Einträge entsteht sie", async () => {
+    assert.ok((await setup()).ok);
+    const key = await recovery.issueRecoveryKey(env.db);
+    const entry = await sealedEntry();
+    const row = await env.db.vaultKeyring.findUniqueOrThrow({ where: { id: "default" } });
+    assert.ok((await ops.resetVaultOperation.execute(session, { password: PASSWORD, confirm: true })).ok);
+    const [file] = readdirSync(path.join(env.dir, "secret-reset"));
+    const saved = JSON.parse(readFileSync(path.join(env.dir, "secret-reset", file), "utf8"));
+    assert.equal(saved.keyring.wrappedKey, row.wrappedKey);
+    assert.equal(saved.keyring.recoveryWrap, row.recoveryWrap);
+    assert.equal(saved.keyring.salt, row.salt);
+    assert.equal(saved.entries[0].wrappedKey, entry.wrappedKey);
+    const text = JSON.stringify(saved);
+    assert.ok(!text.includes(PASSPHRASE) && !text.includes(key) && !text.includes(SECRET.secret), "kein Klartext");
+    // ohne Einträge mit Zugangsdaten entsteht die Datei trotzdem (die Hüllen gehören gesichert)
+    assert.ok((await setup(NEW_PASSPHRASE)).ok);
+    await env.db.vaultEntry.deleteMany();
+    assert.ok((await ops.resetVaultOperation.execute(session, { password: PASSWORD, confirm: true })).ok);
+    assert.equal(readdirSync(path.join(env.dir, "secret-reset")).length, 2);
+  });
+
+  it("wird die Transaktion zurückgerollt (Audit scheitert), bleibt keine verwaiste Sicherungsdatei: Hüllen und Einträge sind unberührt", async () => {
+    assert.ok((await setup()).ok);
+    const entry = await sealedEntry();
+    await env.db.$executeRawUnsafe(FAIL_AUDIT);
+    try {
+      await ops.resetVaultOperation.execute(session, { password: PASSWORD, confirm: true }).catch(() => null);
+    } finally {
+      await env.db.$executeRawUnsafe("DROP TRIGGER fail_audit");
+    }
+    const files = existsSync(path.join(env.dir, "secret-reset")) ? readdirSync(path.join(env.dir, "secret-reset")) : [];
+    assert.deepEqual(files, [], "keine verwaiste Sicherung");
+    assert.equal(await env.db.vaultKeyring.count(), 1);
+    assert.equal((await env.db.vaultEntry.findUniqueOrThrow({ where: { id: entry.id } })).wrappedKey, entry.wrappedKey);
+    assert.equal((await keyring.vaultStatus()).state, "unlocked", "der Speicher wird erst nach dem Commit geleert");
   });
 });

@@ -614,6 +614,20 @@ describe("Datenzugriff", () => {
     assert.deepEqual(pages, []);
   });
 
+  it("IT-Tresor: die Tabelle VaultKeyring (Hüllen des Hauptschlüssels) berühren nur server/vault-keyring.ts, die Tresor-Operationen und das Zurücksetzen – nie Seiten, Bausteine, Suche, API, Export, Backup oder andere Funktionen", () => {
+    const ALLOWED = /^(?:server\/vault-keyring\.ts|modules\/it\/docs\/vault-keyring-operations\.ts|modules\/it\/docs\/vault-reset\.ts)$/;
+    const comments = (text: string) =>
+      text
+        .split("\n")
+        .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+        .join("\n");
+    const offenders = sources.filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && /\bvaultKeyring\b/i.test(code(text))).map(({ file }) => file);
+    assert.deepEqual(offenders, [], "Zugriff auf VaultKeyring außerhalb der Tresor-Dateien");
+    const raw = sources.filter(({ file, text }) => !/\.test\.tsx?$/.test(file) && !ALLOWED.test(file) && /\bVaultKeyring\b/.test(comments(text))).map(({ file }) => file);
+    assert.deepEqual(raw, [], "Roh-SQL auf VaultKeyring außerhalb der Tresor-Dateien");
+    for (const file of ["server/vault-keyring.ts", "modules/it/docs/vault-keyring-operations.ts"]) assert.ok(sources.some((s) => s.file === file), file);
+  });
+
   it("die API der Mitarbeiter liest nur die Spalten ohne besonders geschützte Daten (select) und nie Krankheit (scope)", () => {
     const api = readFileSync(path.join(SRC, "modules/office/employees/api.ts"), "utf8");
     assert.match(api, /select:\s*employeeBaseSelect/);

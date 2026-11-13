@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { formatRecoveryKey } from "@/lib/recovery-key";
-import { deriveOffsiteMasterKey, secretKeyCheck, WRAPPED_SETTING_KEY, wrapSecretKey } from "@/lib/secret-wrap";
+import { deriveOffsiteMasterKey, secretKeyCheck, unwrapSecretKey, WRAPPED_SETTING_KEY, wrapSecretKey } from "@/lib/secret-wrap";
 import { KEY_CHECK_SETTING } from "@/server/secret-key-issue";
 import { readSecretKey, secretKeyHex } from "@/server/secrets";
 import { db } from "@/server/db";
@@ -85,6 +85,18 @@ export async function dropStaleRecoveryKey(client: Writer): Promise<boolean> {
   if (!(await recoveryKeyStatus(client)).stale) return false;
   for (const key of [WRAPPED, CHECK, CREATED, CONFIRMED]) await setSetting(key, null, client);
   return true;
+}
+
+/**
+ * Ist das der **aktuelle** Wiederherstellungsschlüssel dieser Installation (öffnet die gespeicherte Hülle von `secret.key` und stimmt mit dem Schlüssel dieses Datenträgers überein)? Wer eine Hülle des IT-Tresors
+ * unter einem eingegebenen Schlüssel anlegt, prüft vorher damit, dass es der richtige ist – sonst entstünde eine Hülle, die nie jemand öffnen kann. Zählt keinen Versuch (das tut `throttledRecoveryKey`).
+ */
+export async function isCurrentRecoveryKey(client: Writer, recoveryKey: Buffer): Promise<boolean> {
+  const wrapped = await read(client, WRAPPED);
+  const key = readSecretKey();
+  if (!wrapped || key.state !== "readable") return false;
+  const hex = unwrapSecretKey(wrapped, recoveryKey);
+  return hex !== null && secretKeyCheck(hex) === secretKeyCheck(key.hex);
 }
 
 /** Hauptschlüssel der Off-Site-Verschlüsselung (null: kein Wiederherstellungsschlüssel erzeugt oder nicht lesbar). */

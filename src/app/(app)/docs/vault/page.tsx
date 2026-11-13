@@ -52,6 +52,12 @@ export default async function VaultPage({ searchParams }: { searchParams: Promis
           canManage={canManage && session.can("docs.vault")}
           view={{ state: keyring.state, recovery: keyring.recovery, since: keyring.unlockedSince ? date(keyring.unlockedSince, { dateStyle: "medium", timeStyle: "short" }) : null, by: keyring.unlockedByName }}
         />
+        {keyring.state !== "notSetUp" && !keyring.recovery ? (
+          <Alert tone="warning">
+            {t("vault.noRecoveryWrap")}{" "}
+            {session.user.isAdmin ? <TextLink href="/admin/backup/key">{t("vault.keyWarningLink")}</TextLink> : t("vault.keyWarningAdmin")}
+          </Alert>
+        ) : null}
         {!keyConfirmed ? (
           <Alert tone="warning">
             {t("vault.keyWarning")}{" "}

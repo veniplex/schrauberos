@@ -2,7 +2,7 @@
 
 import { formObject } from "@/lib/forms";
 import { defineAction } from "@/server/operations";
-import { changeVaultPassphraseOperation, lockVaultOperation, resetVaultOperation, setupVaultOperation, unlockVaultOperation, unlockVaultWithRecoveryKeyOperation } from "./vault-keyring-operations";
+import { addVaultRecoveryWrapOperation, changeVaultPassphraseOperation, lockVaultOperation, resetVaultOperation, setupVaultOperation, unlockVaultOperation, unlockVaultWithRecoveryKeyOperation } from "./vault-keyring-operations";
 import { deleteVaultEntryOperation, revealVaultEntryOperation, saveVaultEntryOperation } from "./vault-operations";
 
 const PATHS = ["/docs/vault", "/"];
@@ -70,9 +70,14 @@ export const unlockVaultWithRecoveryKey = defineAction(unlockVaultWithRecoveryKe
 });
 export const lockVault = defineAction(lockVaultOperation, { revalidate: [...PATHS, ["/", "layout"]], message: "vault.keyring.messages.locked" });
 export const changeVaultPassphrase = defineAction(changeVaultPassphraseOperation, {
-  form: (fd) => ({ passphrase: text(fd, "vault_passphrase"), confirm: text(fd, "vault_passphrase_confirm"), password: text(fd, "password") }),
+  form: (fd) => ({ current: text(fd, "vault_current"), recoveryKey: text(fd, "vault_recovery_key"), passphrase: text(fd, "vault_passphrase"), confirm: text(fd, "vault_passphrase_confirm"), password: text(fd, "password") }),
   revalidate: PATHS,
   message: "vault.keyring.messages.changed",
+});
+export const addVaultRecoveryWrap = defineAction(addVaultRecoveryWrapOperation, {
+  form: (fd) => ({ recoveryKey: text(fd, "vault_recovery_key"), password: text(fd, "password") }),
+  revalidate: PATHS,
+  message: "vault.keyring.messages.recoveryWrapDone",
 });
 export const resetVault = defineAction(resetVaultOperation, {
   form: (fd) => ({ password: text(fd, "password"), confirm: fd.get("confirm") === "on" }),

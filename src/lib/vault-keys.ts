@@ -18,17 +18,24 @@ export const KEYRING_VERSION = 1;
 export const ENTRY_KEY_FORMAT = 2;
 export const MASTER_KEY_BYTES = 32;
 
-/** scrypt-Kosten der Tresor-Passphrase: N = 2^17 (128 MiB), r = 8, p = 1 – bewusst deutlich über der Anmeldung (die Passphrase wird selten und nur von Berechtigten eingegeben). */
+/**
+ * scrypt-Kosten der Tresor-Passphrase: N = 2^17 (128 MiB), r = 8, p = 1 – bewusst deutlich über der Anmeldung (die Passphrase wird selten und nur von Berechtigten eingegeben).
+ * **Warum nicht höher (Entscheid, Block 15):** N = 2^18 braucht über 256 MiB je Berechnung (auf einem Pi/NAS nicht tragbar, zusammen mit Node und der Datenbank); p = 2 verdoppelte nur die Rechenzeit (auf kleinen Geräten
+ * mehrere Sekunden je Entsperren, gedrosselt global). Den Schutz gegen Offline-Raten auf einem Backup trägt darum die **Länge der Passphrase** (mindestens 16 Zeichen), nicht die Kosten.
+ */
 export const VAULT_SCRYPT = { N: 2 ** 17, r: 8, p: 1 } as const;
 export type ScryptParams = { N: number; r: number; p: number };
 /** Obergrenzen für gespeicherte Kosten (ein manipulierter Datensatz soll keinen riesigen Speicherbedarf auslösen) und Untergrenze (eine abgesenkte Kostenangabe ist ein Angriff auf die Passphrase). */
 const MIN_N = 2 ** 14;
 const MAX_N = 2 ** 18;
 
-/** Sind das zulässige scrypt-Kosten? (N Zweierpotenz zwischen 2^14 und 2^18, r 1–16, p 1–4.) In Tests dürfen kleinere Kosten gelten (`setVaultScryptForTests`). */
+/**
+ * Sind das zulässige scrypt-Kosten? (N Zweierpotenz zwischen 2^14 und 2^18, **r 1–8, p 1–2**: mehr braucht die eigene Wahl `VAULT_SCRYPT` nicht; ein feindlicher Datensatz soll weder Speicher noch
+ * Rechenzeit über das Maß der eigenen Parameter hinaus belegen.) In Tests dürfen kleinere Kosten gelten (`setVaultScryptForTests`).
+ */
 export function validScryptParams(params: ScryptParams, minN = MIN_N): boolean {
   const { N, r, p } = params;
-  return Number.isInteger(N) && N >= minN && N <= MAX_N && (N & (N - 1)) === 0 && Number.isInteger(r) && r >= 1 && r <= 16 && Number.isInteger(p) && p >= 1 && p <= 4;
+  return Number.isInteger(N) && N >= minN && N <= MAX_N && (N & (N - 1)) === 0 && Number.isInteger(r) && r >= 1 && r <= 8 && Number.isInteger(p) && p >= 1 && p <= 2;
 }
 
 /** Leitet aus der Passphrase den Umhüllungsschlüssel ab (scrypt, NFKC, 32 Byte). Läuft im Thread-Pool; der Aufrufer reiht die Berechnung in den Eigentümer-Pfad ein (`server/vault-keyring.ts`). */
@@ -38,25 +45,42 @@ export function deriveKek(passphrase: string, salt: Buffer, params: ScryptParams
   );
 }
 
-export const PASSPHRASE_MIN_CHARS = 12;
+export const PASSPHRASE_MIN_CHARS = 16;
 export const PASSPHRASE_MAX_CHARS = 256;
 /** Häufige Passphrasen (Kleinschreibung, ohne Leerzeichen und Trenner) – bewusst klein: die Länge trägt den Schutz */
 const COMMON = ["passwortpasswort", "passwort1234", "password1234", "passphrasepassphrase", "123456789012", "qwertzuiopasdf", "qwertyuiopasdf", "schrauberos123", "werkstattwerkstatt", "tresortresor"];
 
+/** Ist der Text (Kleinschreibung, nur Buchstaben und Ziffern) eine Wiederholung eines kurzen Bausteins (`abcabcabc…`, `PasswortPasswort…`)? */
+function repeatsShortUnit(flat: string): boolean {
+  for (let unit = 1; unit <= flat.length / 2; unit++) {
+    if (flat.length % unit === 0 && flat === flat.slice(0, unit).repeat(flat.length / unit)) return true;
+  }
+  return false;
+}
+
+/** Besteht der Text überwiegend aus aufeinanderfolgenden Zeichen (`abcdefgh…`, `12345678…`, auch absteigend)? */
+function mostlySequential(flat: string): boolean {
+  const codes = [...flat].map((c) => c.codePointAt(0)!);
+  let steps = 0;
+  for (let i = 1; i < codes.length; i++) if (Math.abs(codes[i] - codes[i - 1]) === 1) steps++;
+  return codes.length >= 8 && steps >= (codes.length - 1) * 0.6;
+}
+
 export type PassphraseProblem = "tooShort" | "tooLong" | "weak" | "username";
 
 /**
- * **Mindestqualität der Tresor-Passphrase:** mindestens 12 Zeichen (NFKC, höchstens 256), mindestens 6 verschiedene Zeichen, nicht nur Ziffern, nicht der Benutzername (auch nicht mit Ziffern dahinter),
- * keine der bekannten häufigen Passphrasen. Mehr wird nicht verlangt (ein Satz aus Wörtern genügt) – die Länge und scrypt tragen den Schutz.
+ * **Mindestqualität der Tresor-Passphrase:** mindestens **16 Zeichen** (NFKC, höchstens 256), mindestens 8 verschiedene Zeichen, nicht nur Ziffern, keine Wiederholung eines kurzen Bausteins, keine Zeichenfolge
+ * (`abcdefgh…`), nicht der Benutzername (auch nicht mit Ziffern dahinter), keine der bekannten häufigen Passphrasen. Mehr wird nicht verlangt (ein Satz aus Wörtern genügt): Die Passphrase ist der **einzige Schutz
+ * gegen Offline-Raten** auf einer Kopie der Datenbank (jedes Backup enthält die Hülle), die Länge trägt ihn.
  */
 export function passphraseProblem(passphrase: string, context: { username?: string } = {}): PassphraseProblem | null {
   const text = passphrase.normalize("NFKC");
   const chars = [...text];
   if (chars.length < PASSPHRASE_MIN_CHARS) return "tooShort";
   if (chars.length > PASSPHRASE_MAX_CHARS) return "tooLong";
-  if (new Set(chars).size < 6 || /^[0-9\s]+$/.test(text)) return "weak";
+  if (new Set(chars).size < 8 || /^[0-9\s]+$/.test(text)) return "weak";
   const flat = text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-  if (COMMON.includes(flat)) return "weak";
+  if (COMMON.includes(flat) || repeatsShortUnit(flat) || mostlySequential(flat)) return "weak";
   const user = context.username?.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
   if (user && user.length >= 3 && flat.startsWith(user) && /^[0-9]*$/.test(flat.slice(user.length))) return "username";
   return null;
@@ -84,10 +108,25 @@ function open(blob: string, key: Buffer, aad: Buffer, prefix: string): Buffer | 
     const decipher = createDecipheriv("aes-256-gcm", key, gcm.iv, { authTagLength: GCM_TAG_BYTES });
     decipher.setAAD(aad);
     decipher.setAuthTag(gcm.tag);
-    return Buffer.concat([decipher.update(data), decipher.final()]);
+    const first = decipher.update(data);
+    try {
+      const last = decipher.final();
+      const plain = Buffer.concat([first, last]);
+      last.fill(0);
+      return plain;
+    } finally {
+      first.fill(0); // Zwischenpuffer mit Klartext (Schlüsselmaterial) nicht liegen lassen
+    }
   } catch {
     return null;
   }
+}
+
+/** Form der Hülle des Hauptschlüssels (ohne zu öffnen): `ok`, `unsupported` (andere, höhere Version: Rückfall nach einem Update) oder `damaged`. */
+export function masterWrapShape(blob: string): "ok" | "unsupported" | "damaged" {
+  const parts = blob.split(":");
+  if (parts[0] === "m1") return parts.length === 4 && gcmParts(parts[1], parts[2]) && strictBase64(parts[3]) ? "ok" : "damaged";
+  return /^m(?!1:)[1-9]\d*:/.test(blob) ? "unsupported" : "damaged";
 }
 
 /** Hauptschlüssel unter einem Umhüllungsschlüssel (`passphrase`: aus der Tresor-Passphrase, `recovery`: aus dem Wiederherstellungsschlüssel). */

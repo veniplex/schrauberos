@@ -179,6 +179,7 @@ tires.update tires.edit
 vault.delete docs.vaultManage
 vault.lock docs.vault
 vault.passphrase docs.vaultManage
+vault.recoveryWrap docs.vaultManage
 vault.reset docs.vaultManage
 vault.reveal docs.vault
 vault.save docs.vaultManage

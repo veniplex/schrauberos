@@ -21,5 +21,5 @@ export const itDocsFeature = defineFeature({
   ],
   quickActions: [{ id: "docs.new", labelKey: "docs.quick.itNew", href: "/docs/it/new", icon: "docs", permission: "docs.edit", order: 81 }],
   routes: ["docs/vault"],
-  auditActions: ["vault.create", "vault.update", "vault.delete", "vault.reveal", "vault.revealFailed", "vault.setup", "vault.unlock", "vault.unlockFailed", "vault.unlockRecovery", "vault.lock", "vault.passphrase", "vault.reset"],
+  auditActions: ["vault.create", "vault.update", "vault.delete", "vault.reveal", "vault.revealFailed", "vault.setup", "vault.unlock", "vault.unlockFailed", "vault.unlockRecovery", "vault.lock", "vault.passphrase", "vault.recoveryWrap", "vault.reset"],
 });

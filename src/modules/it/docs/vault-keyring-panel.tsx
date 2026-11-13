@@ -6,7 +6,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { Checkbox, Field, Form, FormActions, Input } from "@/components/ui/form";
 import { Alert, Badge, Card, DangerZone } from "@/components/ui/layout";
 import { useI18n } from "@/i18n/client";
-import { changeVaultPassphrase, lockVault, resetVault, setupVault, unlockVault, unlockVaultWithRecoveryKey } from "./vault-actions";
+import { addVaultRecoveryWrap, changeVaultPassphrase, lockVault, resetVault, setupVault, unlockVault, unlockVaultWithRecoveryKey } from "./vault-actions";
 
 /** Passwortmanager des Browsers sollen die Tresor-Passphrase weder speichern noch vorschlagen (wie die Felder der Einträge, `vault-form.tsx`) */
 const NO_MANAGER = { "data-no-draft": true, "data-1p-ignore": true, "data-lpignore": "true", "data-bwignore": true, "data-form-type": "other" } as const;
@@ -34,7 +34,7 @@ function NewPassphrase({ idPrefix }: { idPrefix: string }) {
   return (
     <>
       <Field label={t("vault.keyring.passphrase")} htmlFor={`${idPrefix}-pass`} name="passphrase" required hint={t("vault.keyring.passphraseHint")}>
-        <Input id={`${idPrefix}-pass`} name="vault_passphrase" type="password" required minLength={12} maxLength={256} autoComplete="off" {...NO_MANAGER} />
+        <Input id={`${idPrefix}-pass`} name="vault_passphrase" type="password" required minLength={16} maxLength={256} autoComplete="off" {...NO_MANAGER} />
       </Field>
       <Field label={t("vault.keyring.confirm")} htmlFor={`${idPrefix}-confirm`} name="confirm" required>
         <Input id={`${idPrefix}-confirm`} name="vault_passphrase_confirm" type="password" required maxLength={256} autoComplete="off" {...NO_MANAGER} />
@@ -116,11 +116,35 @@ export function VaultKeyringPanel({ view, canManage }: { view: VaultKeyringView;
           </form>
         </div>
       </Card>
+      {!view.recovery ? (
+        <Card title={t("vault.keyring.recoveryWrap.title")}>
+          {canManage ? (
+            <Form action={addVaultRecoveryWrap} className="flex max-w-md flex-col gap-4">
+              <p className="text-sm text-ink-muted">{t("vault.keyring.recoveryWrap.intro")}</p>
+              <Field label={t("vault.keyring.recovery.key")} htmlFor="wrap-key" name="recoveryKey" required hint={t("vault.keyring.recoveryWrap.keyHint")}>
+                <Input id="wrap-key" name="vault_recovery_key" type="password" required maxLength={200} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} {...NO_MANAGER} />
+              </Field>
+              <OwnPassword id="wrap-password" />
+              <FormActions submitLabel={t("vault.keyring.recoveryWrap.submit")} />
+            </Form>
+          ) : (
+            <p className="text-sm text-ink-muted">{t("vault.keyring.recoveryWrap.noRight")}</p>
+          )}
+        </Card>
+      ) : null}
       {canManage ? (
         <>
           <Disclosure title={t("vault.keyring.change.title")} variant="card">
             <Form action={changeVaultPassphrase} className="flex max-w-md flex-col gap-4">
               <p className="text-sm text-ink-muted">{t("vault.keyring.change.hint")}</p>
+              <Field label={t("vault.keyring.change.current")} htmlFor="change-current" name="current" hint={t("vault.keyring.change.currentHint")}>
+                <Input id="change-current" name="vault_current" type="password" maxLength={2048} autoComplete="off" {...NO_MANAGER} />
+              </Field>
+              {view.recovery ? (
+                <Field label={t("vault.keyring.change.orRecovery")} htmlFor="change-recovery" name="recoveryKey" hint={t("vault.keyring.change.orRecoveryHint")}>
+                  <Input id="change-recovery" name="vault_recovery_key" type="password" maxLength={200} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} {...NO_MANAGER} />
+                </Field>
+              ) : null}
               <NewPassphrase idPrefix="change" />
               <OwnPassword id="change-password" />
               <FormActions submitLabel={t("vault.keyring.change.submit")} />

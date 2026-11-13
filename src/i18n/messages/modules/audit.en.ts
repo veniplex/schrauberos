@@ -326,6 +326,7 @@ export const auditEn: typeof auditDe = {
       unlockFailed: "Vault: unlock attempted with a wrong passphrase or recovery key",
       unlockRecovery: "Vault unlocked with the recovery key",
       lock: "Vault locked",
+      recoveryWrap: "Recovery key stored for the vault",
       passphrase: "Vault passphrase changed",
       reset: "Vault reset (credentials removed)",
     },

@@ -7,10 +7,17 @@ import { scryptHash, scryptVerify } from "./scrypt";
 export { MIN_PASSWORD_LENGTH, MAX_PASSWORD_CHARS, passwordProblem } from "@/lib/password-rules";
 
 /**
+ * **Prozess-Singleton** (wie `loginThrottle`): Der gebaute Server enthält dieses Modul in mehreren Bündeln (Aktionen, Routen, Instrumentation); jede Kopie hätte ihre eigenen Pfade, und die Grenzen
+ * (höchstens 2 Anmeldungen, 1 Eigentümer-Berechnung gleichzeitig) gälten je Kopie statt für den Prozess – bei 128 MiB je Tresor-Ableitung ein Speicher- und Thread-Verstärker. Darum hängen beide am globalen Objekt.
+ */
+const shared = globalThis as typeof globalThis & { __sosHashLanes?: { semaphore: Semaphore; owner: FairLane } };
+
+/**
  * scrypt teilt sich den Thread-Pool von libuv (4 Threads) mit Dateizugriffen. Damit Anmeldungen die App nicht ausbremsen, laufen
  * höchstens 2 Hash-Berechnungen für **Anmeldungen** gleichzeitig; sie warten in einer begrenzten Warteschlange (voll → `QueueFullError`).
  */
-export const hashSemaphore = new Semaphore(2, 32);
+const lanes = (shared.__sosHashLanes ??= { semaphore: new Semaphore(2, 32), owner: new FairLane(1, 32, 2) });
+export const hashSemaphore = lanes.semaphore;
 
 /**
  * Eigener Pfad (`FairLane`) für alles, was **nicht** hinter einer Flut von Anmeldungen warten darf: Passwort setzen (Konto, Benutzerverwaltung, Einrichtung), das
@@ -19,7 +26,7 @@ export const hashSemaphore = new Semaphore(2, 32);
  * Vorgang) höchstens eine laufende und eine wartende Berechnung, insgesamt höchstens 32 Wartende, reihum über die Schlüssel – eine Flut mit einem gestohlenen
  * Geräte-Cookie oder wiederholten Passwortabfragen belegt nur die eigenen Plätze und wird danach mit `QueueFullError` („bitte gleich noch einmal“) abgewiesen.
  */
-export const ownerLane = new FairLane(1, 32, 2);
+export const ownerLane = lanes.owner;
 
 /** Platz im Eigentümer-Pfad für ein Konto: alles, was für dieses Konto rechnet (Gerätelogin, Passwort setzen, Passwortabfrage), teilt sich ihn. */
 export const accountOwner = (userId: string): string => `account:${userId}`;
