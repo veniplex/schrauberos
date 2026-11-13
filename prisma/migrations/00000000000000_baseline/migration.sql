@@ -463,13 +463,30 @@ CREATE TABLE "VaultEntry" (
     "title" TEXT NOT NULL,
     "kind" TEXT NOT NULL DEFAULT 'other',
     "system" TEXT,
-    "format" INTEGER NOT NULL DEFAULT 1,
+    "format" INTEGER NOT NULL DEFAULT 2,
     "revision" INTEGER NOT NULL DEFAULT 1,
     "wrappedKey" TEXT,
     "payload" TEXT,
     "unreadableAt" DATETIME,
     "createdByName" TEXT,
     "updatedByName" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "VaultKeyring" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "salt" TEXT NOT NULL,
+    "scryptN" INTEGER NOT NULL,
+    "scryptR" INTEGER NOT NULL,
+    "scryptP" INTEGER NOT NULL,
+    "wrappedKey" TEXT NOT NULL,
+    "check" TEXT NOT NULL,
+    "recoveryWrap" TEXT,
+    "createdByName" TEXT,
+    "changedByName" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );

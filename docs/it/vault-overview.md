@@ -10,9 +10,9 @@ Der **IT-Tresor** verwahrt Zugangsdaten zu IT-Systemen (Router, Server, Konten) 
 
 ## Was der Tresor schützt – und was nicht
 
-Der Tresor schützt vor **versehentlichem Ansehen** (Anzeige nur mit eigenem Passwort, begrenzt und protokolliert) und vor dem **Verlust von Datenbank oder Backup** (ohne den Schlüssel unlesbar). Er schützt **nicht** vor einem Administrator, der die Anwendung vollständig kontrolliert:
+Der Tresor schützt vor **versehentlichem Ansehen** (Anzeige nur mit eigenem Passwort, begrenzt und protokolliert) und vor dem **Verlust von Datenbank oder Backup** (ohne die Tresor-Passphrase oder den Wiederherstellungsschlüssel unlesbar). Der Tresor-Schlüssel entsteht aus einer Passphrase und liegt nur im Speicher der Anwendung: **nach jedem Neustart ist der Tresor gesperrt**, bis eine berechtigte Person die Passphrase eingibt. Er schützt **nicht** vor einem Administrator, der die Anwendung vollständig kontrolliert:
 
-* Wer den **Wiederherstellungsschlüssel erzeugt oder besitzt** und **Backups** laden darf, kann den Tresor außerhalb der Anwendung lesen – ohne Tresor-Recht und ohne Anzeige-Eintrag im Audit-Log. Der Wiederherstellungsschlüssel (Verwaltung → Backups → Schlüssel) ist ein Schlüssel für alles und gehört wie ein Passwort getrennt vom Server aufbewahrt.
+* Wer den **Wiederherstellungsschlüssel besitzt** und **Backups** laden darf, kann den Tresor außerhalb der Anwendung lesen – ohne Tresor-Recht und ohne Anzeige-Eintrag im Audit-Log. Der Wiederherstellungsschlüssel (Verwaltung → Backups → Schlüssel) öffnet alles, auch den Tresor, und gehört getrennt vom Server in sichere Hände. Dasselbe gilt für die Tresor-Passphrase zusammen mit einem Backup.
 * Ein Administrator kann sich die Tresor-Rechte selbst geben. Eine zweite Person, die zustimmen muss, gibt es nicht.
 * Deshalb stehen diese Vorgänge, sobald es Tresor-Einträge gibt, mit dem Vermerk **„Tresor betroffen“** im Audit-Log, und Administratoren sehen einen Hinweis im Systemstatus. Wer das Audit-Log liest (Recht „Audit-Log einsehen“), sollte darauf achten.
 * Titel, Art und System eines Eintrags stehen im Klartext in Liste, Sicherungen und Audit-Log – **keine Geheimnisse in den Titel**.

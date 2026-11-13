@@ -102,6 +102,7 @@ export const backupEn: typeof backupDe = {
   },
   tabs: { label: "Backup areas", backups: "Backups", offsite: "Off-site", key: "Recovery key" },
   key: {
+    errors: { vaultLocked: "The IT vault is set up but locked: a new recovery key would not open it. Please unlock the vault first (a person with the vault right, IT documentation → Vault), then create the key." },
     title: "Recovery key",
     description: "One key for everything: it makes the application's secrets and the off-site backups readable again after the server is lost.",
     intro:

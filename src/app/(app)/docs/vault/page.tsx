@@ -10,7 +10,9 @@ import { getI18n } from "@/i18n/server";
 import { VAULT_KINDS } from "@/modules/it/docs/vault-constants";
 import { listVaultEntries } from "@/modules/it/docs/vault-queries";
 import { VAULT_STATE_TONE } from "@/modules/it/docs/status-tone";
+import { VaultKeyringPanel } from "@/modules/it/docs/vault-keyring-panel";
 import { recoveryKeyConfirmed } from "@/server/recovery-key";
+import { vaultStatus } from "@/server/vault-keyring";
 import { requirePermission } from "@/server/auth/session";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function VaultPage({ searchParams }: { searchParams: Promise<{ q?: string; kind?: string }> }) {
   const session = await requirePermission("docsIt.vault");
   const [{ t, tp, date }, sp] = await Promise.all([getI18n(), searchParams]);
-  const [entries, keyConfirmed] = await Promise.all([listVaultEntries({ q: sp.q, kind: sp.kind }), recoveryKeyConfirmed()]);
+  const [entries, keyConfirmed, keyring] = await Promise.all([listVaultEntries({ q: sp.q, kind: sp.kind }), recoveryKeyConfirmed(), vaultStatus()]);
   const canManage = session.can("docsIt.vaultManage");
   const filtered = Boolean(sp.q?.trim() || sp.kind);
 
@@ -45,6 +47,11 @@ export default async function VaultPage({ searchParams }: { searchParams: Promis
       />
       <div className="flex max-w-5xl flex-col gap-5">
         <Alert tone="info">{t("vault.intro")}</Alert>
+        {/* Tresor-Schlüssel: einrichten, entsperren (nach jedem Neustart), sperren, Passphrase ändern, zurücksetzen */}
+        <VaultKeyringPanel
+          canManage={canManage && session.can("docsIt.vault")}
+          view={{ state: keyring.state, recovery: keyring.recovery, since: keyring.unlockedSince ? date(keyring.unlockedSince, { dateStyle: "medium", timeStyle: "short" }) : null, by: keyring.unlockedByName }}
+        />
         {!keyConfirmed ? (
           <Alert tone="warning">
             {t("vault.keyWarning")}{" "}

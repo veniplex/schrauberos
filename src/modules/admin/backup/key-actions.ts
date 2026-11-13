@@ -6,6 +6,7 @@ import { confirmRecoveryKey, issueRecoveryKey } from "@/server/recovery-key";
 import { resetSecretsByAdministrator } from "@/server/secret-reset";
 import { secretHoldings, withHoldings } from "@/server/secret-holdings";
 import { SecretKeyUnavailableError } from "@/server/secrets";
+import { VaultLockedError } from "@/server/vault-keyring";
 import { defineAction, defineOperation, fail } from "@/server/operations";
 
 /**
@@ -28,7 +29,14 @@ const createRecoveryKeyOperation = defineOperation({
     return { holdings: await secretHoldings() };
   },
   run: async ({ tx, audit, prepared }) => {
-    const key = await issueRecoveryKey(tx);
+    let key: string;
+    try {
+      key = await issueRecoveryKey(tx);
+    } catch (error) {
+      // Der IT-Tresor ist eingerichtet, aber gesperrt: ein neuer Schlüssel würde ihn nicht öffnen – erst entsperren (ein Berechtigter mit dem Tresor-Recht)
+      if (error instanceof VaultLockedError) fail("conflict", "backup.key.errors.vaultLocked");
+      throw error;
+    }
     audit({ target: withHoldings("–", prepared.holdings) }); // nie der Schlüssel selbst
     return { key };
   },

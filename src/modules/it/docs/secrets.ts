@@ -2,9 +2,9 @@ import type { SecretConsumerDef } from "@/server/secret-consumers";
 import { affectedVaultRows, resetUnreadableVaultEntries, vaultEntryCount } from "./vault-reset";
 
 /**
- * Die Eintragsschlüssel des IT-Tresors sind mit `secret.key` umhüllt. Nach einem Restore ohne passenden Schlüssel (und ohne Wiederherstellungsschlüssel) sind sie nicht lesbar: Die Einträge bleiben, ihre
- * Zugangsdaten werden – nach vorheriger Sicherung der Zeilen nach `<DATA_DIR>/secret-reset/` – entfernt und der Eintrag als „Neu eingeben nötig“ markiert (`vault-reset.ts`). Mit dem Wiederherstellungsschlüssel
- * bleibt der Tresor lesbar (er stellt `secret.key` wieder her), dann gibt es nichts zurückzusetzen.
+ * Der IT-Tresor hängt **nicht** an `secret.key` (Hauptschlüssel aus der Tresor-Passphrase, nur im Speicher; `vault-reset.ts`): Ein Restore ohne passenden Schlüssel berührt ihn nicht, er bleibt nach dem Neustart gesperrt und
+ * seine Einträge bleiben lesbar mit der Passphrase oder dem Wiederherstellungsschlüssel – es gibt nichts automatisch zurückzusetzen (`resetUnreadable` meldet 0, `affectedRows` keine Zeilen, nie stilles Löschen). `holdings` bleibt:
+ * Vorgänge, die den Wiederherstellungsschlüssel erzeugen (er öffnet den Tresor) oder Sicherungen in fremde Hände bringen (sie enthalten die Hüllen des Hauptschlüssels), vermerken im Audit-Log auffällig, dass es Einträge gibt.
  */
 export const secretConsumers: SecretConsumerDef[] = [
   { id: "it.vault", feature: "it.docs", resetUnreadable: resetUnreadableVaultEntries, affectedRows: affectedVaultRows, holdings: { label: "Tresor", count: vaultEntryCount } },

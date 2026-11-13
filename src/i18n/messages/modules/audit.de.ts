@@ -319,6 +319,13 @@ export const auditDe = {
       delete: "Tresor-Eintrag gelöscht",
       reveal: "Tresor-Zugangsdaten angezeigt",
       revealFailed: "Tresor: Anzeige mit falschem Passwort versucht",
+      setup: "Tresor eingerichtet (Passphrase festgelegt)",
+      unlock: "Tresor entsperrt",
+      unlockFailed: "Tresor: Entsperren mit falscher Passphrase oder falschem Wiederherstellungsschlüssel versucht",
+      unlockRecovery: "Tresor mit dem Wiederherstellungsschlüssel entsperrt",
+      lock: "Tresor gesperrt",
+      passphrase: "Tresor-Passphrase geändert",
+      reset: "Tresor zurückgesetzt (Zugangsdaten entfernt)",
     },
     docs: {
       create: "Dokumentationsseite angelegt",

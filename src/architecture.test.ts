@@ -586,12 +586,10 @@ describe("Datenzugriff", () => {
   it("IT-Tresor: die Tabelle VaultEntry berühren nur it/docs/vault*.ts (Anzeige, Operationen, Abfragen, Zurücksetzen) – Seiten, Bausteine, Suche, API, Export und andere Funktionen nie; Ausnahmen mit Grund", () => {
     const ALLOWED = /^modules\/it\/docs\/vault[a-z-]*\.tsx?$/;
     const EXCEPTIONS: Record<string, string> = {
-      "server/secret-key-issue.ts": "zählt Einträge mit umhülltem Schlüssel, um zu erkennen, dass ein fehlender secret.key nie still ersetzt werden darf (liest keinen Inhalt)",
       "modules/it/docs/seed.ts": "Demo-Seed: ein Beispiel-Eintrag ohne Zugangsdaten",
     };
     /** Roh-SQL auf die Tabelle (`$queryRaw`, `better-sqlite3`): der Tabellenname steht in einem Text – `code()` ersetzt Texte, hier zählen sie. Nur Kommentarzeilen bleiben außen vor. */
     const RAW_EXCEPTIONS: Record<string, string> = {
-      "server/secrets.ts": "databaseHoldsSecrets (`SELECT 1 FROM VaultEntry WHERE wrappedKey IS NOT NULL LIMIT 1`): läuft synchron und vor Prisma (beim Start, bevor ein neuer secret.key entstehen darf) und liest nur, ob es einen Eintrag mit umhülltem Schlüssel gibt – nie eine Spalte mit Inhalt",
       "modules/it/docs/pages.ts": "Routen-Inventur (Browser-CI): nennt die Tabelle als Namen für die ID der Seite, liest nichts",
     };
     const comments = (text: string) =>

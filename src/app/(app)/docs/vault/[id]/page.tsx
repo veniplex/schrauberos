@@ -4,7 +4,7 @@ import { Pencil } from "lucide-react";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-dialog";
 import { LinkButton } from "@/components/ui/buttons";
 import { Field, Input } from "@/components/ui/form";
-import { Alert, Badge, Card, DangerZone, DefinitionList, StatusBadge } from "@/components/ui/layout";
+import { Alert, Badge, Card, DangerZone, DefinitionList, StatusBadge, TextLink } from "@/components/ui/layout";
 import { PageHeader } from "@/components/ui/page-header";
 import { getI18n } from "@/i18n/server";
 import { deleteVaultEntry } from "@/modules/it/docs/vault-actions";
@@ -12,6 +12,7 @@ import { VAULT_STATE_TONE } from "@/modules/it/docs/status-tone";
 import { getVaultEntry, vaultTitle } from "@/modules/it/docs/vault-queries";
 import { VaultReveal } from "@/modules/it/docs/vault-reveal";
 import { requirePermission, sessionIfAllowed } from "@/server/auth/session";
+import { vaultStatus } from "@/server/vault-keyring";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -26,6 +27,7 @@ export default async function VaultEntryPage({ params }: { params: Promise<{ id:
   const { t, date } = await getI18n();
   const entry = await getVaultEntry(id);
   if (!entry) notFound();
+  const keyring = await vaultStatus();
   const canManage = session.can("docsIt.vaultManage");
   const when = (d: Date) => date(d, { dateStyle: "medium", timeStyle: "short" });
 
@@ -53,7 +55,12 @@ export default async function VaultEntryPage({ params }: { params: Promise<{ id:
         {entry.state === "unreadable" ? <Alert tone="warning">{t("vault.unreadableNotice")}</Alert> : null}
         {entry.state === "empty" ? <Alert tone="info">{t("vault.emptyNotice")}</Alert> : null}
 
-        {entry.state === "sealed" ? <VaultReveal id={entry.id} /> : null}
+        {entry.state === "sealed" && keyring.state === "unlocked" ? <VaultReveal id={entry.id} /> : null}
+        {entry.state === "sealed" && keyring.state !== "unlocked" ? (
+          <Alert tone="warning">
+            {t(keyring.state === "locked" ? "vault.keyring.locked" : "vault.keyring.notSetUp")} <TextLink href="/docs/vault">{t("vault.keyring.unlock.title")}</TextLink>
+          </Alert>
+        ) : null}
 
         <Card title={t("vault.sections.entry")}>
           <DefinitionList

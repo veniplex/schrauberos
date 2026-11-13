@@ -100,6 +100,7 @@ export const backupDe = {
   },
   tabs: { label: "Bereiche der Backups", backups: "Backups", offsite: "Off-Site", key: "Wiederherstellungsschlüssel" },
   key: {
+    errors: { vaultLocked: "Der IT-Tresor ist eingerichtet, aber gesperrt: Ein neuer Wiederherstellungsschlüssel würde ihn nicht öffnen. Bitte zuerst den Tresor entsperren (Person mit dem Tresor-Recht, IT-Dokumentation → Tresor), dann den Schlüssel erzeugen." },
     title: "Wiederherstellungsschlüssel",
     description: "Ein Schlüssel für alles: Er macht die Geheimnisse der Anwendung und die Off-Site-Backups nach einem Verlust des Servers wieder lesbar.",
     intro:

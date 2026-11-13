@@ -39,6 +39,11 @@ function create() {
      */
     vault: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 1_000, now }),
     /** Menge der Anzeigen je Konto (Schlüssel: Konto-Id): 30 freie in 10 Minuten, dann 10 s, 20 s … bis 90 s Wartezeit – auch mit richtigem Passwort lässt sich der Tresor nicht im Akkord abräumen (jede Anzeige steht im Audit-Log). */
+    /**
+     * Eingabe der **Tresor-Passphrase** (Entsperren; Schlüssel: der feste Wert `vault`, also **global**, nie je Konto): 5 freie Fehlversuche, dann 5 s, 10 s … bis 90 s Wartezeit für alle, ein richtiger Versuch setzt zurück. Die
+     * Passphrase schützt den ganzen Tresor – eine Sperre je Konto ließe sich mit mehreren Konten umgehen. Die scrypt-Rechnung läuft auf dem Eigentümer-Pfad (`ownerLane`), nie hinter einer Flut von Anmeldungen.
+     */
+    vaultKey: new Gate({ free: 5, baseMs: 5_000, capMs: CAP_MS, decayMs: 15 * 60_000, maxEntries: 10, now }),
     vaultReveal: new Gate({ free: 30, baseMs: 10_000, capMs: CAP_MS, decayMs: 10 * 60_000, maxEntries: 1_000, now }),
     /**
      * Neue oder umadressierte **Überwachungsziele** je Konto (Schlüssel: Konto-Id; Recht `network.monitor`): 10 freie Änderungen, danach 1, 2, 4 … bis 30 Minuten Wartezeit, 1 Stunde Ruhe setzt zurück. Das Recht lässt den Server

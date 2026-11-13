@@ -5,8 +5,7 @@ import { confirmOwnPassword } from "@/server/auth/confirm-password";
 import { loginThrottle } from "@/server/auth/throttle";
 import { db } from "@/server/db";
 import { defineOperation, fail, failField } from "@/server/operations";
-import { secretKeyIssue } from "@/server/secret-key-issue";
-import { SecretKeyUnavailableError } from "@/server/secrets";
+import { VaultLockedError, vaultStatus } from "@/server/vault-keyring";
 import { VAULT_KINDS, VAULT_LIMITS } from "./vault-constants";
 import { EMPTY_SECRET, hasContent, openVaultEntry, sealVaultEntry, type VaultLabel, type VaultSecret } from "./vault-crypto";
 
@@ -20,10 +19,9 @@ import { EMPTY_SECRET, hasContent, openVaultEntry, sealVaultEntry, type VaultLab
  *  - **Klartext nur in der Antwort der Aktion** (`state` des Adapters): nie URL, Log, Audit, Suche, API, Webhook, CSV.
  *  - **Ändern** verschlüsselt neu (neuer Eintragsschlüssel, neue IV, Revision + 1); leere Felder lassen die bisherigen Werte stehen (der Server liest sie dafür intern, ohne sie anzuzeigen), die „Entfernen“-Häkchen leeren
  *    ein Feld. Titel, Art und System sind mit dem Block verbunden (AAD, `vault-crypto.ts`): ändert sich eine der Angaben, wird der Block mit neu verschlüsselt – dazu muss er lesbar sein.
- *  - **Ändern überschreibt nie einen rettbaren, aber (noch) nicht lesbaren Block:** Gehört der Block zu einem anderen Schlüssel (`mismatch`: der wiederherzustellende Schlüssel kann ihn noch öffnen) oder fehlt
- *    der Schlüssel, ist **jede** Änderung an einem Eintrag mit Block und das Schreiben neuer Zugangsdaten gesperrt, bis der Schlüssel zurück ist (`vault.errors.keyMismatch`/`keyUnavailable`). Ein Block in unbekanntem
- *    Format (`unsupported`, neuere Version) wird nie überschrieben. Ein beschädigter Block (oder einer, der zu keinem Schlüssel mehr gehört) lässt sich nur durch eine **vollständige Neueingabe** aller vier Felder
- *    ersetzen. Fehlt `secret.key` ganz, scheitert alles laut (`keyUnavailable`).
+ *  - **Gesperrter Tresor = nichts geht:** Solange der Tresor nicht eingerichtet (`vault.errors.notSetUp`) oder gesperrt ist (`vault.errors.locked`, nach jedem Neustart bis zur Eingabe der Passphrase), werden weder
+ *    Zugangsdaten gelesen noch geschrieben noch ein Block angefasst – Einträge ohne Zugangsdaten lassen sich anlegen und umbenennen. **Ändern überschreibt nie einen unbekannten Block:** Ein Block in unbekanntem Format
+ *    (`unsupported`, neuere Version) wird nie überschrieben; ein beschädigter Block lässt sich nur durch eine **vollständige Neueingabe** aller vier Felder ersetzen.
  *  - **Löschen** ist endgültig (mit Rückfrage in der Oberfläche); Backups behalten den Stand von damals (verschlüsselt).
  */
 const flag = z.preprocess((v) => v === true || v === "1" || v === "on" || v === "true", z.boolean());
@@ -82,8 +80,6 @@ export const saveVaultEntryOperation = defineOperation({
       let id = input.id;
       let revision = 1;
       let secret: VaultSecret = typed;
-      /** Der bestehende Block war lesbar (dann gilt der Schlüssel dieses Datenträgers für den Eintrag – kein Schlüsselproblem beim erneuten Verschlüsseln) */
-      let openedOk = false;
       if (id) {
         const existing = await tx.vaultEntry.findUnique({ where: { id }, select: { id: true, title: true, kind: true, system: true, format: true, revision: true, wrappedKey: true, payload: true } });
         if (!existing) fail("notFound");
@@ -103,13 +99,10 @@ export const saveVaultEntryOperation = defineOperation({
           const opened = openVaultEntry(existing);
           if (opened.ok) {
             base = opened.secret;
-            openedOk = true;
           } else if (opened.reason !== "empty") {
             // Der Block ist da, lässt sich aber nicht lesen: nie still überschreiben
-            const issue = await secretKeyIssue(tx);
-            if (issue) fail("conflict", issue.kind === "mismatch" ? "vault.errors.keyMismatch" : "vault.errors.keyUnavailable");
             if (opened.reason === "unsupported") fail("conflict", "vault.errors.unsupported");
-            // beschädigt oder zu keinem Schlüssel mehr gehörig: nur eine vollständige Neueingabe ersetzt ihn
+            // beschädigt: nur eine vollständige Neueingabe ersetzt ihn
             const complete = (["url", "username", "secret", "note"] as const).every((field) => clear[field] || typed[field] !== "");
             if (!credentialsChanged || !complete) fail("conflict", "vault.errors.replaceAll");
           }
@@ -123,10 +116,11 @@ export const saveVaultEntryOperation = defineOperation({
       } else {
         id = (await tx.vaultEntry.create({ data: { ...meta, createdByName: principal.user.name }, select: { id: true } })).id;
       }
-      // Neue Zugangsdaten nie unter einem Schlüssel verschlüsseln, der nicht zur Datenbank gehört (`mismatch`): sie wären nach der Wiederherstellung des richtigen Schlüssels unlesbar
-      if (hasContent(secret) && !openedOk) {
-        const issue = await secretKeyIssue(tx);
-        if (issue) fail("conflict", issue.kind === "mismatch" ? "vault.errors.keyMismatch" : "vault.errors.keyUnavailable");
+      // Zugangsdaten schreiben nur bei entsperrtem Tresor (nicht eingerichtet oder gesperrt: nichts wird verschlüsselt, nichts geht verloren)
+      if (hasContent(secret)) {
+        const status = (await vaultStatus(tx)).state;
+        if (status === "notSetUp") fail("conflict", "vault.errors.notSetUp");
+        if (status === "locked") fail("conflict", "vault.errors.locked");
       }
       const sealed = hasContent(secret) ? sealVaultEntry(id, revision, label, secret) : null;
       await tx.vaultEntry.update({
@@ -137,7 +131,7 @@ export const saveVaultEntryOperation = defineOperation({
       audit({ target: credentialsChanged ? `${input.title} · Zugangsdaten` : input.title, entityId: id });
       return { id };
     } catch (error) {
-      if (error instanceof SecretKeyUnavailableError) fail("conflict", "vault.errors.keyUnavailable");
+      if (error instanceof VaultLockedError) fail("conflict", "vault.errors.locked");
       throw error;
     }
   },
@@ -165,7 +159,7 @@ export const deleteVaultEntryOperation = defineOperation({
 
 export type RevealedEntry = { title: string; url: string; username: string; secret: string; note: string };
 
-const REVEAL_ERRORS = { empty: "vault.errors.empty", unreadable: "vault.errors.unreadable", unsupported: "vault.errors.unsupported", damaged: "vault.errors.damaged" } as const;
+const REVEAL_ERRORS = { empty: "vault.errors.empty", unsupported: "vault.errors.unsupported", damaged: "vault.errors.damaged" } as const;
 
 export const revealVaultEntryOperation = defineOperation({
   name: "vault.reveal",
@@ -193,7 +187,7 @@ export const revealVaultEntryOperation = defineOperation({
     try {
       opened = openVaultEntry(entry);
     } catch (error) {
-      if (error instanceof SecretKeyUnavailableError) fail("conflict", "vault.errors.keyUnavailable");
+      if (error instanceof VaultLockedError) fail("conflict", "vault.errors.locked");
       throw error;
     }
     if (!opened.ok) fail("conflict", REVEAL_ERRORS[opened.reason]);

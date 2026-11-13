@@ -673,8 +673,9 @@ model NetConnection {
 // ───────────── IT-Tresor (F13) ─────────────
 
 // Zugangsdaten zu IT-Systemen. Titel, Art und Systembezeichnung stehen im Klartext (Liste, Suche in der Liste); URL, Benutzername, Geheimnis und Notiz nur verschlüsselt (Envelope-Verschlüsselung, README „IT-Tresor“):
-// ein zufälliger 256-Bit-Eintragsschlüssel (DEK) verschlüsselt den Nutzdatenblock mit AES-256-GCM (AAD = Eintrags-ID, Format und Revision), der DEK ist mit dem Schlüssel aus secret.key umhüllt (AAD = Eintrags-ID).
-// Ohne secret.key (Backup ohne Schlüssel) sind beide nicht lesbar – die Zeile bleibt, bis die Administration sie zurücksetzt (Sicherung der Zeilen nach secret-reset/), dann steht dort „Neu eingeben nötig“.
+// ein zufälliger 256-Bit-Eintragsschlüssel (DEK) verschlüsselt den Nutzdatenblock mit AES-256-GCM (AAD = Eintrags-ID, Format und Revision), der DEK ist mit dem **Tresor-Hauptschlüssel** umhüllt (AAD = Eintrags-ID).
+// Den Hauptschlüssel gibt es nur im Speicher des Prozesses (Tabelle VaultKeyring: nur Hüllen davon); nach einem Neustart öffnet ihn die Passphrase oder der Wiederherstellungsschlüssel. Ein Eintrag wird nie stillschweigend zurückgesetzt –
+// nur der ausdrückliche „Tresor zurücksetzen“ (Sicherung der Zeilen nach secret-reset/) entfernt die Blöcke, dann steht dort „Neu eingeben nötig“.
 model VaultEntry {
   id            String    @id @default(cuid())
   title         String
@@ -683,14 +684,14 @@ model VaultEntry {
   // Bezeichnung des Systems (Freitext, z. B. "fw-01"), kein Geheimnis
   system        String?
   // Format der verschlüsselten Teile (Version der Konstruktion, Teil der AAD)
-  format        Int       @default(1)
+  format        Int       @default(2)
   // Zähler: steigt mit jeder neuen Verschlüsselung (Teil der AAD des Blocks)
   revision      Int       @default(1)
   // umhüllter Eintragsschlüssel; null = keine Zugangsdaten hinterlegt oder nicht lesbar (dann ist unreadableAt gesetzt)
   wrappedKey    String?
   // verschlüsselter Block aus URL, Benutzername, Geheimnis und Notiz
   payload       String?
-  // gesetzt, wenn die Geheimnisse nach einer Wiederherstellung ohne passenden Schlüssel zurückgesetzt wurden („Neu eingeben nötig“)
+  // gesetzt, wenn die Zugangsdaten durch das ausdrückliche Zurücksetzen des Tresors entfernt wurden („Neu eingeben nötig“)
   unreadableAt  DateTime?
   createdByName String?
   updatedByName String?
@@ -698,6 +699,27 @@ model VaultEntry {
   updatedAt     DateTime  @updatedAt
 
   @@index([kind])
+}
+
+// Die Hüllen des Tresor-Hauptschlüssels (ein Datensatz, `id = "default"`): Der Hauptschlüssel (256 Bit, zufällig) wird **nie gespeichert**. Gespeichert sind nur (1) er unter einem Schlüssel umhüllt, der per scrypt aus der
+// **Tresor-Passphrase** abgeleitet wird (`salt`, `scryptN/R/P`, `wrappedKey`; die GCM-Prüfung der Hülle ist zugleich die Prüfung der Passphrase), (2) ein Prüfwert (`check`: ein fester Text unter dem Hauptschlüssel, bestätigt, dass der
+// geöffnete Schlüssel zu den Einträgen passt) und (3) optional er unter einem aus dem **Wiederherstellungsschlüssel** abgeleiteten Schlüssel (`recoveryWrap`, „ein Schlüssel für alles“). Die Passphrase zu ändern tauscht nur Hülle und
+// Salz – die Einträge bleiben unberührt. Ohne diesen Datensatz ist der Tresor nicht eingerichtet.
+model VaultKeyring {
+  id            String   @id
+  // Version der Konstruktion (Teil der AAD)
+  version       Int      @default(1)
+  salt          String
+  scryptN       Int
+  scryptR       Int
+  scryptP       Int
+  wrappedKey    String
+  check         String
+  recoveryWrap  String?
+  createdByName String?
+  changedByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // ───────────── Netzwerk-Überwachung (F12) ─────────────

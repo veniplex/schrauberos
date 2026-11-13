@@ -2,6 +2,7 @@
 
 import { formObject } from "@/lib/forms";
 import { defineAction } from "@/server/operations";
+import { changeVaultPassphraseOperation, lockVaultOperation, resetVaultOperation, setupVaultOperation, unlockVaultOperation, unlockVaultWithRecoveryKeyOperation } from "./vault-keyring-operations";
 import { deleteVaultEntryOperation, revealVaultEntryOperation, saveVaultEntryOperation } from "./vault-operations";
 
 const PATHS = ["/docs/vault", "/"];
@@ -46,4 +47,35 @@ export const deleteVaultEntry = defineAction(deleteVaultEntryOperation, {
 export const revealVaultEntry = defineAction(revealVaultEntryOperation, {
   form: (fd) => ({ id: String(fd.get("id") ?? ""), password: String(fd.get("password") ?? "") }),
   state: (data) => ({ vault: data }),
+});
+
+/* ───────────── Tresor-Hülle: einrichten, entsperren, sperren, Passphrase ändern, zurücksetzen ───────────── */
+
+const text = (fd: FormData, name: string) => String(fd.get(name) ?? ""); // Passphrase und Passwort nie kürzen oder umformen
+
+export const setupVault = defineAction(setupVaultOperation, {
+  form: (fd) => ({ passphrase: text(fd, "vault_passphrase"), confirm: text(fd, "vault_passphrase_confirm"), password: text(fd, "password") }),
+  revalidate: [...PATHS, ["/", "layout"]],
+  message: "vault.keyring.messages.setupDone",
+});
+export const unlockVault = defineAction(unlockVaultOperation, {
+  form: (fd) => ({ passphrase: text(fd, "vault_passphrase"), password: text(fd, "password") }),
+  revalidate: [...PATHS, ["/", "layout"]],
+  message: "vault.keyring.messages.unlocked",
+});
+export const unlockVaultWithRecoveryKey = defineAction(unlockVaultWithRecoveryKeyOperation, {
+  form: (fd) => ({ recoveryKey: text(fd, "vault_recovery_key"), password: text(fd, "password") }),
+  revalidate: [...PATHS, ["/", "layout"]],
+  message: "vault.keyring.messages.unlocked",
+});
+export const lockVault = defineAction(lockVaultOperation, { revalidate: [...PATHS, ["/", "layout"]], message: "vault.keyring.messages.locked" });
+export const changeVaultPassphrase = defineAction(changeVaultPassphraseOperation, {
+  form: (fd) => ({ passphrase: text(fd, "vault_passphrase"), confirm: text(fd, "vault_passphrase_confirm"), password: text(fd, "password") }),
+  revalidate: PATHS,
+  message: "vault.keyring.messages.changed",
+});
+export const resetVault = defineAction(resetVaultOperation, {
+  form: (fd) => ({ password: text(fd, "password"), confirm: fd.get("confirm") === "on" }),
+  revalidate: [...PATHS, ["/", "layout"]],
+  message: "vault.keyring.messages.resetDone",
 });

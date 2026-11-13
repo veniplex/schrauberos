@@ -92,12 +92,6 @@ export function databaseHoldsSecrets(file: string | null = currentDatabaseFile()
     return false;
   }
   try {
-    // Ein Eintrag des IT-Tresors mit umhülltem Schlüssel gehört zu einem `secret.key`: auch dann darf nie still ein neuer entstehen (die Tabelle fehlt in alten Datenbanken: dann gibt es nichts zu schützen)
-    try {
-      if (db.prepare(`SELECT 1 FROM VaultEntry WHERE wrappedKey IS NOT NULL LIMIT 1`).get()) return true;
-    } catch {
-      /* keine Tresor-Tabelle */
-    }
     if (db.prepare(`SELECT 1 FROM TwoFactor WHERE secret IS NOT NULL LIMIT 1`).get()) return true;
     for (const row of db.prepare(`SELECT key, value FROM AppSetting`).all() as Array<{ key: string; value: string }>) {
       if (MARKER_KEYS.has(row.key) || SECRET_BLOB.test(row.value)) return true;

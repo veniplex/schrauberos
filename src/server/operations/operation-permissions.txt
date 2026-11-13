@@ -177,8 +177,14 @@ tires.saveSettings settings.manage
 tires.setStatus tires.stock
 tires.update tires.edit
 vault.delete docsIt.vaultManage
+vault.lock docsIt.vault
+vault.passphrase docsIt.vaultManage
+vault.reset docsIt.vaultManage
 vault.reveal docsIt.vault
 vault.save docsIt.vaultManage
+vault.setup docsIt.vaultManage
+vault.unlock docsIt.vault
+vault.unlockRecovery docsIt.vault
 vehicles.archive vehicles.edit
 vehicles.delete vehicles.delete
 vehicles.save vehicles.edit

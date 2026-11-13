@@ -7,6 +7,7 @@ import { KEY_CHECK_SETTING } from "@/server/secret-key-issue";
 import { readSecretKey, secretKeyHex } from "@/server/secrets";
 import { db } from "@/server/db";
 import { getSecret, setSecret, setSetting } from "@/server/settings";
+import { assertVaultReadyForRecoveryKey, wrapVaultForRecovery } from "@/server/vault-keyring";
 
 /**
  * Wiederherstellungsschlüssel (P1b-4a): **ein Schlüssel für alles**.
@@ -31,8 +32,13 @@ const CONFIRMED = "secrets.keyConfirmedAt";
 /** Geheimnis (mit `secret.key` verschlüsselt): Hauptschlüssel der Off-Site-Verschlüsselung, Hex */
 export const OFFSITE_MASTER_SECRET = "secrets.offsiteMaster";
 
-/** Neuen Wiederherstellungsschlüssel erzeugen; ersetzt Hülle, Kennwert und Off-Site-Hauptschlüssel und setzt „gesichert“ zurück. Gibt den Klartext zurück (nur zur einmaligen Anzeige). */
-export async function issueRecoveryKey(client: Writer): Promise<string> {
+/**
+ * Neuen Wiederherstellungsschlüssel erzeugen; ersetzt Hülle, Kennwert und Off-Site-Hauptschlüssel und setzt „gesichert“ zurück. Gibt den Klartext zurück (nur zur einmaligen Anzeige).
+ * **Ein Schlüssel für alles:** Ist der IT-Tresor eingerichtet, hinterlegt dieselbe Transaktion dessen Hauptschlüssel auch unter dem neuen Schlüssel (`wrapVaultForRecovery`) – dazu muss der Tresor entsperrt sein;
+ * ist er gesperrt, wirft die Funktion `VaultLockedError` (vorab, bevor etwas geschrieben wird): ein neuer Schlüssel, der den Tresor nicht öffnet, wäre trügerisch.
+ */
+export async function issueRecoveryKey(client: Writer & Pick<PrismaClient | Prisma.TransactionClient, "vaultKeyring">): Promise<string> {
+  await assertVaultReadyForRecoveryKey(client);
   const key = randomBytes(32);
   const secret = secretKeyHex();
   await setSetting(WRAPPED, wrapSecretKey(secret, key), client);
@@ -40,6 +46,7 @@ export async function issueRecoveryKey(client: Writer): Promise<string> {
   await setSetting(CREATED, new Date().toISOString(), client);
   await setSetting(CONFIRMED, null, client);
   await setSecret(OFFSITE_MASTER_SECRET, deriveOffsiteMasterKey(key).toString("hex"), client);
+  await wrapVaultForRecovery(client, key);
   return formatRecoveryKey(key);
 }
 

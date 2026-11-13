@@ -321,6 +321,13 @@ export const auditEn: typeof auditDe = {
       delete: "Vault entry deleted",
       reveal: "Vault credentials shown",
       revealFailed: "Vault: display attempted with a wrong password",
+      setup: "Vault set up (passphrase chosen)",
+      unlock: "Vault unlocked",
+      unlockFailed: "Vault: unlock attempted with a wrong passphrase or recovery key",
+      unlockRecovery: "Vault unlocked with the recovery key",
+      lock: "Vault locked",
+      passphrase: "Vault passphrase changed",
+      reset: "Vault reset (credentials removed)",
     },
     docs: {
       create: "Documentation page created",

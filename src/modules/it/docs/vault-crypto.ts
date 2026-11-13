@@ -1,7 +1,8 @@
 import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { GCM_TAG_BYTES, gcmParts, strictBase64 } from "@/lib/gcm";
-import { boundBlobShape, decryptSecretBound, encryptSecretBound } from "@/server/secrets";
+import { ENTRY_KEY_FORMAT, entryKeyShape, unwrapEntryKey, wrapEntryKey } from "@/lib/vault-keys";
+import { vaultMasterKey } from "@/server/vault-keyring";
 import { VAULT_LIMITS } from "./vault-constants";
 
 /**
@@ -13,17 +14,15 @@ import { VAULT_LIMITS } from "./vault-constants";
  *    verbunden: wer in der Datenbank Beschriftungen zwischen Einträgen vertauscht, bekommt einen nicht mehr lesbaren Eintrag statt der falschen Zugangsdaten unter einem vertrauten Titel. Folge: Ändert sich eine
  *    der drei Angaben, wird der Block neu verschlüsselt (dazu muss er lesbar sein). **Grenze:** Die Zeile als Ganzes lässt sich zurückspielen (alte Revision samt altem Block und Schlüssel) – das erkennt das
  *    Format nicht (die Revision schützt gegen das Mischen von Teilen, nicht gegen einen älteren, in sich stimmigen Stand).
- *  - Der DEK selbst ist mit dem **Schlüssel aus `secret.key`** umhüllt (`encryptSecretBound` in `server/secrets.ts`: derselbe einheitliche Geheimnis-Mechanismus, AES-256-GCM, zufällige Nonce), gebunden an
- *    `schrauberos:vault:dek:v<Format>:<Eintrags-ID>`. Damit hängt der Tresor an demselben Schlüssel wie alle anderen Geheimnisse: Wer `secret.key` über den **Wiederherstellungsschlüssel** zurückholt
- *    (`recovery-key.ts`), kann auch den Tresor wieder lesen; ohne passenden Schlüssel bleibt er unlesbar, aber nicht zerstört.
- *  - **Fail-closed:** Fehlt `secret.key` oder ist er nicht lesbar, werfen Öffnen und Verschlüsseln `SecretKeyUnavailableError` – nie ein stilles „leer“.
- *  - **Was beim Öffnen herauskommt** (`OpenResult`): `unreadable` heißt *ausschließlich*: der Block ist gut geformt, aber der Schlüssel dieses Datenträgers öffnet den Eintragsschlüssel nicht (fremder Schlüssel) –
- *    nur das setzt der Start zurück. Ein unbekanntes Format (neuere Version, abgesenkte Feldgrenzen) ist `unsupported`, ein veränderter oder schlecht geformter Block `damaged`: beides wird gemeldet,
- *    nie automatisch zurückgesetzt.
+ *  - Der DEK selbst ist mit dem **Tresor-Hauptschlüssel** umhüllt (`wrapEntryKey` in `lib/vault-keys.ts`, AES-256-GCM, zufällige IV, AAD = Format und Eintrags-ID). Den Hauptschlüssel gibt es nur im Speicher des
+ *    Prozesses (`server/vault-keyring.ts`): Er entsteht aus der **Tresor-Passphrase** (scrypt, Hülle in der Datenbank) bzw. dem Wiederherstellungsschlüssel. **Der Tresor hängt nicht mehr an `secret.key`.**
+ *  - **Gesperrt = fail-closed:** Ist der Tresor gesperrt (nach jedem Neustart, bis ein Berechtigter die Passphrase eingibt) oder nicht eingerichtet, werfen Öffnen und Verschlüsseln `VaultLockedError` – nie ein stilles „leer“.
+ *  - **Was beim Öffnen herauskommt** (`OpenResult`): Ein unbekanntes Format (neuere Version, abgesenkte Feldgrenzen) ist `unsupported`, ein veränderter, verschobener oder schlecht geformter Block `damaged`: beides wird
+ *    gemeldet, nie automatisch zurückgesetzt. (Ein Eintragsschlüssel, der unter dem richtigen Hauptschlüssel nicht aufgeht, ist beschädigt – „fremder Schlüssel“ gibt es nicht mehr.)
  *
  * Der Klartext verlässt dieses Modul nur als Rückgabewert von `openVaultEntry`; er wird nirgends geloggt oder gespeichert.
  */
-export const VAULT_FORMAT = 1;
+export const VAULT_FORMAT = ENTRY_KEY_FORMAT;
 const PAYLOAD_PREFIX = "p1";
 
 export type VaultSecret = { url: string; username: string; secret: string; note: string };
@@ -36,7 +35,6 @@ export type VaultLabel = { title: string; kind: string; system: string | null };
 
 const labelDigest = (label: VaultLabel): string => createHash("sha256").update(JSON.stringify([label.title, label.kind, label.system ?? ""])).digest("hex").slice(0, 32);
 const payloadAad = (id: string, format: number, revision: number, label: VaultLabel) => `schrauberos:vault:payload:v${format}:${id}:${revision}:${labelDigest(label)}`;
-const keyAad = (id: string, format: number) => `schrauberos:vault:dek:v${format}:${id}`;
 
 export type SealedEntry = { format: number; revision: number; wrappedKey: string; payload: string };
 
@@ -49,7 +47,7 @@ export function sealVaultEntry(id: string, revision: number, label: VaultLabel, 
     cipher.setAAD(Buffer.from(payloadAad(id, VAULT_FORMAT, revision, label), "utf8"));
     const data = Buffer.concat([cipher.update(JSON.stringify(secret), "utf8"), cipher.final()]);
     const payload = [PAYLOAD_PREFIX, iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
-    return { format: VAULT_FORMAT, revision, wrappedKey: encryptSecretBound(dek, keyAad(id, VAULT_FORMAT)), payload };
+    return { format: VAULT_FORMAT, revision, wrappedKey: wrapEntryKey(dek, vaultMasterKey(), id), payload };
   } finally {
     dek.fill(0);
   }
@@ -58,10 +56,10 @@ export function sealVaultEntry(id: string, revision: number, label: VaultLabel, 
 export type OpenResult =
   | { ok: true; secret: VaultSecret }
   /**
-   * `empty`: keine Zugangsdaten hinterlegt; `unreadable`: gut geformt, aber der Schlüssel dieses Datenträgers öffnet den Eintragsschlüssel nicht (fremder Schlüssel); `unsupported`: Format, Version oder
-   * Feldgrenzen, die dieses Programm nicht kennt (neuere Version) – nie zurücksetzen; `damaged`: Block verändert, verschoben oder schlecht geformt – melden, nie automatisch zurücksetzen
+   * `empty`: keine Zugangsdaten hinterlegt; `unsupported`: Format, Version oder Feldgrenzen, die dieses Programm nicht kennt (neuere Version) – nie zurücksetzen; `damaged`: Block verändert, verschoben oder schlecht
+   * geformt – melden, nie automatisch zurücksetzen
    */
-  | { ok: false; reason: "empty" | "unreadable" | "unsupported" | "damaged" };
+  | { ok: false; reason: "empty" | "unsupported" | "damaged" };
 
 const text = (value: unknown, max: number): string | null => (typeof value === "string" && value.length <= max ? value : null);
 
@@ -79,16 +77,17 @@ function parsePayload(payload: string): Payload | "unsupported" | "damaged" {
 
 export type VaultRow = VaultLabel & { id: string; format: number; revision: number; wrappedKey: string | null; payload: string | null };
 
-/** Öffnet die Zugangsdaten eines Eintrags. Wirft `SecretKeyUnavailableError`, wenn `secret.key` fehlt oder nicht lesbar ist (und der Block gut geformt ist). */
+/** Öffnet die Zugangsdaten eines Eintrags. Wirft `VaultLockedError`, wenn der Tresor gesperrt (oder nicht eingerichtet) ist und der Eintrag einen Block hat. */
 export function openVaultEntry(entry: VaultRow): OpenResult {
   if (!entry.wrappedKey || !entry.payload) return { ok: false, reason: "empty" };
   if (entry.format !== VAULT_FORMAT) return { ok: false, reason: "unsupported" };
-  const wrapped = boundBlobShape(entry.wrappedKey);
+  const wrapped = entryKeyShape(entry.wrappedKey);
   if (wrapped !== "ok") return { ok: false, reason: wrapped };
   const payload = parsePayload(entry.payload);
   if (typeof payload === "string") return { ok: false, reason: payload };
-  const dek = decryptSecretBound(entry.wrappedKey, keyAad(entry.id, entry.format));
-  if (dek === null) return { ok: false, reason: "unreadable" };
+  const dek = unwrapEntryKey(entry.wrappedKey, vaultMasterKey(), entry.id);
+  // Der Hauptschlüssel ist geprüft (Prüfwert): geht der Eintragsschlüssel damit nicht auf, ist er verändert oder in einen anderen Eintrag verschoben
+  if (dek === null) return { ok: false, reason: "damaged" };
   try {
     if (dek.length !== 32) return { ok: false, reason: "damaged" };
     let json: Record<string, unknown>;
