@@ -102,7 +102,10 @@ export function CalendarToolbar({ i18n, view, date, canCreate }: Pick<Ctx, "i18n
           <ChevronRight className="size-4" aria-hidden />
         </LinkButton>
       </div>
-      <h2 className="min-w-0 flex-1 basis-48 text-base font-semibold tabular">{label}</h2>
+      {/* data-e2e-mask: die Woche ändert sich mit dem Kalender, die Browser-CI deckt sie in den Baseline-Screenshots ab */}
+      <h2 data-e2e-mask className="min-w-0 flex-1 basis-48 text-base font-semibold tabular">
+        {label}
+      </h2>
       <SegmentedLinks
         label={t("appointments.view")}
         options={(["week", "day", "list"] as const).map((v) => ({ href: calendarHref(v, date), label: t(`appointments.views.${v}`), active: view === v }))}
@@ -328,7 +331,8 @@ function TimeGrid({ ctx, columns }: { ctx: Ctx; columns: Column[] }) {
 
   return (
     // `isolate`: eigene Ebene – Termine (z-10) und Jetzt-Linie (z-20) bleiben unter dem klebenden Kopf (z-30), ohne die Kopfzeile der Seite (z-20/30) zu berühren
-    <Card as="div" padded={false} className={clsx("isolate", scrollable && "overflow-x-auto")} style={gridVars(ctx.slotMinutes)}>
+    // data-e2e-mask: Wochentag, Jetzt-Linie und die auf „heute“ bezogenen Demo-Termine ändern das Bild je nach Tag und Uhrzeit (nur für die Baseline-Screenshots)
+    <Card as="div" data-e2e-mask padded={false} className={clsx("isolate", scrollable && "overflow-x-auto")} style={gridVars(ctx.slotMinutes)}>
       {ctx.canCreate ? (
         <p id={HINT_ID} className="sr-only">
           {ctx.i18n.t("appointments.gridHint")}
@@ -405,6 +409,7 @@ function WeekStrip({ ctx, week, view, counts }: { ctx: Ctx; week: Date[]; view: 
   return (
     <nav
       aria-label={i18n.t("appointments.weekDays")}
+      data-e2e-mask
       className="sticky top-(--sticky-top) z-20 -mx-4 border-b border-line glass-bar [--glass:var(--bg)] px-4 py-2 sm:-mx-6 sm:px-6"
     >
       <ul className="flex gap-1 overflow-x-auto">
