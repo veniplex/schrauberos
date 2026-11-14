@@ -1,21 +1,27 @@
 name: Build & publish Docker image
 
-# Push auf main veröffentlicht das Image nur als "edge" (und "sha-…"), nie als "latest". Ein Versions-Tag v1.2.3 veröffentlicht das Image ebenfalls zunächst nur als "sha-…": "latest"
-# und die Versions-Tags "1.2.3" / "1.2" setzt erst der Job "release" nach der Echtprobe (Retag desselben Digests; Vorabversionen wie v1.2.3-rc1 bekommen nur ihren vollen Namen, nie "latest").
+# Jeder Push auf main läuft vollständig durch (Typen, Lint, Tests, native Tests, Browser-Tests, Lighthouse, XRechnung, Image-Bau mit Smoke-Test) und veröffentlicht das Image nur als
+# "edge" (und "sha-…"), nie als "latest".
+#
+# **Ein Release entsteht automatisch, wenn die Version in package.json auf main einen neuen Wert hat** (Job "plan", scripts/release-plan.mjs: es gibt noch keinen Tag v<Version>). Das
+# Hochsetzen der Version ist der Auslöser. Ist dann alles grün, folgt der Job "release": Echtprobe, Siegel und Signatur, Anlegen des Tags v<Version> am geprüften Commit, "latest" /
+# "X.Y.Z" / "X.Y" (Retag desselben Digests) und das veröffentlichte GitHub-Release. Das Image bekommt bis dahin nur seinen "sha-…"-Namen. Ein von Hand gesetzter Versions-Tag v1.2.3 geht
+# denselben Weg (Vorabversionen wie v1.2.3-rc1 bekommen nur ihren vollen Namen, nie "latest").
 # Das Image wird vor dem Veröffentlichen gestartet (scripts/smoke-image.sh: Standard- und gehärtete Compose-Datei). Versions-Tags erzeugen zusätzlich ein Release-Paket für
 # Web-Updates, gezogen aus dem getesteten Image, mit Siegel (SOS-SEAL) und signiertem Manifest (Job "release").
 #
 # Alle Actions sind auf einen Commit-SHA festgelegt (Kommentar = Version); Dependabot (.github/dependabot.yml) schlägt Updates vor.
 #
-# Versions-Tags sind gesichert: Der Job "guard" verlangt, dass der getaggte Commit auf main liegt (Vorfahre von origin/main), und der Job "release" (hält den
-# Signaturschlüssel) läuft in der GitHub-Umgebung "release" – dort muss ein Pflicht-Reviewer eingetragen sein (Repository-Einstellung, siehe README). Das Image wird
+# Releases sind gesichert: Der Job "guard" verlangt, dass der Commit auf main liegt (Vorfahre von origin/main), und der Job "release" (hält den
+# Signaturschlüssel) läuft in der GitHub-Umgebung "release" – dort ist ein Pflicht-Reviewer eingetragen (Repository-Einstellung, siehe README); ohne ihn läuft das Release vollautomatisch.
+# Den Tag legt der Job selbst an: Die Regel „Versions-Tags“ (Repository-Einstellung) verbietet das Anlegen von v*-Tags, der Job braucht dort eine Ausnahme (README, Checkliste). Das Image wird
 # **einmal** gebaut, genau dieses Image wird gestartet (Smoke-Test) und danach unverändert gepusht; das Release-Paket ist ein Auszug (docker cp /app) desselben Images.
 #
 # Die Signierstrecke hat zwei Proben ohne Veröffentlichung: "Run workflow" mit "rehearsal" (nur Testschlüssel, kein Secret) und mit "check_signing_key" (Umgebung "release": prüft nur, dass
 # das Secret zum öffentlichen Schlüssel passt). Der Produktionsschlüssel wird nie für eine Probe verwendet, die jeder Zweig mit Schreibrecht auslösen könnte.
 #
-# Browser-Tests (Playwright, Job "e2e") kosten viele Minuten: Sie laufen NICHT bei jedem Push auf main, sondern nur bei Versions-Tags (und blockieren
-# dort Image und Release), bei Pull Requests und von Hand ("Run workflow"; optional "update_snapshots" für neue Baseline-Screenshots).
+# Browser-Tests (Playwright, Job "e2e") und die XRechnung-Prüfung laufen bei jedem Push auf main, bei Pull Requests und von Hand ("Run workflow"; optional "update_snapshots" für neue
+# Baseline-Screenshots) und blockieren Image und Release.
 #
 # Lighthouse-CI (Job "lighthouse", mobil: Leistung, Zugänglichkeit, Installierbarkeit) läuft zu denselben Zeiten wie die Browser-Tests, blockiert aber nichts: Die Schwellen in
 # lighthouserc.json sind Platzhalter (nur Warnungen), bis die erste Messung vorliegt.
@@ -23,6 +29,7 @@ name: Build & publish Docker image
 # Auf main läuft die Pipeline nur, wenn sich etwas ändert, das in Image oder Tests eingeht: reine Änderungen an README, CLAUDE.md, AGENTS.md,
 # .claude/ und den .env-Vorlagen lösen nichts aus (sie sind nicht im Image: siehe .dockerignore). Die Compose-Dateien gehen in den Smoke-Test
 # ein und lösen deshalb einen Lauf aus; die Docs unter docs/ gehören zum Image (Hilfe in der App). Versions-Tags bauen immer; "Run workflow" erzwingt einen Lauf von Hand.
+# (package.json steht nicht in dieser Liste: Das Hochsetzen der Version löst den Lauf und damit das Release aus.)
 on:
   push:
     branches: [main]
@@ -63,8 +70,28 @@ permissions:
   contents: read
 
 jobs:
+  # Entscheidet, ob dieser Lauf ein Release ist (neue Version in package.json auf main, oder ein Versions-Tag). Liest nur, schreibt nichts.
+  plan:
+    name: Release-Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - id: plan
+        run: node --no-warnings scripts/release-plan.mjs
+
   check:
     name: Typecheck, Lint, Tests
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -84,12 +111,14 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - name: Schema und Migrationen stimmen überein (Drift-Check)
         run: npm run db:check
-      # Versions-Tag: Baseline und Migrationen müssen eingefroren sein (npm run db:freeze) und seit dem letzten eingefrorenen Release unverändert bleiben
+      # Release: Baseline und Migrationen müssen eingefroren sein (npm run db:freeze) und seit dem letzten eingefrorenen Release unverändert bleiben
       - name: Migrationen eingefroren und seit dem letzten Release unverändert
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.plan.outputs.release == 'true'
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           git fetch --tags --force --unshallow || git fetch --tags --force
-          npm run db:release-check -- --tag "$GITHUB_REF_NAME"
+          npm run db:release-check -- --tag "$RELEASE_TAG"
 
   # Der C-Prüfer im Starter (docker/verify.c, docker/bootstrap.c; README „Starter-Vertrauensanker“): alle nativen Stufen (Krypto-Vektoren, Goldkorpus, Mutationen, Parser-Differential, ASAN/UBSAN, Starter-Schleife,
   # PID-Namensraum, libFuzzer-Kurzlauf, winziger Container) – ohne Browser und ohne Bau der App. Fehlt Linux/Compiler, schlägt der Job fehl (REQUIRE_NATIVE=1).
@@ -123,10 +152,11 @@ jobs:
           SOS_STARTER_BINARY="$PWD/bootstrap-test" node --no-warnings docker/test/run.mjs corpus
 
   guard:
-    name: Versions-Tag liegt auf main
-    # Nur für Versions-Tags: Wer Schreibrechte hat, kann einen Tag auf einen beliebigen Commit (anderer Branch, Fork-Stand) setzen. Veröffentlicht wird nur, was
+    name: Release-Commit liegt auf main
+    # Nur für Releases: Wer Schreibrechte hat, kann einen Tag auf einen beliebigen Commit (anderer Branch, Fork-Stand) setzen. Veröffentlicht wird nur, was
     # auch auf main liegt (also durch dessen Schutzregeln/Review gegangen ist).
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,8 +166,8 @@ jobs:
         run: |
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
-            || { echo "::error::Der Commit von $GITHUB_REF_NAME liegt nicht auf main – es wird nichts veröffentlicht."; exit 1; }
-      # Wurzelschlüssel-Gate früh (Z6-2 N5): Dasselbe Skript, das später die `trust`-Stufe des Image-Baus ausführt, bricht hier nach Sekunden ab – nicht erst nach den ~75 Minuten von e2e und native –,
+            || { echo "::error::Der Commit $GITHUB_SHA liegt nicht auf main – es wird nichts veröffentlicht."; exit 1; }
+      # Wurzelschlüssel-Gate früh (Z6-2 N5): Dasselbe Skript, das später die `trust`-Stufe des Image-Baus ausführt, bricht hier nach Sekunden ab – nicht erst nach den Minuten von e2e und native –,
       # wenn ROOT_PUBLIC_KEY fehlt, gleich dem Release-Schlüssel ist oder ein Testschlüssel im Image landen würde. Schreibt nichts (Ausgabe nur ins Runner-Temp-Verzeichnis).
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -147,7 +177,6 @@ jobs:
 
   e2e:
     name: Browser-Tests (Playwright)
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: check
     # Fest auf 24.04 statt ubuntu-latest: Das Label wechselt auf Ubuntu 26 (Schriften, Browser-Abhängigkeiten); die Baseline-Screenshots entstehen mit dem Playwright-Image zu Ubuntu 24.04 (noble)
     runs-on: ubuntu-24.04
@@ -186,7 +215,6 @@ jobs:
 
   lighthouse:
     name: Lighthouse (mobil)
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: check
     # Wie e2e: fest auf 24.04 (siehe dort)
     runs-on: ubuntu-24.04
@@ -221,10 +249,9 @@ jobs:
 
   # E-Rechnungen (XRechnung/EN 16931) gegen den KoSIT-Prüfer: Die Tests der Rechnungserstellung (F3, Dateien *.einvoice.test.ts) schreiben ihre XML-Beispiele nach EINVOICE_SAMPLES_DIR
   # (src/test/einvoice-samples.ts), scripts/validate-xrechnung.sh lädt Prüfer und Prüfregeln in festgelegter Version, prüft die Prüfsummen und lässt jedes Beispiel prüfen. Seit F3 ist ein leerer
-  # Beispielordner ein Fehler (XRECHNUNG_REQUIRE_SAMPLES=1). Läuft wie e2e nicht bei jedem Push auf main (dann übersprungen); bei Versions-Tags ist er Voraussetzung für Image und Release.
+  # Beispielordner ein Fehler (XRECHNUNG_REQUIRE_SAMPLES=1). Läuft wie e2e bei jedem Push auf main und ist Voraussetzung für Image und Release.
   xrechnung:
     name: XRechnung (KoSIT-Prüfer)
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -260,9 +287,9 @@ jobs:
 
   publish:
     name: Image bauen, testen und nach ghcr.io pushen
-    # Nicht bei Pull Requests; bei Tags erst, wenn die Browser-Tests grün sind (auf main sind sie übersprungen) und der Tag auf main liegt
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && needs.native.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') && (needs.xrechnung.result == 'success' || needs.xrechnung.result == 'skipped') && (needs.guard.result == 'success' || needs.guard.result == 'skipped') }}
-    needs: [check, native, guard, e2e, xrechnung]
+    # Nicht bei Pull Requests; erst wenn Tests, Browser-Tests und XRechnung grün sind und (bei einem Release) der Commit auf main liegt
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.check.result == 'success' && needs.native.result == 'success' && needs.e2e.result == 'success' && needs.xrechnung.result == 'success' && (needs.guard.result == 'success' || needs.guard.result == 'skipped') }}
+    needs: [plan, check, native, guard, e2e, xrechnung]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -274,11 +301,14 @@ jobs:
         with:
           node-version: 26
       - id: ver
+        env:
+          RELEASE: ${{ needs.plan.outputs.release }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
         run: |
           pkg=$(node -p "require('./package.json').version")
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            v="${GITHUB_REF_NAME#v}"
-            [ "$v" = "$pkg" ] || { echo "Tag v$v passt nicht zur Version in package.json ($pkg)"; exit 1; }
+          if [ "$RELEASE" = "true" ]; then
+            v="$RELEASE_VERSION"
+            [ "$v" = "$pkg" ] || { echo "Version des Release-Plans ($v) passt nicht zu package.json ($pkg)"; exit 1; }
           else
             v="$pkg-dev.${GITHUB_SHA::7}"
           fi
@@ -310,7 +340,7 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.ver.outputs.version }}
             APP_COMMIT=${{ github.sha }}
-            SOS_TAG_BUILD=${{ startsWith(github.ref, 'refs/tags/v') && '1' || '0' }}
+            SOS_TAG_BUILD=${{ needs.plan.outputs.release == 'true' && '1' || '0' }}
           tags: |
             ${{ steps.meta.outputs.tags }}
             schrauberos:smoke
@@ -321,9 +351,9 @@ jobs:
       - name: Smoke-Test des Images
         run: bash scripts/smoke-image.sh schrauberos:smoke
       # 2b) Der Vertrauensanker mit der echten App: dasselbe Dockerfile, Ziel runner-test (nur der Starter trägt Testschlüssel statt der echten; alle übrigen Stufen kommen aus dem Cache).
-      #     Dieses Image wird nie veröffentlicht. Nur bei Versions-Tags (kostet einige Minuten).
-      - name: Image mit Testschlüsseln bauen (nur Versions-Tags)
-        if: startsWith(github.ref, 'refs/tags/v')
+      #     Dieses Image wird nie veröffentlicht. Nur bei einem Release (kostet einige Minuten).
+      - name: Image mit Testschlüsseln bauen (nur Release)
+        if: needs.plan.outputs.release == 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -336,7 +366,7 @@ jobs:
           tags: schrauberos:anchor-test
           cache-from: type=gha
       - name: Smoke-Test des Vertrauensankers (Testschlüssel-Image)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.plan.outputs.release == 'true'
         run: bash scripts/smoke-anchor.sh schrauberos:anchor-test
       # 3) Das Release-Paket ist ein Auszug des GETESTETEN Images (/app), kein zweiter Build (Next erzeugt je Build eine andere BUILD_ID; ein zweiter Build könnte vom getesteten
       #    abweichen). Das Paket enthält damit genau die Dateien und die Dateiliste (SOS-TREE), die der Starter-Vertrauensanker beim Start prüft.
@@ -348,19 +378,19 @@ jobs:
           docker rm "$cid" >/dev/null
           node scripts/verify-tree.mjs pkg
       - name: Paket aus dem getesteten Image verpacken
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.plan.outputs.release == 'true'
         run: |
           mkdir release
           # Reihenfolge und Besitzer festlegen: gleiche Eingabe, gleiche Bytes
           tar --sort=name --owner=0 --group=0 --numeric-owner -czf "release/schrauberos-${{ steps.ver.outputs.version }}.tar.gz" -C pkg .
       - name: Paket als Artefakt ablegen (für den Release-Job)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.plan.outputs.release == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-package
           path: release/
           retention-days: 7
-      # 4) Erst jetzt veröffentlichen: dasselbe lokale Image. Bei Versions-Tags nur unter dem Commit-Namen (sha-…), NICHT als Versions- oder latest-Tag: Die Tags 1.2.3 / 1.2 / latest
+      # 4) Erst jetzt veröffentlichen: dasselbe lokale Image. Bei einem Release nur unter dem Commit-Namen (sha-…), NICHT als Versions- oder latest-Tag: Die Tags 1.2.3 / 1.2 / latest
       #    setzt erst der Job "release" nach der Echtprobe (Retag desselben Digests, ohne Neubau).
       - name: Image veröffentlichen (das getestete Image, unverändert)
         id: push
@@ -380,11 +410,12 @@ jobs:
 
   release:
     name: Echtprobe, Siegel, Release und Versions-Tags des Images
-    # Erst wenn das Image unter seinem Commit-Namen veröffentlicht ist. Die Umgebung "release" verlangt einen Pflicht-Reviewer (Repository-Einstellung, README): ohne Freigabe kommt der
-    # Signaturschlüssel nicht in diesen Job – auch nicht, wenn jemand mit Schreibrecht einen Tag pusht. Dieser Job ist das Tor: Erst nach der Echtprobe entstehen "latest", "X.Y.Z" und "X.Y"
-    # (Retag desselben Digests) und das veröffentlichte GitHub-Release. Scheitert die Echtprobe, bleibt "latest" unverändert und es gibt kein Release.
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.check.result == 'success' && needs.guard.result == 'success' && needs.e2e.result == 'success' && needs.xrechnung.result == 'success' && needs.publish.result == 'success' }}
-    needs: [check, guard, e2e, xrechnung, publish]
+    # Erst wenn das Image unter seinem Commit-Namen veröffentlicht ist. Die Umgebung "release" (Pflicht-Reviewer, Repository-Einstellung, README) hält den Signaturschlüssel: ohne
+    # Freigabe kommt er nicht in diesen Job. Dieser Job ist das Tor: Erst nach der Echtprobe entstehen der Tag v<Version>, "latest", "X.Y.Z" und "X.Y" (Retag desselben Digests) und das
+    # veröffentlichte GitHub-Release. Scheitert die Echtprobe, bleibt "latest" unverändert und es gibt weder Tag noch Release.
+    # Ein Neustart der fehlgeschlagenen Jobs desselben Laufs ("Re-run failed jobs") setzt hier fort: Der Plan bleibt erhalten, der Tag-Schritt ist wiederholbar.
+    if: ${{ !cancelled() && needs.plan.outputs.release == 'true' && needs.check.result == 'success' && needs.guard.result == 'success' && needs.e2e.result == 'success' && needs.xrechnung.result == 'success' && needs.publish.result == 'success' }}
+    needs: [plan, check, guard, e2e, xrechnung, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: release
@@ -402,10 +433,12 @@ jobs:
           node-version: 26
       # Reihenfolge der Tags: "latest" und "X.Y" setzt nur der höchste Versions-Tag. Der Job "guard" prüft nur, dass der Commit auf main liegt; ein Tag auf einem alten main-Commit mit
       # passender package.json-Version würde "latest" sonst zurückdrehen. Vor allem anderen (Signatur, Veröffentlichung, Retag) – es gibt bewusst keinen Pfad für Rückportierungen.
-      - name: Der Tag ist der höchste Versions-Tag
+      - name: Die Version ist die höchste Version
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           git fetch --tags --force --quiet
-          node --no-warnings scripts/check-release-order.mjs --tag "$GITHUB_REF_NAME"
+          node --no-warnings scripts/check-release-order.mjs --tag "$RELEASE_TAG"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
@@ -413,10 +446,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: ver
+        env:
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
         run: |
           pkg=$(node -p "require('./package.json').version")
-          v="${GITHUB_REF_NAME#v}"
-          [ "$v" = "$pkg" ] || { echo "Tag v$v passt nicht zur Version in package.json ($pkg)"; exit 1; }
+          v="$RELEASE_VERSION"
+          [ "$v" = "$pkg" ] || { echo "Version des Release-Plans ($v) passt nicht zu package.json ($pkg)"; exit 1; }
           [ "$v" = "${{ needs.publish.outputs.version }}" ] || { echo "Version des Images weicht ab"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -429,7 +464,7 @@ jobs:
           tar -xzpf "release/schrauberos-${{ steps.ver.outputs.version }}.tar.gz" -C bundle
       # Vorabversionen (Tag mit "-", z. B. v0.2.0-rc1) sind nicht installierbar (nur x.y.z): kein Siegel, keine Signatur, keine Echtprobe.
       - name: Siegel erzeugen und signieren (Schlüssel nur in diesem Schritt)
-        if: ${{ !contains(github.ref_name, '-') }}
+        if: ${{ !contains(needs.plan.outputs.tag, '-') }}
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
         run: |
@@ -438,17 +473,43 @@ jobs:
       # Echtprobe: das veröffentlichte Produktions-Image (per Digest) mit dem frisch signierten Paket und den echten Schlüsseln. Danach manipuliert, muss es abweisen.
       # Ohne netzwerk, ohne Umgebung, ohne Secrets im Container; der Schlüssel liegt hier nur als Schritt-Umgebung im vorigen Schritt.
       - name: Echtprobe (Produktions-Image, echte Schlüssel)
-        if: ${{ !contains(github.ref_name, '-') }}
+        if: ${{ !contains(needs.plan.outputs.tag, '-') }}
         run: bash scripts/real-trial.sh "ghcr.io/${{ github.repository }}@${{ needs.publish.outputs.digest }}" "${{ steps.ver.outputs.version }}" bundle release/SOS-SEAL
+      # Der Tag entsteht erst jetzt – nach allen Prüfungen und der Echtprobe, am geprüften Commit (bei einem von Hand gesetzten Tag existiert er schon und muss auf diesen Commit zeigen).
+      # Wiederholbar: Gibt es den Tag schon an diesem Commit, ist der Schritt erfüllt. Ein Tag, der anderswo hinzeigt, bricht ab (Tags werden nie verschoben).
+      # Scheitert das Anlegen mit „Rule violations“, fehlt der Ausnahme-Eintrag dieses Jobs in der Regel „Versions-Tags“ (README, Checkliste): Es ist dann noch nichts öffentlich geworden außer dem sha-Image.
+      - name: Versions-Tag am geprüften Commit anlegen
+        if: github.ref_type != 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RELEASE_TAG" --jq ".[] | select(.ref == \"refs/tags/$RELEASE_TAG\") | .object.sha")"
+          if [ -n "$existing" ]; then
+            [ "$existing" = "$GITHUB_SHA" ] || { echo "::error::Der Tag $RELEASE_TAG existiert schon und zeigt auf $existing, nicht auf $GITHUB_SHA."; exit 1; }
+            echo "Der Tag $RELEASE_TAG liegt schon am geprüften Commit."
+          else
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$GITHUB_SHA" --silent
+            echo "Tag $RELEASE_TAG angelegt."
+          fi
       # Das Release zuerst als Entwurf: Web-Updates sehen nur veröffentlichte Releases.
       - name: GitHub-Release als Entwurf anlegen
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           # Web-Updates fragen "releases/latest": Vorabversionen (Tag mit "-") sind als Vorabversion markiert und nie "latest"
           flags=()
-          case "$GITHUB_REF_NAME" in *-*) flags=(--prerelease --latest=false) ;; esac
-          gh release create "$GITHUB_REF_NAME" release/* --draft --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}"
+          case "$RELEASE_TAG" in *-*) flags=(--prerelease --latest=false) ;; esac
+          # Notizen aus RELEASE-NOTES-<Version>.md, wenn vorhanden (sonst aus den Commits)
+          notes=(--generate-notes)
+          if [ -f "RELEASE-NOTES-${{ steps.ver.outputs.version }}.md" ]; then notes=(--notes-file "RELEASE-NOTES-${{ steps.ver.outputs.version }}.md"); fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Es gibt schon ein Release zu $RELEASE_TAG (Wiederholung): Dateien werden ersetzt."
+            gh release upload "$RELEASE_TAG" release/* --clobber
+          else
+            gh release create "$RELEASE_TAG" release/* --draft --title "$RELEASE_TAG" "${notes[@]}" "${flags[@]}"
+          fi
       # Erst nach bestandener Echtprobe: Versions-Tags und latest auf denselben Digest (kein Neubau)
       - name: Versions-Tags des Images setzen (Retag desselben Digests)
         run: |
@@ -463,7 +524,8 @@ jobs:
       - name: GitHub-Release veröffentlichen
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+        run: gh release edit "$RELEASE_TAG" --draft=false
 
   # Generalprobe der Signierstrecke: NIE mit dem Produktionsschlüssel (jeder Zweig mit Schreibrecht kann sie per "Run workflow" auslösen). Sie läuft mit Testschlüsseln
   # (src/lib/updates/testdata/anchor/test-keys.ts) auf einem kleinen Beispielpaket: Dateiliste, Siegel, Manifest und die Prüfung des Ergebnisses. Kein Secret, keine Umgebung "release".

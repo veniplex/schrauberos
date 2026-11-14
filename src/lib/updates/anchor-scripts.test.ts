@@ -254,3 +254,46 @@ describe("Reihenfolge der Versions-Tags (scripts/check-release-order.mjs, Gate d
     assert.equal(run("check-release-order.mjs", []).ok, false);
   });
 });
+
+describe("Release-Plan (scripts/release-plan.mjs, Job plan: eine neue Version auf main ist der Auslöser)", () => {
+  const plan = (event: string, ref: string, version: string, tags: string) => run("release-plan.mjs", ["--event", event, "--ref", ref, "--version", version, "--tags", tags]);
+
+  it("Push auf main mit einer Version ohne Tag ist ein Release; mit vorhandenem Tag nicht", () => {
+    const fresh = plan("push", "refs/heads/main", "0.2.0", "v0.1.0");
+    assert.equal(fresh.ok, true);
+    assert.match(fresh.output, /RELEASE/);
+    assert.match(fresh.output, /release=true\ntag=v0\.2\.0\nversion=0\.2\.0/);
+    const known = plan("push", "refs/heads/main", "0.1.0", "v0.1.0");
+    assert.equal(known.ok, true);
+    assert.match(known.output, /kein Release/);
+    assert.match(known.output, /release=false/);
+  });
+
+  it("Pull Requests, Läufe von Hand und andere Zweige veröffentlichen nie", () => {
+    for (const [event, ref] of [
+      ["pull_request", "refs/pull/8/merge"],
+      ["workflow_dispatch", "refs/heads/main"],
+      ["push", "refs/heads/feature"],
+    ]) {
+      const result = plan(event, ref, "9.9.9", "v0.1.0");
+      assert.equal(result.ok, true);
+      assert.match(result.output, /release=false/, `${event} ${ref}`);
+    }
+  });
+
+  it("ein Tag-Push ist ein Release für genau diesen Tag; passt er nicht zu package.json, bricht der Plan ab", () => {
+    const ok = plan("push", "refs/tags/v0.2.0", "0.2.0", "v0.1.0 v0.2.0");
+    assert.equal(ok.ok, true);
+    assert.match(ok.output, /release=true\ntag=v0\.2\.0/);
+    const wrong = plan("push", "refs/tags/v0.3.0", "0.2.0", "v0.3.0");
+    assert.equal(wrong.ok, false);
+    assert.match(wrong.output, /passt nicht zur Version/);
+  });
+
+  it("eine Vorabversion auf main wird zum Release (als Vorabversion); eine ungültige Version bricht ab", () => {
+    assert.match(plan("push", "refs/heads/main", "0.3.0-rc1", "v0.2.0").output, /release=true\ntag=v0\.3\.0-rc1/);
+    const bad = plan("push", "refs/heads/main", "abc", "v0.2.0");
+    assert.equal(bad.ok, false);
+    assert.match(bad.output, /keine Version/);
+  });
+});

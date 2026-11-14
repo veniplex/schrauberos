@@ -32,10 +32,10 @@ describe("XRechnung-Prüfung: Gerüst", () => {
     assert.match(script, /sha256sum --check --strict/);
   });
 
-  it("der Pipeline-Job läuft bei Pull Requests, Versions-Tags und von Hand – nicht bei jedem Push auf main – und ruft das Skript auf", () => {
+  it("der Pipeline-Job läuft immer (jeder Push auf main, Pull Requests, von Hand, Releases) und ruft das Skript auf", () => {
     const job = /\n  xrechnung:\n([\s\S]*?)(?=\n  [a-z-]+:\n)/.exec(workflow)?.[1] ?? "";
     assert.ok(job, "Job „xrechnung“ fehlt");
-    assert.match(job, /if: github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch' \|\| startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+    assert.doesNotMatch(job, /\n    if:/, "keine Bedingung: der Job läuft bei jedem Lauf");
     assert.match(job, /EINVOICE_SAMPLES_DIR/);
     assert.match(job, /scripts\/validate-xrechnung\.sh/);
     assert.doesNotMatch(job, /secrets\./, "der Job braucht keine Geheimnisse");
@@ -47,7 +47,8 @@ describe("XRechnung-Prüfung: Gerüst", () => {
     assert.match(job, /exit 1/, "keine Tests *.einvoice.test.ts: Fehler statt Gerüst");
     const publish = /\n  publish:\n([\s\S]*?)(?=\n  [a-z-]+:\n)/.exec(workflow)?.[1] ?? "";
     assert.match(publish, /needs: \[[^\]]*\bxrechnung\b[^\]]*\]/);
-    assert.match(publish, /needs\.xrechnung\.result == 'success' \|\| needs\.xrechnung\.result == 'skipped'/);
+    assert.match(publish, /needs\.xrechnung\.result == 'success'/);
+    assert.doesNotMatch(publish, /needs\.xrechnung\.result == 'skipped'/, "übersprungen genügt nicht");
     const release = /\n  release:\n([\s\S]*?)(?=\n  [a-z-]+:\n|$)/.exec(workflow)?.[1] ?? "";
     assert.match(release, /needs\.xrechnung\.result == 'success'/);
     // die Tests, die Beispiele schreiben, gibt es (der Job fände sie sonst nicht)
