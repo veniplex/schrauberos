@@ -256,7 +256,7 @@ describe("Reihenfolge der Versions-Tags (scripts/check-release-order.mjs, Gate d
 });
 
 describe("Release-Plan (scripts/release-plan.mjs, Job plan: eine neue Version auf main ist der Auslöser)", () => {
-  const plan = (event: string, ref: string, version: string, tags: string) => run("release-plan.mjs", ["--event", event, "--ref", ref, "--version", version, "--tags", tags]);
+  const plan = (event: string, ref: string, version: string, tags: string) => run("release-plan.mjs", ["--event", event, "--ref", ref, "--version", version, "--tags", tags], { GITHUB_OUTPUT: "" }); // in der Pipeline ist GITHUB_OUTPUT gesetzt: das Skript schriebe dann dorthin statt ins Protokoll
 
   it("Push auf main mit einer Version ohne Tag ist ein Release; mit vorhandenem Tag nicht", () => {
     const fresh = plan("push", "refs/heads/main", "0.2.0", "v0.1.0");
