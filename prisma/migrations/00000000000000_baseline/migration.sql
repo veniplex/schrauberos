@@ -1,4 +1,4 @@
--- schrauberos:baseline unreleased (erzeugt mit npm run db:baseline aus prisma/schema.prisma – nicht von Hand ändern)
+-- schrauberos:baseline frozen sha256:b070bbca408cdfc57d1d4e5647f45beed51a12fe69db396725441a4a9f9349e6
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
