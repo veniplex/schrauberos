@@ -19,7 +19,7 @@
 # Basisimage per Digest festgelegt (Lieferkette): ein verschobenes Tag ändert den Build nicht. Dependabot (docker) schlägt neue Digests als Pull
 # Request vor. Von Hand erneuern: Digest des Tags (Index über alle Architekturen) aus dem Docker-Hub-Register lesen und hier ersetzen.
 # Node 26 ("Lithium") ist seit dem 28.10.2026 LTS (Wartung bis 04/2029); ungerade Hauptversionen (25, 27 …) sind nie LTS. Die Patchversion ist ausdrücklich genannt und mindestens sieben Tage alt (Lieferkette).
-FROM node:26.13.0-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072 AS base
+FROM node:26.13.1-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
